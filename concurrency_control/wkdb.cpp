@@ -71,10 +71,17 @@ RC Wkdb::validate(TxnManager * txn) {
   for (UInt32 i = 0; i < wset->set_size; i++) {
     //1. get the max read timestamp, and just the lower
     row_t * cur_wrow = wset->rows[i];
+
+    while(!ATOM_CAS(cur_wrow->manager->wkdb_avail,true,false)) { }
+    // pthread_mutex_lock( cur_wrow->manager->latch );
+
     if (lower <= cur_wrow->manager->timestamp_last_read) {
       lower = cur_wrow->manager->timestamp_last_read + 1;
     }
-    if (lower >= upper) goto VALID_END;
+    if (lower >= upper) {
+      ATOM_CAS(cur_wrow->manager->wkdb_avail,false,true);
+      goto VALID_END;
+    }
     
     //2. write in the key's write xid
     if (cur_wrow->manager->write_trans) {
@@ -82,6 +89,7 @@ RC Wkdb::validate(TxnManager * txn) {
         wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
         rc = Abort;
         DEBUG("write trans already in use %lu, now txn %lu\n", cur_wrow->manager->write_trans, txn->get_txn_id())
+        ATOM_CAS(cur_wrow->manager->wkdb_avail,false,true);
         goto FINISH;
       }
     } else {
@@ -92,16 +100,21 @@ RC Wkdb::validate(TxnManager * txn) {
     std::set<uint64_t> * readxid_list = cur_wrow->manager->uncommitted_reads;
 
     for(auto it = readxid_list->begin(); it != readxid_list->end(); it++) {
-      if (lower >= upper) goto VALID_END;
+      if (lower >= upper) {
+        ATOM_CAS(cur_wrow->manager->wkdb_avail,false,true);
+        goto VALID_END;
+      }
 
       uint64_t txn_id = *it;
       DEBUG("    UR %ld -- %ld: %ld\n",txn->get_txn_id(),cur_wrow->get_primary_key(),txn_id);
-      if (txn_id == txn->get_txn_id())
+      if (txn_id == txn->get_txn_id()) {
         continue;
+      }
       uint64_t it_upper = wkdb_time_table.get_upper(txn->get_thd_id(),*it);
       uint64_t it_lower = wkdb_time_table.get_lower(txn->get_thd_id(),*it);
-      if (it_lower >= it_upper)
+      if (it_lower >= it_upper) {
         continue;
+      }
       WKDBState state = wkdb_time_table.get_state(txn->get_thd_id(),*it);
       if(state == WKDB_VALIDATED || state == WKDB_COMMITTED) {
         INC_STATS(txn->get_thd_id(),wkdb_case4_cnt,1);
@@ -109,6 +122,7 @@ RC Wkdb::validate(TxnManager * txn) {
           lower = it_upper;
         }
       } else if(state == WKDB_RUNNING) {
+        INC_STATS(txn->get_thd_id(),wkdb_case5_cnt,1);
         if (lower <= it_lower){
           //TRANS_LOG_WARN("DTAvalidation set lower = dta_txn->lower + 1, transid:%lu running_txn_id:%lu lower:%lu upper:%lu running_txn_id.lower:%lu running_txn_id.upper:%lu", ctx, part_ctx->GetTransID(), lower, upper, dta_txn->lower, dta_txn->upper);
           lower = it_lower + 1;
@@ -121,6 +135,8 @@ RC Wkdb::validate(TxnManager * txn) {
         }
       }
     }
+    // pthread_mutex_unlock( cur_wrow->manager->latch );
+    ATOM_CAS(cur_wrow->manager->wkdb_avail,false,true);
   }
 
 VALID_END:

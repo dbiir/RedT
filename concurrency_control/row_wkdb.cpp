@@ -76,6 +76,7 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 	}
 
 	// pthread_mutex_lock( latch );
+
 	// Add to uncommitted reads (soft lock)
 	DEBUG("uncommitted_reads %ld -- %ld\n", _row->get_primary_key(), uncommitted_reads->size());
 	uncommitted_reads->insert(txn->get_txn_id());
@@ -90,13 +91,9 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 		// Optimization for concurrent update
 		if ((write_trans != 0 && write_trans != txn->get_txn_id()) && preq_len < g_max_pre_req) {
 			rc = WAIT;
-			//txn->wait_starttime = get_sys_clock();
 			DEBUG("buf P_REQ %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
 			buffer_req(P_REQ, txn);
 			txn->ts_ready = false;
-			// rc = Abort;
-			// return rc;
-		// } else {
 		} else if (_row->get_table() && !strcmp(_row->get_table_name(),"WAREHOUSE")) {
 			DEBUG("set write tran of row: %lu with txn: %lu \n", _row->get_primary_key(), txn->get_txn_id());
 			DEBUG("current row: table: %s, %lu \n", _row->get_table_name(), _row->get_table()->get_table_size())
@@ -124,26 +121,26 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 		// 	wkdb_time_table.set_lower(txn->get_thd_id(),txn->get_txn_id(), timestamp_last_read + 1);
 	}
 
-	// if (rc == RCOK) {
-	// 	if (whis_len > g_his_recycle_len) {
-	// 	//if (whis_len > g_his_recycle_len || rhis_len > g_his_recycle_len) {
-	// 		ts_t t_th = glob_manager.get_min_ts(txn->get_thd_id());
-	// 		// Here is a tricky bug. The oldest transaction might be 
-	// 		// reading an even older version whose timestamp < t_th.
-	// 		// But we cannot recycle that version because it is still being used.
-	// 		// So the HACK here is to make sure that the first version older than
-	// 		// t_th not be recycled.
-	// 		if (whis_len > 1 && 
-	// 			writehistail->prev->ts < t_th) {
-	// 			row_t * latest_row = clear_history(W_REQ, t_th);
-	// 			if (latest_row != NULL) {
-	// 				assert(_row != latest_row);
-	// 				_row->copy(latest_row);
-	// 			}
-	// 		}
-	// 		DEBUG("GC finish\n");
-	// 	}
-	// }
+	if (rc == RCOK) {
+		if (whis_len > g_his_recycle_len) {
+		//if (whis_len > g_his_recycle_len || rhis_len > g_his_recycle_len) {
+			ts_t t_th = glob_manager.get_min_ts(txn->get_thd_id());
+			// Here is a tricky bug. The oldest transaction might be 
+			// reading an even older version whose timestamp < t_th.
+			// But we cannot recycle that version because it is still being used.
+			// So the HACK here is to make sure that the first version older than
+			// t_th not be recycled.
+			if (whis_len > 1 && 
+				writehistail->prev->ts < t_th) {
+				row_t * latest_row = clear_history(W_REQ, t_th);
+				if (latest_row != NULL) {
+					assert(_row != latest_row);
+					_row->copy(latest_row);
+				}
+			}
+			DEBUG("GC finish\n");
+		}
+	}
 
 	// pthread_mutex_unlock( latch );	
 
@@ -285,7 +282,7 @@ void Row_wkdb::buffer_req(TsType type, TxnManager * txn)
 WKDBMVReqEntry * Row_wkdb::debuffer_req(TsType type, TxnManager * txn) {
 	WKDBMVReqEntry ** queue = &prereq_mvcc;
 	// WKDBMVReqEntry * return_queue = NULL;
-	DEBUG("debuffer transaction restart\n");
+	// DEBUG("debuffer transaction restart\n");
 	WKDBMVReqEntry * req = *queue;
 	WKDBMVReqEntry * prev_req = NULL;
 	if (txn != NULL && req && preq_len) {
