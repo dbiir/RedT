@@ -1,5 +1,5 @@
 #!/bin/bash
-# set -x
+set -x
 
 while [[ $# -gt 0 ]]
 do
@@ -11,6 +11,11 @@ do
             ;;
         -c)
             CC=($(echo $2 | tr ',' ' '))
+            shift
+            shift
+            ;;
+        -c2)
+            CC2=($(echo $2 | tr ',' ' '))
             shift
             shift
             ;;
@@ -35,7 +40,7 @@ do
     TpmC=$TpmC"\"${RESULT_PATH}/tmp-"${CC[$i]}"\" using 1:2 title \"${CC[$i]}\" w lp lw 2 ps 1 pt $i dt 1"
     Rollback=$Rollback"\"${RESULT_PATH}/tmp-"${CC[$i]}"\" using 1:(\$3*100) title \"${CC[$i]}\" w lp lw 2 ps 1 pt $i dt 1"
     Distributed=$Distributed"\"${RESULT_PATH}/tmp-"${CC[$i]}"\" using 1:(\$4*100) title \"${CC[$i]}\" w lp lw 2 ps 1 pt $i dt 1"
-    if [ $i != ${#CC[@]} ]
+    if [ $i != ${l} ]
     then
         TpmC=$TpmC","
         Rollback=$Rollback","
@@ -44,10 +49,21 @@ do
     # echo ${CC[$i]}
     # echo ${RESULT_PATH[$i]}
 done
-echo $TpmC
-echo $Rollback
-echo $Distributed
-
+#echo $TpmC
+#echo $Rollback
+#echo $Distributed
+if [[ ! -z "${CC2[@]}" ]]
+then
+l=${#CC2[@]}
+let l--
+for i in $(seq 0 ${l})
+do
+    let "I=$i+${#CC[@]}"
+    TpmC=$TpmC",""\"${RESULT_PATH}/tmp-"${CC2[$i]}".back\" using 1:2 title \"${CC2[$i]}\" w lp lw 2 ps 1 pt $I dt 1"
+    Rollback=$Rollback",""\"${RESULT_PATH}/tmp-"${CC2[$i]}".back\" using 1:(\$3*100) title \"${CC2[$i]}\" w lp lw 2 ps 1 pt $I dt 1"
+    Distributed=$Distributed",""\"${RESULT_PATH}/tmp-"${CC2[$i]}".back\" using 1:(\$4*100) title \"${CC2[$i]}\" w lp lw 2 ps 1 pt $I dt 1"
+done
+fi
 
 cp deneva-draw.plt ${RESULT_PATH}/draw-multi.plt
 sed -i 's?OUTPUT?'${RESULT_PATH}'?g' ${RESULT_PATH}/draw-multi.plt
