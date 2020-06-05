@@ -1,0 +1,7 @@
+config.h
+*.o
+results*
+figs*
+*ifconfig.txt
+rundb
+runcl
