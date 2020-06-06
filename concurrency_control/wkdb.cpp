@@ -17,10 +17,11 @@
 #include "global.h"
 #include "helper.h"
 #include "txn.h"
+#include "row.h"
 #include "wkdb.h"
 #include "manager.h"
 #include "mem_alloc.h"
-#include "row_maat.h"
+#include "row_wkdb.h"
 
 wkdb_set_ent::wkdb_set_ent() {
 	set_size = 0;
@@ -34,6 +35,9 @@ void Wkdb::init() {
 }
 
 RC Wkdb::validate(TxnManager * txn) {
+
+#if CC_ALG == WOOKONG
+
   uint64_t start_time = get_sys_clock();
   uint64_t timespan;
   sem_wait(&_semaphore);
@@ -47,133 +51,91 @@ RC Wkdb::validate(TxnManager * txn) {
   uint64_t lower = wkdb_time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
   uint64_t upper = wkdb_time_table.get_upper(txn->get_thd_id(),txn->get_txn_id());
   DEBUG("WKDB Validate Start %ld: [%lu,%lu]\n",txn->get_txn_id(),lower,upper);
-  std::set<uint64_t> after;
-  std::set<uint64_t> before;
+
+	wkdb_set_ent * wset;
+	wkdb_set_ent * rset;
+	get_rw_set(txn, rset, wset);
+  if (wset->set_size) {
+    goto ABORT_END;
+  }
+
   // lower bound of txn greater than write timestamp
   if(lower <= txn->greatest_write_timestamp) {
     lower = txn->greatest_write_timestamp + 1;
     INC_STATS(txn->get_thd_id(),maat_case1_cnt,1);
   }
-  // lower bound of uncommitted writes greater than upper bound of txn
-  for(auto it = txn->uncommitted_writes->begin(); it != txn->uncommitted_writes->end();it++) {
-    uint64_t it_lower = wkdb_time_table.get_lower(txn->get_thd_id(),*it);
-    if(upper >= it_lower) {
-      WKDBState state = wkdb_time_table.get_state(txn->get_thd_id(),*it);
-      if(state == WKDB_VALIDATED || state == WKDB_COMMITTED) {
-        INC_STATS(txn->get_thd_id(),maat_case2_cnt,1);
-        if(it_lower > 0) {
-          upper = it_lower - 1;
-        } else {
-          upper = it_lower;
-        }
-      }
-      if(state == WKDB_RUNNING) {
-        after.insert(*it);
-      }
+
+  //Examine each element in the write set
+  for (UInt32 i = 0; i < wset->set_size; i++) {
+    //1. get the max read timestamp, and just the lower
+    row_t * cur_wrow = wset->rows[i];
+    if (lower <= cur_wrow->manager->timestamp_last_read) {
+      lower = cur_wrow->manager->timestamp_last_read + 1;
     }
-  }
-  // lower bound of txn greater than read timestamp
-  if(lower <= txn->greatest_read_timestamp) {
-    lower = txn->greatest_read_timestamp + 1;
-    INC_STATS(txn->get_thd_id(),maat_case3_cnt,1);
-  }
-  // upper bound of uncommitted reads less than lower bound of txn
-  for(auto it = txn->uncommitted_reads->begin(); it != txn->uncommitted_reads->end();it++) {
-    uint64_t it_upper = wkdb_time_table.get_upper(txn->get_thd_id(),*it);
-    if(lower <= it_upper) {
+    if (lower >= upper) goto ABORT_END;
+    
+    //2. write in the key's write xid
+    if (!cur_wrow->manager->write_trans) {
+      wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
+      rc = Abort;
+      goto FINISH;
+    } else {
+      cur_wrow->manager->write_trans = txn->get_txn_id();
+    }
+
+    //3. find the key's read xids, adjust their lower and upper
+    std::set<uint64_t> * readxid_list = cur_wrow->manager->uncommitted_reads;
+
+    for(auto it = readxid_list->begin(); it != readxid_list->end(); it++) {
+      if (lower >= upper) goto ABORT_END;
+      uint64_t txn_id = *it;
+      DEBUG("    UR %ld -- %ld: %ld\n",txn->get_txn_id(),cur_wrow->get_primary_key(),txn_id);
+      if (txn_id == txn->get_txn_id())
+        continue;
+      uint64_t it_upper = wkdb_time_table.get_upper(txn->get_thd_id(),*it);
+      uint64_t it_lower = wkdb_time_table.get_lower(txn->get_thd_id(),*it);
       WKDBState state = wkdb_time_table.get_state(txn->get_thd_id(),*it);
       if(state == WKDB_VALIDATED || state == WKDB_COMMITTED) {
         INC_STATS(txn->get_thd_id(),maat_case4_cnt,1);
-        if(it_upper < UINT64_MAX) {
-          lower = it_upper + 1;
-        } else {
+        if(lower < it_upper) {
           lower = it_upper;
         }
-      }
-      if(state == WKDB_RUNNING) {
-        before.insert(*it);
+      } else if(state == WKDB_RUNNING) {
+        if (lower <= it_lower){
+          //TRANS_LOG_WARN("DTAvalidation set lower = dta_txn->lower + 1, transid:%lu running_txn_id:%lu lower:%lu upper:%lu running_txn_id.lower:%lu running_txn_id.upper:%lu", ctx, part_ctx->GetTransID(), lower, upper, dta_txn->lower, dta_txn->upper);
+          lower = it_lower + 1;
+          it_upper = lower < it_upper ? lower : it_upper;
+        } else if (lower < it_upper){
+          //TRANS_LOG_WARN("DTAvalidation set running_txn.upper < ctx.lower, transid:%lu running_txn_id:%lu lower:%lu upper:%lu running_txn_id.lower:%lu running_txn_id.upper:%lu", ctx, part_ctx->GetTransID(), lower, upper, dta_txn->lower, dta_txn->upper);
+          it_upper = lower;
+        }
       }
     }
   }
-  // upper bound of uncommitted write writes less than lower bound of txn
-  for(auto it = txn->uncommitted_writes_y->begin(); it != txn->uncommitted_writes_y->end();it++) {
-      WKDBState state = wkdb_time_table.get_state(txn->get_thd_id(),*it);
-    uint64_t it_upper = wkdb_time_table.get_upper(txn->get_thd_id(),*it);
-      if(state == WKDB_ABORTED) {
-        continue;
-      }
-      if(state == WKDB_VALIDATED || state == WKDB_COMMITTED) {
-        if(lower <= it_upper) {
-          INC_STATS(txn->get_thd_id(),maat_case5_cnt,1);
-          if(it_upper < UINT64_MAX) {
-            lower = it_upper + 1;
-          } else {
-            lower = it_upper;
-          }
-        }
-      }
-      if(state == WKDB_RUNNING) {
-        after.insert(*it);
-      }
-  }
-  if(lower >= upper) {
-    // Abort
+
+ABORT_END:
+  if (lower >= upper){
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
     rc = Abort;
-  } else {
-    // Validated
+  }
+  else{
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_VALIDATED);
     rc = RCOK;
-
-    for(auto it = before.begin(); it != before.end();it++) {
-      uint64_t it_upper = wkdb_time_table.get_upper(txn->get_thd_id(),*it);
-      if(it_upper > lower && it_upper < upper-1) {
-        lower = it_upper + 1;
-      }
-    }
-    for(auto it = before.begin(); it != before.end();it++) {
-      uint64_t it_upper = wkdb_time_table.get_upper(txn->get_thd_id(),*it);
-      if(it_upper >= lower) {
-        if(lower > 0) {
-          wkdb_time_table.set_upper(txn->get_thd_id(),*it,lower-1);
-        } else {
-          wkdb_time_table.set_upper(txn->get_thd_id(),*it,lower);
-        }
-      }
-    }
-    for(auto it = after.begin(); it != after.end();it++) {
-      uint64_t it_lower = wkdb_time_table.get_lower(txn->get_thd_id(),*it);
-      uint64_t it_upper = wkdb_time_table.get_upper(txn->get_thd_id(),*it);
-      if(it_upper != UINT64_MAX && it_upper > lower + 2 && it_upper < upper ) {
-        upper = it_upper - 2;
-      } 
-      if((it_lower < upper && it_lower > lower+1)) {
-        upper = it_lower - 1;
-      } 
-    }
-    // set all upper and lower bounds to meet inequality
-    for(auto it = after.begin(); it != after.end();it++) {
-      uint64_t it_lower = wkdb_time_table.get_lower(txn->get_thd_id(),*it);
-      if(it_lower <= upper) {
-        if(upper < UINT64_MAX) {
-          wkdb_time_table.set_lower(txn->get_thd_id(),*it,upper+1);
-        } else {
-          wkdb_time_table.set_lower(txn->get_thd_id(),*it,upper);
-        }
-      }
-    }
-
     assert(lower < upper);
     INC_STATS(txn->get_thd_id(),maat_range,upper-lower);
     INC_STATS(txn->get_thd_id(),maat_commit_cnt,1);
   }
+ 
   wkdb_time_table.set_lower(txn->get_thd_id(),txn->get_txn_id(),lower);
   wkdb_time_table.set_upper(txn->get_thd_id(),txn->get_txn_id(),upper);
+
+FINISH:
   INC_STATS(txn->get_thd_id(),maat_validate_cnt,1);
   timespan = get_sys_clock() - start_time;
   INC_STATS(txn->get_thd_id(),maat_validate_time,timespan);
   txn->txn_stats.cc_time += timespan;
   txn->txn_stats.cc_time_short += timespan;
+
   DEBUG("WKDB Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
   sem_post(&_semaphore);
   return rc;
@@ -200,6 +162,7 @@ RC Wkdb::get_rw_set(TxnManager * txn, wkdb_set_ent * &rset, wkdb_set_ent *& wset
 
 	assert(n == wset->set_size);
 	assert(m == rset->set_size);
+#endif
 	return RCOK;
 }
 

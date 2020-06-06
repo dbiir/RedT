@@ -30,7 +30,7 @@ void Row_wkdb::init(row_t * row) {
   wkdb_avail = true;
   uncommitted_writes = new std::set<uint64_t>();
   uncommitted_reads = new std::set<uint64_t>();
-  wts = 0;
+  write_trans = 0;
   assert(uncommitted_writes->begin() == uncommitted_writes->end());
   assert(uncommitted_writes->size() == 0);
 	

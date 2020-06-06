@@ -185,11 +185,11 @@ int main(int argc, char* argv[])
   fflush(stdout);
   wkdb_time_table.init();
   printf("Done\n");
-  printf("Initializing WKDB KeyxidCache and RtsCache... ");
-  fflush(stdout);
-  wkdb_key_xid_cache.init();
-  wkdb_rts_cache.init();
-  printf("Done\n");
+  // printf("Initializing WKDB KeyxidCache and RtsCache... ");
+  // fflush(stdout);
+  // wkdb_key_xid_cache.init();
+  // wkdb_rts_cache.init();
+  // printf("Done\n");
   printf("Initializing WKDB manager... ");
   fflush(stdout);
 	wkdb_man.init();
