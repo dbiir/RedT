@@ -192,7 +192,7 @@ public:
     uint64_t get_batch_id() {return txn->batch_id;}
     void set_batch_id(uint64_t batch_id) {txn->batch_id = batch_id;}
 
-    // For MaaT & WKDB
+    // For MaaT
     uint64_t commit_timestamp;
     uint64_t get_commit_timestamp() {return commit_timestamp;}
     void set_commit_timestamp(uint64_t timestamp) {commit_timestamp = timestamp;}

@@ -351,10 +351,10 @@ public:
   void release() {}
 
   uint64_t pid;
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
   uint64_t ts;
 #endif
-#if CC_ALG == MVCC
+#if CC_ALG == MVCC || CC_ALG == WOOKONG
   uint64_t thd_id;
 
 #elif CC_ALG == OCC 

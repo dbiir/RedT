@@ -45,7 +45,7 @@ RC Wkdb::validate(TxnManager * txn) {
   timespan = get_sys_clock() - start_time;
   txn->txn_stats.cc_block_time += timespan;
   txn->txn_stats.cc_block_time_short += timespan;
-  INC_STATS(txn->get_thd_id(),maat_cs_wait_time,timespan);
+  INC_STATS(txn->get_thd_id(),wkdb_cs_wait_time,timespan);
   start_time = get_sys_clock();
   RC rc = RCOK;
   uint64_t lower = wkdb_time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
@@ -62,7 +62,7 @@ RC Wkdb::validate(TxnManager * txn) {
   // lower bound of txn greater than write timestamp
   if(lower <= txn->greatest_write_timestamp) {
     lower = txn->greatest_write_timestamp + 1;
-    INC_STATS(txn->get_thd_id(),maat_case1_cnt,1);
+    INC_STATS(txn->get_thd_id(),wkdb_case1_cnt,1);
   }
 
   //Examine each element in the write set
@@ -96,7 +96,7 @@ RC Wkdb::validate(TxnManager * txn) {
       uint64_t it_lower = wkdb_time_table.get_lower(txn->get_thd_id(),*it);
       WKDBState state = wkdb_time_table.get_state(txn->get_thd_id(),*it);
       if(state == WKDB_VALIDATED || state == WKDB_COMMITTED) {
-        INC_STATS(txn->get_thd_id(),maat_case4_cnt,1);
+        INC_STATS(txn->get_thd_id(),wkdb_case4_cnt,1);
         if(lower < it_upper) {
           lower = it_upper;
         }
@@ -122,17 +122,17 @@ ABORT_END:
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_VALIDATED);
     rc = RCOK;
     assert(lower < upper);
-    INC_STATS(txn->get_thd_id(),maat_range,upper-lower);
-    INC_STATS(txn->get_thd_id(),maat_commit_cnt,1);
+    INC_STATS(txn->get_thd_id(),wkdb_range,upper-lower);
+    INC_STATS(txn->get_thd_id(),wkdb_commit_cnt,1);
   }
  
   wkdb_time_table.set_lower(txn->get_thd_id(),txn->get_txn_id(),lower);
   wkdb_time_table.set_upper(txn->get_thd_id(),txn->get_txn_id(),upper);
 
 FINISH:
-  INC_STATS(txn->get_thd_id(),maat_validate_cnt,1);
+  INC_STATS(txn->get_thd_id(),wkdb_validate_cnt,1);
   timespan = get_sys_clock() - start_time;
-  INC_STATS(txn->get_thd_id(),maat_validate_time,timespan);
+  INC_STATS(txn->get_thd_id(),wkdb_validate_time,timespan);
   txn->txn_stats.cc_time += timespan;
   txn->txn_stats.cc_time_short += timespan;
 

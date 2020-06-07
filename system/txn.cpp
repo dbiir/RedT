@@ -338,7 +338,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
   return_id = UINT64_MAX;
 
 	this->h_wl = h_wl;
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT
   uncommitted_writes = new std::set<uint64_t>();
   uncommitted_writes_y = new std::set<uint64_t>();
   uncommitted_reads = new std::set<uint64_t>();
@@ -372,7 +372,7 @@ void TxnManager::reset() {
   greatest_write_timestamp = 0;
   greatest_read_timestamp = 0;
   commit_timestamp = 0;
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT
   uncommitted_writes->clear();
   uncommitted_writes_y->clear();
   uncommitted_reads->clear();
@@ -404,7 +404,7 @@ TxnManager::release() {
   INC_STATS(get_thd_id(),mtx[1],get_sys_clock()-prof_starttime);
   txn = NULL;
 
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT
   delete uncommitted_writes;
   delete uncommitted_writes_y;
   delete uncommitted_reads;

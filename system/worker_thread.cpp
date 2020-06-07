@@ -410,10 +410,11 @@ RC WorkerThread::process_rqry(Message * msg) {
   txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
 #endif
 #if CC_ALG == MAAT
-          time_table.init(get_thd_id(),txn_man->get_txn_id());
+    time_table.init(get_thd_id(),txn_man->get_txn_id());
 #endif
 #if CC_ALG == WOOKONG
-          wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id());
+    txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
+    wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id());
 #endif
 
   rc = txn_man->run_txn();
@@ -526,6 +527,7 @@ RC WorkerThread::process_rtxn(Message * msg) {
           assert(time_table.get_state(get_thd_id(),txn_man->get_txn_id()) == MAAT_RUNNING);
 #endif
 #if CC_ALG == WOOKONG
+          txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
           wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id());
           assert(wkdb_time_table.get_lower(get_thd_id(),txn_man->get_txn_id()) == 0);
           assert(wkdb_time_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
@@ -613,7 +615,7 @@ RC WorkerThread::process_calvin_rtxn(Message * msg) {
 
 
 bool WorkerThread::is_cc_new_timestamp() {
-  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP);
+  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == WOOKONG);
 }
 
 ts_t WorkerThread::get_next_ts() {
