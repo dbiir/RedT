@@ -29,17 +29,17 @@ def get_summary(sfile):
     return results
 
 def process_results(results):
-	for r in results:
-		(name,val) = re.split('=',r)
-		val = float(val)
-		if name not in summary.keys():
-		    summary[name] = [val]
-		else:
-		    summary[name].append(val)
+    for r in results:
+        (name,val) = re.split('=',r)
+        val = float(val)
+        if name not in summary.keys():
+            summary[name] = [val]
+        else:
+            summary[name].append(val)
 
 
 if len(sys.argv) < 2:
-	sys.exit("Usage: %s [output-file-name]" % sys.argv[0])
+    sys.exit("Usage: %s [output-file-name]" % sys.argv[0])
 
 for arg in sys.argv[1:]:
     if not os.path.exists(arg):
