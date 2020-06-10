@@ -17,7 +17,7 @@ do
         ./rundb -nid0 -zipf${theta_value} & 
         #connect 146 
         echo "trying to connect 147"
-ssh -t -p22 root@10.77.110.146  << remotessh
+ssh -t -p22 root@10.77.110.147  << remotessh
             cd /root/zzhdeneva
             sed -i -e "/CC_ALG/d"  -e "100a  \#define CC_ALG  ${concurrency_control}" config.h
             make clean 
@@ -32,7 +32,7 @@ remotessh
     sleep 5
 done
 
-ssh -t -p22 root@10.77.110.146  << remotessh
+ssh -t -p22 root@10.77.110.147  << remotessh
             cd /root/zzhdeneva/test
             python output-gather.py > output.txt
             exit

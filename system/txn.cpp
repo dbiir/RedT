@@ -708,7 +708,7 @@ void TxnManager::release_last_row_lock() {
 
 void TxnManager::cleanup_row(RC rc, uint64_t rid) {
     access_t type = txn->accesses[rid]->type;
-    if (type == WR && rc == Abort && CC_ALG != MAAT && CC_ALG != WOOKONG) {
+    if (type == WR && rc == Abort && CC_ALG != MAAT) {
         type = XP;
     }
 

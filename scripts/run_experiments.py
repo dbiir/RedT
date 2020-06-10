@@ -60,14 +60,17 @@ for arg in sys.argv[1:]:
         exps.append(arg)
 
 for exp in exps:
+    print exp
     fmt,experiments = experiment_map[exp]()
+    print fmt
+    print experiments
 
     for e in experiments:
         cfgs = get_cfgs(fmt,e)
         if remote:
             cfgs["TPORT_TYPE"],cfgs["TPORT_TYPE_IPC"],cfgs["TPORT_PORT"]="\"tcp\"","false",7000
 
-        output_f = get_outfile_name(cfgs)
+        output_f = get_outfile_name(cfgs,fmt)
 
         # Check whether experiment has been already been run in this batch
         if skip:
@@ -181,10 +184,12 @@ for exp in exps:
 
             else:
                 nnodes = cfgs["NODE_CNT"]
+                print nnodes
                 nclnodes = cfgs["CLIENT_NODE_CNT"]
+                print nclnodes
                 pids = []
                 print("Deploying: {}".format(output_f))
-                for n in range(nnodes+nclnodes):
+                for n in range(int(nnodes)+int(nclnodes)):
                     if n < nnodes:
                         cmd = "./rundb -nid{}".format(n)
                     else:

@@ -108,21 +108,23 @@ def ycsb_scaling_abort():
 
 def ycsb_skew():
     wl = 'YCSB'
-    nnodes = [16]
-    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    nnodes = [1]
+    #algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    algos=['WOOKONG'] 
     base_table_size=2097152*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
     load = [10000]
     tcnt = [4]
-    skew = [0.0,0.25,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.9]
+    skew = [0.6]
+    #skew = [0.0,0.25,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.9]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
     return fmt,exp
 
 def ycsb_writes():
     wl = 'YCSB'
-    nnodes = [16]
+    nnodes = [1]
     algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
     base_table_size=2097152*8
     txn_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
@@ -344,13 +346,13 @@ experiment_map = {
 
 # Default values for variable configurations
 configs = {
-    "NODE_CNT" : 16,
-    "THREAD_CNT": 4,
+    "NODE_CNT" : 1,
+    "THREAD_CNT": 2,
     "REPLICA_CNT": 0,
     "REPLICA_TYPE": "AP",
-    "REM_THREAD_CNT": "THREAD_CNT",
-    "SEND_THREAD_CNT": "THREAD_CNT",
-    "CLIENT_NODE_CNT" : "NODE_CNT",
+    "REM_THREAD_CNT": THREAD_CNT,
+    "SEND_THREAD_CNT": THREAD_CNT,
+    "CLIENT_NODE_CNT" : THREAD_CNT,
     "CLIENT_THREAD_CNT" : 4,
     "CLIENT_REM_THREAD_CNT" : 2,
     "CLIENT_SEND_THREAD_CNT" : 2,
@@ -359,7 +361,7 @@ configs = {
     "CC_ALG" : "WAIT_DIE",
     "MPR" : 1.0,
     "TPORT_TYPE":"IPC",
-    "TPORT_PORT":"17000",
+    "TPORT_PORT":"18000",
     "PART_CNT": "NODE_CNT",
     "PART_PER_TXN": "PART_CNT",
     "MAX_TXN_IN_FLIGHT": 100,

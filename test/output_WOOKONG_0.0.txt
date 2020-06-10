@@ -1,0 +1,105 @@
+Running client...
+
+CC Alg 13
+g_done_timer 60000000000
+g_thread_cnt 1
+g_abort_penalty 10000000
+g_zipf_theta 0.000000
+g_node_id 1
+g_client_rem_thread_cnt 1
+g_client_send_thread_cnt 1
+g_max_txn_per_part 500000
+g_load_per_server 100
+g_inflight_max 100
+g_mpr 1.000000
+g_mpitem 0.010000
+g_part_per_txn 1
+g_req_per_query 5
+g_client_node_cnt 1
+g_rem_thread_cnt 1
+g_send_thread_cnt 1
+g_client_thread_cnt 2
+g_num_wh 1
+g_perc_payment 0.000000
+g_wh_update 1
+g_part_cnt 1
+g_node_cnt 1
+g_thread_cnt 1
+g_query_intvl 1
+g_prt_lat_distr 0
+g_part_alloc 0
+g_mem_pad 1
+g_perc_multi_part 1.000000
+g_tup_read_perc 1.000000
+g_tup_write_perc 0.000000
+g_txn_read_perc 0.800000
+g_txn_write_perc 0.200000
+g_synth_table_size 65536
+g_max_part_key 10000
+g_max_product_key 1000
+g_max_supplier_key 1000
+g_field_per_tuple 10
+g_data_perc 100.000000
+g_access_perc 0.030000
+g_strict_ppt 0
+g_network_delay 0
+g_total_thread_cnt 4
+g_total_client_thread_cnt 4
+g_total_node_cnt 2
+g_seq_batch_time_limit 5000000
+Node 1: servicing 1 total nodes starting with node 0
+Random seed: 11111483228957288
+Initializing stats... Done
+Initializing transport manager... Tport Init 1: 5
+Reading ifconfig file: ./ifconfig.txt
+0: 10.77.110.147
+1: 10.77.110.147
+2 2
+Port ID:  0, 0 -> 1 : 17002
+Sock Binding to tcp://10.77.110.147:17002 1
+Port ID:  0, 1 -> 0 : 17001
+Sock Connecting to tcp://10.77.110.147;10.77.110.147:17001 1 -> 0
+Done
+Initializing client manager... workload initialized!
+Initializing simulation... Done
+Done
+Initializing work queue... Done
+Initializing msg pool... Done
+Initializing message queue... Done
+Initializing client query queue... Done
+Initialization Time = 680487612
+Setup 1:0
+Setup 1:1
+Setup 1:2
+Setup 1:3
+Received INIT_DONE from node 0
+Running 1:3
+Running 1:2
+Running 1:1
+Send INIT_DONE to 0
+Running 1:0
+Starttime set to 11111483913140808
+Running ClientThread 0
+Running OutputThread 3
+Running InputThread 2
+Running ClientThread 1
+[prog] total_runtime=10.012173,tput=0.000000,txn_cnt=0,txn_sent_cnt=0,txn_run_time=0.000000,txn_run_avg_time=0.000000,cl_send_intv=0.000000,msg_queue_delay_time=0.000000,msg_queue_cnt=0,msg_queue_enq_cnt=0,msg_queue_delay_time_avg=0.000000,msg_send_time=0.000000,msg_send_time_avg=0.000000,msg_recv_time=0.000000,msg_recv_time_avg=0.000000,msg_recv_idle_time=0.009422,msg_batch_cnt=0,msg_batch_size_msgs=0,msg_batch_size_msgs_avg=0.000000,msg_batch_size_bytes=0,msg_batch_size_bytes_avg=0.000000,msg_batch_size_bytes_to_server=0,msg_batch_size_bytes_to_client=0,msg_send_cnt=0,msg_recv_cnt=0,msg_unpack_time=0.000000,msg_unpack_time_avg=0.000000,mbuf_send_intv_time=0.000000,mbuf_send_intv_time_avg=0.000000,msg_copy_output_time=0.000000,virt_mem_usage=698940,phys_mem_usage=276592,cpu_ttl=0.000044
+tif_node0=100, 
+[prog] total_runtime=20.012173,tput=1547.708022,txn_cnt=30973,txn_sent_cnt=30973,txn_run_time=874.780500,txn_run_avg_time=0.028243,cl_send_intv=20.055780,msg_queue_delay_time=5.536130,msg_queue_cnt=30973,msg_queue_enq_cnt=30973,msg_queue_delay_time_avg=0.000179,msg_send_time=0.109082,msg_send_time_avg=0.000004,msg_recv_time=0.674609,msg_recv_time_avg=0.000022,msg_recv_idle_time=6.442911,msg_batch_cnt=30973,msg_batch_size_msgs=30973,msg_batch_size_msgs_avg=1.000000,msg_batch_size_bytes=7433520,msg_batch_size_bytes_avg=240.000000,msg_batch_size_bytes_to_server=7433520,msg_batch_size_bytes_to_client=0,msg_send_cnt=30973,msg_recv_cnt=30973,msg_unpack_time=0.041011,msg_unpack_time_avg=0.000001,mbuf_send_intv_time=0.002356,mbuf_send_intv_time_avg=0.000000,msg_copy_output_time=0.019614,virt_mem_usage=698940,phys_mem_usage=281148,cpu_ttl=57.455771
+tif_node0=100, 
+[prog] total_runtime=30.017213,tput=2055.720504,txn_cnt=61707,txn_sent_cnt=61707,txn_run_time=1745.432808,txn_run_avg_time=0.028286,cl_send_intv=40.059435,msg_queue_delay_time=12.699364,msg_queue_cnt=61707,msg_queue_enq_cnt=61707,msg_queue_delay_time_avg=0.000206,msg_send_time=0.238482,msg_send_time_avg=0.000004,msg_recv_time=1.345166,msg_recv_time_avg=0.000022,msg_recv_idle_time=12.879912,msg_batch_cnt=61707,msg_batch_size_msgs=61707,msg_batch_size_msgs_avg=1.000000,msg_batch_size_bytes=14809680,msg_batch_size_bytes_avg=240.000000,msg_batch_size_bytes_to_server=14809680,msg_batch_size_bytes_to_client=0,msg_send_cnt=61707,msg_recv_cnt=61707,msg_unpack_time=0.082764,msg_unpack_time_avg=0.000001,mbuf_send_intv_time=0.004743,mbuf_send_intv_time_avg=0.000000,msg_copy_output_time=0.039257,virt_mem_usage=698940,phys_mem_usage=285380,cpu_ttl=57.369088
+tif_node0=100, 
+[prog] total_runtime=40.030703,tput=2311.525719,txn_cnt=92532,txn_sent_cnt=92532,txn_run_time=2606.729258,txn_run_avg_time=0.028171,cl_send_intv=60.042019,msg_queue_delay_time=20.452846,msg_queue_cnt=92532,msg_queue_enq_cnt=92532,msg_queue_delay_time_avg=0.000221,msg_send_time=0.377223,msg_send_time_avg=0.000004,msg_recv_time=2.017718,msg_recv_time_avg=0.000022,msg_recv_idle_time=19.476700,msg_batch_cnt=92532,msg_batch_size_msgs=92532,msg_batch_size_msgs_avg=1.000000,msg_batch_size_bytes=22207680,msg_batch_size_bytes_avg=240.000000,msg_batch_size_bytes_to_server=22207680,msg_batch_size_bytes_to_client=0,msg_send_cnt=92532,msg_recv_cnt=92532,msg_unpack_time=0.127604,msg_unpack_time_avg=0.000001,mbuf_send_intv_time=0.007211,mbuf_send_intv_time_avg=0.000000,msg_copy_output_time=0.059187,virt_mem_usage=698940,phys_mem_usage=289872,cpu_ttl=58.010934
+tif_node0=100, 
+[prog] total_runtime=50.042520,tput=2439.165742,txn_cnt=122062,txn_sent_cnt=122062,txn_run_time=3494.048556,txn_run_avg_time=0.028625,cl_send_intv=80.078596,msg_queue_delay_time=27.502344,msg_queue_cnt=122062,msg_queue_enq_cnt=122062,msg_queue_delay_time_avg=0.000225,msg_send_time=0.510117,msg_send_time_avg=0.000004,msg_recv_time=2.523345,msg_recv_time_avg=0.000021,msg_recv_idle_time=25.910606,msg_batch_cnt=122062,msg_batch_size_msgs=122062,msg_batch_size_msgs_avg=1.000000,msg_batch_size_bytes=29294880,msg_batch_size_bytes_avg=240.000000,msg_batch_size_bytes_to_server=29294880,msg_batch_size_bytes_to_client=0,msg_send_cnt=122062,msg_recv_cnt=122062,msg_unpack_time=0.166566,msg_unpack_time_avg=0.000001,mbuf_send_intv_time=0.009520,mbuf_send_intv_time_avg=0.000000,msg_copy_output_time=0.078405,virt_mem_usage=698940,phys_mem_usage=293832,cpu_ttl=56.898734
+tif_node0=100, 
+[prog] total_runtime=60.042520,tput=2532.655197,txn_cnt=152067,txn_sent_cnt=152067,txn_run_time=4385.770705,txn_run_avg_time=0.028841,cl_send_intv=100.141936,msg_queue_delay_time=34.432356,msg_queue_cnt=152067,msg_queue_enq_cnt=152067,msg_queue_delay_time_avg=0.000226,msg_send_time=0.628972,msg_send_time_avg=0.000004,msg_recv_time=2.914909,msg_recv_time_avg=0.000019,msg_recv_idle_time=32.409588,msg_batch_cnt=152067,msg_batch_size_msgs=152067,msg_batch_size_msgs_avg=1.000000,msg_batch_size_bytes=36496080,msg_batch_size_bytes_avg=240.000000,msg_batch_size_bytes_to_server=36496080,msg_batch_size_bytes_to_client=0,msg_send_cnt=152067,msg_recv_cnt=152067,msg_unpack_time=0.200098,msg_unpack_time_avg=0.000001,mbuf_send_intv_time=0.011833,mbuf_send_intv_time_avg=0.000000,msg_copy_output_time=0.097700,virt_mem_usage=698940,phys_mem_usage=298056,cpu_ttl=56.561181
+tif_node0=100, 
+FINISH 1:2
+FINISH 1:3
+Txns sent to node 0: 107551
+FINISH 1:0
+Txns sent to node 0: 104141
+FINISH 1:1
+CLIENT PASS! SimTime = 70014299136
+[summary] total_runtime=60.000000,tput=3029.866657,txn_cnt=181792,txn_sent_cnt=181792,txn_run_time=5260.462509,txn_run_avg_time=0.028937,cl_send_intv=119.985964,msg_queue_delay_time=40.294351,msg_queue_cnt=181792,msg_queue_enq_cnt=181792,msg_queue_delay_time_avg=0.000222,msg_send_time=0.741328,msg_send_time_avg=0.000004,msg_recv_time=3.334407,msg_recv_time_avg=0.000018,msg_recv_idle_time=38.996747,msg_batch_cnt=181792,msg_batch_size_msgs=181792,msg_batch_size_msgs_avg=1.000000,msg_batch_size_bytes=43630080,msg_batch_size_bytes_avg=240.000000,msg_batch_size_bytes_to_server=43630080,msg_batch_size_bytes_to_client=0,msg_send_cnt=181792,msg_recv_cnt=181792,msg_unpack_time=0.234484,msg_unpack_time_avg=0.000001,mbuf_send_intv_time=0.014162,mbuf_send_intv_time_avg=0.000000,msg_copy_output_time=0.116915,ccl0=0.000361,ccl1=0.007509,ccl10=0.013232,ccl25=0.018223,ccl50=0.027713,ccl75=0.038606,ccl90=0.044924,ccl95=0.050068,ccl96=0.052116,ccl97=0.053733,ccl98=0.057045,ccl99=0.060959,ccl100=0.134865,virt_mem_usage=698940,phys_mem_usage=302540,cpu_ttl=56.925676

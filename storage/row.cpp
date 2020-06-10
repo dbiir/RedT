@@ -250,7 +250,13 @@ RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row) {
             assert(row->get_table_name() != NULL);
         }
 	}
-	if (rc != Abort &&( CC_ALG == MVCC) && type == WR) {
+
+	// DEBUG_M("row_t::get_row WKDB alloc \n");
+	// txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	// txn->cur_row->init(row->get_table(), row->get_part_id());
+	// txn->cur_row->copy(row);
+
+	if (rc != Abort && type == WR) {
 	    DEBUG_M("row_t::get_row MVCC alloc \n");
 		row_t * newr = (row_t *) mem_allocator.alloc(sizeof(row_t));
 		newr->init(this->get_table(), get_part_id());
@@ -357,7 +363,7 @@ RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 	//ts_t endtime = get_sys_clock();
 	row = this;
 
-#elif CC_ALG == MVCC || CC_ALG == TIMESTAM || CC_ALG == WOOKONG
+#elif CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == WOOKONG
 			assert(txn->ts_ready);
 			//INC_STATS(thd_id, time_wait, t2 - t1);
 			row = txn->cur_row;
@@ -448,27 +454,18 @@ void row_t::return_row(RC rc, access_t type, TxnManager * txn, row_t * row) {
 #elif CC_ALG == WOOKONG
 	assert (row != NULL);
 
+	if (rc == Abort) {
+		manager->abort(type,txn);
+	} else {
+		manager->commit(type,txn,row);
+	}
+
 	if (type == XP) {
 		row->free_row();
     	DEBUG_M("row_t::return_row XP free \n");
 		mem_allocator.free(row, sizeof(row_t));
-		this->manager->access(XP_REQ, txn, NULL);
-	} else if (type == WR) {
-		assert (type == WR && row != NULL);
-		assert (row->get_schema() == this->get_schema());
-		RC rc = this->manager->access(W_REQ, txn, row);
-		assert(rc == RCOK);
 	}
 
-  if (rc == Abort) {
-    manager->abort(type,txn);
-  } else {
-    manager->commit(type,txn,row);
-  }
-
-	row->free_row();
- 	DEBUG_M("row_t::return_row Wkdb free \n");
-	mem_allocator.free(row, sizeof(row_t));
 #elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC 
 	assert (row != NULL);
 	if (ROLL_BACK && type == XP) {// recover from previous writes.

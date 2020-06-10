@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -g -gdwarf-3 -std=c++0x 
+CFLAGS=-Wall -g -ggdb -gdwarf-3 -std=c++0x 
 #CFLAGS += -fsanitize=address -fno-omit-frame-pointer 
 NNMSG=./nanomsg-0.5-beta
 
