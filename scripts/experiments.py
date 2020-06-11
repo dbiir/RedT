@@ -109,7 +109,7 @@ def ycsb_skew():
     wl = 'YCSB'
     nnodes = [4]
     #algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
-    algos=['MVCC','MAAT'] 
+    algos=['TIMESTAMP','MVCC','MAAT','WOOKONG'] 
     base_table_size=2097152*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
@@ -349,9 +349,9 @@ configs = {
     "THREAD_CNT": 4,
     "REPLICA_CNT": 0,
     "REPLICA_TYPE": "AP",
-    "REM_THREAD_CNT": THREAD_CNT,
-    "SEND_THREAD_CNT": THREAD_CNT,
-    "CLIENT_NODE_CNT" : NODE_CNT,
+    "REM_THREAD_CNT": 2,
+    "SEND_THREAD_CNT": 2,
+    "CLIENT_NODE_CNT" : 4,
     "CLIENT_THREAD_CNT" : 4,
     "CLIENT_REM_THREAD_CNT" : 2,
     "CLIENT_SEND_THREAD_CNT" : 2,
