@@ -1,5 +1,7 @@
-HOSTS=$(cat /home/benchpress/DBx1000/vcloud_ifconfig.txt)
-CMD1="pkill -f 'rundb'"
-CMD2="pkill -f 'runcl'"
-/home/benchpress/DBx1000/scripts/vcloud_cmd.sh "$HOSTS" "$CMD1" 
-/home/benchpress/DBx1000/scripts/vcloud_cmd.sh "$HOSTS" "$CMD2" 
+ps -aux | grep runcl | awk '{print $2}' | xargs kill -9 2>/dev/null 1>/dev/null
+ps -aux | grep rundb | awk '{print $2}' | xargs kill -9 2>/dev/null 1>/dev/null
+for i in $(seq 203 231)
+do
+    ssh 10.77.70.$i "ps -aux | grep rundb | awk '{print \$2}' | xargs kill -9" 2>/dev/null 1>/dev/null
+    ssh 10.77.70.$i "ps -aux | grep runcl | awk '{print \$2}' | xargs kill -9" 2>/dev/null 1>/dev/null
+done

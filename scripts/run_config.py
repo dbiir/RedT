@@ -28,7 +28,6 @@ istc_machines=[
 vcloud_uname = 'centos'
 #identity = "/usr0/home/dvanaken/.ssh/id_rsa_vcloud"
 vcloud_machines = [
-"203",
 "204",
 "205",
 "206",

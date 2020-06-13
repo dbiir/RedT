@@ -5,17 +5,17 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 4
-#define THREAD_CNT 4
-#define REM_THREAD_CNT 2
-#define SEND_THREAD_CNT 2
+#define NODE_CNT 1 
+#define THREAD_CNT 1
+#define REM_THREAD_CNT THREAD_CNT
+#define SEND_THREAD_CNT THREAD_CNT
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
-#define CLIENT_NODE_CNT 4
-#define CLIENT_THREAD_CNT 4
-#define CLIENT_REM_THREAD_CNT 2
-#define CLIENT_SEND_THREAD_CNT 2
+#define CLIENT_NODE_CNT NODE_CNT
+#define CLIENT_THREAD_CNT 2
+#define CLIENT_REM_THREAD_CNT 1
+#define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
 
 #define LOAD_METHOD LOAD_MAX
@@ -44,7 +44,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 10000
+#define MAX_TXN_IN_FLIGHT 100
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -72,11 +72,11 @@
 /***********************************************/
 // Message Passing
 /***********************************************/
-#define TPORT_TYPE tcp
-#define TPORT_PORT 7000
+#define TPORT_TYPE TCP
+#define TPORT_PORT 17000
 #define SET_AFFINITY true
-#define TPORT_TYPE tcp
-#define TPORT_PORT 7000
+#define TPORT_TYPE TCP
+#define TPORT_PORT 17000
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -98,7 +98,7 @@
 // Concurrency Control
 /***********************************************/
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG
-#define CC_ALG WOOKONG
+#define CC_ALG  WOOKONG
 #define ISOLATION_LEVEL SERIALIZABLE
 #define YCSB_ABORT_MODE false
 
@@ -166,15 +166,15 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 67108864
-#define ZIPF_THETA 0.5
-#define TXN_WRITE_PERC 0.5
-#define TUP_WRITE_PERC 0.5
+#define SYNTH_TABLE_SIZE 65536
+#define ZIPF_THETA 0.3
+#define TXN_WRITE_PERC 0.2
+#define TUP_WRITE_PERC 0.0
 #define SCAN_PERC           0
 #define SCAN_LEN          20
 #define PART_PER_TXN PART_CNT
 #define PERC_MULTI_PART     MPR 
-#define REQ_PER_QUERY 10
+#define REQ_PER_QUERY 5
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 0
@@ -348,7 +348,7 @@ enum PPSTxnType {PPS_ALL = 0,
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
 #define DONE_TIMER 1 * 60 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 60 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false

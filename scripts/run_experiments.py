@@ -192,3 +192,32 @@ for exp in exps:
                 for n in range(nnodes + nclnodes):
                     pids[n].wait()
 
+    al = []
+    for e in experiments:
+        al.append(str(e[2]))
+    al=sorted(list(set(al)))
+
+    sk = []
+    for e in experiments:
+        sk.append(str(e[-2]))
+    sk=sorted(list(set(sk)))
+
+    wr = []
+    for e in experiments:
+        wr.append(str(e[-4]))
+    wr=sorted(list(set(wr)))
+
+    cn = []
+    for e in experiments:
+        cn.append(str(e[1]))
+    cn=sorted(list(set(cn)))
+
+    cmd=''
+    os.chdir('./scripts')
+    if exp == 'ycsb_skew':
+        cmd='./result.sh -a ycsb_skew -n {} -c {} -s {} -t {}'.format(cn[0], ','.join(al), ','.join(sk), strnow)
+    elif exp == 'ycsb_writes':
+        cmd='./result.sh -a ycsb_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join(al), ','.join(wr), strnow)
+    elif exp == 'ycsb_scaling':
+        cmd='./result.sh -a ycsb_scaling -n {} -c {} -t {}'.format(','.join(cn), ','.join(al), strnow)
+    os.system(cmd)
