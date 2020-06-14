@@ -41,7 +41,6 @@ class Row_wkdb {
 public:
 	void init(row_t * row);
   RC access(TsType type, TxnManager * txn, row_t * row);
-  RC read_and_prewrite(TxnManager * txn);
   RC read_and_write(TsType type, TxnManager * txn, row_t * row);
   RC prewrite(TxnManager * txn);
   RC abort(access_t type, TxnManager * txn);
@@ -55,7 +54,7 @@ private:
 
 public:	
   std::set<uint64_t> * uncommitted_reads;
-  std::set<uint64_t> * uncommitted_writes;
+  //std::set<uint64_t> * uncommitted_writes;
 
   uint64_t write_trans;
   uint64_t timestamp_last_read;
@@ -80,13 +79,13 @@ private:
 	row_t * clear_history(TsType type, ts_t ts); 
 
 	WKDBMVReqEntry * readreq_mvcc;
-  WKDBMVReqEntry * prereq_mvcc;
-  WKDBMVHisEntry * readhis;
-  WKDBMVHisEntry * writehis;
-	WKDBMVHisEntry * readhistail;
+  	WKDBMVReqEntry * prereq_mvcc;
+  	//WKDBMVHisEntry * readhis;
+  	WKDBMVHisEntry * writehis;
+	//WKDBMVHisEntry * readhistail;
 	WKDBMVHisEntry * writehistail;
 	uint64_t whis_len;
-	uint64_t rhis_len;
+	//uint64_t rhis_len;
 	uint64_t rreq_len;
 	uint64_t preq_len;
 

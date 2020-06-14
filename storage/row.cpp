@@ -251,11 +251,6 @@ RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row) {
         }
 	}
 
-	// DEBUG_M("row_t::get_row WKDB alloc \n");
-	// txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
-	// txn->cur_row->init(row->get_table(), row->get_part_id());
-	// txn->cur_row->copy(row);
-
 	if (rc != Abort && type == WR) {
 	    DEBUG_M("row_t::get_row MVCC alloc \n");
 		row_t * newr = (row_t *) mem_allocator.alloc(sizeof(row_t));

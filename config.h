@@ -19,7 +19,7 @@
 #define CLIENT_RUNTIME false
 
 #define LOAD_METHOD LOAD_MAX
-#define LOAD_PER_SERVER 100
+#define LOAD_PER_SERVER 10000
 
 // Replication
 #define REPLICA_CNT 0
