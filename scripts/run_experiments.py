@@ -108,7 +108,7 @@ for exp in exps:
                     cfg_fname = "vcloud_ifconfig.txt"
                 else:
                     assert(False)
-                machines = sorted(machines_[:(cfgs["NODE_CNT"] + cfgs["CLIENT_NODE_CNT"])])
+                machines = sorted(machines_[:(cfgs["NODE_CNT"] + cfgs["NODE_CNT"])])
                 # TODO: ensure that machine order and node order is the same for ifconfig
                 f = open(cfg_fname,'r')
                 lines = f.readlines()
