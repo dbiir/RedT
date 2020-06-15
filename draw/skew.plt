@@ -6,7 +6,7 @@ set key Left
 set xlabel "skew ratio"
 set xrange [0:1.0]
 #set logscale x
-#set xtics ("0" 0,"0.1" 1,"0.2" 2,"0.3" 3,"0.4" 4, "0.5" 5, "0.6" 6)
+#set xtics ("0" 0,"0.25" 1,"0.5" 2,"0.3" 3,"0.4" 4, "0.5" 5, "0.6" 6)
 #set terminal postscript eps color enhanced linewidth 3 "Helvetica" 25
 set terminal svg linewidth 1
 

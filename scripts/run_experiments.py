@@ -22,6 +22,7 @@ cluster = None
 skip = False
 exps=[]
 arg_cluster = False
+merge_mode = False
 
 if len(sys.argv) < 2:
      sys.exit("Usage: %s [-exec/-e/-noexec/-ne] [-c cluster] experiments\n \
@@ -47,6 +48,8 @@ for arg in sys.argv[1:]:
     elif arg == "-c":
         remote = True
         arg_cluster = True
+    elif arg == '-m':
+        merge_mode = True
     elif arg_cluster:
         cluster = arg
         arg_cluster = False
@@ -71,7 +74,6 @@ for exp in exps:
 
         output_dir = output_f + "/"
         output_f = output_f + strnow 
-        print output_f
 
         f = open("config.h",'r')
         lines = f.readlines()
@@ -108,21 +110,15 @@ for exp in exps:
                     cfg_fname = "vcloud_ifconfig.txt"
                 else:
                     assert(False)
-                machines = sorted(machines_[:(cfgs["NODE_CNT"] + cfgs["NODE_CNT"])])
-                # TODO: ensure that machine order and node order is the same for ifconfig
-                f = open(cfg_fname,'r')
-                lines = f.readlines()
-                f.close()
+                if merge_mode:
+                    machines = sorted(machines_[:(cfgs["NODE_CNT"])])
+                    for m in machines[:]:
+                        machines.append(m)
+                else:
+                    machines = sorted(machines_[:(cfgs["NODE_CNT"]*2)])  
                 with open("ifconfig.txt",'w') as f_ifcfg:
-                    for line in lines:
-                        line = line.rstrip('\n')
-                        if cluster == 'istc':
-                            line = re.split(' ',line)
-                            if line[0] in machines:
-                                f_ifcfg.write(line[1] + "\n")
-                        elif cluster == 'vcloud':
-                            if line in machines:
-                                f_ifcfg.write("10.77.70." + line + "\n")
+                    for m in machines:
+                        f_ifcfg.write("10.77.110." + m + "\n")
 
                 if cfgs["WORKLOAD"] == "TPCC":
                     files = ["rundb","runcl","ifconfig.txt","./benchmarks/TPCC_short_schema.txt","./benchmarks/TPCC_full_schema.txt"]
@@ -133,30 +129,16 @@ for exp in exps:
                         cmd = 'scp {}/{} {}.csail.mit.edu:/home/{}/'.format(PATH,f,m,uname)
                     elif cluster == 'vcloud':
                         cmd = 'scp {}/{} centos@10.77.70.{}:/home/{}'.format(PATH,f,m,uname)
-                    print(cmd)
                     os.system(cmd)
 
-# Be sure all rundb/runcl are killed
-                # if cluster == 'vcloud':
-                #     cmd = './scripts/vcloud_cmd.sh \"{}\" \"pkill -f \'rundb\'\"'.format(' '.join(machines))
-                #     print(cmd)
-                #     os.system(cmd)
-                #     cmd = './scripts/vcloud_cmd.sh \"{}\" \"pkill -f \'runcl\'\"'.format(' '.join(machines))
-                #     print(cmd)
-                #     os.system(cmd)
-
-# Sync clocks before each experiment
-                # if cluster == 'vcloud':
-                #     print("Syncing Clocks...")
-                #     cmd = './scripts/vcloud_cmd.sh \'{}\' \'ntpdate -b clock-1.cs.cmu.edu\''.format(' '.join(machines))
-                #     print(cmd)
-                #     os.system(cmd)
                 print("Deploying: {}".format(output_f))
                 if cluster == 'istc':
                     cmd = './scripts/deploy.sh \'{}\' /home/{}/ {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"])
                 elif cluster == 'vcloud':
-                    cmd = './scripts/vcloud_deploy.sh \'{}\' /home/{}/ {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"])
-                print(cmd)
+                    if merge_mode:
+                        cmd = './scripts/vcloud_merge_deploy.sh \'{}\' /home/{}/ {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"])
+                    else:
+                        cmd = './scripts/vcloud_deploy.sh \'{}\' /home/{}/ {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"])
                 os.system(cmd)
 
                 for m,n in zip(machines,range(len(machines))):
@@ -165,14 +147,8 @@ for exp in exps:
                         print(cmd)
                         os.system(cmd)
                     elif cluster == 'vcloud':
-                        cmd = 'scp centos@10.77.70.{}:/home/{}/results.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
-                        print(cmd)
+                        cmd = 'scp centos@10.77.70.{}:/home/{}/dbresults.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
                         os.system(cmd)
-                        # cmd = 'ssh -i {} root@172.19.153.{} \"rm /{}/results.out\"'.format(identity,m,uname)
-                        # print(cmd)
-                        # os.system(cmd)
-
-
             else:
                 nnodes = cfgs["NODE_CNT"]
                 nclnodes = cfgs["CLIENT_NODE_CNT"]
@@ -218,8 +194,20 @@ for exp in exps:
         cmd='./result.sh -a ycsb_skew -n {} -c {} -s {} -t {}'.format(cn[0], ','.join(al), ','.join(sk), strnow)
     elif exp == 'ycsb_writes':
         cmd='./result.sh -a ycsb_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join(al), ','.join(wr), strnow)
-    elif exp == 'ycsb_scaling':
+    elif 'ycsb_scaling' in exp:
         cmd='./result.sh -a ycsb_scaling -n {} -c {} -t {}'.format(','.join(cn), ','.join(al), strnow)
-    elif exp == 'tpcc_scaling2':
+    elif 'tpcc_scaling' in exp:
         cmd='./result.sh -a tpcc_scaling2 -n {} -c {} -t {}'.format(','.join(cn), ','.join(al), strnow)
+    os.system(cmd)
+
+    cmd=''
+    os.chdir('./draw')
+    if exp == 'ycsb_skew':
+        cmd='./deneva-plot.sh -a ycsb_skew -c {} -t {}'.format(','.join(al), strnow)
+    elif exp == 'ycsb_writes':
+        cmd='./deneva-plot.sh -a ycsb_writes -c {} -t {}'.format(','.join(al), strnow)
+    elif 'ycsb_scaling' in exp:
+        cmd='./deneva-plot.sh -a ycsb_scaling -c {} -t {}'.format(','.join(al), strnow)
+    elif 'tpcc_scaling' in exp:
+        cmd='./deneva-plot.sh -a tpcc_scaling2 -c {} -t {}'.format(','.join(al), strnow)
     os.system(cmd)

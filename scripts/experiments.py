@@ -61,7 +61,7 @@ def ycsb_scaling():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     nnodes = [1,2,4,8]
-    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG','OCC']
     #algos=['NO_WAIT','WAIT_DIE','MVCC']
     base_table_size=2097152*8
     txn_write_perc = [0.5]
@@ -111,7 +111,7 @@ def ycsb_scaling_abort():
 def ycsb_skew():
     wl = 'YCSB'
     nnodes = [8]
-    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG','OCC']
     #algos=['TIMESTAMP','MVCC','MAAT','WOOKONG'] 
     base_table_size=2097152*8
     txn_write_perc = [0.5]
@@ -128,7 +128,7 @@ def ycsb_writes():
     wl = 'YCSB'
     nnodes = [8]
     #algos=['WOOKONG']
-    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG','OCC']
     base_table_size=2097152*8
     txn_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
     #txn_write_perc = [0.0,0.1,0.2,0.3]
@@ -220,7 +220,7 @@ def tpcc_scaling2():
     wl = 'TPCC'
     #nnodes = [1,2,4,8,16,32,64]
     nnodes = [1,2,4,8]
-    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
+    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG','OCC']
     #nalgos=['NO_WAIT','WAIT_DIE']
     npercpay=[0.0]
     wh=4

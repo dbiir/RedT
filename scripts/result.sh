@@ -55,7 +55,7 @@ then
             let TMPN--
             for i in $(seq 0 $TMPN)
             do
-                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep SKEW-${skew} | grep ^${i}_)
+                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _SKEW-${skew}_ | grep ^${i}_)
                 AS=${AS}$(readlink -f ${RESULT_PATH}/$f)" "
             done
 
@@ -79,7 +79,7 @@ then
             let TMPN--
             for i in $(seq 0 $TMPN)
             do
-                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep N-${nn} | grep ^${i}_)
+                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _N-${nn}_ | grep ^${i}_)
                 AS=${AS}$(readlink -f ${RESULT_PATH}/$f)" "
             done
 
@@ -103,7 +103,7 @@ then
             let TMPN--
             for i in $(seq 0 $TMPN)
             do
-                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep WR-${wr} | grep ^${i}_)
+                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _WR-${wr}_ | grep ^${i}_)
                 AS=${AS}$(readlink -f ${RESULT_PATH}/$f)" "
             done
 
@@ -127,7 +127,7 @@ then
             let TMPN--
             for i in $(seq 0 $TMPN)
             do
-                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep N-${nn} | grep ^${i}_)
+                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _N-${nn}_ | grep ^${i}_)
                 AS=${AS}$(readlink -f ${RESULT_PATH}/$f)" "
             done
 
