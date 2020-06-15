@@ -219,7 +219,7 @@ def tpcc_scaling1():
 def tpcc_scaling2():
     wl = 'TPCC'
     #nnodes = [1,2,4,8,16,32,64]
-    nnodes = [1,2]
+    nnodes = [1,2,4,8]
     nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     #nalgos=['NO_WAIT','WAIT_DIE']
     npercpay=[0.0]

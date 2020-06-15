@@ -220,4 +220,6 @@ for exp in exps:
         cmd='./result.sh -a ycsb_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join(al), ','.join(wr), strnow)
     elif exp == 'ycsb_scaling':
         cmd='./result.sh -a ycsb_scaling -n {} -c {} -t {}'.format(','.join(cn), ','.join(al), strnow)
+    elif exp == 'tpcc_scaling2':
+        cmd='./result.sh -a tpcc_scaling2 -n {} -c {} -t {}'.format(','.join(cn), ','.join(al), strnow)
     os.system(cmd)

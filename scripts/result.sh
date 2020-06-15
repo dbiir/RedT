@@ -113,6 +113,27 @@ then
     done
 elif [[ "${TEST_TYPE}" == 'tpcc_scaling2' ]]
 then
-    echo 1
+    for cc in ${CC[@]}
+    do
+        TMPFILE=tmp-${cc}
+        rm -rf ${TMPFILE}
+        touch ${TMPFILE}
+        for nn in ${NUMBEROFNODE[@]}
+        do
+            echo -n ${nn}" " >> ${TMPFILE}
+            AS=''
+
+            TMPN=${nn}
+            let TMPN--
+            for i in $(seq 0 $TMPN)
+            do
+                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep N-${nn} | grep ^${i}_)
+                AS=${AS}$(readlink -f ${RESULT_PATH}/$f)" "
+            done
+
+            python parse_results.py $AS >> ${TMPFILE}
+        done
+        mv ${TMPFILE} ${RESULT_PATH}/
+    done
 fi
 
