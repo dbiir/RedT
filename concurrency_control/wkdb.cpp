@@ -55,8 +55,10 @@ RC Wkdb::validate(TxnManager * txn) {
 	wkdb_set_ent * wset;
 	wkdb_set_ent * rset;
 	get_rw_set(txn, rset, wset);
-  if (wset->set_size) {
-    goto ABORT_END;
+
+  DEBUG("WKDB write set size %ld: %u \n",txn->get_txn_id(),wset->set_size);
+  if (!wset->set_size) {
+    goto VALID_END;
   }
 
   // lower bound of txn greater than write timestamp
@@ -72,7 +74,7 @@ RC Wkdb::validate(TxnManager * txn) {
     if (lower <= cur_wrow->manager->timestamp_last_read) {
       lower = cur_wrow->manager->timestamp_last_read + 1;
     }
-    if (lower >= upper) goto ABORT_END;
+    if (lower >= upper) goto VALID_END;
     
     //2. write in the key's write xid
     if (cur_wrow->manager->write_trans) {
@@ -87,7 +89,8 @@ RC Wkdb::validate(TxnManager * txn) {
     std::set<uint64_t> * readxid_list = cur_wrow->manager->uncommitted_reads;
 
     for(auto it = readxid_list->begin(); it != readxid_list->end(); it++) {
-      if (lower >= upper) goto ABORT_END;
+      if (lower >= upper) goto VALID_END;
+
       uint64_t txn_id = *it;
       DEBUG("    UR %ld -- %ld: %ld\n",txn->get_txn_id(),cur_wrow->get_primary_key(),txn_id);
       if (txn_id == txn->get_txn_id())
@@ -115,7 +118,7 @@ RC Wkdb::validate(TxnManager * txn) {
     }
   }
 
-ABORT_END:
+VALID_END:
   if (lower >= upper){
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
     rc = Abort;
@@ -210,7 +213,7 @@ WkdbTimeTableEntry* WkdbTimeTable::find(uint64_t key) {
 
 }
 
-void WkdbTimeTable::init(uint64_t thd_id, uint64_t key) {
+void WkdbTimeTable::init(uint64_t thd_id, uint64_t key, uint64_t ts) {
   uint64_t idx = hash(key);
   uint64_t mtx_wait_starttime = get_sys_clock();
   pthread_mutex_lock(&table[idx].mtx);
@@ -219,7 +222,7 @@ void WkdbTimeTable::init(uint64_t thd_id, uint64_t key) {
   if(!entry) {
     DEBUG_M("WkdbTimeTable::init entry alloc\n");
     entry = (WkdbTimeTableEntry*) mem_allocator.alloc(sizeof(WkdbTimeTableEntry));
-    entry->init(key);
+    entry->init(key, ts);
     LIST_PUT_TAIL(table[idx].head,table[idx].tail,entry);
   }
   pthread_mutex_unlock(&table[idx].mtx);

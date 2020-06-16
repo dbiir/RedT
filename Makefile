@@ -1,4 +1,4 @@
-CC=g++
+CC=/usr/bin/g++
 CFLAGS=-Wall -g -ggdb -gdwarf-3 -std=c++0x 
 #CFLAGS += -fsanitize=address -fno-omit-frame-pointer 
 NNMSG=./nanomsg-0.5-beta

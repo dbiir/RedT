@@ -217,11 +217,7 @@ RC Row_wkdb::abort(access_t type, TxnManager * txn) {
   	while(!ATOM_CAS(wkdb_avail,true,false)) { }
   	INC_STATS(txn->get_thd_id(),mtx[32],get_sys_clock() - mtx_wait_starttime);
   	DEBUG("wkdb Abort %ld: %d -- %ld\n",txn->get_txn_id(),type,_row->get_primary_key());
-// #if WORKLOAD == TPCC
-//     uncommitted_reads->erase(txn->get_txn_id());
-//     uncommitted_writes->erase(txn->get_txn_id());
-// #else
-    
+
   	uncommitted_reads->erase(txn->get_txn_id());
 
   	if(type == WR) {
@@ -236,7 +232,6 @@ RC Row_wkdb::abort(access_t type, TxnManager * txn) {
 		return_req_entry(req);
 		//update_buffer(txn);
 	}
-// #endif
 
   	ATOM_CAS(wkdb_avail,false,true);
   	return Abort;
@@ -248,28 +243,17 @@ RC Row_wkdb::commit(access_t type, TxnManager * txn, row_t * data) {
   INC_STATS(txn->get_thd_id(),mtx[33],get_sys_clock() - mtx_wait_starttime);
   DEBUG("wkdb Commit %ld: %d,%lu -- %ld\n",txn->get_txn_id(),type,txn->get_commit_timestamp(),_row->get_primary_key());
 
-// #if WORKLOAD == TPCC
-//     if(txn->get_commit_timestamp() >  timestamp_last_read)
-//       timestamp_last_read = txn->get_commit_timestamp();
-//     uncommitted_reads->erase(txn->get_txn_id());
-//     if(txn->get_commit_timestamp() >  timestamp_last_write)
-//       timestamp_last_write = txn->get_commit_timestamp();
-//     uncommitted_writes->erase(txn->get_txn_id());
-//     // Apply write to DB
-//     write(data);
-// #else
-
   uint64_t txn_commit_ts = txn->get_commit_timestamp();
 
-  if(txn_commit_ts >  timestamp_last_read)
+  if (txn_commit_ts > timestamp_last_read)
     timestamp_last_read = txn_commit_ts;
   uncommitted_reads->erase(txn->get_txn_id());
 
   if(type == WR) {
-	ts_t ts = txn->get_timestamp();
+	//ts_t ts = txn->get_timestamp();
 
 	// the corresponding prewrite request is debuffered.
-	insert_history(ts, data);
+	insert_history(txn_commit_ts, data);
 	DEBUG("wkdb insert histroy %ld: %lu -- %ld\n",txn->get_txn_id(),txn->get_commit_timestamp(),data->get_primary_key());
 	DEBUG("debuf %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
 	WKDBMVReqEntry * req = debuffer_req(P_REQ, txn);

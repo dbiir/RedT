@@ -59,7 +59,7 @@ def pps_scaling():
 
 def ycsb_scaling():
     wl = 'YCSB'
-    nnodes = [1,2,4,8,16,32,64]
+    nnodes = [1,2,4,8,16,32]
     #nnodes = [1]
     #algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     #algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
@@ -372,8 +372,8 @@ configs = {
     "TPORT_TYPE":"IPC",
     "TPORT_PORT":"18000",
     "PART_CNT": "NODE_CNT",
-    "PART_PER_TXN": "PART_CNT",
-    "MAX_TXN_IN_FLIGHT": 100,
+    "PART_PER_TXN": 2,
+    "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '0UL',
     "NETWORK_DELAY_TEST": 'false',
     "DONE_TIMER": "1 * 60 * BILLION // ~1 minutes",
