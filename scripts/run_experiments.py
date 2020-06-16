@@ -13,6 +13,7 @@ os.chdir('..')
 
 PATH=os.getcwd()
 result_dir = PATH + "/results/" + strnow + '/'
+perf_dir = result_dir + 'perf/'
 
 cfgs = configs
 
@@ -23,6 +24,7 @@ skip = False
 exps=[]
 arg_cluster = False
 merge_mode = False
+perfTime = 60
 
 if len(sys.argv) < 2:
      sys.exit("Usage: %s [-exec/-e/-noexec/-ne] [-c cluster] experiments\n \
@@ -89,14 +91,17 @@ for exp in exps:
                 if not found_cfg: f_cfg.write(line)
 
         cmd = "make clean; make -j16"
+        print cmd
         os.system(cmd)
         if not execute:
             exit()
 
         if execute:
-            cmd = "mkdir -p {}".format(result_dir)
+            cmd = "mkdir -p {}".format(perf_dir)
+            print cmd
             os.system(cmd)
             cmd = "cp config.h {}{}.cfg".format(result_dir,output_f)
+            print cmd
             os.system(cmd)
 
             if remote:
@@ -118,7 +123,7 @@ for exp in exps:
                     machines = sorted(machines_[:(cfgs["NODE_CNT"]*2)])  
                 with open("ifconfig.txt",'w') as f_ifcfg:
                     for m in machines:
-                        f_ifcfg.write("10.77.110." + m + "\n")
+                        f_ifcfg.write("10.77.70." + m + "\n")
 
                 if cfgs["WORKLOAD"] == "TPCC":
                     files = ["rundb","runcl","ifconfig.txt","./benchmarks/TPCC_short_schema.txt","./benchmarks/TPCC_full_schema.txt"]
@@ -129,29 +134,43 @@ for exp in exps:
                         cmd = 'scp {}/{} {}.csail.mit.edu:/home/{}/'.format(PATH,f,m,uname)
                     elif cluster == 'vcloud':
                         cmd = 'scp {}/{} centos@10.77.70.{}:/home/{}'.format(PATH,f,m,uname)
+                    print cmd
                     os.system(cmd)
 
                 print("Deploying: {}".format(output_f))
                 if cluster == 'istc':
                     cmd = './scripts/deploy.sh \'{}\' /home/{}/ {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"])
                 elif cluster == 'vcloud':
+                    os.chdir('./scripts')
                     if merge_mode:
-                        cmd = './scripts/vcloud_merge_deploy.sh \'{}\' /home/{}/ {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"])
+                        cmd = './vcloud_merge_deploy.sh \'{}\' /home/{}/ {} {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"],perfTime)
                     else:
-                        cmd = './scripts/vcloud_deploy.sh \'{}\' /home/{}/ {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"])
+                        cmd = './vcloud_deploy.sh \'{}\' /home/{}/ {} {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"],perfTime)
+                print cmd
                 os.system(cmd)
-
+                cmd = "scp getFlame.sh 10.77.70.204:/home/centos/"
+                print cmd
+                os.system(cmd)
+                cmd = 'ssh 10.77.70.204 "bash /home/centos/getFlame.sh"'
+                print cmd
+                os.system(cmd)
+                cmd = "scp 10.77.70.204:/home/centos/perf.svg {}{}.svg".format(perf_dir, output_f)
+                print cmd
+                os.system(cmd)
+                os.chdir('..')
                 for m,n in zip(machines,range(len(machines))):
                     if cluster == 'istc':
                         cmd = 'scp {}.csail.mit.edu:/home/{}/results.out {}{}_{}.out'.format(m,uname,result_dir,n,output_f)
-                        print(cmd)
+                        print cmd
                         os.system(cmd)
                     elif cluster == 'vcloud':
                         cmd = 'scp centos@10.77.70.{}:/home/{}/dbresults.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
+                        print cmd
                         os.system(cmd)
+                       
             else:
                 nnodes = cfgs["NODE_CNT"]
-                nclnodes = cfgs["CLIENT_NODE_CNT"]
+                nclnodes = cfgs["NODE_CNT"]
                 pids = []
                 print("Deploying: {}".format(output_f))
                 for n in range(nnodes+nclnodes):
@@ -170,44 +189,46 @@ for exp in exps:
 
     al = []
     for e in experiments:
-        al.append(str(e[2]))
+        al.append(e[2])
     al=sorted(list(set(al)))
 
     sk = []
     for e in experiments:
-        sk.append(str(e[-2]))
+        sk.append(e[-2])
     sk=sorted(list(set(sk)))
 
     wr = []
     for e in experiments:
-        wr.append(str(e[-4]))
+        wr.append(e[-4])
     wr=sorted(list(set(wr)))
 
     cn = []
     for e in experiments:
-        cn.append(str(e[1]))
+        cn.append(e[1])
     cn=sorted(list(set(cn)))
 
     cmd=''
     os.chdir('./scripts')
     if exp == 'ycsb_skew':
-        cmd='./result.sh -a ycsb_skew -n {} -c {} -s {} -t {}'.format(cn[0], ','.join(al), ','.join(sk), strnow)
+        cmd='./result.sh -a ycsb_skew -n {} -c {} -s {} -t {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in sk]), strnow)
     elif exp == 'ycsb_writes':
-        cmd='./result.sh -a ycsb_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join(al), ','.join(wr), strnow)
+        cmd='./result.sh -a ycsb_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join([str(x) for x in al]), ','.join([str(x) for x in wr]), strnow)
     elif 'ycsb_scaling' in exp:
-        cmd='./result.sh -a ycsb_scaling -n {} -c {} -t {}'.format(','.join(cn), ','.join(al), strnow)
+        cmd='./result.sh -a ycsb_scaling -n {} -c {} -t {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow)
     elif 'tpcc_scaling' in exp:
-        cmd='./result.sh -a tpcc_scaling2 -n {} -c {} -t {}'.format(','.join(cn), ','.join(al), strnow)
+        cmd='./result.sh -a tpcc_scaling2 -n {} -c {} -t {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow)
+    print cmd
     os.system(cmd)
 
     cmd=''
-    os.chdir('./draw')
+    os.chdir('../draw')
     if exp == 'ycsb_skew':
-        cmd='./deneva-plot.sh -a ycsb_skew -c {} -t {}'.format(','.join(al), strnow)
+        cmd='./deneva-plot.sh -a ycsb_skew -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     elif exp == 'ycsb_writes':
-        cmd='./deneva-plot.sh -a ycsb_writes -c {} -t {}'.format(','.join(al), strnow)
+        cmd='./deneva-plot.sh -a ycsb_writes -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     elif 'ycsb_scaling' in exp:
-        cmd='./deneva-plot.sh -a ycsb_scaling -c {} -t {}'.format(','.join(al), strnow)
+        cmd='./deneva-plot.sh -a ycsb_scaling -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     elif 'tpcc_scaling' in exp:
-        cmd='./deneva-plot.sh -a tpcc_scaling2 -c {} -t {}'.format(','.join(al), strnow)
+        cmd='./deneva-plot.sh -a tpcc_scaling2 -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    print cmd
     os.system(cmd)

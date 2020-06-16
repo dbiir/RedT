@@ -5,10 +5,10 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
+#define NODE_CNT 64
 #define THREAD_CNT 4
-#define REM_THREAD_CNT 2
-#define SEND_THREAD_CNT 2
+#define REM_THREAD_CNT THREAD_CNT
+#define SEND_THREAD_CNT THREAD_CNT
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
@@ -19,7 +19,7 @@
 #define CLIENT_RUNTIME false
 
 #define LOAD_METHOD LOAD_MAX
-#define LOAD_PER_SERVER 10000
+#define LOAD_PER_SERVER 100
 
 // Replication
 #define REPLICA_CNT 0
@@ -37,7 +37,7 @@
 // # of transactions to run for warmup
 #define WARMUP            0
 // YCSB or TPCC or PPS
-#define WORKLOAD TPCC
+#define WORKLOAD YCSB
 // print the transaction latency distribution
 #define PRT_LAT_DISTR false
 #define STATS_ENABLE        true
@@ -166,10 +166,10 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 65536
-#define ZIPF_THETA 0.3
-#define TXN_WRITE_PERC 0.0
-#define TUP_WRITE_PERC 0.0
+#define SYNTH_TABLE_SIZE 1073741824
+#define ZIPF_THETA 0.2
+#define TXN_WRITE_PERC 0.5
+#define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
 #define PART_PER_TXN PART_CNT
@@ -192,7 +192,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false 
 #define WH_UPDATE         true
-#define NUM_WH 8
+#define NUM_WH PART_CNT
 // % of transactions that access multiple partitions
 #define MPR 1.0
 #define MPIR 0.01

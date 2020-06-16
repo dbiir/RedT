@@ -75,7 +75,7 @@ RC Wkdb::validate(TxnManager * txn) {
     if (lower >= upper) goto ABORT_END;
     
     //2. write in the key's write xid
-    if (!cur_wrow->manager->write_trans) {
+    if (cur_wrow->manager->write_trans) {
       wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
       rc = Abort;
       goto FINISH;
@@ -105,9 +105,11 @@ RC Wkdb::validate(TxnManager * txn) {
           //TRANS_LOG_WARN("DTAvalidation set lower = dta_txn->lower + 1, transid:%lu running_txn_id:%lu lower:%lu upper:%lu running_txn_id.lower:%lu running_txn_id.upper:%lu", ctx, part_ctx->GetTransID(), lower, upper, dta_txn->lower, dta_txn->upper);
           lower = it_lower + 1;
           it_upper = lower < it_upper ? lower : it_upper;
+          wkdb_time_table.set_upper(txn->get_thd_id(),*it,it_upper);
         } else if (lower < it_upper){
           //TRANS_LOG_WARN("DTAvalidation set running_txn.upper < ctx.lower, transid:%lu running_txn_id:%lu lower:%lu upper:%lu running_txn_id.lower:%lu running_txn_id.upper:%lu", ctx, part_ctx->GetTransID(), lower, upper, dta_txn->lower, dta_txn->upper);
           it_upper = lower;
+          wkdb_time_table.set_upper(txn->get_thd_id(),*it,it_upper);
         }
       }
     }

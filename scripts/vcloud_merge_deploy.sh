@@ -1,6 +1,6 @@
 #!/bin/bash
-LOCAL_UNAME=gpadmin
-USERNAME=gpadmin
+LOCAL_UNAME=centos
+USERNAME=centos
 HOSTS="$1"
 NODE_CNT="$3"
 count=0
@@ -8,15 +8,18 @@ count=0
 for HOSTNAME in ${HOSTS}; do
     #SCRIPT="env SCHEMA_PATH=\"$2\" timeout -k 10m 10m gdb -batch -ex \"run\" -ex \"bt\" --args ./rundb -nid${count} >> results.out 2>&1 | grep -v ^\"No stack.\"$"
     if [ $count -ge $NODE_CNT ]; then
-        SCRIPT="source /etc/profile;env SCHEMA_PATH=\"$2\" timeout -k 8m 8m /home/gpadmin/runcl -nid${count} > /home/gpadmin/clresults.out 2>&1"
+        SCRIPT="source /etc/profile; env SCHEMA_PATH=\"$2\" timeout -k 80m 80m /home/centos/runcl -nid${count} > /home/centos/clresults.out 2>&1"
         echo "${HOSTNAME}: runcl ${count}"
     else
-        SCRIPT="source /etc/profile;env SCHEMA_PATH=\"$2\" timeout -k 8m 8m /home/gpadmin/rundb -nid${count} > /home/gpadmin/dbresults.out 2>&1"
+        SCRIPT="source /etc/profile; env SCHEMA_PATH=\"$2\" timeout -k 80m 80m /home/centos/rundb -nid${count} > /home/centos/dbresults.out 2>&1"
         echo "${HOSTNAME}: rundb ${count}"
     fi
-    ssh -n -o BatchMode=yes -o StrictHostKeyChecking=no -l ${USERNAME} 10.77.110.${HOSTNAME} "${SCRIPT}" &
+    ssh -n -o BatchMode=yes -o StrictHostKeyChecking=no -l ${USERNAME} 10.77.70.${HOSTNAME} "${SCRIPT}" &
     count=`expr $count + 1`
 done
+
+scp wkdbperf.sh 10.77.70.204:/home/centos/
+ssh 10.77.70.204 "bash /home/centos/wkdbperf.sh $4"
 
 while [ $count -gt 0 ]
 do
