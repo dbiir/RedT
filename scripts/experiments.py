@@ -59,8 +59,8 @@ def pps_scaling():
 
 def ycsb_scaling():
     wl = 'YCSB'
-    nnodes = [1,2,4,8,16,32]
-    #nnodes = [1]
+    #nnodes = [1,2,4,8,16,32,64]
+    nnodes = [1]
     #algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     #algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     algos=['WOOKONG']
@@ -69,8 +69,8 @@ def ycsb_scaling():
     tup_write_perc = [0.5]
     load = [10000]
     tcnt = [4]
-    #skew = [0.6,0.7]
-    skew = [0.2]
+    skew = [0.0]
+    #skew = [0.0,0.5,0.9]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
     #txn_write_perc = [0.0]
@@ -111,9 +111,9 @@ def ycsb_scaling_abort():
 
 def ycsb_skew():
     wl = 'YCSB'
-    nnodes = [16]
-    #algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
-    algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
+    nnodes = [8]
+    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
+    #algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     #algos=['WOOKONG']
     base_table_size=2097152*8
     txn_write_perc = [0.5]
@@ -128,10 +128,10 @@ def ycsb_skew():
 
 def ycsb_writes():
     wl = 'YCSB'
-    nnodes = [16]
+    nnodes = [8]
     #algos=['WOOKONG']
-    #algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
-    algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
+    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
+    #algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     base_table_size=2097152*8
     txn_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
     #txn_write_perc = [0.0,0.1,0.2,0.3]
@@ -223,8 +223,8 @@ def tpcc_scaling2():
     wl = 'TPCC'
     nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8]
-    #nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','WOOKONG','OCC']
-    algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
+    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','WOOKONG','OCC']
+    #algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     npercpay=[0.0]
     wh=4
     load = [10000]

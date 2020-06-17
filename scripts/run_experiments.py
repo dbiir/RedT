@@ -133,7 +133,7 @@ for exp in exps:
                     if cluster == 'istc':
                         cmd = 'scp {}/{} {}.csail.mit.edu:/home/{}/'.format(PATH,f,m,uname)
                     elif cluster == 'vcloud':
-                        cmd = 'scp {}/{} centos@10.77.70.{}:/home/{}'.format(PATH,f,m,uname)
+                        cmd = 'scp {}/{} 10.77.70.{}:/home/{}'.format(PATH,f,m,uname)
                     print cmd
                     os.system(cmd)
 
@@ -164,7 +164,7 @@ for exp in exps:
                         print cmd
                         os.system(cmd)
                     elif cluster == 'vcloud':
-                        cmd = 'scp centos@10.77.70.{}:/home/{}/dbresults.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
+                        cmd = 'scp 10.77.70.{}:/home/{}/dbresults.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
                         print cmd
                         os.system(cmd)
                        

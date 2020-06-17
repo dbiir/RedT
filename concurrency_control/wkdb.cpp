@@ -167,7 +167,7 @@ RC Wkdb::get_rw_set(TxnManager * txn, wkdb_set_ent * &rset, wkdb_set_ent *& wset
 
 	assert(n == wset->set_size);
 	assert(m == rset->set_size);
-#endif
+
 	return RCOK;
 }
 

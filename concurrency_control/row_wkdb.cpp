@@ -54,16 +54,13 @@ void Row_wkdb::init(row_t * row) {
 RC Row_wkdb::access(TsType type, TxnManager * txn, row_t * row) {
     uint64_t starttime = get_sys_clock();
     RC rc = RCOK;
-// #if WORKLOAD == TPCC
-//   read_and_prewrite(txn);
-// #else
-  rc = read_and_write(type, txn, row);
-// #endif
 
-  uint64_t timespan = get_sys_clock() - starttime;
-  txn->txn_stats.cc_time += timespan;
-  txn->txn_stats.cc_time_short += timespan;
-  return rc;
+	rc = read_and_write(type, txn, row);
+
+	uint64_t timespan = get_sys_clock() - starttime;
+	txn->txn_stats.cc_time += timespan;
+  	txn->txn_stats.cc_time_short += timespan;
+  	return rc;
 }
 
 RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
@@ -96,7 +93,6 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 
   	// Fetch the previous version
 	ts_t ts = txn->get_timestamp();
-
 
 	if (g_central_man)
 		glob_manager.lock_row(_row);

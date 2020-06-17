@@ -1,7 +1,7 @@
 #!/bin/bash
 set -x
 
-BASE_PATH="/home/centos/deneva-code"
+BASE_PATH="/root/deneva-code"
 
 homepage="${BASE_PATH}/results/"
 files=$(ls -t $homepage)

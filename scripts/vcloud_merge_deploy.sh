@@ -18,6 +18,7 @@ for HOSTNAME in ${HOSTS}; do
     count=`expr $count + 1`
 done
 
+sleep 90
 scp wkdbperf.sh 10.77.70.204:/home/centos/
 ssh 10.77.70.204 "bash /home/centos/wkdbperf.sh $4"
 

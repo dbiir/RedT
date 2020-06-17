@@ -252,7 +252,7 @@ RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row) {
 	}
 
 	if (rc != Abort && type == WR) {
-	    DEBUG_M("row_t::get_row MVCC alloc \n");
+	    DEBUG_M("row_t::get_row WKDB alloc \n");
 		row_t * newr = (row_t *) mem_allocator.alloc(sizeof(row_t));
 		newr->init(this->get_table(), get_part_id());
 		newr->copy(row);
