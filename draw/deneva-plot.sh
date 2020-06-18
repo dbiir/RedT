@@ -58,7 +58,7 @@ sed -i "29c $Distributed" ${RESULT_PATH}/draw-multi.plt
 if [[ $TEST_TYPE == "ycsb_skew" ]]
 then
 sed -i "6c set xlabel \"Skew Factor (Theta)\"" ${RESULT_PATH}/draw-multi.plt
-elif [[ $TEST_TYPE == "ycsb_write" ]]
+elif [[ $TEST_TYPE == "ycsb_writes" ]]
 then
 sed -i "6c set xlabel \"% of Update Transactions\"" ${RESULT_PATH}/draw-multi.plt
 elif [[ $TEST_TYPE == "ycsb_scaling" ]]

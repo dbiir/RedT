@@ -78,9 +78,11 @@ RC Wkdb::validate(TxnManager * txn) {
     
     //2. write in the key's write xid
     if (cur_wrow->manager->write_trans) {
-      wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
-      rc = Abort;
-      goto FINISH;
+      if (cur_wrow->manager->write_trans != txn->get_txn_id()) {
+        wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
+        rc = Abort;
+        goto FINISH;
+      }
     } else {
       cur_wrow->manager->write_trans = txn->get_txn_id();
     }
@@ -97,6 +99,8 @@ RC Wkdb::validate(TxnManager * txn) {
         continue;
       uint64_t it_upper = wkdb_time_table.get_upper(txn->get_thd_id(),*it);
       uint64_t it_lower = wkdb_time_table.get_lower(txn->get_thd_id(),*it);
+      if (it_lower >= it_upper)
+        continue;
       WKDBState state = wkdb_time_table.get_state(txn->get_thd_id(),*it);
       if(state == WKDB_VALIDATED || state == WKDB_COMMITTED) {
         INC_STATS(txn->get_thd_id(),wkdb_case4_cnt,1);
@@ -122,8 +126,7 @@ VALID_END:
   if (lower >= upper){
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
     rc = Abort;
-  }
-  else{
+  } else {
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_VALIDATED);
     rc = RCOK;
     assert(lower < upper);
@@ -168,6 +171,7 @@ RC Wkdb::get_rw_set(TxnManager * txn, wkdb_set_ent * &rset, wkdb_set_ent *& wset
 	assert(n == wset->set_size);
 	assert(m == rset->set_size);
 
+#endif
 	return RCOK;
 }
 
@@ -183,6 +187,7 @@ RC Wkdb::find_bound(TxnManager * txn) {
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_COMMITTED);
     // TODO: can commit_time be selected in a smarter way?
     txn->commit_timestamp = lower; 
+    // wkdb_time_table.set_upper(txn->get_thd_id(),txn->get_txn_id(),txn->commit_timestamp+1);
   }
   DEBUG("WKDB Bound %ld: %d [%lu,%lu] %lu\n",txn->get_txn_id(),rc,lower,upper,txn->commit_timestamp);
   return rc;

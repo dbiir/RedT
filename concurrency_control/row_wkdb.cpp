@@ -81,11 +81,6 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 	DEBUG("XP-REQ %ld -- %ld: lw %ld\n",txn->get_txn_id(),_row->get_primary_key(),timestamp_last_read);
   }
 
-  // Adjust txn.lower
-  uint64_t lower =  wkdb_time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
-  if (lower < timestamp_last_read)
-    wkdb_time_table.set_lower(txn->get_thd_id(),txn->get_txn_id(), timestamp_last_read + 1);
-
   // Add to uncommitted reads (soft lock)
   uncommitted_reads->insert(txn->get_txn_id());
 
@@ -122,6 +117,12 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
       // insert_history(ts, NULL);
       assert(strstr(_row->get_table_name(), ret->get_table_name()));
     } 
+
+	// Adjust txn.lower
+  	// uint64_t lower =  wkdb_time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
+  	// if (lower < timestamp_last_read)
+    // 	wkdb_time_table.set_lower(txn->get_thd_id(),txn->get_txn_id(), timestamp_last_read + 1);
+
   } else if (type == P_REQ) {
 		/*if ( conflict(type, ts) ) {
 			rc = Abort;
@@ -216,11 +217,12 @@ RC Row_wkdb::abort(access_t type, TxnManager * txn) {
 
   	uncommitted_reads->erase(txn->get_txn_id());
 
-  	if(type == WR) {
+  	if(type == WR && write_trans == txn->get_txn_id()) {
     	write_trans = 0;
   	}
 
 	if (type == XP) {
+
 		write_trans = 0;
 		DEBUG("debuf %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
 		WKDBMVReqEntry * req = debuffer_req(P_REQ, txn);
@@ -259,15 +261,6 @@ RC Row_wkdb::commit(access_t type, TxnManager * txn, row_t * data) {
 
     write_trans = 0;
   }
-
-/*
-#if WORKLOAD == TPCC
-    if(txn_commit_ts >  timestamp_last_read)
-      timestamp_last_read = txn_commit_ts;
-#endif
-*/
-
-// #endif
 
   ATOM_CAS(wkdb_avail,false,true);
 	return RCOK;
