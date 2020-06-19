@@ -27,6 +27,12 @@ istc_machines=[
 
 vcloud_uname = 'centos'
 #identity = "/usr0/home/dvanaken/.ssh/id_rsa_vcloud"
+
+# vcloud_machines = [
+#     "146",
+#     "147"
+# ]
+
 vcloud_machines = [
 "204",
 "205",
@@ -92,4 +98,11 @@ vcloud_machines = [
 "146",
 "147",
 "148"
+]
+
+local_uname = 'root'
+
+local_machines = [
+    "146",
+    "147"
 ]

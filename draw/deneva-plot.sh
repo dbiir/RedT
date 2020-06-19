@@ -32,9 +32,9 @@ l=${#CC[@]}
 let l--
 for i in $(seq 0 ${l})
 do
-    TpmC=$TpmC"\"${RESULT_PATH}/tmp-"${CC[$i]}"\" using 1:2 title \"${CC[$i]}\" w lp lw 2 ps 2 pt $i dt 1"
-    Rollback=$Rollback"\"${RESULT_PATH}/tmp-"${CC[$i]}"\" using 1:(\$3*100) title \"${CC[$i]}\" w lp lw 2 ps 2 pt $i dt 1"
-    Distributed=$Distributed"\"${RESULT_PATH}/tmp-"${CC[$i]}"\" using 1:(\$4*100) title \"${CC[$i]}\" w lp lw 2 ps 2 pt $i dt 1"
+    TpmC=$TpmC"\"${RESULT_PATH}/tmp-"${CC[$i]}"\" using 1:2 title \"${CC[$i]}\" w lp lw 2 ps 1 pt $i dt 1"
+    Rollback=$Rollback"\"${RESULT_PATH}/tmp-"${CC[$i]}"\" using 1:(\$3*100) title \"${CC[$i]}\" w lp lw 2 ps 1 pt $i dt 1"
+    Distributed=$Distributed"\"${RESULT_PATH}/tmp-"${CC[$i]}"\" using 1:(\$4*100) title \"${CC[$i]}\" w lp lw 2 ps 1 pt $i dt 1"
     if [ $i != ${#CC[@]} ]
     then
         TpmC=$TpmC","
