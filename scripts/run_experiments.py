@@ -137,9 +137,11 @@ for exp in exps:
                     if cluster == 'istc':
                         cmd = 'scp {}/{} {}.csail.mit.edu:/home/{}/'.format(PATH,f,m,uname)
                     elif cluster == 'vcloud':
-                        cmd = 'scp {}/{} 10.77.70.{}:/home/{}'.format(PATH,f,m,uname)
+                        os.system('./scripts/kill.sh 10.77.70.{}'.format(m))
+                        cmd = 'scp {}/{} centos@10.77.70.{}:/home/{}'.format(PATH,f,m,uname)
                     elif cluster == 'local':
-                        cmd = 'scp {}/{} 10.77.110.{}:/{}'.format(PATH,f,m,uname)
+                        os.system('./scripts/kill.sh 10.77.110.{}'.format(m))
+                        cmd = 'scp {}/{} centos@10.77.110.{}:/home/{}'.format(PATH,f,m,uname)
                     print cmd
                     os.system(cmd)
 
@@ -154,20 +156,20 @@ for exp in exps:
                         cmd = './vcloud_deploy.sh \'{}\' /home/{}/ {} {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"],perfTime)
                 elif cluster == 'local':
                     os.chdir('./scripts')
-                    cmd = './vcloud_local_deploy.sh \'{}\' /{}/ {} {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"],perfTime)
+                    cmd = './vcloud_local_deploy.sh \'{}\' /home/{}/ {} {}'.format(' '.join(machines),uname,cfgs["NODE_CNT"],perfTime)
                 print cmd
                 os.system(cmd)
                 if cluster == 'local':
                     ip = '10.77.110.146'
                 else:
                     ip = '10.77.70.204'
-                cmd = "scp getFlame.sh {}:/home/centos/".format(ip)
+                cmd = "scp getFlame.sh centos@{}:/home/centos/".format(ip)
                 print cmd
                 os.system(cmd)
-                cmd = 'ssh {} "bash /home/centos/getFlame.sh"'.format(ip)
+                cmd = 'ssh centos@{} "bash /home/centos/getFlame.sh"'.format(ip)
                 print cmd
                 os.system(cmd)
-                cmd = "scp {}:/home/centos/perf.svg {}{}.svg".format(ip,perf_dir, output_f)
+                cmd = "scp centos@{}:/home/centos/perf.svg {}{}.svg".format(ip,perf_dir, output_f)
                 print cmd
                 os.system(cmd)
                 os.chdir('..')
@@ -177,11 +179,11 @@ for exp in exps:
                         print cmd
                         os.system(cmd)
                     elif cluster == 'vcloud':
-                        cmd = 'scp 10.77.70.{}:/home/{}/dbresults.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
+                        cmd = 'scp centos@10.77.70.{}:/home/{}/dbresults.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
                         print cmd
                         os.system(cmd)
                     elif cluster == 'local':
-                        cmd = 'scp 10.77.110.{}:/{}/dbresults.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
+                        cmd = 'scp centos@10.77.110.{}:/home/{}/dbresults.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
                         print cmd
                         os.system(cmd)
                        

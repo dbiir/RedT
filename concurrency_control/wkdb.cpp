@@ -61,11 +61,11 @@ RC Wkdb::validate(TxnManager * txn) {
     goto VALID_END;
   }
 
-  // lower bound of txn greater than write timestamp
-  if(lower <= txn->greatest_write_timestamp) {
-    lower = txn->greatest_write_timestamp + 1;
-    INC_STATS(txn->get_thd_id(),wkdb_case1_cnt,1);
-  }
+  // // lower bound of txn greater than write timestamp
+  // if(lower <= txn->greatest_write_timestamp) {
+  //   lower = txn->greatest_write_timestamp + 1;
+  //   INC_STATS(txn->get_thd_id(),wkdb_case1_cnt,1);
+  // }
 
   //Examine each element in the write set
   for (UInt32 i = 0; i < wset->set_size; i++) {

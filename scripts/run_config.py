@@ -100,7 +100,7 @@ vcloud_machines = [
 "148"
 ]
 
-local_uname = 'root'
+local_uname = 'centos'
 
 local_machines = [
     "146",

@@ -42,7 +42,7 @@ public:
 	void init(row_t * row);
   RC access(TsType type, TxnManager * txn, row_t * row);
   RC read_and_write(TsType type, TxnManager * txn, row_t * row);
-  RC prewrite(TxnManager * txn);
+//   RC prewrite(TxnManager * txn);
   RC abort(access_t type, TxnManager * txn);
   RC commit(access_t type, TxnManager * txn, row_t * data);
   void write(row_t * data);
@@ -63,7 +63,6 @@ public:
 // multi-verison part
 private:
  	pthread_mutex_t * latch;
-	bool blatch;
 
 	WKDBMVReqEntry * get_req_entry();
 	void return_req_entry(WKDBMVReqEntry * entry);
@@ -80,12 +79,9 @@ private:
 
 	WKDBMVReqEntry * readreq_mvcc;
   	WKDBMVReqEntry * prereq_mvcc;
-  	//WKDBMVHisEntry * readhis;
   	WKDBMVHisEntry * writehis;
-	//WKDBMVHisEntry * readhistail;
 	WKDBMVHisEntry * writehistail;
 	uint64_t whis_len;
-	//uint64_t rhis_len;
 	uint64_t rreq_len;
 	uint64_t preq_len;
 

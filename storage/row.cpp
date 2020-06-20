@@ -98,7 +98,7 @@ uint64_t row_t::get_field_cnt() {
 void row_t::set_value(int id, void * ptr) {
 	int datasize = get_schema()->get_field_size(id);
 	int pos = get_schema()->get_field_index(id);
-  DEBUG("set_value pos %d datasize %d -- %lx\n",pos,datasize,(uint64_t)this);
+  DEBUG_M("set_value pos %d datasize %d -- %lx\n",pos,datasize,(uint64_t)this);
 #if SIM_FULL_ROW
 	memcpy( &data[pos], ptr, datasize);
 #else
@@ -227,11 +227,11 @@ RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row) {
 	goto end;
 #endif
 #if CC_ALG == WOOKONG
-	if (type == WR) {
-		rc = this->manager->access(P_REQ, txn, NULL);
-		if (rc != RCOK) 
-			goto end;
-	}
+	// if (type == WR) {
+	// 	rc = this->manager->access(P_REQ, txn, NULL);
+	// 	if (rc != RCOK) 
+	// 		goto end;
+	// }
 	if ((type == WR && rc == RCOK) || type == RD || type == SCAN) {
 		rc = this->manager->access(R_REQ, txn, NULL);
 		if (rc == RCOK ) {
@@ -254,7 +254,7 @@ RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row) {
 	if (rc != Abort && type == WR) {
 	    DEBUG_M("row_t::get_row WKDB alloc \n");
 		row_t * newr = (row_t *) mem_allocator.alloc(sizeof(row_t));
-		newr->init(this->get_table(), get_part_id());
+		newr->init(this->get_table(), this->get_part_id());
 		newr->copy(row);
 		row = newr;
 	}

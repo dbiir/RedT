@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+# set -x
 
 while [[ $# -gt 0 ]]
 do
@@ -71,3 +71,6 @@ fi
 
 
 ../gnuplot-5.2.8/bin/gnuplot ${RESULT_PATH}/draw-multi.plt
+
+cat ${RESULT_PATH}/tmp-MVCC
+cat ${RESULT_PATH}/tmp-WOOKONG

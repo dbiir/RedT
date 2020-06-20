@@ -14,13 +14,13 @@ for HOSTNAME in ${HOSTS}; do
         SCRIPT="source /etc/profile;env SCHEMA_PATH=\"$2\" timeout -k 15m 15m /home/centos/rundb -nid${count} > /home/centos/dbresults.out 2>&1"
         echo "${HOSTNAME}: rundb ${count}"
     fi
-    ssh -n -o BatchMode=yes -o StrictHostKeyChecking=no -l ${USERNAME} 10.77.70.${HOSTNAME} "${SCRIPT}" &
+    ssh -n -o BatchMode=yes -o StrictHostKeyChecking=no -l ${USERNAME} centos@10.77.70.${HOSTNAME} "${SCRIPT}" &
     count=`expr $count + 1`
 done
 
 sleep 90
-scp wkdbperf.sh 10.77.70.204:/home/centos/
-ssh 10.77.70.204 "bash /home/centos/wkdbperf.sh $4"
+scp wkdbperf.sh centos@10.77.70.204:/home/centos/
+ssh centos@10.77.70.204 "bash /home/centos/wkdbperf.sh $4"
 
 while [ $count -gt 0 ]
 do
