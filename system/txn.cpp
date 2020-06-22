@@ -508,7 +508,7 @@ RC TxnManager::start_commit() {
   RC rc = RCOK;
   DEBUG("%ld start_commit RO?%d multi-part?%d \n",get_txn_id(),query->readonly(),is_multi_part());
   if(is_multi_part()) {
-    if(!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == WOOKONG) {
+    if(!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT) {
       // send prepare messages
       send_prepare_messages();
       rc = WAIT_REM;
