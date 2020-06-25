@@ -81,6 +81,7 @@ RC Wkdb::validate(TxnManager * txn) {
       if (cur_wrow->manager->write_trans != txn->get_txn_id()) {
         wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
         rc = Abort;
+        DEBUG("write trans already in use %lu, now txn %lu\n", cur_wrow->manager->write_trans, txn->get_txn_id())
         goto FINISH;
       }
     } else {
@@ -168,6 +169,7 @@ RC Wkdb::get_rw_set(TxnManager * txn, wkdb_set_ent * &rset, wkdb_set_ent *& wset
 			rset->rows[m ++] = txn->get_access_original_row(i);
 	}
 
+  DEBUG("write set %d and read set %d\n", wset->set_size, rset->set_size);
 	assert(n == wset->set_size);
 	assert(m == rset->set_size);
 

@@ -61,9 +61,9 @@ def ycsb_scaling():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     nnodes = [1,2,4,8,16,32]
-    # algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
-    algos=['WOOKONG','WAIT_DIE']
+    # algos=['WOOKONG','WAIT_DIE']
     base_table_size=2097152*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
@@ -84,11 +84,11 @@ def ycsb_scaling1():
     nnodes = [1,2,4,8,16,32]
     algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     base_table_size=2097152*8
-    txn_write_perc = [0.5]
-    tup_write_perc = [0.5]
+    txn_write_perc = [0.0]
+    tup_write_perc = [0.0]
     load = [10000]
     tcnt = [4]
-    skew = [0.5]
+    skew = [0.0]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
     return fmt,exp
@@ -245,7 +245,7 @@ def tpcc_scaling():
 
 def tpcc_scaling_debug():
     wl = 'TPCC'
-    nnodes = [1,2,4,8,16,32]
+    nnodes = [1,2,4,8,16]
     nalgos=['WOOKONG']
     npercpay=[1.0]
     wh=32
@@ -257,7 +257,9 @@ def tpcc_scaling_debug():
 def tpcc_scaling1():
     wl = 'TPCC'
     nnodes = [1,2,4,8,16,32]
-    nalgos=['WOOKONG','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC']
+    # nnodes = [8]
+    nalgos=['WOOKONG','MAAT','MVCC','TIMESTAMP','OCC']
+    # nalgos=['WOOKONG']
     npercpay=[0.0]
     wh=32
     load = [10000]
@@ -268,7 +270,9 @@ def tpcc_scaling1():
 def tpcc_scaling2():
     wl = 'TPCC'
     nnodes = [1,2,4,8,16,32]
-    nalgos=['WOOKONG','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC']
+    # nnodes = [8]
+    nalgos=['WOOKONG','MAAT','MVCC','TIMESTAMP','OCC']
+    # nalgos=['WOOKONG','MVCC','OCC']
     npercpay=[1.0]
     wh=32
     load = [10000]
@@ -279,7 +283,9 @@ def tpcc_scaling2():
 def tpcc_scaling3():
     wl = 'TPCC'
     nnodes = [1,2,4,8,16,32]
-    nalgos=['WOOKONG','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC']
+    # nnodes = [4]
+    nalgos=['WOOKONG','MAAT','MVCC','TIMESTAMP','OCC']
+    # nalgos=['WOOKONG','MVCC']
     npercpay=[0.5]
     wh=32
     load = [10000]

@@ -227,13 +227,12 @@ RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row) {
 	goto end;
 #endif
 #if CC_ALG == WOOKONG
-	// if (type == WR) {
-	// 	rc = this->manager->access(P_REQ, txn, NULL);
-	// 	if (rc != RCOK) 
-	// 		goto end;
-	// }
+
 	if ((type == WR && rc == RCOK) || type == RD || type == SCAN) {
-		rc = this->manager->access(R_REQ, txn, NULL);
+		if (type == WR)
+			rc = this->manager->access(P_REQ, txn, NULL);
+		else
+			rc = this->manager->access(R_REQ, txn, NULL);
 		if (rc == RCOK ) {
 			row = txn->cur_row;
 		} else if (rc == WAIT) {
@@ -350,25 +349,25 @@ end:
 // Return call for get_row if waiting 
 RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 
-  RC rc = RCOK;
-  assert(CC_ALG == WAIT_DIE || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TIMESTAMP);
+  	RC rc = RCOK;
+  	assert(CC_ALG == WAIT_DIE || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TIMESTAMP);
 #if CC_ALG == WAIT_DIE
-  assert(txn->lock_ready);
+  	assert(txn->lock_ready);
 	rc = RCOK;
 	//ts_t endtime = get_sys_clock();
 	row = this;
 
 #elif CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == WOOKONG
-			assert(txn->ts_ready);
-			//INC_STATS(thd_id, time_wait, t2 - t1);
-			row = txn->cur_row;
+	assert(txn->ts_ready);
+	//INC_STATS(thd_id, time_wait, t2 - t1);
+	row = txn->cur_row;
 
-			assert(row->get_data() != NULL);
-			assert(row->get_table() != NULL);
-			assert(row->get_schema() == this->get_schema());
-			assert(row->get_table_name() != NULL);
+	assert(row->get_data() != NULL);
+	assert(row->get_table() != NULL);
+	assert(row->get_schema() == this->get_schema());
+	assert(row->get_table_name() != NULL);
 	if (( CC_ALG == MVCC || CC_ALG == WOOKONG) && type == WR) {
-    DEBUG_M("row_t::get_row_post_wait MVCC alloc \n");
+    	DEBUG_M("row_t::get_row_post_wait MVCC alloc \n");
 		row_t * newr = (row_t *) mem_allocator.alloc(sizeof(row_t));
 		newr->init(this->get_table(), get_part_id());
 

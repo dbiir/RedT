@@ -16,6 +16,7 @@
 
 #include "row.h"
 #include "txn.h"
+#include "table.h"
 #include "row_wkdb.h"
 #include "mem_alloc.h"
 #include "manager.h"
@@ -65,39 +66,46 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 	INC_STATS(txn->get_thd_id(),mtx[30],get_sys_clock() - mtx_wait_starttime);
 	
 	if (type == 0) {
-		DEBUG("READ %ld -- %ld: lw %ld\n",txn->get_txn_id(),_row->get_primary_key(),timestamp_last_read);
+		DEBUG("READ %ld -- %ld: lw %lu, table name: %s \n",txn->get_txn_id(),_row->get_primary_key(),timestamp_last_read,_row->get_table_name());
 	} else if (type == 1) {
-		DEBUG("COMMIT-WRITE %ld -- %ld: lw %ld\n",txn->get_txn_id(),_row->get_primary_key(),timestamp_last_read);
+		DEBUG("COMMIT-WRITE %ld -- %ld: lw %lu\n",txn->get_txn_id(),_row->get_primary_key(),timestamp_last_read);
 	} else if (type == 2) {
-		DEBUG("WRITE (P_REQ) %ld -- %ld: lw %ld\n",txn->get_txn_id(),_row->get_primary_key(),timestamp_last_read);
+		DEBUG("WRITE (P_REQ) %ld -- %ld: lw %lu\n",txn->get_txn_id(),_row->get_primary_key(),timestamp_last_read);
 	} else if (type == 3) {
-		DEBUG("XP-REQ %ld -- %ld: lw %ld\n",txn->get_txn_id(),_row->get_primary_key(),timestamp_last_read);
+		DEBUG("XP-REQ %ld -- %ld: lw %lu\n",txn->get_txn_id(),_row->get_primary_key(),timestamp_last_read);
 	}
 
 	// pthread_mutex_lock( latch );
 	// Add to uncommitted reads (soft lock)
-	DEBUG("uncommitted_reads %ld -- %ld", _row->get_primary_key(), uncommitted_reads->size());
+	DEBUG("uncommitted_reads %ld -- %ld\n", _row->get_primary_key(), uncommitted_reads->size());
 	uncommitted_reads->insert(txn->get_txn_id());
 
  	// =======TODO: Do we need using write_txn to adjust it's upper?
 
   	// Fetch the previous version
 	ts_t ts = txn->get_timestamp();
+	// ts_t ts =  wkdb_time_table.get_upper(txn->get_thd_id(),txn->get_txn_id());
 
-  	if (type == R_REQ) {
-		// figure out if ts is in interval(prewrite(x))
-		//bool conf = conflict(type, ts);
-		// bool conf = false;
-		// if (conf && rreq_len < g_max_read_req) {
-		// 	rc = WAIT;
-		// 	//txn->wait_starttime = get_sys_clock();
-		// 	DEBUG("buf R_REQ %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
-		// 	buffer_req(R_REQ, txn);
-		// 	txn->ts_ready = false;
+	if (type == P_REQ) {
+		// Optimization for concurrent update
+		if ((write_trans != 0 && write_trans != txn->get_txn_id()) && preq_len < g_max_pre_req) {
+			rc = WAIT;
+			//txn->wait_starttime = get_sys_clock();
+			DEBUG("buf P_REQ %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
+			buffer_req(P_REQ, txn);
+			txn->ts_ready = false;
+			// rc = Abort;
+			// return rc;
 		// } else {
+		} else if (_row->get_table() && !strcmp(_row->get_table_name(),"WAREHOUSE")) {
+			DEBUG("set write tran of row: %lu with txn: %lu \n", _row->get_primary_key(), txn->get_txn_id());
+			DEBUG("current row: table: %s, %lu \n", _row->get_table_name(), _row->get_table()->get_table_size())
+			write_trans = txn->get_txn_id();
+		}
+	}
 
-		// return results immediately.
-		rc = RCOK;
+  	if (type == R_REQ || type == P_REQ) {
+
 		if (timestamp_last_write < ts) {
 			txn->cur_row = _row;
 		} else {
@@ -109,26 +117,12 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 			assert(strstr(_row->get_table_name(), ret->get_table_name()));
 		}
 		DEBUG("R_REQ return %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
-		// } 
 
 		// Adjust txn.lower
 		// uint64_t lower =  wkdb_time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
 		// if (lower < timestamp_last_read)
 		// 	wkdb_time_table.set_lower(txn->get_thd_id(),txn->get_txn_id(), timestamp_last_read + 1);
 	}
-  	// } else if (type == P_REQ) {
-		/*if ( conflict(type, ts) ) {
-			rc = Abort;
-		} else*/ 
-		// if (preq_len < g_max_pre_req){
-      	// 	DEBUG("buf P_REQ %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
-		// 	buffer_req(P_REQ, txn);
-		// 	rc = RCOK;
-		// } else  {
-		// 	rc = Abort;
-		// }
-	// } else 
-	// 	assert(false);
 
 	// if (rc == RCOK) {
 	// 	if (whis_len > g_his_recycle_len) {
@@ -170,13 +164,10 @@ RC Row_wkdb::abort(access_t type, TxnManager * txn) {
     	write_trans = 0;
   	}
 
-	// if (type == XP) {
-		// DEBUG("debuf %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
-		// WKDBMVReqEntry * req = debuffer_req(P_REQ, txn);
-		// assert (req != NULL);
-		// return_req_entry(req);
-		//update_buffer(txn);
-	// }
+	if (type == XP) {
+		DEBUG("debuf %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
+		debuffer_req(P_REQ, txn);
+	}
 
   	ATOM_CAS(wkdb_avail,false,true);
   	return Abort;
@@ -203,12 +194,14 @@ RC Row_wkdb::commit(access_t type, TxnManager * txn, row_t * data) {
 		// the corresponding prewrite request is debuffered.
 		insert_history(txn_commit_ts, data);
 		DEBUG("wkdb insert histroy %ld: %lu -- %ld\n",txn->get_txn_id(),txn->get_commit_timestamp(),data->get_primary_key());
-		// DEBUG("debuf %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
-		// WKDBMVReqEntry * req = debuffer_req(P_REQ, txn);
-		// assert(req != NULL);
-		// return_req_entry(req);
 
-		write_trans = 0;
+		if(write_trans == txn->get_txn_id()) {
+    		write_trans = 0;
+  		}
+
+		DEBUG("debuf %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
+		debuffer_req(P_REQ, txn);
+
 	}
 
   	ATOM_CAS(wkdb_avail,false,true);
@@ -289,24 +282,23 @@ void Row_wkdb::buffer_req(TsType type, TxnManager * txn)
 //	 debuffer all non-conflicting requests
 // for type == P_REQ
 //   debuffer the request with matching txn.
-WKDBMVReqEntry * Row_wkdb::debuffer_req( TsType type, TxnManager * txn) {
-	WKDBMVReqEntry ** queue;
-	WKDBMVReqEntry * return_queue = NULL;
-	switch (type) {
-	case R_REQ : queue = &readreq_mvcc; break;
-	case P_REQ : queue = &prereq_mvcc; break;
-	default: assert(false);
-	}
-	
+WKDBMVReqEntry * Row_wkdb::debuffer_req(TsType type, TxnManager * txn) {
+	WKDBMVReqEntry ** queue = &prereq_mvcc;
+	// WKDBMVReqEntry * return_queue = NULL;
+	DEBUG("debuffer transaction restart\n");
 	WKDBMVReqEntry * req = *queue;
 	WKDBMVReqEntry * prev_req = NULL;
-	if (txn != NULL) {
-		assert(type == P_REQ);
-		while (req != NULL && req->txn != txn) {		
+	if (txn != NULL && req && preq_len) {
+		while (req != NULL && req->txn == txn) {	
 			prev_req = req;
 			req = req->next;
+			if (prev_req->txn != txn) {
+				break;
+			}
 		}
-		assert(req != NULL);
+		if (req == NULL) {
+			return NULL;
+		}
 		if (prev_req != NULL)
 			prev_req->next = req->next;
 		else {
@@ -314,37 +306,23 @@ WKDBMVReqEntry * Row_wkdb::debuffer_req( TsType type, TxnManager * txn) {
 			*queue = req->next;
 		}
 		preq_len --;
-		req->next = return_queue;
-		return_queue = req;
-	} else {
-		assert(type == R_REQ);
-		// should return all non-conflicting read requests
-		// The following code makes the assumption that each write op
-		// must read the row first. i.e., there is no write-only operation.
-		uint64_t min_pts = UINT64_MAX;
-		//uint64_t min_pts = (1UL << 32);
-		for (WKDBMVReqEntry * preq = prereq_mvcc; preq != NULL; preq = preq->next)
-			if (preq->ts < min_pts)
-				min_pts = preq->ts;
-		while (req != NULL) {
-			if (req->ts <= min_pts) {
-				if (prev_req == NULL) {
-					assert(req == *queue);
-					*queue = (*queue)->next;
-				} else 
-					prev_req->next = req->next;
-				rreq_len --;
-				req->next = return_queue;
-				return_queue = req;
-				req = (prev_req == NULL)? *queue : prev_req->next;
-			} else {
-				prev_req = req;
-				req = req->next;
-			}
-		}
+		req->next = NULL;
+
+		write_trans = req->txn->get_txn_id();
+		// req->txn->last_row = _row;
+		req->txn->cur_row = _row;
+		req->txn->ts_ready = true;
+		uint64_t timespan = get_sys_clock() - req->starttime;
+		req->txn->txn_stats.cc_block_time += timespan;
+		req->txn->txn_stats.cc_block_time_short += timespan;
+		if (txn->get_commit_timestamp() != 0)
+			req->txn->set_timestamp(txn->get_commit_timestamp());
+		wkdb_time_table.set_upper(txn->get_thd_id(),req->txn->get_txn_id(),UINT64_MAX);
+    	txn_table.restart_txn(txn->get_thd_id(),req->txn->get_txn_id(),0);
+		DEBUG("txn %lu restart after txn %lu has been commit \n", txn->get_txn_id(), req->txn->get_txn_id());
+		return_req_entry(req);
 	}
-	
-	return return_queue;
+	return req;
 }
 
 void Row_wkdb::insert_history(ts_t ts, row_t * row) 
