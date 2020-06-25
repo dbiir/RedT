@@ -115,8 +115,8 @@ OptCC::per_row_validate(TxnManager * txn) {
 
 RC OptCC::central_validate(TxnManager * txn) {
 	RC rc;
-  uint64_t starttime = get_sys_clock();
-  uint64_t total_starttime = starttime;
+	uint64_t starttime = get_sys_clock();
+	uint64_t total_starttime = starttime;
 	uint64_t start_tn = txn->get_start_timestamp();
 	uint64_t finish_tn;
 	//set_ent ** finish_active;
@@ -131,14 +131,14 @@ RC OptCC::central_validate(TxnManager * txn) {
 	set_ent * his;
 	set_ent * ent;
 	int n = 0;
-  int stop __attribute__((unused));
+  	int stop __attribute__((unused));
 
 	//pthread_mutex_lock( &latch );
-  sem_wait(&_semaphore);
-  INC_STATS(txn->get_thd_id(),occ_cs_wait_time,get_sys_clock() - starttime);
-  starttime = get_sys_clock();
+	sem_wait(&_semaphore);
+	INC_STATS(txn->get_thd_id(),occ_cs_wait_time,get_sys_clock() - starttime);
+	starttime = get_sys_clock();
 	//finish_tn = tnc;
-  assert(!g_ts_batch_alloc);
+  	assert(!g_ts_batch_alloc);
 	finish_tn = glob_manager.get_ts(txn->get_thd_id());
 	ent = active;
 	f_active_len = active_len;
@@ -154,11 +154,12 @@ RC OptCC::central_validate(TxnManager * txn) {
 	}
 	his = history;
 	//pthread_mutex_unlock( &latch );
-  DEBUG("Start Validation %ld: start_ts %ld, finish_ts %ld, active size %ld\n",txn->get_txn_id(),start_tn,finish_tn,f_active_len);
-  sem_post(&_semaphore);
-  INC_STATS(txn->get_thd_id(),occ_cs_time,get_sys_clock() - starttime);
-  starttime = get_sys_clock();
-  starttime = get_sys_clock();
+	DEBUG("Start Validation %ld: start_ts %lu, finish_ts %lu, active size %lu\n",txn->get_txn_id(),start_tn,finish_tn,f_active_len);
+	sem_post(&_semaphore);
+	INC_STATS(txn->get_thd_id(),occ_cs_time,get_sys_clock() - starttime);
+	starttime = get_sys_clock();
+	starttime = get_sys_clock();
+
 
   uint64_t checked = 0;
   uint64_t active_checked = 0;
@@ -168,37 +169,41 @@ RC OptCC::central_validate(TxnManager * txn) {
 		while (his && his->tn > finish_tn) 
 			his = his->next;
 		while (his && his->tn > start_tn) {
-      ++hist_checked;
-      ++checked;
+      		++hist_checked;
+      		++checked;
 			valid = test_valid(his, rset);
+#if WORKLOAD == TPCC
+			if (valid)
+				valid = test_valid(his, wset);
+#endif
 			if (!valid) { 
-        INC_STATS(txn->get_thd_id(),occ_hist_validate_fail_time,get_sys_clock() - starttime);
+        		INC_STATS(txn->get_thd_id(),occ_hist_validate_fail_time,get_sys_clock() - starttime);
 				goto final;
-      }
+      		}
 			his = his->next;
 		}
 	}
 
-  INC_STATS(txn->get_thd_id(),occ_hist_validate_time,get_sys_clock() - starttime);
-  starttime = get_sys_clock();
-  stop = 1;
+	INC_STATS(txn->get_thd_id(),occ_hist_validate_time,get_sys_clock() - starttime);
+	starttime = get_sys_clock();
+	stop = 1;
 	for (UInt32 i = 0; i < f_active_len; i++) {
 		set_ent * wact = finish_active[i];
-    ++checked;
-    ++active_checked;
+    	++checked;
+    	++active_checked;
 		valid = test_valid(wact, rset);
 		if (valid) {
-      ++checked;
-      ++active_checked;
+      		++checked;
+      		++active_checked;
 			valid = test_valid(wact, wset);
 		} 
-    if (!valid) {
-      INC_STATS(txn->get_thd_id(),occ_act_validate_fail_time,get_sys_clock() - starttime);
-      goto final;
-    }
+		if (!valid) {
+			INC_STATS(txn->get_thd_id(),occ_act_validate_fail_time,get_sys_clock() - starttime);
+			goto final;
+		}
 	}
-  INC_STATS(txn->get_thd_id(),occ_act_validate_time,get_sys_clock() - starttime);
-  starttime = get_sys_clock();
+	INC_STATS(txn->get_thd_id(),occ_act_validate_time,get_sys_clock() - starttime);
+	starttime = get_sys_clock();
 final:
   /*
 	if (valid) 
@@ -211,13 +216,13 @@ final:
 
 	if (valid) {
 		rc = RCOK;
-    INC_STATS(txn->get_thd_id(),occ_check_cnt,checked);
+    	INC_STATS(txn->get_thd_id(),occ_check_cnt,checked);
 	} else {
 		//txn->cleanup(Abort);
-    INC_STATS(txn->get_thd_id(),occ_abort_check_cnt,checked);
+    	INC_STATS(txn->get_thd_id(),occ_abort_check_cnt,checked);
 		rc = Abort;
     // Optimization: If this is aborting, remove from active set now
-      sem_wait(&_semaphore);
+      	sem_wait(&_semaphore);
         set_ent * act = active;
         set_ent * prev = NULL;
         while (act != NULL && act->txn != txn) {
@@ -233,8 +238,8 @@ final:
         }
       sem_post(&_semaphore);
 	}
-  DEBUG("End Validation %ld: active# %ld, hist# %ld\n",txn->get_txn_id(),active_checked,hist_checked);
-  INC_STATS(txn->get_thd_id(),occ_validate_time,get_sys_clock() - total_starttime);
+	DEBUG("End Validation %ld: active# %ld, hist# %ld\n",txn->get_txn_id(),active_checked,hist_checked);
+	INC_STATS(txn->get_thd_id(),occ_validate_time,get_sys_clock() - total_starttime);
 	return rc;
 }
 
@@ -253,21 +258,21 @@ void OptCC::central_finish(RC rc, TxnManager * txn) {
 
 	if (!readonly) {
 		// only update active & tnc for non-readonly transactions
-  uint64_t starttime = get_sys_clock();
-//		pthread_mutex_lock( &latch );
-  sem_wait(&_semaphore);
+  		uint64_t starttime = get_sys_clock();
+		//		pthread_mutex_lock( &latch );
+  		sem_wait(&_semaphore);
 		set_ent * act = active;
 		set_ent * prev = NULL;
 		while (act != NULL && act->txn != txn) {
 			prev = act;
 			act = act->next;
 		}
-    if(act == NULL) {
-      assert(rc == Abort);
-		  //pthread_mutex_unlock( &latch );
-      sem_post(&_semaphore);
-      return;
-    }
+    	if(act == NULL) {
+      		assert(rc == Abort);
+		  	//pthread_mutex_unlock( &latch );
+			sem_post(&_semaphore);
+			return;
+    	}
 		assert(act->txn == txn);
 		if (prev != NULL)
 			prev->next = act->next;
@@ -276,20 +281,21 @@ void OptCC::central_finish(RC rc, TxnManager * txn) {
 		active_len --;
 		if (rc == RCOK) {
 			// remove the assert for performance
-      /*
+      		/*
 			if (history)
 				assert(history->tn == tnc);
-      */
-			tnc ++;
-			wset->tn = tnc;
+      		*/
+			// tnc ++;
+			wset->tn = glob_manager.get_ts(txn->get_thd_id());
 			STACK_PUSH(history, wset);
+			DEBUG("occ insert history");
 			his_len ++;
-      //mem_allocator.free(wset->rows, sizeof(row_t *) * wset->set_size);
-      //mem_allocator.free(wset, sizeof(set_ent));
+			//mem_allocator.free(wset->rows, sizeof(row_t *) * wset->set_size);
+			//mem_allocator.free(wset, sizeof(set_ent));
 		}
-	//	pthread_mutex_unlock( &latch );
-  sem_post(&_semaphore);
-  INC_STATS(txn->get_thd_id(),occ_finish_time,get_sys_clock() - starttime);
+		//	pthread_mutex_unlock( &latch );
+		sem_post(&_semaphore);
+		INC_STATS(txn->get_thd_id(),occ_finish_time,get_sys_clock() - starttime);
 	}
 }
 
