@@ -2,10 +2,29 @@
 
 #define _CONFIG_H_
 
+/***tictoc****/
+/*
+#define WRITE_PERMISSION_LOCK         false
+#define MULTI_VERSION                 false
+#define ENABLE_LOCAL_CACHING          false
+#define OCC_LOCK_TYPE                 WAIT_DIE
+#define TICTOC_MV                     false
+#define OCC_WAW_LOCK                  true
+#define RO_LEASE                      false
+#define ATOMIC_WORD                   false
+#define TRACK_LAST                    false
+#define UPDATE_TABLE_TS               true
+#define WRITE_PERMISSION_LOCK         false
+#define LOCK_ALL_BEFORE_COMMIT        false
+#define LOCK_ALL_DEBUG                false
+#define PAUSE __asm__ ( "pause;" );
+#define COMPILER_BARRIER asm volatile("" ::: "memory");
+*/
+
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 64
+#define NODE_CNT 1
 #define THREAD_CNT 4
 #define REM_THREAD_CNT THREAD_CNT
 #define SEND_THREAD_CNT THREAD_CNT
@@ -97,8 +116,8 @@
 /***********************************************/
 // Concurrency Control
 /***********************************************/
-// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG
-#define CC_ALG WOOKONG
+// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC
+#define CC_ALG TICTOC
 #define ISOLATION_LEVEL SERIALIZABLE
 #define YCSB_ABORT_MODE false
 
@@ -138,7 +157,11 @@
 #define TXN_QUEUE_SIZE_LIMIT    THREAD_CNT
 // [CALVIN]
 #define SEQ_THREAD_CNT 4 
-
+// [TICTOC]
+#define MAX_NUM_WAITS 4
+#define PRE_ABORT true
+#define OCC_LOCK_TYPE WAIT_DIE
+#define OCC_WAW_LOCK true
 /***********************************************/
 // Logging
 /***********************************************/
@@ -166,13 +189,13 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 1073741824
-#define ZIPF_THETA 0.2
+#define SYNTH_TABLE_SIZE 16777216
+#define ZIPF_THETA 0.6
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN PART_CNT
+#define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR 
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
@@ -306,6 +329,7 @@ enum PPSTxnType {PPS_ALL = 0,
 #define MAAT      11
 #define WDL           12
 #define WOOKONG     13
+#define TICTOC     14
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

@@ -19,7 +19,7 @@
 #include "txn.h"
 #include "pthread.h"
 //#include <jemallloc.h>
-
+__thread uint64_t Manager::_max_cts = 1;
 void Manager::init() {
 	timestamp = 1;
 	last_min_ts_time = 0;

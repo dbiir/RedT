@@ -103,7 +103,7 @@ public:
   //uint64_t txn_id;
   //uint64_t batch_id;
   bool readonly;
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == TICTOC
   uint64_t commit_timestamp;
 #endif
 
@@ -160,7 +160,9 @@ public:
 
   RC rc;
   uint64_t pid;
-
+#if CC_ALG == TICTOC
+  uint64_t _min_commit_ts;
+#endif
 };
 
 class AckMessage : public Message {
@@ -174,7 +176,7 @@ public:
   void release() {}
 
   RC rc;
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == TICTOC
   uint64_t lower;
   uint64_t upper;
 #endif
@@ -196,6 +198,9 @@ public:
 
   uint64_t pid;
   RC rc;
+#if CC_ALG == TICTOC
+  uint64_t _min_commit_ts;
+#endif
   uint64_t txn_id;
 };
 
@@ -351,10 +356,10 @@ public:
   void release() {}
 
   uint64_t pid;
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TICTOC
   uint64_t ts;
 #endif
-#if CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TICTOC
   uint64_t thd_id;
 
 #elif CC_ALG == OCC 

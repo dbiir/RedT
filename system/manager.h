@@ -36,7 +36,11 @@ public:
 	// lock/timestamp manager. 
  	void 			lock_row(row_t * row);
 	void 			release_row(row_t * row);
-	
+
+    // TICTOC, max_cts
+    void set_max_cts(uint64_t cts) { _max_cts = cts; }
+    uint64_t get_max_cts() { return _max_cts; }
+
 	TxnManager * 		get_txn_man(int thd_id) { return _all_txns[thd_id]; };
 	void 			set_txn_man(TxnManager * txn);
 private:
@@ -48,6 +52,8 @@ private:
 	TxnManager ** 		_all_txns;
 	ts_t			last_min_ts_time;
 	ts_t			min_ts;
+
+	static __thread uint64_t _max_cts; // max commit timestamp seen by the thread so far.
 };
 
 #endif

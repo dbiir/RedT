@@ -54,6 +54,7 @@ class Row_occ;
 class Row_maat;
 class Row_specex;
 class Row_wkdb;
+class Row_tictoc;
 
 class row_t
 {
@@ -102,10 +103,13 @@ public:
 	void free_row();
 
 	// for concurrency control. can be lock, timestamp etc.
-  RC get_lock(access_t type, TxnManager * txn); 
+  	RC get_lock(access_t type, TxnManager * txn); 
+	RC get_ts(uint64_t &orig_wts, uint64_t &orig_rts);
+	RC get_row(access_t type, TxnManager * txn, row_t *& row, uint64_t &orig_wts, uint64_t &orig_rts);
 	RC get_row(access_t type, TxnManager * txn, row_t *& row);
-  RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row); 
+  	RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row); 
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row);
+	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
   #if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
     Row_lock * manager;
@@ -119,6 +123,8 @@ public:
   	Row_maat * manager;
   #elif CC_ALG == WOOKONG 
     Row_wkdb * manager;
+  #elif CC_ALG == TICTOC 
+    Row_tictoc * manager;
   #elif CC_ALG == HSTORE_SPEC
   	Row_specex * manager;
   #elif CC_ALG == AVOID

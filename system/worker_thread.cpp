@@ -33,6 +33,7 @@
 #include "abort_queue.h"
 #include "maat.h"
 #include "wkdb.h"
+#include "tictoc.h"
 
 void WorkerThread::setup() {
 
@@ -280,7 +281,7 @@ RC WorkerThread::process_rfin(Message * msg) {
   assert(CC_ALG != CALVIN);
 
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()),"RFIN local: %ld %ld/%d\n",msg->get_txn_id(),msg->get_txn_id()%g_node_cnt,g_node_id);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == TICTOC
   txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
 #endif
 
@@ -293,7 +294,7 @@ RC WorkerThread::process_rfin(Message * msg) {
   } 
   txn_man->commit();
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
-  if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == WOOKONG)
+  if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == WOOKONG || CC_ALG == TICTOC)
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_FIN),GET_NODE_ID(msg->get_txn_id()));
   release_txn_man();
 
@@ -322,6 +323,25 @@ RC WorkerThread::process_rack_prep(Message * msg) {
     time_table.set_state(get_thd_id(),msg->get_txn_id(),MAAT_ABORTED);
   }
 #endif
+
+#if CC_ALG == TICTOC && 0
+  // Integrate bounds
+  TxnManager * txn_man = txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),msg->get_batch_id());
+  uint64_t lower = ((AckMessage*)msg)->lower;
+  uint64_t upper = ((AckMessage*)msg)->upper;
+  if(lower > time_table.get_lower(get_thd_id(),msg->get_txn_id())) {
+    time_table.set_lower(get_thd_id(),msg->get_txn_id(),lower);
+  }
+  if(upper < time_table.get_upper(get_thd_id(),msg->get_txn_id())) {
+    time_table.set_upper(get_thd_id(),msg->get_txn_id(),upper);
+  }
+  DEBUG("%ld bound set: [%ld,%ld] -> [%ld,%ld]\n",msg->get_txn_id(),lower,upper,time_table.get_lower(get_thd_id(),msg->get_txn_id()),time_table.get_upper(get_thd_id(),msg->get_txn_id()));
+  if(((AckMessage*)msg)->rc != RCOK) {
+    txn_man->
+    time_table.set_state(get_thd_id(),msg->get_txn_id(),MAAT_ABORTED);
+  }
+#endif
+
 #if CC_ALG == WOOKONG
   // Integrate bounds
   uint64_t lower = ((AckMessage*)msg)->lower;
@@ -342,7 +362,10 @@ RC WorkerThread::process_rack_prep(Message * msg) {
 
   // Done waiting 
   if(txn_man->get_rc() == RCOK) {
-    rc  = txn_man->validate();
+    if (CC_ALG == TICTOC)
+      rc = RCOK;
+    else
+      rc = txn_man->validate();
   }
   if(rc == Abort || txn_man->get_rc() == Abort) {
     txn_man->txn->rc = Abort;
@@ -391,7 +414,13 @@ RC WorkerThread::process_rqry_rsp(Message * msg) {
     txn_man->start_abort();
     return Abort;
   }
-
+#if CC_ALG == TICTOC
+  // Integrate bounds
+  TxnManager * txn_man = txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),msg->get_batch_id());
+  QueryResponseMessage* qmsg = (QueryResponseMessage*)msg;
+  txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ? 
+                            txn_man->_min_commit_ts : qmsg->_min_commit_ts;
+#endif
   RC rc = txn_man->run_txn();
   check_if_done(rc);
   return rc;
@@ -412,6 +441,11 @@ RC WorkerThread::process_rqry(Message * msg) {
 #if CC_ALG == MAAT
     time_table.init(get_thd_id(),txn_man->get_txn_id());
 #endif
+/*
+#if CC_ALG == TICTOC
+    time_table.init(get_thd_id(),txn_man->get_txn_id());
+#endif
+*/
 #if CC_ALG == WOOKONG
     txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
     wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id());
@@ -458,6 +492,14 @@ RC WorkerThread::process_rprepare(Message * msg) {
   DEBUG("RPREP %ld\n",msg->get_txn_id());
     RC rc = RCOK;
 
+#if CC_ALG == TICTOC
+    // Integrate bounds
+    TxnManager * txn_man = txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),msg->get_batch_id());
+    PrepareMessage* pmsg = (PrepareMessage*)msg;
+    txn_man->_min_commit_ts = pmsg->_min_commit_ts;
+    // txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ? 
+    //                         txn_man->_min_commit_ts : qmsg->_min_commit_ts;
+#endif
     // Validate transaction
     rc  = txn_man->validate();
     txn_man->set_rc(rc);
@@ -526,6 +568,14 @@ RC WorkerThread::process_rtxn(Message * msg) {
           assert(time_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
           assert(time_table.get_state(get_thd_id(),txn_man->get_txn_id()) == MAAT_RUNNING);
 #endif
+/*
+#if CC_ALG == TICTOC
+          time_table.init(get_thd_id(),txn_man->get_txn_id());
+          assert(time_table.get_lower(get_thd_id(),txn_man->get_txn_id()) == 0);
+          assert(time_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
+          assert(time_table.get_state(get_thd_id(),txn_man->get_txn_id()) == MAAT_RUNNING);
+#endif
+*/
 #if CC_ALG == WOOKONG
           txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
           wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id());
@@ -615,7 +665,7 @@ RC WorkerThread::process_calvin_rtxn(Message * msg) {
 
 
 bool WorkerThread::is_cc_new_timestamp() {
-  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == WOOKONG);
+  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == WOOKONG || CC_ALG == TICTOC);
 }
 
 ts_t WorkerThread::get_next_ts() {

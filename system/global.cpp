@@ -33,6 +33,7 @@
 #include "logger.h"
 #include "maat.h"
 #include "wkdb.h"
+#include "tictoc.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 
@@ -45,6 +46,7 @@ Client_query_queue client_query_queue;
 OptCC occ_man;
 Maat maat_man;
 Wkdb wkdb_man;
+Tictoc tictoc_man;
 Transport tport_man;
 TxnManPool txn_man_pool;
 TxnPool txn_pool;
@@ -162,6 +164,9 @@ UInt64 g_his_recycle_len = HIS_RECYCLE_LEN;
 
 // CALVIN
 UInt32 g_seq_thread_cnt = SEQ_THREAD_CNT;
+
+// TICTOC
+uint32_t g_max_num_waits = MAX_NUM_WAITS;
 
 double g_mpr = MPR;
 double g_mpitem = MPIR;

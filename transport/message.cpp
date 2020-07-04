@@ -26,6 +26,7 @@
 #include "message.h"
 #include "maat.h"
 #include "wkdb.h"
+#include "tictoc.h"
 
 std::vector<Message*> * Message::create_messages(char * buf) {
   std::vector<Message*> * all_msgs = new std::vector<Message*>;
@@ -374,7 +375,7 @@ void Message::release_message(Message * msg) {
 
 uint64_t QueryMessage::get_size() {
   uint64_t size = Message::mget_size();
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TICTOC
   size += sizeof(ts);
 #endif
 #if CC_ALG == OCC 
@@ -385,7 +386,7 @@ uint64_t QueryMessage::get_size() {
 
 void QueryMessage::copy_from_txn(TxnManager * txn) {
   Message::mcopy_from_txn(txn);
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TICTOC
   ts = txn->get_timestamp();
   assert(ts != 0);
 #endif
@@ -396,7 +397,7 @@ void QueryMessage::copy_from_txn(TxnManager * txn) {
 
 void QueryMessage::copy_to_txn(TxnManager * txn) {
   Message::mcopy_to_txn(txn);
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TICTOC
   assert(ts != 0);
   txn->set_timestamp(ts);
 #endif
@@ -410,7 +411,7 @@ void QueryMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
   uint64_t ptr __attribute__ ((unused));
   ptr = Message::mget_size();
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TICTOC
  COPY_VAL(ts,buf,ptr);
   assert(ts != 0);
 #endif
@@ -423,7 +424,7 @@ void QueryMessage::copy_to_buf(char * buf) {
   Message::mcopy_to_buf(buf);
   uint64_t ptr __attribute__ ((unused));
   ptr = Message::mget_size();
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TICTOC
  COPY_BUF(buf,ts,ptr);
   assert(ts != 0);
 #endif
@@ -1030,11 +1031,17 @@ void ForwardMessage::copy_to_buf(char * buf) {
 uint64_t PrepareMessage::get_size() {
   uint64_t size = Message::mget_size();
   //size += sizeof(uint64_t);
+#if CC_ALG == TICTOC
+  size += sizeof(uint64_t); 
+#endif
   return size;
 }
 
 void PrepareMessage::copy_from_txn(TxnManager * txn) {
   Message::mcopy_from_txn(txn);
+#if CC_ALG == TICTOC
+  _min_commit_ts = txn->_min_commit_ts;
+#endif
 }
 
 void PrepareMessage::copy_to_txn(TxnManager * txn) {
@@ -1044,13 +1051,19 @@ void PrepareMessage::copy_to_txn(TxnManager * txn) {
 void PrepareMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
   uint64_t ptr = Message::mget_size();
- assert(ptr == get_size());
+#if CC_ALG == TICTOC
+  COPY_VAL(_min_commit_ts,buf,ptr);
+#endif
+  assert(ptr == get_size());
 }
 
 void PrepareMessage::copy_to_buf(char * buf) {
   Message::mcopy_to_buf(buf);
   uint64_t ptr = Message::mget_size();
- assert(ptr == get_size());
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == TICTOC
+  COPY_BUF(buf,_min_commit_ts,ptr);
+#endif
+  assert(ptr == get_size());
 }
 
 /************************/
@@ -1144,6 +1157,9 @@ void AckMessage::copy_to_buf(char * buf) {
 uint64_t QueryResponseMessage::get_size() {
   uint64_t size = Message::mget_size(); 
   size += sizeof(RC);
+#if CC_ALG == TICTOC
+  size += sizeof(uint64_t); 
+#endif
   //size += sizeof(uint64_t);
   return size;
 }
@@ -1151,7 +1167,9 @@ uint64_t QueryResponseMessage::get_size() {
 void QueryResponseMessage::copy_from_txn(TxnManager * txn) {
   Message::mcopy_from_txn(txn);
   rc = txn->get_rc();
-
+#if CC_ALG == TICTOC
+  _min_commit_ts = txn->_min_commit_ts;
+#endif
 }
 
 void QueryResponseMessage::copy_to_txn(TxnManager * txn) {
@@ -1164,6 +1182,9 @@ void QueryResponseMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
   uint64_t ptr = Message::mget_size();
   COPY_VAL(rc,buf,ptr);
+#if CC_ALG == TICTOC
+  COPY_VAL(_min_commit_ts,buf,ptr);
+#endif
 
  assert(ptr == get_size());
 }
@@ -1172,6 +1193,9 @@ void QueryResponseMessage::copy_to_buf(char * buf) {
   Message::mcopy_to_buf(buf);
   uint64_t ptr = Message::mget_size();
   COPY_BUF(buf,rc,ptr);
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == TICTOC
+  COPY_BUF(buf,_min_commit_ts,ptr);
+#endif
  assert(ptr == get_size());
 }
 
@@ -1184,7 +1208,7 @@ uint64_t FinishMessage::get_size() {
   size += sizeof(uint64_t); 
   size += sizeof(RC); 
   size += sizeof(bool); 
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == TICTOC
   size += sizeof(uint64_t); 
 #endif
   return size;
@@ -1194,7 +1218,7 @@ void FinishMessage::copy_from_txn(TxnManager * txn) {
   Message::mcopy_from_txn(txn);
   rc = txn->get_rc();
   readonly = txn->query->readonly();
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == TICTOC
   commit_timestamp = txn->get_commit_timestamp();
 #endif
 
@@ -1202,7 +1226,7 @@ void FinishMessage::copy_from_txn(TxnManager * txn) {
 
 void FinishMessage::copy_to_txn(TxnManager * txn) {
   Message::mcopy_to_txn(txn);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == TICTOC
   txn->commit_timestamp = commit_timestamp;
 #endif
 
@@ -1214,7 +1238,7 @@ void FinishMessage::copy_from_buf(char * buf) {
   COPY_VAL(pid,buf,ptr);
   COPY_VAL(rc,buf,ptr);
   COPY_VAL(readonly,buf,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == TICTOC
   COPY_VAL(commit_timestamp,buf,ptr);
 #endif
  assert(ptr == get_size());
@@ -1226,7 +1250,7 @@ void FinishMessage::copy_to_buf(char * buf) {
   COPY_BUF(buf,pid,ptr);
   COPY_BUF(buf,rc,ptr);
   COPY_BUF(buf,readonly,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == TICTOC
   COPY_BUF(buf,commit_timestamp,ptr);
 #endif
 

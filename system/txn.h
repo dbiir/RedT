@@ -42,6 +42,11 @@ public:
 	row_t * 	orig_row;
 	row_t * 	data;
 	row_t * 	orig_data;
+#if CC_ALG == TICTOC
+    uint64_t    orig_wts;
+    uint64_t    orig_rts;
+    bool         locked;
+#endif
 	void cleanup();
 };
 
@@ -204,6 +209,20 @@ public:
 
     uint64_t twopl_wait_start;
 
+    // For Tictoc
+    uint64_t _min_commit_ts;
+    uint64_t _max_commit_ts;
+    volatile uint32_t _num_lock_waits;
+    bool _signal_abort;
+    bool _is_sub_txn;
+
+    uint64_t _timestamp;
+    uint64_t     get_priority() { return _timestamp; }
+    // debug time
+    uint64_t _start_wait_time;
+    uint64_t _lock_acquire_time;
+    uint64_t _lock_acquire_time_commit;
+    uint64_t _lock_acquire_time_abort;
 	////////////////////////////////
 	// LOGGING
 	////////////////////////////////

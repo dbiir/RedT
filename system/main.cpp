@@ -39,6 +39,7 @@
 #include "maat.h"
 #include "client_query.h"
 #include "wkdb.h"
+#include "tictoc.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 
@@ -195,6 +196,18 @@ int main(int argc, char* argv[])
 	wkdb_man.init();
   printf("Done\n");
 #endif
+/*
+#if CC_ALG == TICTOC
+  printf("Initializing Time Table... ");
+  fflush(stdout);
+  time_table.init();
+  printf("Done\n");
+  printf("Initializing MaaT manager... ");
+  fflush(stdout);
+	maat_man.init();
+  printf("Done\n");
+#endif
+*/
 #if LOGGING
   printf("Initializing logger... ");
   fflush(stdout);
@@ -251,7 +264,13 @@ int main(int argc, char* argv[])
     occ_man.init();
     printf("Done\n");
 #endif
-
+/*
+#if CC_ALG == TICTOC
+    printf("Initializing occ lock manager... ");
+    occ_man.init();
+    printf("Done\n");
+#endif
+*/
     /*
     printf("Initializing threads... ");
     fflush(stdout);

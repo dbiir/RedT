@@ -59,6 +59,7 @@ class Query_queue;
 class OptCC;
 class Maat;
 class Wkdb;
+class Tictoc;
 class Transport;
 class Remote_query;
 class TxnManPool;
@@ -100,6 +101,7 @@ extern Client_query_queue client_query_queue;
 extern OptCC occ_man;
 extern Maat maat_man;
 extern Wkdb wkdb_man;
+extern Tictoc tictoc_man;
 extern Transport tport_man;
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;
@@ -237,11 +239,14 @@ extern double g_perc_updatepart;
 // CALVIN
 extern UInt32 g_seq_thread_cnt;
 
+// TICTOC
+extern uint32_t g_max_num_waits;
+
 // Replication
 extern UInt32 g_repl_type;
 extern UInt32 g_repl_cnt;
 
-enum RC { RCOK=0, Commit, Abort, WAIT, WAIT_REM, ERROR, FINISH, NONE };
+enum RC { RCOK=0, Commit, Abort, WAIT, WAIT_REM, ERROR, FINISH, NONE};
 enum RemReqType {INIT_DONE=0,
     RLK,
     RULK,
