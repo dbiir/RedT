@@ -40,31 +40,29 @@ struct WKDBMVHisEntry {
 class Row_wkdb {
 public:
 	void init(row_t * row);
-  RC access(TsType type, TxnManager * txn, row_t * row);
-  RC read_and_write(TsType type, TxnManager * txn, row_t * row);
-  RC prewrite(TxnManager * txn);
-  RC abort(access_t type, TxnManager * txn);
-  RC commit(access_t type, TxnManager * txn, row_t * data);
-  void write(row_t * data);
+	RC access(TsType type, TxnManager * txn, row_t * row);
+	RC read_and_write(TsType type, TxnManager * txn, row_t * row);
+	//   RC prewrite(TxnManager * txn);
+	RC abort(access_t type, TxnManager * txn);
+	RC commit(access_t type, TxnManager * txn, row_t * data);
+	void write(row_t * data);
 	
+	volatile bool wkdb_avail;
+
 private:
-  volatile bool wkdb_avail;
-	
 	row_t * _row;
 
 public:	
-  std::set<uint64_t> * uncommitted_reads;
-  //std::set<uint64_t> * uncommitted_writes;
+	std::set<uint64_t> * uncommitted_reads;
+	//std::set<uint64_t> * uncommitted_writes;
 
-  uint64_t write_trans;
-  uint64_t timestamp_last_read;
-  uint64_t timestamp_last_write;
+	uint64_t write_trans;
+	uint64_t timestamp_last_read;
+	uint64_t timestamp_last_write;
 
 // multi-verison part
 private:
- 	pthread_mutex_t * latch;
-	bool blatch;
-
+	pthread_mutex_t * latch;
 	WKDBMVReqEntry * get_req_entry();
 	void return_req_entry(WKDBMVReqEntry * entry);
 	WKDBMVHisEntry * get_his_entry();
@@ -80,12 +78,9 @@ private:
 
 	WKDBMVReqEntry * readreq_mvcc;
   	WKDBMVReqEntry * prereq_mvcc;
-  	//WKDBMVHisEntry * readhis;
   	WKDBMVHisEntry * writehis;
-	//WKDBMVHisEntry * readhistail;
 	WKDBMVHisEntry * writehistail;
 	uint64_t whis_len;
-	//uint64_t rhis_len;
 	uint64_t rreq_len;
 	uint64_t preq_len;
 

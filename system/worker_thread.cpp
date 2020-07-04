@@ -294,7 +294,7 @@ RC WorkerThread::process_rfin(Message * msg) {
   } 
   txn_man->commit();
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
-  if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == WOOKONG || CC_ALG == TICTOC)
+  if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC)
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_FIN),GET_NODE_ID(msg->get_txn_id()));
   release_txn_man();
 
@@ -448,7 +448,7 @@ RC WorkerThread::process_rqry(Message * msg) {
 */
 #if CC_ALG == WOOKONG
     txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
-    wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id());
+    wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id(),txn_man->get_timestamp());
 #endif
 
   rc = txn_man->run_txn();
@@ -578,8 +578,8 @@ RC WorkerThread::process_rtxn(Message * msg) {
 */
 #if CC_ALG == WOOKONG
           txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
-          wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id());
-          assert(wkdb_time_table.get_lower(get_thd_id(),txn_man->get_txn_id()) == 0);
+          wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id(), txn_man->get_timestamp());
+          //assert(wkdb_time_table.get_lower(get_thd_id(),txn_man->get_txn_id()) == 0);
           assert(wkdb_time_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
           assert(wkdb_time_table.get_state(get_thd_id(),txn_man->get_txn_id()) == WKDB_RUNNING);
 #endif

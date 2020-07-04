@@ -95,9 +95,9 @@ void Thread::progress_stats() {
         SET_STATS(get_thd_id(), total_runtime, prog_time - simulation->run_starttime); 
 
         if(ISCLIENT) {
-          stats.print_client(true);
+          // stats.print_client(true);
         } else {
-          stats.print(true);
+          // stats.print(true);
         }
       }
 		}

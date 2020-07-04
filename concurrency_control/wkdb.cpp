@@ -55,30 +55,43 @@ RC Wkdb::validate(TxnManager * txn) {
 	wkdb_set_ent * wset;
 	wkdb_set_ent * rset;
 	get_rw_set(txn, rset, wset);
-  if (wset->set_size) {
-    goto ABORT_END;
+
+  DEBUG("WKDB write set size %ld: %u \n",txn->get_txn_id(),wset->set_size);
+  if (!wset->set_size) {
+    goto VALID_END;
   }
 
-  // lower bound of txn greater than write timestamp
-  if(lower <= txn->greatest_write_timestamp) {
-    lower = txn->greatest_write_timestamp + 1;
-    INC_STATS(txn->get_thd_id(),wkdb_case1_cnt,1);
-  }
+  // // lower bound of txn greater than write timestamp
+  // if(lower <= txn->greatest_write_timestamp) {
+  //   lower = txn->greatest_write_timestamp + 1;
+  //   INC_STATS(txn->get_thd_id(),wkdb_case1_cnt,1);
+  // }
 
   //Examine each element in the write set
   for (UInt32 i = 0; i < wset->set_size; i++) {
     //1. get the max read timestamp, and just the lower
     row_t * cur_wrow = wset->rows[i];
+
+    while(!ATOM_CAS(cur_wrow->manager->wkdb_avail,true,false)) { }
+    // pthread_mutex_lock( cur_wrow->manager->latch );
+
     if (lower <= cur_wrow->manager->timestamp_last_read) {
       lower = cur_wrow->manager->timestamp_last_read + 1;
     }
-    if (lower >= upper) goto ABORT_END;
+    if (lower >= upper) {
+      ATOM_CAS(cur_wrow->manager->wkdb_avail,false,true);
+      goto VALID_END;
+    }
     
     //2. write in the key's write xid
     if (cur_wrow->manager->write_trans) {
-      wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
-      rc = Abort;
-      goto FINISH;
+      if (cur_wrow->manager->write_trans != txn->get_txn_id()) {
+        wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
+        rc = Abort;
+        DEBUG("write trans already in use %lu, now txn %lu\n", cur_wrow->manager->write_trans, txn->get_txn_id())
+        ATOM_CAS(cur_wrow->manager->wkdb_avail,false,true);
+        goto FINISH;
+      }
     } else {
       cur_wrow->manager->write_trans = txn->get_txn_id();
     }
@@ -87,13 +100,21 @@ RC Wkdb::validate(TxnManager * txn) {
     std::set<uint64_t> * readxid_list = cur_wrow->manager->uncommitted_reads;
 
     for(auto it = readxid_list->begin(); it != readxid_list->end(); it++) {
-      if (lower >= upper) goto ABORT_END;
+      if (lower >= upper) {
+        ATOM_CAS(cur_wrow->manager->wkdb_avail,false,true);
+        goto VALID_END;
+      }
+
       uint64_t txn_id = *it;
       DEBUG("    UR %ld -- %ld: %ld\n",txn->get_txn_id(),cur_wrow->get_primary_key(),txn_id);
-      if (txn_id == txn->get_txn_id())
+      if (txn_id == txn->get_txn_id()) {
         continue;
+      }
       uint64_t it_upper = wkdb_time_table.get_upper(txn->get_thd_id(),*it);
       uint64_t it_lower = wkdb_time_table.get_lower(txn->get_thd_id(),*it);
+      if (it_lower >= it_upper) {
+        continue;
+      }
       WKDBState state = wkdb_time_table.get_state(txn->get_thd_id(),*it);
       if(state == WKDB_VALIDATED || state == WKDB_COMMITTED) {
         INC_STATS(txn->get_thd_id(),wkdb_case4_cnt,1);
@@ -101,6 +122,7 @@ RC Wkdb::validate(TxnManager * txn) {
           lower = it_upper;
         }
       } else if(state == WKDB_RUNNING) {
+        INC_STATS(txn->get_thd_id(),wkdb_case5_cnt,1);
         if (lower <= it_lower){
           //TRANS_LOG_WARN("DTAvalidation set lower = dta_txn->lower + 1, transid:%lu running_txn_id:%lu lower:%lu upper:%lu running_txn_id.lower:%lu running_txn_id.upper:%lu", ctx, part_ctx->GetTransID(), lower, upper, dta_txn->lower, dta_txn->upper);
           lower = it_lower + 1;
@@ -113,14 +135,15 @@ RC Wkdb::validate(TxnManager * txn) {
         }
       }
     }
+    // pthread_mutex_unlock( cur_wrow->manager->latch );
+    ATOM_CAS(cur_wrow->manager->wkdb_avail,false,true);
   }
 
-ABORT_END:
+VALID_END:
   if (lower >= upper){
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_ABORTED);
     rc = Abort;
-  }
-  else{
+  } else {
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_VALIDATED);
     rc = RCOK;
     assert(lower < upper);
@@ -162,8 +185,10 @@ RC Wkdb::get_rw_set(TxnManager * txn, wkdb_set_ent * &rset, wkdb_set_ent *& wset
 			rset->rows[m ++] = txn->get_access_original_row(i);
 	}
 
+  DEBUG("write set %d and read set %d\n", wset->set_size, rset->set_size);
 	assert(n == wset->set_size);
 	assert(m == rset->set_size);
+
 #endif
 	return RCOK;
 }
@@ -180,6 +205,7 @@ RC Wkdb::find_bound(TxnManager * txn) {
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_COMMITTED);
     // TODO: can commit_time be selected in a smarter way?
     txn->commit_timestamp = lower; 
+    // wkdb_time_table.set_upper(txn->get_thd_id(),txn->get_txn_id(),txn->commit_timestamp+1);
   }
   DEBUG("WKDB Bound %ld: %d [%lu,%lu] %lu\n",txn->get_txn_id(),rc,lower,upper,txn->commit_timestamp);
   return rc;
@@ -210,7 +236,7 @@ WkdbTimeTableEntry* WkdbTimeTable::find(uint64_t key) {
 
 }
 
-void WkdbTimeTable::init(uint64_t thd_id, uint64_t key) {
+void WkdbTimeTable::init(uint64_t thd_id, uint64_t key, uint64_t ts) {
   uint64_t idx = hash(key);
   uint64_t mtx_wait_starttime = get_sys_clock();
   pthread_mutex_lock(&table[idx].mtx);
@@ -219,7 +245,7 @@ void WkdbTimeTable::init(uint64_t thd_id, uint64_t key) {
   if(!entry) {
     DEBUG_M("WkdbTimeTable::init entry alloc\n");
     entry = (WkdbTimeTableEntry*) mem_allocator.alloc(sizeof(WkdbTimeTableEntry));
-    entry->init(key);
+    entry->init(key, ts);
     LIST_PUT_TAIL(table[idx].head,table[idx].tail,entry);
   }
   pthread_mutex_unlock(&table[idx].mtx);

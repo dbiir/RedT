@@ -52,8 +52,8 @@ struct WkdbTimeTableEntry{
   WKDBState state;
   WkdbTimeTableEntry * next;
   WkdbTimeTableEntry * prev;
-  void init(uint64_t key) {
-    lower = 0;
+  void init(uint64_t key, uint64_t ts) {
+    lower = ts;
     upper = UINT64_MAX;
     this->key = key;
     state = WKDB_RUNNING;
@@ -76,7 +76,7 @@ struct WkdbTimeTableNode {
 class WkdbTimeTable {
 public:
 	void init();
-	void init(uint64_t thd_id, uint64_t key);
+	void init(uint64_t thd_id, uint64_t key, uint64_t ts);
 	void release(uint64_t thd_id, uint64_t key);
   uint64_t get_lower(uint64_t thd_id, uint64_t key);
   uint64_t get_upper(uint64_t thd_id, uint64_t key);

@@ -51,6 +51,8 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "string": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "*.trm": "cpp",
+        "*.inc": "cpp"
     }
 }

@@ -2,32 +2,13 @@
 
 #define _CONFIG_H_
 
-/***tictoc****/
-/*
-#define WRITE_PERMISSION_LOCK         false
-#define MULTI_VERSION                 false
-#define ENABLE_LOCAL_CACHING          false
-#define OCC_LOCK_TYPE                 WAIT_DIE
-#define TICTOC_MV                     false
-#define OCC_WAW_LOCK                  true
-#define RO_LEASE                      false
-#define ATOMIC_WORD                   false
-#define TRACK_LAST                    false
-#define UPDATE_TABLE_TS               true
-#define WRITE_PERMISSION_LOCK         false
-#define LOCK_ALL_BEFORE_COMMIT        false
-#define LOCK_ALL_DEBUG                false
-#define PAUSE __asm__ ( "pause;" );
-#define COMPILER_BARRIER asm volatile("" ::: "memory");
-*/
-
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
+#define NODE_CNT 1
 #define THREAD_CNT 4
-#define REM_THREAD_CNT 2
-#define SEND_THREAD_CNT 2
+#define REM_THREAD_CNT THREAD_CNT
+#define SEND_THREAD_CNT THREAD_CNT
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
@@ -116,11 +97,12 @@
 /***********************************************/
 // Concurrency Control
 /***********************************************/
-// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC
-#define CC_ALG TICTOC
+// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG
+#define CC_ALG WOOKONG
 #define ISOLATION_LEVEL SERIALIZABLE
 #define YCSB_ABORT_MODE false
 
+// all transactions acquire tuples according to the primary key order.
 #define KEY_ORDER         false
 // transaction roll back changes after abort
 #define ROLL_BACK         true
@@ -156,11 +138,7 @@
 #define TXN_QUEUE_SIZE_LIMIT    THREAD_CNT
 // [CALVIN]
 #define SEQ_THREAD_CNT 4 
-// [TICTOC]
-#define MAX_NUM_WAITS 4
-#define PRE_ABORT true
-#define OCC_LOCK_TYPE WAIT_DIE
-#define OCC_WAW_LOCK true
+
 /***********************************************/
 // Logging
 /***********************************************/
@@ -188,8 +166,8 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 16777216
-#define ZIPF_THETA 0.6
+#define SYNTH_TABLE_SIZE 33554432
+#define ZIPF_THETA 0.8
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
@@ -285,7 +263,7 @@ enum PPSTxnType {PPS_ALL = 0,
 #define DEBUG_TIMESTAMP       false
 #define DEBUG_SYNTH         false
 #define DEBUG_ASSERT        false
-#define DEBUG_DISTR false
+#define DEBUG_DISTR true
 #define DEBUG_ALLOC false
 #define DEBUG_RACE false
 #define DEBUG_TIMELINE        false
@@ -328,7 +306,6 @@ enum PPSTxnType {PPS_ALL = 0,
 #define MAAT      11
 #define WDL           12
 #define WOOKONG     13
-#define TICTOC     14
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
@@ -371,10 +348,12 @@ enum PPSTxnType {PPS_ALL = 0,
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
 #define DONE_TIMER 1 * 60 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 60 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false
 #define ENVIRONMENT_EC2 false
 
 #endif
+
+

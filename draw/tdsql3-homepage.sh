@@ -1,19 +1,19 @@
 #!/bin/bash
 set -x
 
-BASE_PATH="/home/centos/deneva-code"
+BASE_PATH="/root/deneva-code"
 
 homepage="${BASE_PATH}/results/"
-files=$(ls -t $homepage)
+files=$(ls -t $homepage | grep r | grep -v patch)
 
 cd $homepage
 main=index.html
-cat /dev/null > $main
 echo '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>DBT</title></head><body><h1>deneva实验结果汇总</h1><ul>' > $main
 echo '<hr />' >> $main
 for i in $files; do
   if [ $i != 'index.html' ] && [ $i != 'getindex.sh' ] && [ $i != 'main.html' ]; then
   # todo add the test desc 
+  echo '<h2>'$i'</h2>' >> $main
       if [[ -f "$i/1tpmc.svg" ]]; then
         # firstline=$(grep -n "测试情况概述" $i/index.html | cut -d ":" -f 1)
         # endline=$(grep -n "测试结果对比" $i/index.html | cut -d ":" -f 1)
