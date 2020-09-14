@@ -26,6 +26,7 @@ int32_t Inflight_entry::inc_inflight() {
     int32_t result;
     sem_wait(&mutex);
     if (num_inflight_txns < g_inflight_max) {
+    // if (num_inflight_txns < 1) {    
         result = ++num_inflight_txns;
     } else {
         result = -1;

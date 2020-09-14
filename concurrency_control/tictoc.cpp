@@ -26,28 +26,34 @@
 bool Tictoc::_pre_abort = PRE_ABORT;
 
 RC Tictoc::get_rw_set(TxnManager * txn, tictoc_set_ent * &rset, tictoc_set_ent *& wset) {
+#if CC_ALG == TICTOC
 	wset = (tictoc_set_ent*) mem_allocator.alloc(sizeof(tictoc_set_ent));
 	rset = (tictoc_set_ent*) mem_allocator.alloc(sizeof(tictoc_set_ent));
 	wset->set_size = txn->get_write_set_size();
 	rset->set_size = txn->get_read_set_size();
 	wset->rows = (row_t **) mem_allocator.alloc(sizeof(row_t *) * wset->set_size);
 	rset->rows = (row_t **) mem_allocator.alloc(sizeof(row_t *) * rset->set_size);
+	wset->access = (Access **) mem_allocator.alloc(sizeof(Access *) * wset->set_size);
+	rset->access = (Access **) mem_allocator.alloc(sizeof(Access *) * rset->set_size);
 	wset->txn = txn;
 	rset->txn = txn;
 
 	UInt32 n = 0, m = 0;
 	for (uint64_t i = 0; i < wset->set_size + rset->set_size; i++) {
 		if (txn->get_access_type(i) == WR){
-            wset->access[n ++] = txn->txn->accesses[i];
-			wset->rows[n ++] = txn->get_access_original_row(i);
+            wset->access[n] = txn->txn->accesses[i];
+			wset->rows[n] = txn->get_access_original_row(i);
+            n++;
         }
 		else {
-            rset->access[n ++] = txn->txn->accesses[i];
-			rset->rows[m ++] = txn->get_access_original_row(i);
+            rset->access[m] = txn->txn->accesses[i];
+			rset->rows[m] = txn->get_access_original_row(i);
+            m++;
         }
 	}
 	assert(n == wset->set_size);
 	assert(m == rset->set_size);
+#endif
 	return RCOK;
 }
 
@@ -66,6 +72,7 @@ RC Tictoc::validate(TxnManager * txn)
 RC Tictoc::validate_coor(TxnManager * txn)
 {
     RC rc = RCOK;
+#if CC_ALG == TICTOC
     // split _access_set into read_set and write_set
 	tictoc_set_ent * wset;
 	tictoc_set_ent * rset;
@@ -100,15 +107,15 @@ RC Tictoc::validate_coor(TxnManager * txn)
         rc = lock_write_set(wset, txn);
         if (rc == Abort) {
             // INC_INT_STATS(num_aborts_ws, 1);  // local abort
-
         }
     }
     if (rc != Abort) {
+        RC rc2 = RCOK;
         // if any rts has been updated, update _min_commit_ts.
         compute_commit_ts(txn);
         // at this point, _min_commit_ts is the final min_commit_ts for the prepare phase. .
-        if (ISOLATION_LEVEL == SERIALIZABLE)
-            RC rc2 = validate_read_set(rset, txn, txn->_min_commit_ts);
+        if (ISOLATION_LEVEL == SERIALIZABLE) {
+            rc2 = validate_read_set(rset, txn, txn->_min_commit_ts);
             if (rc2 == Abort) {
                 rc = rc2;
                 // INC_INT_STATS(num_aborts_rs, 1);  // local abort
@@ -119,12 +126,14 @@ RC Tictoc::validate_coor(TxnManager * txn)
     if (rc == Abort) {
         unlock_write_set(rc, wset, txn);
     }
+#endif
     return rc;
 }
 
 RC Tictoc::validate_part(TxnManager * txn)
 {
     RC rc = RCOK;
+#if CC_ALG == TICTOC
     // split _access_set into read_set and write_set
 	tictoc_set_ent * wset;
 	tictoc_set_ent * rset;
@@ -144,11 +153,11 @@ RC Tictoc::validate_part(TxnManager * txn)
         }
     }
     if (rc != Abort) {
-        if (validate_write_set(_min_commit_ts) == Abort)
+        if (validate_write_set(wset, txn, txn->_min_commit_ts) == Abort)
             rc = Abort;
     }
     if (rc != Abort) {
-        if (validate_read_set(_min_commit_ts) == Abort) {
+        if (validate_read_set(rset, txn, txn->_min_commit_ts) == Abort) {
             rc = Abort;
             // INC_INT_STATS(num_Aborts_rs, 1);
         }
@@ -164,11 +173,13 @@ RC Tictoc::validate_part(TxnManager * txn)
         // } else
         //     return rc;
     }
+#endif
     return rc;
 }
 
 void Tictoc::compute_commit_ts(TxnManager * txn)
 {
+#if CC_ALG == TICTOC
 	uint64_t size = txn->get_write_set_size();
 	size += txn->get_read_set_size();
 	for (uint64_t i = 0; i < size; i++) {
@@ -179,6 +190,7 @@ void Tictoc::compute_commit_ts(TxnManager * txn)
             txn->_min_commit_ts = txn->txn->accesses[i]->orig_wts >  txn->_min_commit_ts ? txn->txn->accesses[i]->orig_wts : txn->_min_commit_ts;
         }
 	}
+#endif
 #if 0
     for (auto access : _remote_set)
     {
@@ -199,6 +211,7 @@ void Tictoc::compute_commit_ts(TxnManager * txn)
 RC
 Tictoc::validate_read_set(tictoc_set_ent * rset, TxnManager * txn, uint64_t commit_ts)
 {
+#if CC_ALG == TICTOC
 #if 0
     for (auto access : _index_access_set) {
         if (access.type == INS || access.type == DEL)
@@ -229,7 +242,7 @@ Tictoc::validate_read_set(tictoc_set_ent * rset, TxnManager * txn, uint64_t comm
             return Abort;
         }
     }
-
+#endif
     return RCOK;
 }
 
@@ -238,6 +251,7 @@ Tictoc::lock_write_set(tictoc_set_ent * wset, TxnManager * txn)
 {
     assert(!OCC_WAW_LOCK);
     RC rc = RCOK;
+#if CC_ALG == TICTOC
     txn->_num_lock_waits = 0;
 #if 0
     vector<AccessTicToc *>::iterator it;
@@ -275,12 +289,25 @@ Tictoc::lock_write_set(tictoc_set_ent * wset, TxnManager * txn)
         return Abort;
     else if (txn->_num_lock_waits > 0)
         return WAIT;
+#endif
     return rc;
+}
+
+void
+Tictoc::cleanup(RC rc, TxnManager * txn)
+{
+#if CC_ALG == TICTOC
+	tictoc_set_ent * wset;
+	tictoc_set_ent * rset;
+    get_rw_set(txn, rset, wset);
+    unlock_write_set(rc, wset, txn);
+#endif
 }
 
 void
 Tictoc::unlock_write_set(RC rc, tictoc_set_ent * wset, TxnManager * txn)
 {
+#if CC_ALG == TICTOC
 #if 0
     for (vector<IndexAccessTicToc>::iterator it = _index_access_set.begin();
         it != _index_access_set.end(); it ++ )
@@ -298,11 +325,13 @@ Tictoc::unlock_write_set(RC rc, tictoc_set_ent * wset, TxnManager * txn)
             wset->access[i]->locked = false;
         }
     }
+#endif
 }
 
 RC
 Tictoc::validate_write_set(tictoc_set_ent * wset, TxnManager * txn, uint64_t commit_ts)
 {
+#if CC_ALG == TICTOC
     for (UInt32 i = 0; i < wset->set_size; i++) {
         if (txn->_min_commit_ts <= wset->access[i]->orig_rts){
             // INC_INT_STATS(int_urgentwrite, 1);  // write too urgent
@@ -316,6 +345,7 @@ Tictoc::validate_write_set(tictoc_set_ent * wset, TxnManager * txn, uint64_t com
             return Abort;
         }
     }
+#endif
 #endif
     return RCOK;
 }

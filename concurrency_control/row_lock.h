@@ -18,11 +18,11 @@
 #define ROW_LOCK_H
 
 struct LockEntry {
-    lock_t type;
-    ts_t   start_ts;
-    TxnManager * txn;
-	LockEntry * next;
-	LockEntry * prev;
+  lock_t type;
+  ts_t   start_ts;
+  TxnManager * txn;
+  LockEntry * next;
+  LockEntry * prev;
 };
 
 class Row_lock {

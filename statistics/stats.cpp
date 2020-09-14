@@ -207,6 +207,11 @@ void Stats_thd::clear() {
   occ_abort_check_cnt=0;
   occ_ts_abort_cnt=0;
   occ_finish_time=0;
+  // WSI
+  wsi_validate_time=0;
+  wsi_cs_wait_time=0;
+  wsi_check_cnt=0;
+  wsi_abort_check_cnt=0;
 
   // MAAT
   maat_validate_cnt=0;
@@ -219,6 +224,11 @@ void Stats_thd::clear() {
   maat_case5_cnt=0;
   maat_range=0;
   maat_commit_cnt=0;
+
+  // // SSI
+  // ssi_validate_cnt=0;
+  // ssi_validate_time=0;
+  // ssi_commit_cnt=0;
 
   // WKDB
   wkdb_validate_cnt=0;

@@ -9,7 +9,7 @@ f = open(sys.argv[1])
 x = f.readline().split()
 z = f.readline().split()
 y = []
-for i in range(int(sys.argv[2])):
+for i in range(5):
     y.append([float(x) for x in f.readline().split()])
 
 xindex = arange(len(x)+1)

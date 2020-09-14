@@ -553,7 +553,10 @@ stat_map2 = {
   'maat_range': [],
   'maat_commit_cnt': [],
   'maat_range_avg': [],
-
+#   # SSI
+#   'ssi_validate_cnt': [],
+#   'ssi_validate_time': [],
+#   'ssi_commit_cnt': [],
   # Logging
   'log_write_cnt': [],
   'log_write_time': [],

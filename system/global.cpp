@@ -22,6 +22,10 @@
 #include "query.h"
 #include "client_query.h"
 #include "occ.h"
+#include "bocc.h"
+#include "focc.h"
+#include "ssi.h"
+#include "wsi.h"
 #include "transport.h"
 #include "work_queue.h"
 #include "abort_queue.h"
@@ -36,6 +40,7 @@
 #include "tictoc.h"
 #include "key_xid.h"
 #include "rts_cache.h"
+#include "http.h"
 
 mem_alloc mem_allocator;
 Stats stats;
@@ -44,8 +49,12 @@ Manager glob_manager;
 Query_queue query_queue;
 Client_query_queue client_query_queue;
 OptCC occ_man;
+Focc focc_man;
+Bocc bocc_man;
 Maat maat_man;
 Wkdb wkdb_man;
+ssi ssi_man;
+wsi wsi_man;
 Tictoc tictoc_man;
 Transport tport_man;
 TxnManPool txn_man_pool;
@@ -63,9 +72,12 @@ Client_txn client_man;
 Sequencer seq_man;
 Logger logger;
 TimeTable time_table;
+InOutTable inout_table;
 WkdbTimeTable wkdb_time_table;
 KeyXidCache wkdb_key_xid_cache;
 RtsCache wkdb_rts_cache;
+// QTcpQueue tcp_queue;
+TcpTimestamp tcp_ts;
 
 bool volatile warmup_done = false;
 bool volatile enable_thread_mem_pool = false;
@@ -125,6 +137,7 @@ UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt 
 #else
 UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt;
 #endif
+
 UInt32 g_total_client_thread_cnt = g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
 UInt32 g_total_node_cnt = g_node_cnt + g_client_node_cnt + g_repl_cnt*g_node_cnt;
 UInt64 g_synth_table_size = SYNTH_TABLE_SIZE;

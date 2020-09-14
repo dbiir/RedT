@@ -37,11 +37,16 @@
 #include "abort_queue.h"
 #include "work_queue.h"
 #include "maat.h"
+#include "ssi.h"
+#include "wsi.h"
+#include "focc.h"
+#include "bocc.h"
 #include "client_query.h"
 #include "wkdb.h"
 #include "tictoc.h"
 #include "key_xid.h"
 #include "rts_cache.h"
+#include "http.h"
 
 void network_test();
 void network_test_recv();
@@ -53,6 +58,7 @@ InputThread * input_thds;
 OutputThread * output_thds;
 AbortThread * abort_thds;
 LogThread * log_thds;
+// TcpThread * tcp_thds;
 #if CC_ALG == CALVIN
 CalvinLockThread * calvin_lock_thds;
 CalvinSequencerThread * calvin_seq_thds;
@@ -80,6 +86,7 @@ int main(int argc, char* argv[])
   fflush(stdout);
 	stats.init(g_total_thread_cnt);
   printf("Done\n");
+
   printf("Initializing global manager... ");
   fflush(stdout);
 	glob_manager.init();
@@ -181,6 +188,22 @@ int main(int argc, char* argv[])
 	maat_man.init();
   printf("Done\n");
 #endif
+#if CC_ALG == SSI
+  printf("Initializing In Out Table... ");
+  fflush(stdout);
+  inout_table.init();
+  printf("Done\n");
+  printf("Initializing SSI manager... ");
+  fflush(stdout);
+  ssi_man.init();
+  printf("Done\n");
+#endif
+#if CC_ALG == WSI
+  printf("Initializing WSI manager... ");
+  fflush(stdout);
+  wsi_man.init();
+  printf("Done\n");
+#endif
 #if CC_ALG == WOOKONG
   printf("Initializing WKDB Time Table... ");
   fflush(stdout);
@@ -196,18 +219,14 @@ int main(int argc, char* argv[])
 	wkdb_man.init();
   printf("Done\n");
 #endif
-/*
+
 #if CC_ALG == TICTOC
-  printf("Initializing Time Table... ");
-  fflush(stdout);
-  time_table.init();
-  printf("Done\n");
   printf("Initializing MaaT manager... ");
   fflush(stdout);
-	maat_man.init();
+	tictoc_man.init();
   printf("Done\n");
 #endif
-*/
+
 #if LOGGING
   printf("Initializing logger... ");
   fflush(stdout);
@@ -235,6 +254,14 @@ int main(int argc, char* argv[])
 #if CC_ALG == CALVIN
     all_thd_cnt += 2; // sequencer + scheduler thread
 #endif
+
+	if (g_ts_alloc == LTS_TCP_CLOCK) {
+    printf("Initializing tcp queue... ");
+    fflush(stdout);
+    tcp_ts.init(all_thd_cnt);
+    printf("Done\n");    
+  }
+
     printf("%ld, %ld, %ld, %d \n", thd_cnt, rthd_cnt, sthd_cnt, g_abort_thread_cnt);
     printf("all_thd_cnt: %ld, g_this_total_thread_cnt: %d \n", all_thd_cnt, g_this_total_thread_cnt);
     fflush(stdout);
@@ -264,13 +291,18 @@ int main(int argc, char* argv[])
     occ_man.init();
     printf("Done\n");
 #endif
-/*
-#if CC_ALG == TICTOC
+
+#if CC_ALG == BOCC
     printf("Initializing occ lock manager... ");
-    occ_man.init();
+    bocc_man.init();
     printf("Done\n");
 #endif
-*/
+
+#if CC_ALG == FOCC
+    printf("Initializing occ lock manager... ");
+    focc_man.init();
+    printf("Done\n");
+#endif
     /*
     printf("Initializing threads... ");
     fflush(stdout);
@@ -311,7 +343,6 @@ int main(int argc, char* argv[])
 	    input_thds[j].init(id,g_node_id,m_wl);
 	    pthread_create(&p_thds[id++], NULL, run_thread, (void *)&input_thds[j]);
 	}
-
 
 	for (uint64_t j = 0; j < sthd_cnt; j++) {
 	    assert(id >= wthd_cnt + rthd_cnt && id < wthd_cnt + rthd_cnt + sthd_cnt);
@@ -374,6 +405,12 @@ int main(int argc, char* argv[])
   msg_pool.free_all();
   qry_pool.free_all();
   */
+  if (g_ts_alloc == LTS_TCP_CLOCK) {
+    for (uint32_t i = 0; i < all_thd_cnt; i++) {
+      tcp_ts.CloseToLts(i);
+    }
+  }
+    
 	return 0;
 }
 

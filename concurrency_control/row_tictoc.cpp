@@ -22,6 +22,37 @@
 #include "helper.h"
 #include "tictoc.h"
 
+
+#if OCC_LOCK_TYPE == WAIT_DIE || OCC_WAW_LOCK
+bool
+Row_tictoc::CompareWait::operator() (TxnManager * en1, TxnManager * en2) const
+{
+    return en1->get_priority() < en2->get_priority();
+}
+#endif
+
+Row_tictoc::Row_tictoc(row_t * row) {
+	_row = row;
+	_latch = new pthread_mutex_t;
+	_blatch = false;
+	pthread_mutex_init( _latch, NULL );
+	_wts = 0;
+	_rts = 0;
+	_ts_lock = false;
+	_num_remote_reads = 0;
+
+  #if OCC_LOCK_TYPE == WAIT_DIE || OCC_WAW_LOCK
+	  _max_num_waits = g_max_num_waits;
+	_lock_owner = NULL;
+  #endif
+#if TICTOC_MV
+	_hist_wts = 0;
+#endif
+
+	_deleted = false;
+	_delete_timestamp = 0;
+}
+
 void Row_tictoc::init(row_t * row) {
 	_row = row;
 	_latch = new pthread_mutex_t;
@@ -61,9 +92,9 @@ Row_tictoc::access(access_t type, TxnManager * txn, row_t *& row,
 					uint64_t &wts, uint64_t &rts) {
 	uint64_t starttime = get_sys_clock();
 	RC rc = RCOK;
-  if(type == RD)
+  if(type == RD || !OCC_WAW_LOCK)
 	read(txn, NULL, wts, rts, true);
-  if(type == WR)
+  else if(type == WR)
 	write(txn, wts, rts);
 //   rc = read_and_write(type, txn, row);
 
@@ -81,6 +112,7 @@ Row_tictoc::read(TxnManager * txn, char * data,
 		this->latch();
 	wts = _wts;
 	rts = _rts;
+    // txn->cur_row = _row;
 	if (data)
 		memcpy(data, _row->get_data(), _row->get_tuple_size());
 
@@ -103,7 +135,7 @@ Row_tictoc::write(TxnManager * txn, uint64_t &wts, uint64_t &rts, bool latch)
 #endif
 	if (latch)
 		pthread_mutex_lock( _latch );
-	  if (!_ts_lock) {
+	if (!_ts_lock) {
 		_ts_lock = true;
 		_lock_owner = txn;
 	} else if (_lock_owner != txn) {
@@ -115,13 +147,16 @@ Row_tictoc::write(TxnManager * txn, uint64_t &wts, uint64_t &rts, bool latch)
 		// 			"txn=%ld, _lock_owner=%ld. ID=%ld\n", (uint64_t)txn, (uint64_t)_lock_owner, txn->get_txn_id());
 		// txn has higher priority, should wait.
 		// assert (MAN(txn)->get_priority() != MAN(_lock_owner)->get_priority());
-		if (_waiting_set.size() < _max_num_waits)
+		if (_waiting_set.size() < _max_num_waits && 
+            txn->get_priority() < _lock_owner->get_priority())
 		{
 			_waiting_set.insert(txn);
 			rc = WAIT;
 			// txn->_start_wait_time = get_sys_clock();
-		} else
+		} else {
 			rc = Abort;
+            DEBUG("tictoc abort 158 %ld,%lu -- %ld\n",txn->get_txn_id(),txn->_min_commit_ts,_row->get_primary_key());
+        }
 #endif
 	}
 	if (rc == RCOK) {
@@ -192,8 +227,14 @@ Row_tictoc::try_lock(TxnManager * txn)
         // txn has higher priority, should wait.
         if (_waiting_set.size() >= _max_num_waits){
             rc = Abort;
-        } else
+            DEBUG("tictoc abort 230 %ld,%lu -- %ld\n",txn->get_txn_id(),txn->_min_commit_ts,_row->get_primary_key());
+        } else if (txn->get_priority() < _lock_owner->get_priority()) {
+            _waiting_set.insert(txn);
+            rc = WAIT;
+        } else {
             rc = Abort;
+            DEBUG("tictoc abort 236 %ld,%lu -- %ld\n",txn->get_txn_id(),txn->_min_commit_ts,_row->get_primary_key());
+        }
     }
 #endif
     pthread_mutex_unlock( _latch );
@@ -265,6 +306,7 @@ Row_tictoc::try_renew(ts_t wts, ts_t rts, ts_t &new_rts)
 void
 Row_tictoc::release(TxnManager * txn, RC rc)
 {
+#if CC_ALG == TICTOC
     pthread_mutex_lock( _latch );
 #if !OCC_WAW_LOCK
   #if OCC_LOCK_TYPE == NO_WAIT
@@ -338,20 +380,24 @@ Row_tictoc::release(TxnManager * txn, RC rc)
   #endif
 #endif
     pthread_mutex_unlock( _latch );
+#endif
 }
 
 void
 Row_tictoc::get_ts(uint64_t &wts, uint64_t &rts)
 {
+#if CC_ALG == TICTOC
     pthread_mutex_lock( _latch );
     wts = _wts;
     rts = _rts;
     pthread_mutex_unlock( _latch );
+#endif
 }
 
 bool
 Row_tictoc::renew(ts_t wts, ts_t rts, ts_t &new_rts) // Renew without lock checking
 {
+
 #if LOCK_ALL_BEFORE_COMMIT
 #if ATOMIC_WORD
     uint64_t v = _ts_word;
@@ -449,12 +495,5 @@ Row_tictoc::renew(ts_t wts, ts_t rts, ts_t &new_rts) // Renew without lock check
 
 }
 
-#if OCC_LOCK_TYPE == WAIT_DIE || OCC_WAW_LOCK
-bool
-Row_tictoc::CompareWait::operator() (TxnManager * en1, TxnManager * en2) const
-{
-    return en1->get_priority() < en2->get_priority();
-}
-#endif
 
 

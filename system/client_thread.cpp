@@ -62,7 +62,11 @@ RC ClientThread::run() {
 		//uint32_t next_node = iters++ % g_node_cnt;
     progress_stats();
     int32_t inf_cnt;
+#if CC_ALG == BOCC || CC_ALG == FOCC
+    uint32_t next_node = 0;
+#else
 		uint32_t next_node = (((iters++) * g_client_thread_cnt) + _thd_id )% g_servers_per_client;
+#endif
 		uint32_t next_node_id = next_node + g_server_start_node;
 		// Just in case...
 		if (iters == UINT64_MAX)

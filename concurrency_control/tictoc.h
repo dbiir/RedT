@@ -38,7 +38,7 @@ class Tictoc {
 public:
   void init();
   RC validate(TxnManager * txn);
-  
+  void cleanup(RC rc, TxnManager * txn);
   void set_txn_ready(RC rc, TxnManager * txn);
   bool is_txn_ready(TxnManager * txn);
   static bool     _pre_abort;

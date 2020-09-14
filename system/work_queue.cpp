@@ -185,7 +185,10 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
   Message * msg = NULL;
   work_queue_entry * entry = NULL;
   uint64_t mtx_wait_starttime = get_sys_clock();
-  bool valid = work_queue->pop(entry);
+  bool valid = false;
+
+  // valid = work_queue->pop(entry);
+  valid = new_txn_queue->pop(entry);
   if(!valid) {
 #if SERVER_GENERATE_QUERIES
     if(ISSERVER) {
@@ -196,7 +199,8 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
       }
     }
 #else
-    valid = new_txn_queue->pop(entry);
+    valid = work_queue->pop(entry);
+    // valid = new_txn_queue->pop(entry);
 #endif
   }
   INC_STATS(thd_id,mtx[14],get_sys_clock() - mtx_wait_starttime);

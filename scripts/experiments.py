@@ -59,12 +59,20 @@ def pps_scaling():
 
 def ycsb_scaling():
     wl = 'YCSB'
-    #nnodes = [1,2,4,8,16,32,64]
+    # nnodes = [1,2,4,8,16,32,64]
+    nnodes = [2]
+    # nnodes = [1]
     #algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
-    #algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
-    algos=['TICTOC']
-    base_table_size=2097152*8
-    skew = [0.6]
+    # algos=['TICTOC','CALVIN','NO_WAIT']
+    # algos=['OCC','FOCC','BOCC','WSI','SSI']
+    algos=['OCC']
+    # algos=['OCC','MVCC','MAAT','TIMESTAMP','NO_WAIT','WAIT_DIE']
+    base_table_size=1048576*8
+    txn_write_perc = [0.5]
+    tup_write_perc = [0.5]
+    load = [10000] 
+    tcnt = [4]
+    skew = [0.0]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
     #txn_write_perc = [0.0]
@@ -76,8 +84,9 @@ def ycsb_scaling1():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     nnodes = [1,2,4,8,16,32]
-    algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
-    # algos=['CALVIN']
+    # algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    algos=['TICTOC']
+    # algos=['TICTOC','CALVIN','NO_WAIT']
     base_table_size=2097152*8
     txn_write_perc = [0.0]
     tup_write_perc = [0.0]
@@ -93,8 +102,9 @@ def ycsb_scaling2():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     nnodes = [1,2,4,8,16,32]
-    algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    # algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=['CALVIN']
+    algos=['TICTOC']
     base_table_size=2097152*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
@@ -139,7 +149,8 @@ def ycsb_scaling_abort():
 def ycsb_skew():
     wl = 'YCSB'
     nnodes = [16]
-    algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    # algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    algos=['TICTOC']
     # algos=['CALVIN']
     base_table_size=2097152*8
     txn_write_perc = [0.5]
@@ -168,8 +179,8 @@ def ycsb_skew1():
 def ycsb_writes():
     wl = 'YCSB'
     nnodes = [16]
-    algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
-    # algos=['WOOKONG','MAAT','OCC']
+    # algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    algos=['TICTOC']
     # algos=['CALVIN']
     base_table_size=2097152*8
     txn_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
@@ -272,8 +283,8 @@ def tpcc_scaling1():
     wl = 'TPCC'
     nnodes = [1,2,4,8,16,32]
     # nnodes = [8]
-    nalgos=['WOOKONG','MAAT','MVCC','TIMESTAMP','OCC','WAIT_DIE']
-    # nalgos=['CALVIN']
+    # nalgos=['WOOKONG','MAAT','MVCC','TIMESTAMP','OCC','WAIT_DIE']
+    nalgos=['TICTOC']
     npercpay=[0.0]
     wh=32
     load = [10000]
@@ -285,8 +296,8 @@ def tpcc_scaling2():
     wl = 'TPCC'
     nnodes = [1,2,4,8,16,32]
     # nnodes = [8]
-    nalgos=['WOOKONG','MAAT','MVCC','TIMESTAMP','OCC','WAIT_DIE']
-    # nalgos=['WOOKONG','MVCC','OCC']
+    # nalgos=['WOOKONG','MAAT','MVCC','TIMESTAMP','OCC','WAIT_DIE']
+    nalgos=['TICTOC']
     # nalgos=['CALVIN']
     npercpay=[1.0]
     wh=32
@@ -473,7 +484,7 @@ configs = {
     "NETWORK_DELAY": '0UL',
     "NETWORK_DELAY_TEST": 'false',
     "DONE_TIMER": "1 * 60 * BILLION // ~1 minutes",
-    "WARMUP_TIMER": "1 * 60 * BILLION // ~1 minutes",
+    "WARMUP_TIMER": "1 * 10 * BILLION // ~1 minutes",
     "SEQ_BATCH_TIMER": "5 * 1 * MILLION // ~5ms -- same as CALVIN paper",
     "BATCH_TIMER" : "0",
     "PROG_TIMER" : "10 * BILLION // in s",

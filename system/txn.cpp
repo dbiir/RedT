@@ -22,6 +22,8 @@
 #include "thread.h"
 #include "mem_alloc.h"
 #include "occ.h"
+#include "focc.h"
+#include "bocc.h"
 #include "row_occ.h"
 #include "table.h"
 #include "catalog.h"
@@ -37,6 +39,8 @@
 #include "maat.h"
 #include "wkdb.h"
 #include "tictoc.h"
+#include "ssi.h"
+#include "wsi.h"
 #include "manager.h"
 
 void TxnStats::init() {
@@ -298,7 +302,7 @@ void Transaction::release_accesses(uint64_t thd_id) {
 void Transaction::release_inserts(uint64_t thd_id) {
   for(uint64_t i = 0; i < insert_rows.size(); i++) {
 	row_t * row = insert_rows[i];
-#if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != WOOKONG && CC_ALG != TICTOC
+#if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != WOOKONG && CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC
 	DEBUG_M("TxnManager::cleanup row->manager free\n");
 	mem_allocator.free(row->manager, 0);
 #endif
@@ -433,29 +437,40 @@ void TxnManager::reset_query() {
 }
 
 RC TxnManager::commit() {
-  DEBUG("Commit %ld\n",get_txn_id());
-  release_locks(RCOK);
+	DEBUG("Commit %ld\n",get_txn_id());
+	release_locks(RCOK);
 #if CC_ALG == MAAT
-  time_table.release(get_thd_id(),get_txn_id());
+  	time_table.release(get_thd_id(),get_txn_id());
 #endif
 #if CC_ALG == WOOKONG
-  wkdb_time_table.release(get_thd_id(),get_txn_id());
+  	wkdb_time_table.release(get_thd_id(),get_txn_id());
 #endif
-  commit_stats();
+#if CC_ALG == TICTOC
+  	tictoc_man.cleanup(RCOK, this);
+#endif
+#if CC_ALG == SSI
+	inout_table.set_commit_ts(get_thd_id(), get_txn_id(), get_commit_timestamp());
+	inout_table.set_state(get_thd_id(), get_txn_id(), SSI_COMMITTED);
+#endif
+  	commit_stats();
 #if LOGGING
 	LogRecord * record = logger.createRecord(get_txn_id(),L_NOTIFY,0,0);
 	if(g_repl_cnt > 0) {
 	  msg_queue.enqueue(get_thd_id(),Message::create_message(record,LOG_MSG),g_node_id + g_node_cnt + g_client_node_cnt); 
 	}
-  logger.enqueueRecord(record);
-  return WAIT;
+	logger.enqueueRecord(record);
+	return WAIT;
 #endif
-  return Commit;
+  	return Commit;
 }
 
 RC TxnManager::abort() {
   if(aborted)
 	return Abort;
+#if CC_ALG == SSI
+	inout_table.set_state(get_thd_id(), get_txn_id(), SSI_ABORTED);
+	inout_table.clear_Conflict(get_thd_id(), get_txn_id());
+#endif
   DEBUG("Abort %ld\n",get_txn_id());
   txn->rc = Abort;
   INC_STATS(get_thd_id(),total_txn_abort_cnt,1);
@@ -473,12 +488,7 @@ RC TxnManager::abort() {
   //assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
   time_table.release(get_thd_id(),get_txn_id());
 #endif 
-/*
-#if CC_ALG == TICTOC
-  //assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
-  time_table.release(get_thd_id(),get_txn_id());
-#endif 
-*/
+
 #if CC_ALG == WOOKONG
   //assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
   wkdb_time_table.release(get_thd_id(),get_txn_id());
@@ -517,33 +527,42 @@ RC TxnManager::start_abort() {
 }
 
 RC TxnManager::start_commit() {
-  RC rc = RCOK;
-  DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
+	RC rc = RCOK;
+	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
 	_is_sub_txn = false;
-  if(is_multi_part()) {
+  	if(is_multi_part()) {
 		if(CC_ALG == TICTOC) {
 			rc = validate();
 			if (rc != Abort) {
 				send_prepare_messages();
 				rc = WAIT_REM;
 			}
-		} else if(!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == WOOKONG) {
+		} else if(!query->readonly() || CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI ) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;
 		} else {
+			if(CC_ALG == WSI) {
+				wsi_man.gene_finish_ts(this);
+			}
 			send_finish_messages();
 			rsp_cnt = 0;
 			rc = commit();
 		}
-  } else { // is not multi-part
+  	} else { // is not multi-part
 		rc = validate();
+		if(CC_ALG == SSI) {
+			ssi_man.gene_finish_ts(this);
+		}
+		if(CC_ALG == WSI) {
+			wsi_man.gene_finish_ts(this);
+		}
 		if(rc == RCOK)
 			rc = commit();
 		else
 			start_abort();
 	}
-  return rc;
+  	return rc;
 }
 
 void TxnManager::send_prepare_messages() {
@@ -591,11 +610,16 @@ bool TxnManager::is_multi_part() {
 }
 
 void TxnManager::commit_stats() {
+	DEBUG("Commit_stats %ld\n",get_txn_id());
 	uint64_t commit_time = get_sys_clock();
 	uint64_t timespan_short = commit_time - txn_stats.restart_starttime;
 	uint64_t timespan_long  = commit_time - txn_stats.starttime;
 	INC_STATS(get_thd_id(),total_txn_commit_cnt,1);
-
+	
+	uint64_t warmuptime = get_sys_clock() - simulation->run_starttime;
+	DEBUG("Commit_stats execute_time %ld warmup_time %ld\n",warmuptime,g_warmup_timer);
+	if (simulation->is_warmup_done())
+		DEBUG("Commit_stats total_txn_commit_cnt %ld\n",stats._stats[get_thd_id()]->total_txn_commit_cnt);
 	if(!IS_LOCAL(get_txn_id()) && CC_ALG != CALVIN) {
 	  INC_STATS(get_thd_id(),remote_txn_commit_cnt,1);
 	  txn_stats.commit_stats(get_thd_id(),get_txn_id(),get_batch_id(), timespan_long, timespan_short);
@@ -781,7 +805,15 @@ void TxnManager::cleanup(RC rc) {
 #if CC_ALG == OCC && MODE == NORMAL_MODE
 	occ_man.finish(rc,this);
 #endif
-
+#if CC_ALG == BOCC && MODE == NORMAL_MODE
+	bocc_man.finish(rc,this);
+#endif
+#if CC_ALG == FOCC && MODE == NORMAL_MODE
+	focc_man.finish(rc,this);
+#endif
+#if (CC_ALG == WSI) && MODE == NORMAL_MODE
+	wsi_man.finish(rc,this);
+#endif
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
 	assert(txn->accesses.get_count() == txn->row_cnt);
@@ -825,11 +857,12 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	uint64_t timespan;
 	RC rc = RCOK;
 	DEBUG_M("TxnManager::get_row access alloc\n");
-	Access * access;
+	Access * access = NULL;
 	this->last_row = row;
 	this->last_type = type;
 
 #if CC_ALG == TICTOC
+	bool isexist = false;
 	uint64_t size = get_write_set_size();
 	size += get_read_set_size();
 	// UInt32 n = 0, m = 0;
@@ -837,6 +870,8 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 		if (txn->accesses[i]->orig_row == row) {
 			access = txn->accesses[i];
 			access->orig_row->get_ts(access->orig_wts, access->orig_rts);
+			isexist = true;
+			// DEBUG("TxnManagerTictoc::find the exist access \n", access->orig_data, access->orig_row, access->data, access->orig_rts, access->orig_wts);
 			break;
 		}
 	}
@@ -865,6 +900,9 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	//assert(txn->accesses.get_count() - 1 == row_cnt);
 #if CC_ALG != TICTOC
 	rc = row->get_row(type, this, access->data);
+#endif
+#if CC_ALG == FOCC
+	focc_man.active_storage(type, this, access);
 #endif
 	if (rc == Abort || rc == WAIT) {
 		row_rtn = NULL;
@@ -904,11 +942,19 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	}
 #endif
 
+#if CC_ALG == TICTOC
+	if (!isexist) {
+		++txn->row_cnt;
+		if (type == WR)
+			++txn->write_cnt;
+  		txn->accesses.add(access);
+	}
+#else
 	++txn->row_cnt;
 	if (type == WR)
 		++txn->write_cnt;
-
-  txn->accesses.add(access);
+	txn->accesses.add(access);
+#endif
 
 	timespan = get_sys_clock() - starttime;
 	INC_STATS(get_thd_id(), txn_manager_time, timespan);
@@ -1000,7 +1046,7 @@ RC TxnManager::validate() {
 #if MODE != NORMAL_MODE
   return RCOK;
 #endif
-  if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != WOOKONG && CC_ALG != TICTOC) {
+  if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != WOOKONG && CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != WSI && CC_ALG != SSI) {
 	  return RCOK;
   }
 
@@ -1008,6 +1054,14 @@ RC TxnManager::validate() {
   uint64_t starttime = get_sys_clock();
   if(CC_ALG == OCC && rc == RCOK)
 	rc = occ_man.validate(this);
+  if(CC_ALG == BOCC && rc == RCOK)
+	rc = bocc_man.validate(this);
+  if(CC_ALG == FOCC && rc == RCOK)
+	rc = focc_man.validate(this);
+  if(CC_ALG == SSI && rc == RCOK)
+	rc = ssi_man.validate(this);
+  if(CC_ALG == WSI && rc == RCOK)
+	rc = wsi_man.validate(this);
   if(CC_ALG == MAAT  && rc == RCOK) {
 	rc = maat_man.validate(this);
 	// Note: home node must be last to validate
@@ -1073,7 +1127,7 @@ bool TxnManager::calvin_collect_phase_done() {
 void TxnManager::release_locks(RC rc) {
 	uint64_t starttime = get_sys_clock();
 
-  cleanup(rc);
+  	cleanup(rc);
 
 	uint64_t timespan = (get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(), txn_cleanup_time,  timespan);

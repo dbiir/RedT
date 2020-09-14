@@ -20,14 +20,6 @@
 #include "row.h"
 #include "semaphore.h"
 
-
-// For simplicity, the txn hisotry for OCC is oganized as follows:
-// 1. history is never deleted.
-// 2. hisotry forms a single directional list. 
-//		history head -> hist_1 -> hist_2 -> hist_3 -> ... -> hist_n
-//    The head is always the latest and the tail the youngest. 
-// 	  When history is traversed, always go from head -> tail order.
-
 class TxnManager;
 
 class set_ent{

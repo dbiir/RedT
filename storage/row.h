@@ -51,6 +51,8 @@ class Row_lock;
 class Row_mvcc;
 class Row_ts;
 class Row_occ;
+class Row_ssi;
+class Row_wsi;
 class Row_maat;
 class Row_specex;
 class Row_wkdb;
@@ -117,7 +119,7 @@ public:
    	Row_ts * manager;
   #elif CC_ALG == MVCC
   	Row_mvcc * manager;
-  #elif CC_ALG == OCC
+  #elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
   	Row_occ * manager;
   #elif CC_ALG == MAAT 
   	Row_maat * manager;
@@ -129,6 +131,10 @@ public:
   	Row_specex * manager;
   #elif CC_ALG == AVOID
     Row_avoid * manager;
+  #elif CC_ALG == SSI
+	Row_ssi * manager;
+  #elif CC_ALG == WSI
+	Row_wsi * manager;
   #endif
 	char * data;
   int tuple_size;

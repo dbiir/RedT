@@ -117,7 +117,7 @@
 // Concurrency Control
 /***********************************************/
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC
-#define CC_ALG TICTOC
+#define CC_ALG OCC
 #define ISOLATION_LEVEL SERIALIZABLE
 #define YCSB_ABORT_MODE false
 
@@ -189,7 +189,7 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
 #define SYNTH_TABLE_SIZE 16777216
-#define ZIPF_THETA 0.6
+#define ZIPF_THETA 0.0
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
@@ -329,11 +329,20 @@ enum PPSTxnType {PPS_ALL = 0,
 #define WDL           12
 #define WOOKONG     13
 #define TICTOC     14
+#define FOCC       15
+#define BOCC       16
+#define SSI        17
+#define WSI        17
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
 #define TS_HW           3
 #define TS_CLOCK          4
+#define LTS_CURL_CLOCK          5
+#define LTS_TCP_CLOCK          6
+
+#define LTS_TCP_IP  "10.77.110.147"
+#define LTS_TCP_PORT  62389
 // MODES
 // NORMAL < NOCC < QRY_ONLY < SETUP < SIMPLE
 #define NORMAL_MODE 1
@@ -371,7 +380,7 @@ enum PPSTxnType {PPS_ALL = 0,
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
 #define DONE_TIMER 1 * 60 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 60 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false

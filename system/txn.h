@@ -21,6 +21,7 @@
 #include "helper.h"
 #include "semaphore.h"
 #include "array.h"
+#include "transport/message.h"
 //#include "wl.h"
 
 class Workload;
@@ -60,7 +61,7 @@ public:
     //vector<Access*> accesses;
     Array<Access*> accesses;
     uint64_t timestamp;
-      // For OCC
+    // For OCC and SSI
     uint64_t start_timestamp;
     uint64_t end_timestamp;
 
@@ -198,7 +199,7 @@ public:
     void set_batch_id(uint64_t batch_id) {txn->batch_id = batch_id;}
 
     // For MaaT
-    uint64_t commit_timestamp;
+    uint64_t commit_timestamp; //commit_ts also be used in SSI/WSI
     uint64_t get_commit_timestamp() {return commit_timestamp;}
     void set_commit_timestamp(uint64_t timestamp) {commit_timestamp = timestamp;}
     uint64_t greatest_write_timestamp;
@@ -258,6 +259,9 @@ public:
     bool calvin_exec_phase_done();
     bool calvin_collect_phase_done();
 
+    int last_batch_id;
+    int last_txn_id;
+    Message* last_msg;
 protected:	
 
     int rsp_cnt;

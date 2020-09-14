@@ -202,6 +202,12 @@ public:
   uint64_t occ_ts_abort_cnt;
   double occ_finish_time;
 
+  // WSI
+  double wsi_validate_time;
+  double wsi_cs_wait_time;
+  uint64_t wsi_check_cnt;
+  uint64_t wsi_abort_check_cnt;
+
   // MAAT
   uint64_t maat_validate_cnt;
   double maat_validate_time;
@@ -213,6 +219,11 @@ public:
   uint64_t maat_case5_cnt;
   double maat_range;
   uint64_t maat_commit_cnt;
+
+  // // SSI
+  // uint64_t ssi_validate_cnt;
+  // double ssi_validate_time;
+  // uint64_t ssi_commit_cnt;
 
   // WKDB
   uint64_t wkdb_validate_cnt;

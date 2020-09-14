@@ -3,7 +3,6 @@
 #include "global.h"
 #ifndef ROW_TICTOC_H
 #define ROW_TICTOC_H
-#if CC_ALG == TICTOC
 
 #if WRITE_PERMISSION_LOCK
 
@@ -60,13 +59,13 @@ public:
 	ts_t                get_last_rts();
 	ts_t                get_last_wts();
 
-	uint64_t             get_wts();
-	uint64_t             get_rts();
+	uint64_t             get_wts() {return _wts;}
+	uint64_t             get_rts() {return _rts;}
 	void                 get_ts(uint64_t &wts, uint64_t &rts);
 	void                set_ts(uint64_t wts, uint64_t rts);
 
-  	#if OCC_LOCK_TYPE == WAIT_DIE || OCC_WAW_LOCK
 	TxnManager *        _lock_owner;
+  	#if OCC_LOCK_TYPE == WAIT_DIE || OCC_WAW_LOCK
 	// #define MAN(txn) ((TicTocManager *) (txn)->get_cc_manager())
 	struct CompareWait {
 		bool operator() (TxnManager * en1, TxnManager * en2) const;
@@ -102,5 +101,4 @@ public:
 };
 // __attribute__ ((aligned(64)));
 
-#endif
 #endif

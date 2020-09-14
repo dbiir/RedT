@@ -37,9 +37,9 @@ Row_occ::access(TxnManager * txn, TsType type) {
   sem_wait(&_semaphore);
 	if (type == R_REQ) {
 		if (txn->get_start_timestamp() < wts) {
-      INC_STATS(txn->get_thd_id(),occ_ts_abort_cnt,1);
+      		INC_STATS(txn->get_thd_id(),occ_ts_abort_cnt,1);
 			rc = Abort;
-    }
+   	 	}
 		else { 
 			txn->cur_row->copy(_row);
 			rc = RCOK;

@@ -13,11 +13,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-
+#include "global.h"
 #include "manager.h"
 #include "row.h"
 #include "txn.h"
 #include "pthread.h"
+#include "http.h"
 //#include <jemallloc.h>
 __thread uint64_t Manager::_max_cts = 1;
 void Manager::init() {
@@ -33,8 +34,8 @@ void Manager::init() {
 	}
 	for (UInt32 i = 0; i < BUCKET_CNT; i++)
 		pthread_mutex_init( &mutexes[i], NULL );
-  for (UInt32 i = 0; i < g_thread_cnt * g_node_cnt; ++i)
-      all_ts[i] = 0;
+	for (UInt32 i = 0; i < g_thread_cnt * g_node_cnt; ++i)
+		all_ts[i] = 0;
 }
 
 uint64_t 
@@ -60,6 +61,23 @@ Manager::get_ts(uint64_t thread_id) {
 		break;
 	case TS_CLOCK :
 		time = get_wall_clock() * (g_node_cnt + g_thread_cnt) + (g_node_id * g_thread_cnt + thread_id);
+		break;
+	case LTS_CURL_CLOCK:
+		time = CurlGetTimeStamp();
+		break;
+	case LTS_TCP_CLOCK:
+		// pthread_mutex_lock( &ts_mutex );
+		time = tcp_ts.TcpGetTimeStamp(thread_id);
+		// pthread_mutex_unlock( &ts_mutex );
+		// if (tcp_queue.is_active) {
+		// 	tcp_queue.enqueue(thread_id, 0, 0);
+		// 	time = tcp_queue.lock_thd(thread_id);
+		// } else {
+		// 	// pthread_mutex_lock( &ts_mutex );
+		// 	time = TcpGetTimeStamp();
+		// 	// pthread_mutex_unlock( &ts_mutex );			
+		// }
+
 		break;
 	default :
 		assert(false);

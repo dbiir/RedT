@@ -73,12 +73,19 @@ Client_query_queue::initQueriesParallel() {
 	request_cnt = g_max_txn_per_part + 4;
 	
     uint32_t final_request;
+#if CC_ALG == BOCC || CC_ALG == FOCC
+    if (tid == g_init_parallelism-1) {
+        final_request = request_cnt * g_servers_per_client;
+    } else {
+        final_request = request_cnt * g_servers_per_client / g_init_parallelism * (tid+1);
+    }
+#else
     if (tid == g_init_parallelism-1) {
         final_request = request_cnt;
     } else {
         final_request = request_cnt / g_init_parallelism * (tid+1);
     }
-
+#endif
 #if WORKLOAD == YCSB	
     YCSBQueryGenerator * gen = new YCSBQueryGenerator;
     gen->init();
@@ -88,10 +95,21 @@ Client_query_queue::initQueriesParallel() {
     PPSQueryGenerator * gen = new PPSQueryGenerator;
 #endif
 #if SERVER_GENERATE_QUERIES
+  #if CC_ALG == BOCC || CC_ALG == FOCC
+  for (UInt32 query_id = request_cnt / g_init_parallelism * tid; query_id < final_request; query_id ++) {
+    queries[thread_id][query_id] = gen->create_query(_wl,g_node_id);
+  }
+  #else
   for ( UInt32 thread_id = 0; thread_id < g_thread_cnt; thread_id ++) {
     for (UInt32 query_id = request_cnt / g_init_parallelism * tid; query_id < final_request; query_id ++) {
       queries[thread_id][query_id] = gen->create_query(_wl,g_node_id);
     }
+  }
+  #endif
+#else
+#if CC_ALG == BOCC || CC_ALG == FOCC
+  for (UInt32 query_id = request_cnt / g_init_parallelism * tid; query_id < final_request; query_id ++) {
+    queries[0][query_id] = gen->create_query(_wl,g_server_start_node);
   }
 #else
   for ( UInt32 server_id = 0; server_id < g_servers_per_client; server_id ++) {
@@ -99,6 +117,7 @@ Client_query_queue::initQueriesParallel() {
       queries[server_id][query_id] = gen->create_query(_wl,server_id+g_server_start_node);
     }
   }
+#endif
 #endif
 
 }
