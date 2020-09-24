@@ -439,7 +439,7 @@ void TxnManager::reset_query() {
 RC TxnManager::commit() {
 	DEBUG("Commit %ld\n",get_txn_id());
 	release_locks(RCOK);
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT && 0
   	time_table.release(get_thd_id(),get_txn_id());
 #endif
 #if CC_ALG == WOOKONG
@@ -484,7 +484,7 @@ RC TxnManager::abort() {
 
   aborted = true;
   release_locks(Abort);
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT && 0
   //assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
   time_table.release(get_thd_id(),get_txn_id());
 #endif 
@@ -526,6 +526,27 @@ RC TxnManager::start_abort() {
   return abort();
 }
 
+#ifdef NO_2PC
+RC TxnManager::start_commit() {
+	RC rc = RCOK;
+	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
+	_is_sub_txn = false;
+	
+	rc = validate();
+	if(CC_ALG == SSI) {
+		ssi_man.gene_finish_ts(this);
+	}
+	if(CC_ALG == WSI) {
+		wsi_man.gene_finish_ts(this);
+	}
+	if(rc == RCOK)
+		rc = commit();
+	else
+		start_abort();
+
+  	return rc;
+}
+#else
 RC TxnManager::start_commit() {
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
@@ -564,7 +585,7 @@ RC TxnManager::start_commit() {
 	}
   	return rc;
 }
-
+#endif
 void TxnManager::send_prepare_messages() {
   rsp_cnt = query->partitions_touched.size() - 1;
   DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);

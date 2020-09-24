@@ -41,6 +41,7 @@ void OptCC::init() {
 
 RC OptCC::validate(TxnManager * txn) {
 	RC rc;
+	return RCOK;
   uint64_t starttime = get_sys_clock();
 #if PER_ROW_VALID
 	rc = per_row_validate(txn);
@@ -52,6 +53,7 @@ RC OptCC::validate(TxnManager * txn) {
 }
 
 void OptCC::finish(RC rc, TxnManager * txn) {
+	return ;
 #if PER_ROW_VALID
   per_row_finish(rc,txn);
 #else

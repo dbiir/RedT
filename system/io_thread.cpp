@@ -30,9 +30,10 @@
 #include "message.h"
 #include "client_txn.h"
 #include "work_queue.h"
+#include "txn.h"
+#include "ycsb.h"
 
 void InputThread::setup() {
-
   std::vector<Message*> * msgs;
   while(!simulation->is_setup_done()) {
     msgs = tport_man.recv_msg(get_thd_id());
@@ -65,6 +66,14 @@ void InputThread::setup() {
       msgs->erase(msgs->begin());
     }
     delete msgs;
+  }
+  if (!ISCLIENT) {
+  txn_man = (YCSBTxnManager *)
+		mem_allocator.align_alloc( sizeof(YCSBTxnManager));
+	new(txn_man) YCSBTxnManager();
+  // txn_man = (TxnManager*) malloc(sizeof(TxnManager));
+  uint64_t thd_id = get_thd_id();
+  txn_man->init(thd_id, NULL);
   }
 }
 
@@ -131,6 +140,66 @@ RC InputThread::client_recv_loop() {
   return FINISH;
 }
 
+bool InputThread::fakeprocess(Message * msg) {
+  RC rc __attribute__ ((unused));
+  bool eq = false;
+  
+  txn_man->set_txn_id(msg->get_txn_id());
+  // txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),0);
+  // txn_man->txn_stats.clear_short();
+  // if (CC_ALG != CALVIN) {
+  //   txn_man->txn_stats.lat_network_time_start = msg->lat_network_time;
+  //   txn_man->txn_stats.lat_other_time_start = msg->lat_other_time;
+  // }
+  // txn_man->txn_stats.msg_queue_time += msg->mq_time;
+  // txn_man->txn_stats.msg_queue_time_short += msg->mq_time;
+  // msg->mq_time = 0;
+  // txn_man->txn_stats.work_queue_time += msg->wq_time;
+  // txn_man->txn_stats.work_queue_time_short += msg->wq_time;
+  // //txn_man->txn_stats.network_time += msg->ntwk_time;
+  // msg->wq_time = 0;
+  // txn_man->txn_stats.work_queue_cnt += 1;
+
+  // DEBUG("%ld Processing %ld %d\n",get_thd_id(),msg->get_txn_id(),msg->get_rtype());
+  // assert(msg->get_rtype() == CL_QRY || msg->get_txn_id() != UINT64_MAX);
+  // uint64_t starttime = get_sys_clock();
+		switch(msg->get_rtype()) {
+			case RPREPARE: 
+        rc = RCOK;
+        txn_man->set_rc(rc);
+        msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+				break;
+			case RQRY:
+        rc = RCOK;
+        txn_man->set_rc(rc);
+        msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),msg->return_node_id);
+				break;
+			case RQRY_CONT:
+        rc = RCOK;
+        txn_man->set_rc(rc);
+        msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),msg->return_node_id);
+				break;
+			case RFIN: 
+        rc = RCOK;
+        txn_man->set_rc(rc);
+        if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC || CC_ALG == BOCC || CC_ALG == SSI)
+        // if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC)
+          msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_FIN),GET_NODE_ID(msg->get_txn_id()));
+        // rc = process_rfin(msg);
+				break;
+      default:
+        eq = true;
+        break;
+		}
+    return eq;
+  // uint64_t timespan = get_sys_clock() - starttime;
+  // INC_STATS(get_thd_id(),worker_process_cnt,1);
+  // INC_STATS(get_thd_id(),worker_process_time,timespan);
+  // INC_STATS(get_thd_id(),worker_process_cnt_by_type[msg->rtype],1);
+  // INC_STATS(get_thd_id(),worker_process_time_by_type[msg->rtype],timespan);
+  // DEBUG("%ld EndProcessing %d %ld\n",get_thd_id(),msg->get_rtype(),msg->get_txn_id());
+}
+
 RC InputThread::server_recv_loop() {
 
 	myrand rdm;
@@ -170,7 +239,10 @@ RC InputThread::server_recv_loop() {
         continue;
       }
 #endif
-      work_queue.enqueue(get_thd_id(),msg,false);
+#ifdef FAKE_PROCESS
+      if (fakeprocess(msg))
+#endif
+        work_queue.enqueue(get_thd_id(),msg,false);
       msgs->erase(msgs->begin());
     }
     delete msgs;

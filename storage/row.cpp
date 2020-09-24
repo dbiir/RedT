@@ -283,9 +283,9 @@ RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row) {
 #endif
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT 
 	//uint64_t thd_id = txn->get_thd_id();
-	lock_t lt = (type == RD || type == SCAN)? LOCK_SH : LOCK_EX;
-	rc = this->manager->lock_get(lt, txn);
-
+	// lock_t lt = (type == RD || type == SCAN)? LOCK_SH : LOCK_EX;
+	// rc = this->manager->lock_get(lt, txn);
+	rc = RCOK;
 	if (rc == RCOK) {
 		row = this;
 	} else if (rc == Abort) {} 
@@ -451,7 +451,7 @@ void row_t::return_row(RC rc, access_t type, TxnManager * txn, row_t * row) {
 	if (CC_ALG != CALVIN && ROLL_BACK && type == XP) {// recover from previous writes. should not happen w/ Calvin
 		this->copy(row);
 	}
-	this->manager->lock_release(txn);
+	// this->manager->lock_release(txn);
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI
 	// for RD or SCAN or XP, the row should be deleted.
 	// because all WR should be companied by a RD

@@ -1071,7 +1071,7 @@ void PrepareMessage::copy_to_buf(char * buf) {
 uint64_t AckMessage::get_size() {
   uint64_t size = Message::mget_size();
   size += sizeof(RC);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG && 0
   size += sizeof(uint64_t) * 2;
 #endif
 #if WORKLOAD == PPS && CC_ALG == CALVIN
@@ -1085,7 +1085,7 @@ void AckMessage::copy_from_txn(TxnManager * txn) {
   Message::mcopy_from_txn(txn);
   //rc = query->rc;
   rc = txn->get_rc();
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT && 0
   lower = time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
   upper = time_table.get_upper(txn->get_thd_id(),txn->get_txn_id());
 #endif
@@ -1114,7 +1114,7 @@ void AckMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
   uint64_t ptr = Message::mget_size();
   COPY_VAL(rc,buf,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG && 0
   COPY_VAL(lower,buf,ptr);
   COPY_VAL(upper,buf,ptr);
 #endif
@@ -1136,7 +1136,7 @@ void AckMessage::copy_to_buf(char * buf) {
   Message::mcopy_to_buf(buf);
   uint64_t ptr = Message::mget_size();
   COPY_BUF(buf,rc,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG && 0
   COPY_BUF(buf,lower,ptr);
   COPY_BUF(buf,upper,ptr);
 #endif
@@ -1208,7 +1208,7 @@ uint64_t FinishMessage::get_size() {
   size += sizeof(uint64_t); 
   size += sizeof(RC); 
   size += sizeof(bool); 
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI && 0
   size += sizeof(uint64_t); 
 #endif
   return size;
@@ -1218,7 +1218,7 @@ void FinishMessage::copy_from_txn(TxnManager * txn) {
   Message::mcopy_from_txn(txn);
   rc = txn->get_rc();
   readonly = txn->query->readonly();
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI && 0
   commit_timestamp = txn->get_commit_timestamp();
 #endif
 
@@ -1226,7 +1226,7 @@ void FinishMessage::copy_from_txn(TxnManager * txn) {
 
 void FinishMessage::copy_to_txn(TxnManager * txn) {
   Message::mcopy_to_txn(txn);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI && 0
   txn->commit_timestamp = commit_timestamp;
 #endif
 
@@ -1238,7 +1238,7 @@ void FinishMessage::copy_from_buf(char * buf) {
   COPY_VAL(pid,buf,ptr);
   COPY_VAL(rc,buf,ptr);
   COPY_VAL(readonly,buf,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI && 0
   COPY_VAL(commit_timestamp,buf,ptr);
 #endif
  assert(ptr == get_size());
@@ -1250,7 +1250,7 @@ void FinishMessage::copy_to_buf(char * buf) {
   COPY_BUF(buf,pid,ptr);
   COPY_BUF(buf,rc,ptr);
   COPY_BUF(buf,readonly,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI && 0
   COPY_BUF(buf,commit_timestamp,ptr);
 #endif
 

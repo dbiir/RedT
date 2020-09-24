@@ -238,7 +238,80 @@ bool Row_mvcc::conflict(TsType type, ts_t ts) {
 	}
 	return true;
 }
+#if 0
+RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
+	RC rc = RCOK;
+	ts_t ts = txn->get_timestamp();
+	uint64_t starttime = get_sys_clock();
 
+	if (g_central_man)
+		glob_manager.lock_row(_row);
+	else
+		pthread_mutex_lock( latch );
+  if (type == R_REQ) {
+		rc = RCOK;
+		MVHisEntry * whis = writehis;
+		while (whis != NULL && whis->ts > ts) 
+			whis = whis->next;
+		row_t * ret = (whis == NULL)? 
+			_row : whis->row;
+		txn->cur_row = ret;	
+	} else if (type == P_REQ) {
+        DEBUG("buf P_REQ %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
+		buffer_req(P_REQ, txn);
+		rc = RCOK;	
+	} else if (type == W_REQ) {
+		rc = RCOK;
+		// the corresponding prewrite request is debuffered.
+		insert_history(ts, row);
+        DEBUG("debuf %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
+		MVReqEntry * req = debuffer_req(P_REQ, txn);
+		assert(req != NULL);
+		return_req_entry(req);
+		// update_buffer(txn);
+	} else if (type == XP_REQ) {
+        DEBUG("debuf %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
+		MVReqEntry * req = debuffer_req(P_REQ, txn);
+		assert (req != NULL);
+		return_req_entry(req);
+		// update_buffer(txn);
+	} else 
+		assert(false);
+	
+	if (rc == RCOK) {
+		if (whis_len > g_his_recycle_len || rhis_len > g_his_recycle_len) {
+			ts_t t_th = glob_manager.get_min_ts(txn->get_thd_id());
+			if (readhistail && readhistail->ts < t_th)
+				clear_history(R_REQ, t_th);
+			// Here is a tricky bug. The oldest transaction might be 
+			// reading an even older version whose timestamp < t_th.
+			// But we cannot recycle that version because it is still being used.
+			// So the HACK here is to make sure that the first version older than
+			// t_th not be recycled.
+			if (whis_len > 1 && 
+				writehistail->prev->ts < t_th) {
+				row_t * latest_row = clear_history(W_REQ, t_th);
+				if (latest_row != NULL) {
+					assert(_row != latest_row);
+					_row->copy(latest_row);
+				}
+			}
+		}
+	}
+	
+	uint64_t timespan = get_sys_clock() - starttime;
+	txn->txn_stats.cc_time += timespan;
+	txn->txn_stats.cc_time_short += timespan;
+
+	if (g_central_man)
+		glob_manager.release_row(_row);
+	else
+		pthread_mutex_unlock( latch );	
+		
+	return rc;
+}
+
+#else
 RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 	RC rc = RCOK;
 	ts_t ts = txn->get_timestamp();
@@ -332,7 +405,7 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 		
 	return rc;
 }
-
+#endif
 void Row_mvcc::update_buffer(TxnManager * txn) {
 	MVReqEntry * ready_read = debuffer_req(R_REQ, NULL);
 	MVReqEntry * req = ready_read;

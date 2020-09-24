@@ -168,7 +168,7 @@ BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
 	double x = (double)(rand() % 10000) / 10000;
 	int y = URand(1, 100);
 
-	//if(x > g_mpr) { 
+	// if(x > g_mpr) { 
 	if(x > 0.15) { 
 		// home warehouse
 		query->c_d_id = query->d_id;

@@ -27,6 +27,7 @@ void Maat::init() {
 }
 
 RC Maat::validate(TxnManager * txn) {
+  return RCOK;
   uint64_t start_time = get_sys_clock();
   uint64_t timespan;
   sem_wait(&_semaphore);

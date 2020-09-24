@@ -184,7 +184,12 @@ stat_map = OrderedDict([
   ('worker_process_avg_time', []),
   ('worker_process_cnt_by_type', []),
   ('worker_process_time_by_type', []),
-
+  ('work_queue_wq_cnt', []),
+  ('work_queue_tx_cnt', []),
+  ('work_queue_ewq_cnt', []),
+  ('work_queue_dwq_cnt', []),
+  ('work_queue_etx_cnt', []),
+  ('work_queue_dtx_cnt', []),
   # IO
   ('msg_queue_delay_time', []),
   ('msg_queue_cnt', []),
@@ -497,7 +502,8 @@ stat_map2 = {
   'worker_process_avg_time': [],
   'worker_process_cnt_by_type': [],
   'worker_process_time_by_type': [],
-
+  'work_queue_wq_cnt': [],
+  'work_queue_tx_cnt': [],
   # IO
   'msg_queue_delay_time': [],
   'msg_queue_cnt': [],

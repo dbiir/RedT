@@ -34,6 +34,22 @@ void Stats_thd::init(uint64_t thd_id) {
   worker_process_cnt_by_type= (uint64_t *) mem_allocator.align_alloc(sizeof(uint64_t) * NO_MSG);
   DEBUG_M("Stats_thd::init worker_process_time_by_type alloc\n");
   worker_process_time_by_type= (double *) mem_allocator.align_alloc(sizeof(double) * NO_MSG);
+
+  DEBUG_M("Stats_thd::init work_queue_wq_cnt alloc\n");
+  work_queue_wq_cnt= (uint64_t *) mem_allocator.align_alloc(sizeof(uint64_t) * SECOND);
+  DEBUG_M("Stats_thd::init work_queue_tx_cnt alloc\n");
+  work_queue_tx_cnt= (uint64_t *) mem_allocator.align_alloc(sizeof(uint64_t) * SECOND);
+
+  DEBUG_M("Stats_thd::init work_queue_ewq_cnt alloc\n");
+  work_queue_ewq_cnt= (uint64_t *) mem_allocator.align_alloc(sizeof(uint64_t) * SECOND);
+  DEBUG_M("Stats_thd::init work_queue_dwq_cnt alloc\n");
+  work_queue_dwq_cnt= (uint64_t *) mem_allocator.align_alloc(sizeof(uint64_t) * SECOND);
+
+  DEBUG_M("Stats_thd::init work_queue_etx_cnt alloc\n");
+  work_queue_etx_cnt= (uint64_t *) mem_allocator.align_alloc(sizeof(uint64_t) * SECOND);
+  DEBUG_M("Stats_thd::init work_queue_dtx_cnt alloc\n");
+  work_queue_dtx_cnt= (uint64_t *) mem_allocator.align_alloc(sizeof(uint64_t) * SECOND);
+
   DEBUG_M("Stats_thd::init mtx alloc\n");
   mtx= (double *) mem_allocator.align_alloc(sizeof(double) * 40);
 
@@ -128,6 +144,14 @@ void Stats_thd::clear() {
     worker_process_time_by_type[i]=0;
   }
 
+  for(uint64_t i = 0; i < SECOND; i ++) {
+    work_queue_wq_cnt[i]=0;
+    work_queue_tx_cnt[i]=0;
+    work_queue_ewq_cnt[i]=0;
+    work_queue_dwq_cnt[i]=0;
+    work_queue_etx_cnt[i]=0;
+    work_queue_dtx_cnt[i]=0;
+  }
   // IO
   msg_queue_delay_time=0;
   msg_queue_cnt=0;
@@ -688,6 +712,39 @@ void Stats_thd::print(FILE * outf, bool prog) {
       ,worker_process_cnt_by_type[i]
       ,i
       ,worker_process_time_by_type[i] / BILLION
+    );
+  }
+
+  for(uint64_t i = 0; i < SECOND; i ++) {
+    fprintf(outf,
+      ",work_queue_wq_cnt%ld=%ld"
+      ",work_queue_tx_cnt%ld=%ld"
+      ,i
+      ,work_queue_wq_cnt[i]
+      ,i
+      ,work_queue_tx_cnt[i]
+    );
+  }
+
+  for(uint64_t i = 0; i < SECOND; i ++) {
+    fprintf(outf,
+      ",work_queue_ewq_cnt%ld=%ld"
+      ",work_queue_dwq_cnt%ld=%ld"
+      ,i
+      ,work_queue_ewq_cnt[i]
+      ,i
+      ,work_queue_dwq_cnt[i]
+    );
+  }
+
+  for(uint64_t i = 0; i < SECOND; i ++) {
+    fprintf(outf,
+      ",work_queue_etx_cnt%ld=%ld"
+      ",work_queue_dtx_cnt%ld=%ld"
+      ,i
+      ,work_queue_etx_cnt[i]
+      ,i
+      ,work_queue_dtx_cnt[i]
     );
   }
 
@@ -1331,7 +1388,15 @@ void Stats_thd::combine(Stats_thd * stats) {
     worker_process_cnt_by_type[i]+=stats->worker_process_cnt_by_type[i];
     worker_process_time_by_type[i]+=stats->worker_process_time_by_type[i];
   }
+  for(uint64_t i = 0; i < SECOND; i ++) {
+    work_queue_wq_cnt[i]+=stats->work_queue_wq_cnt[i];
+    work_queue_tx_cnt[i]+=stats->work_queue_tx_cnt[i];
 
+    work_queue_ewq_cnt[i]+=stats->work_queue_ewq_cnt[i];
+    work_queue_dwq_cnt[i]+=stats->work_queue_dwq_cnt[i];
+    work_queue_etx_cnt[i]+=stats->work_queue_etx_cnt[i];
+    work_queue_dtx_cnt[i]+=stats->work_queue_dtx_cnt[i];
+  }
   // IO
   msg_queue_delay_time+=stats->msg_queue_delay_time;
   msg_queue_cnt+=stats->msg_queue_cnt;

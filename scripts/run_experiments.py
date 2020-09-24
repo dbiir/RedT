@@ -121,7 +121,7 @@ for exp in exps:
                     for m in machines[:]:
                         machines.append(m)
                 else:
-                    machines = sorted(machines_[:(cfgs["NODE_CNT"]*2)])  
+                    machines = sorted(machines_[:(cfgs["NODE_CNT"] + cfgs["CLIENT_NODE_CNT"])])  
                 with open("ifconfig.txt",'w') as f_ifcfg:
                     for m in machines:
                         if cluster == 'local':

@@ -163,7 +163,59 @@ ts_t Row_ts::cal_min(TsType type) {
 	}
 	return new_min_pts;
 }
+#if 1
+RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
+	RC rc;
+	uint64_t starttime = get_sys_clock();
+	ts_t ts = txn->get_timestamp();
+	if (g_central_man)
+		glob_manager.lock_row(_row);
+	else
+		pthread_mutex_lock( latch );
+	if (type == R_REQ) {
 
+		txn->cur_row->copy(_row);
+		if (rts < ts)
+			rts = ts;
+		rc = RCOK;
+		
+	} else if (type == P_REQ) {
+		buffer_req(P_REQ, txn, NULL);
+		rc = RCOK;
+	} else if (type == W_REQ) {
+		// write requests are always accepted.
+		rc = RCOK;
+
+		_row->copy(row);
+		if (wts < ts)
+			wts = ts;
+		// debuffer the P_REQ
+		TsReqEntry * req = debuffer_req(P_REQ, txn);
+		assert(req != NULL);
+		// update_buffer(txn->get_thd_id());
+		return_req_entry(req);
+		// the "row" is freed after hard copy to "_row"
+		row->free_row();
+		mem_allocator.free(row, sizeof(row_t));
+		
+	} else if (type == XP_REQ) {
+		TsReqEntry * req = debuffer_req(P_REQ, txn);
+		assert (req != NULL);
+		// update_buffer(txn->get_thd_id());
+		return_req_entry(req);
+	} else 
+		assert(false);
+
+    uint64_t timespan = get_sys_clock() - starttime;
+    txn->txn_stats.cc_time += timespan;
+    txn->txn_stats.cc_time_short += timespan;
+	if (g_central_man)
+		glob_manager.release_row(_row);
+	else
+		pthread_mutex_unlock( latch );
+	return rc;
+}
+#else
 RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 	RC rc;
 	uint64_t starttime = get_sys_clock();
@@ -264,7 +316,7 @@ final:
 		pthread_mutex_unlock( latch );
 	return rc;
 }
-
+#endif
 void Row_ts::update_buffer(uint64_t thd_id) {
 
 	while (true) {

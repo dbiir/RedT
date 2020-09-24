@@ -24,7 +24,7 @@ Row_occ::init(row_t * row) {
 	_row = row;
 	_latch = (pthread_mutex_t *) 
 		mem_allocator.alloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init( _latch, NULL );
+	// pthread_mutex_init( _latch, NULL );
   sem_init(&_semaphore, 0, 1);
 	wts = 0;
 	blatch = false;
@@ -46,7 +46,7 @@ Row_occ::access(TxnManager * txn, TsType type) {
 		}
 	} else 
 		assert(false);
-	//pthread_mutex_unlock( _latch );
+	// pthread_mutex_unlock( _latch );
   sem_post(&_semaphore);
 	return rc;
 }

@@ -22,7 +22,8 @@
 #include "helper.h"
 #include <queue>
 #include <boost/lockfree/queue.hpp>
-//#include "message.h"
+#include <boost/circular_buffer.hpp>  
+#include "semaphore.h"
 
 class BaseQuery;
 class Workload;
@@ -69,34 +70,64 @@ struct CompareWQEntry {
 #endif
 
 };
-
+typedef boost::circular_buffer<work_queue_entry*> WCircularBuffer;
 class QWorkQueue {
 public:
   void init();
-  void enqueue(uint64_t thd_id,Message * msg,bool busy); 
+  void enqueue(uint64_t thd_id,Message * msg,bool busy);
   Message * dequeue(uint64_t thd_id);
-  void sched_enqueue(uint64_t thd_id, Message * msg); 
-  Message * sched_dequeue(uint64_t thd_id); 
-  void sequencer_enqueue(uint64_t thd_id, Message * msg); 
-  Message * sequencer_dequeue(uint64_t thd_id); 
+  void sched_enqueue(uint64_t thd_id, Message * msg);
+  Message * sched_dequeue(uint64_t thd_id);
+  void sequencer_enqueue(uint64_t thd_id, Message * msg);
+  Message * sequencer_dequeue(uint64_t thd_id);
 
   uint64_t get_cnt() {return get_wq_cnt() + get_rem_wq_cnt() + get_new_wq_cnt();}
-  uint64_t get_wq_cnt() {return 0;}
-  //uint64_t get_wq_cnt() {return work_queue.size();}
+  uint64_t get_wq_cnt() {return work_queue_size;}
+  uint64_t get_txn_cnt() {return txn_queue_size;}
+
+  uint64_t get_enwq_cnt() {return work_enqueue_size;}
+  uint64_t get_dewq_cnt() {return work_dequeue_size;}
+  uint64_t get_entxn_cnt() {return txn_enqueue_size;}
+  uint64_t get_detxn_cnt() {return txn_dequeue_size;}
+
+  void set_enwq_cnt() { work_enqueue_size = 0;}
+  void set_dewq_cnt() { work_dequeue_size = 0;}
+  void set_entxn_cnt() { txn_enqueue_size = 0;}
+  void set_detxn_cnt() { txn_dequeue_size = 0;}
+  // uint64_t get_wq_cnt() {return work_queue->size();}
   uint64_t get_sched_wq_cnt() {return 0;}
-  uint64_t get_rem_wq_cnt() {return 0;} 
+  uint64_t get_rem_wq_cnt() {return 0;}
   uint64_t get_new_wq_cnt() {return 0;}
-  //uint64_t get_rem_wq_cnt() {return remote_op_queue.size();}
-  //uint64_t get_new_wq_cnt() {return new_query_queue.size();}
+  // uint64_t get_rem_wq_cnt() {return remote_op_queue.size();}
+  // uint64_t get_new_wq_cnt() {return new_query_queue.size();}
 
 private:
+#ifdef NEW_WORK_QUEUE
+  WCircularBuffer work_queue;
+  WCircularBuffer new_txn_queue;
+
+  sem_t 	mw;
+  sem_t 	mt;
+#else
   boost::lockfree::queue<work_queue_entry* > * work_queue;
   boost::lockfree::queue<work_queue_entry* > * new_txn_queue;
+#endif
   boost::lockfree::queue<work_queue_entry* > * seq_queue;
   boost::lockfree::queue<work_queue_entry* > ** sched_queue;
+
   uint64_t sched_ptr;
   BaseQuery * last_sched_dq;
   uint64_t curr_epoch;
+
+  sem_t 	_semaphore;
+  uint64_t work_queue_size;
+  uint64_t txn_queue_size;
+
+  uint64_t work_enqueue_size;
+  uint64_t work_dequeue_size;
+  uint64_t txn_enqueue_size;
+  uint64_t txn_dequeue_size;
+
 
 };
 

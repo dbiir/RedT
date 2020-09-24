@@ -65,6 +65,7 @@ def ycsb_scaling():
     #algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     # algos=['TICTOC','CALVIN','NO_WAIT']
     # algos=['OCC','FOCC','BOCC','WSI','SSI']
+    # algos=['NO_WAIT','WAIT_DIE']
     algos=['OCC']
     # algos=['OCC','MVCC','MAAT','TIMESTAMP','NO_WAIT','WAIT_DIE']
     base_table_size=1048576*8
@@ -245,15 +246,19 @@ def ycsb_partitions_distr():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [1,2,4,8,16,32,64]
-    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    npercpay=[0.0,1.0]
-    wh=128
+    nnodes = [4]
+    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
+    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC']
+    # nalgos=['NO_WAIT']
+    npercpay=[1.0]
+    # npercpay=[0.0]
+    # wh=128
+    wh=64
     load = [10000]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT"]
     exp = [[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
-    wh=4
-    exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
+    # wh=4
+    # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
     return fmt,exp
 
 # def tpcc_scaling1():
@@ -468,7 +473,8 @@ configs = {
     "REPLICA_TYPE": "AP",
     "REM_THREAD_CNT": 2,
     "SEND_THREAD_CNT": 2,
-    "CLIENT_NODE_CNT" : "NODE_CNT",
+    # "CLIENT_NODE_CNT" : "NODE_CNT",
+    "CLIENT_NODE_CNT" : 2,
     "CLIENT_THREAD_CNT" : 4,
     "CLIENT_REM_THREAD_CNT" : 2,
     "CLIENT_SEND_THREAD_CNT" : 2,

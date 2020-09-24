@@ -48,6 +48,86 @@ void WorkerThread::setup() {
 
 }
 
+void WorkerThread::fakeprocess(Message * msg) {
+  RC rc __attribute__ ((unused));
+
+  DEBUG("%ld Processing %ld %d\n",get_thd_id(),msg->get_txn_id(),msg->get_rtype());
+  assert(msg->get_rtype() == CL_QRY || msg->get_txn_id() != UINT64_MAX);
+  uint64_t starttime = get_sys_clock();
+		switch(msg->get_rtype()) {
+			case RPASS:
+        //rc = process_rpass(msg);
+				break;
+			case RPREPARE: 
+        rc = RCOK;
+        txn_man->set_rc(rc);
+        msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+				break;
+			case RFWD:
+        rc = process_rfwd(msg);
+				break;
+			case RQRY:
+        rc = RCOK;
+        txn_man->set_rc(rc);
+        msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),msg->return_node_id);
+				break;
+			case RQRY_CONT:
+        rc = RCOK;
+        txn_man->set_rc(rc);
+        msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),msg->return_node_id);
+				break;
+			case RQRY_RSP:
+        rc = process_rqry_rsp(msg);
+				break;
+			case RFIN: 
+        rc = RCOK;
+        txn_man->set_rc(rc);
+        if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC || CC_ALG == BOCC || CC_ALG == SSI)
+        // if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC)
+          msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_FIN),GET_NODE_ID(msg->get_txn_id()));
+        // rc = process_rfin(msg);
+				break;
+			case RACK_PREP:
+        rc = process_rack_prep(msg);
+				break;
+			case RACK_FIN:
+        rc = process_rack_rfin(msg);
+				break;
+			case RTXN_CONT:
+        rc = process_rtxn_cont(msg);
+				break;
+      case CL_QRY:
+			case RTXN:
+#if CC_ALG == CALVIN
+        rc = process_calvin_rtxn(msg);
+#else
+        rc = process_rtxn(msg);
+#endif
+				break;
+			case LOG_FLUSHED:
+        rc = process_log_flushed(msg);
+				break;
+			case LOG_MSG:
+        rc = process_log_msg(msg);
+				break;
+			case LOG_MSG_RSP:
+        rc = process_log_msg_rsp(msg);
+				break;
+			default:
+        printf("Msg: %d\n",msg->get_rtype());
+        fflush(stdout);
+				assert(false);
+				break;
+		}
+  uint64_t timespan = get_sys_clock() - starttime;
+  INC_STATS(get_thd_id(),worker_process_cnt,1);
+  INC_STATS(get_thd_id(),worker_process_time,timespan);
+  INC_STATS(get_thd_id(),worker_process_cnt_by_type[msg->rtype],1);
+  INC_STATS(get_thd_id(),worker_process_time_by_type[msg->rtype],timespan);
+  DEBUG("%ld EndProcessing %d %ld\n",get_thd_id(),msg->get_rtype(),msg->get_txn_id());
+}
+
+
 void WorkerThread::process(Message * msg) {
   RC rc __attribute__ ((unused));
 
@@ -257,9 +337,11 @@ RC WorkerThread::run() {
       }
       txn_man->register_thread(this);
     }
-
+#ifdef FAKE_PROCESS
+    fakeprocess(msg);
+#else
     process(msg);
-
+#endif
     ready_starttime = get_sys_clock();
     if(txn_man) {
       bool ready = txn_man->set_ready();
@@ -285,7 +367,7 @@ RC WorkerThread::process_rfin(Message * msg) {
   assert(CC_ALG != CALVIN);
 
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()),"RFIN local: %ld %ld/%d\n",msg->get_txn_id(),msg->get_txn_id()%g_node_cnt,g_node_id);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG && 0
   txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
 #endif
 
@@ -313,7 +395,7 @@ RC WorkerThread::process_rack_prep(Message * msg) {
 
   int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
   assert(responses_left >=0);
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT && 0
   // Integrate bounds
   uint64_t lower = ((AckMessage*)msg)->lower;
   uint64_t upper = ((AckMessage*)msg)->upper;
@@ -433,7 +515,7 @@ RC WorkerThread::process_rqry(Message * msg) {
 #if CC_ALG == MVCC
   txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
 #endif
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT && 0
     time_table.init(get_thd_id(),txn_man->get_txn_id());
 #endif
 
@@ -553,7 +635,7 @@ RC WorkerThread::process_rtxn(Message * msg) {
 #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI
           txn_man->set_start_timestamp(get_next_ts());
 #endif
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT && 0
           time_table.init(get_thd_id(),txn_man->get_txn_id());
           assert(time_table.get_lower(get_thd_id(),txn_man->get_txn_id()) == 0);
           assert(time_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
@@ -668,3 +750,53 @@ ts_t WorkerThread::get_next_ts() {
 }
 
 
+
+void WorkerNumThread::setup() {
+}
+
+RC WorkerNumThread::run() {
+  tsetup();
+  printf("Running WorkerNumThread %ld\n",_thd_id);
+
+  // uint64_t idle_starttime = 0;
+  int i = 0;
+	while(!simulation->is_done()) {
+    progress_stats();
+
+    uint64_t wq_size = work_queue.get_wq_cnt();
+    uint64_t tx_size = work_queue.get_txn_cnt();
+    uint64_t ewq_size = work_queue.get_enwq_cnt();
+    uint64_t dwq_size = work_queue.get_dewq_cnt();
+
+    uint64_t etx_size = work_queue.get_entxn_cnt();
+    uint64_t dtx_size = work_queue.get_detxn_cnt();
+
+    work_queue.set_detxn_cnt();
+    work_queue.set_dewq_cnt();
+    work_queue.set_entxn_cnt();
+    work_queue.set_enwq_cnt();
+  
+    INC_STATS(_thd_id,work_queue_wq_cnt[i],wq_size);
+    INC_STATS(_thd_id,work_queue_tx_cnt[i],tx_size);
+
+    INC_STATS(_thd_id,work_queue_ewq_cnt[i],ewq_size);
+    INC_STATS(_thd_id,work_queue_dwq_cnt[i],dwq_size);
+
+    INC_STATS(_thd_id,work_queue_etx_cnt[i],etx_size);
+    INC_STATS(_thd_id,work_queue_dtx_cnt[i],dtx_size);
+    i++;
+    sleep(1);
+    // if(idle_starttime ==0)
+    //   idle_starttime = get_sys_clock();
+    
+    // if(get_sys_clock() - idle_starttime > 1000000000) {
+    //   i++;
+    //   idle_starttime = 0;
+    // }
+    //uint64_t starttime = get_sys_clock();
+
+	}
+  printf("FINISH %ld:%ld\n",_node_id,_thd_id);
+  fflush(stdout);
+  return FINISH;
+}

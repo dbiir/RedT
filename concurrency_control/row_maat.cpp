@@ -54,7 +54,7 @@ RC Row_maat::access(access_t type, TxnManager * txn) {
 RC Row_maat::read_and_prewrite(TxnManager * txn) {
 	assert (CC_ALG == MAAT);
 	RC rc = RCOK;
-
+  return rc;
   uint64_t mtx_wait_starttime = get_sys_clock();
   while(!ATOM_CAS(maat_avail,true,false)) { }
   INC_STATS(txn->get_thd_id(),mtx[30],get_sys_clock() - mtx_wait_starttime);
@@ -99,7 +99,7 @@ RC Row_maat::read_and_prewrite(TxnManager * txn) {
 RC Row_maat::read(TxnManager * txn) {
 	assert (CC_ALG == MAAT);
 	RC rc = RCOK;
-
+  return rc;
   uint64_t mtx_wait_starttime = get_sys_clock();
   while(!ATOM_CAS(maat_avail,true,false)) { }
   INC_STATS(txn->get_thd_id(),mtx[30],get_sys_clock() - mtx_wait_starttime);
@@ -127,7 +127,7 @@ RC Row_maat::read(TxnManager * txn) {
 RC Row_maat::prewrite(TxnManager * txn) {
 	assert (CC_ALG == MAAT);
 	RC rc = RCOK;
-
+  return rc;
   uint64_t mtx_wait_starttime = get_sys_clock();
   while(!ATOM_CAS(maat_avail,true,false)) { }
   INC_STATS(txn->get_thd_id(),mtx[31],get_sys_clock() - mtx_wait_starttime);
@@ -165,6 +165,7 @@ RC Row_maat::prewrite(TxnManager * txn) {
 
 
 RC Row_maat::abort(access_t type, TxnManager * txn) {	
+  return Abort;
   uint64_t mtx_wait_starttime = get_sys_clock();
   while(!ATOM_CAS(maat_avail,true,false)) { }
   INC_STATS(txn->get_thd_id(),mtx[32],get_sys_clock() - mtx_wait_starttime);
@@ -187,6 +188,8 @@ RC Row_maat::abort(access_t type, TxnManager * txn) {
 }
 
 RC Row_maat::commit(access_t type, TxnManager * txn, row_t * data) {	
+  write(data);
+  return RCOK;
   uint64_t mtx_wait_starttime = get_sys_clock();
   while(!ATOM_CAS(maat_avail,true,false)) { }
   INC_STATS(txn->get_thd_id(),mtx[33],get_sys_clock() - mtx_wait_starttime);

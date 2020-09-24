@@ -121,7 +121,13 @@ public:
   uint64_t worker_process_cnt;
   uint64_t * worker_process_cnt_by_type;
   double * worker_process_time_by_type;
+  uint64_t * work_queue_wq_cnt;
+  uint64_t * work_queue_tx_cnt;
 
+  uint64_t * work_queue_ewq_cnt;
+  uint64_t * work_queue_dwq_cnt;
+  uint64_t * work_queue_etx_cnt;
+  uint64_t * work_queue_dtx_cnt;
   // IO
   double msg_queue_delay_time;
   uint64_t msg_queue_cnt;

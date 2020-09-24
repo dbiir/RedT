@@ -27,6 +27,7 @@ public:
     RC run();
     void setup();
     void process(Message * msg);
+    void fakeprocess(Message * msg);
     void check_if_done(RC rc);
     void release_txn_man();
     void commit();
@@ -62,4 +63,10 @@ private:
 
 };
 
+class WorkerNumThread : public Thread {
+public:
+    RC run();
+    void setup();
+
+};
 #endif

@@ -24,6 +24,13 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
+// ! Parameters used to locate distributed performance bottlenecks.
+#define SECOND 100 // Set the queue monitoring time.
+#define LESS_DIS // Reduce the number of yCSB remote data to 1
+#define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
+#define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
+#define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
+// ! end of these parameters
 #define NODE_CNT 2
 #define THREAD_CNT 4
 #define REM_THREAD_CNT 2
@@ -31,7 +38,7 @@
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
-#define CLIENT_NODE_CNT NODE_CNT
+#define CLIENT_NODE_CNT 2
 #define CLIENT_THREAD_CNT 4
 #define CLIENT_REM_THREAD_CNT 2
 #define CLIENT_SEND_THREAD_CNT 2
@@ -63,7 +70,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 10000
+#define MAX_TXN_IN_FLIGHT 1800000
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -120,7 +127,7 @@
 #define CC_ALG OCC
 #define ISOLATION_LEVEL SERIALIZABLE
 #define YCSB_ABORT_MODE false
-
+#define QUEUE_CAPACITY_NEW 1000000
 #define KEY_ORDER         false
 // transaction roll back changes after abort
 #define ROLL_BACK         true
