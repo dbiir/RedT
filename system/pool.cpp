@@ -24,6 +24,8 @@
 #include "ycsb.h"
 #include "tpcc_query.h"
 #include "pps_query.h"
+#include "da.h"
+#include "da_query.h"
 #include "query.h"
 #include "msg_queue.h"
 #include "row.h"
@@ -67,9 +69,11 @@ void TxnManPool::put(uint64_t thd_id, TxnManager * item) {
   item->release();
   int tries = 0;
 #if CC_ALG == CALVIN
-  while(!pool->push(item) && tries++ < TRY_LIMIT) { }
+  while (!pool->push(item) && tries++ < TRY_LIMIT) {
+  }
 #else
-  while(!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) { }
+  while (!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) {
+  }
 #endif
   if(tries >= TRY_LIMIT) {
     mem_allocator.free(item,sizeof(TxnManager));
@@ -127,9 +131,11 @@ void TxnPool::put(uint64_t thd_id,Transaction * item) {
   item->reset(thd_id);
   int tries = 0;
 #if CC_ALG == CALVIN
-  while(!pool->push(item) && tries++ < TRY_LIMIT) { }
+  while (!pool->push(item) && tries++ < TRY_LIMIT) {
+  }
 #else
-  while(!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) { }
+  while (!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) {
+  }
 #endif
   if(tries >= TRY_LIMIT) {
     item->release(thd_id);
@@ -175,6 +181,9 @@ void QryPool::init(Workload * wl, uint64_t size) {
 #elif WORKLOAD==YCSB
     YCSBQuery * m_qry = (YCSBQuery *) mem_allocator.alloc(sizeof(YCSBQuery));
     m_qry = new YCSBQuery();
+#elif WORKLOAD==DA
+    DAQuery * m_qry = (DAQuery *) mem_allocator.alloc(sizeof(DAQuery));
+    m_qry = new DAQuery();
 #endif
     m_qry->init();
     qry = m_qry;
@@ -201,6 +210,10 @@ void QryPool::get(uint64_t thd_id, BaseQuery *& item) {
     YCSBQuery * qry = NULL;
     qry = (YCSBQuery *) mem_allocator.alloc(sizeof(YCSBQuery));
     qry = new YCSBQuery();
+#elif WORKLOAD==DA
+    DAQuery * qry = NULL;
+    qry = (DAQuery *) mem_allocator.alloc(sizeof(DAQuery));
+    qry = new DAQuery();
 #endif
     qry->init();
     item = (BaseQuery*)qry;
@@ -222,9 +235,11 @@ void QryPool::put(uint64_t thd_id, BaseQuery * item) {
   //mem_allocator.free(item,sizeof(item));
   int tries = 0;
 #if CC_ALG == CALVIN
-  while(!pool->push(item) && tries++ < TRY_LIMIT) { }
+  while (!pool->push(item) && tries++ < TRY_LIMIT) {
+  }
 #else
-  while(!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) { }
+  while (!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) {
+  }
 #endif
   if(tries >= TRY_LIMIT) {
 #if WORKLOAD == YCSB
@@ -329,7 +344,8 @@ void TxnTablePool::get(uint64_t thd_id, txn_node *& item) {
 
 void TxnTablePool::put(uint64_t thd_id, txn_node * item) {
   int tries = 0;
-  while(!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) { }
+  while (!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) {
+  }
   if(tries >= TRY_LIMIT) {
     mem_allocator.free(item,sizeof(txn_node));
   }
@@ -368,7 +384,8 @@ void MsgPool::put(msg_entry* item) {
   item->dest = UINT64_MAX;
   item->starttime = UINT64_MAX;
   int tries = 0;
-  while(!pool->push(item) && tries++ < TRY_LIMIT) { }
+  while (!pool->push(item) && tries++ < TRY_LIMIT) {
+  }
   if(tries >= TRY_LIMIT) {
     mem_allocator.free(item,sizeof(msg_entry));
   }
@@ -406,7 +423,8 @@ void RowPool::get(uint64_t thd_id, row_t* & item) {
 
 void RowPool::put(uint64_t thd_id, row_t* item) {
   int tries = 0;
-  while(!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) { }
+  while (!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) {
+  }
   if(tries >= TRY_LIMIT) {
     mem_allocator.free(item,sizeof(row_t));
   }

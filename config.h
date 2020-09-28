@@ -22,26 +22,47 @@
 */
 
 /***********************************************/
-// Simulation + Hardware
+// DA Trans Creator
 /***********************************************/
+//which creator to use
+#define CREATOR_USE_T false
+
+//TraversalActionSequenceCreator
+#define TRANS_CNT 2
+#define ITEM_CNT 4  
+#define SUBTASK_NUM 1
+#define SUBTASK_ID 0
+#define MAX_DML 4
+#define WITH_ABORT false
+#define TAIL_DTL false
+#define SAVE_HISTROY_WITH_EMPTY_OPT false
+#define DYNAMIC_SEQ_LEN false
+
+//InputActionSequenceCreator
+#define INPUT_FILE_PATH "./input.txt"
+
 // ! Parameters used to locate distributed performance bottlenecks.
 #define SECOND 100 // Set the queue monitoring time.
-#define LESS_DIS // Reduce the number of yCSB remote data to 1
-#define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
-#define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
-#define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
+// #define LESS_DIS // Reduce the number of yCSB remote data to 1
+// #define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
+// #define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
+// #define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
 // ! end of these parameters
+
+/***********************************************/
+// Simulation + Hardware
+/***********************************************/
 #define NODE_CNT 2
-#define THREAD_CNT 4
+#define THREAD_CNT 4 //trans_num
 #define REM_THREAD_CNT 2
 #define SEND_THREAD_CNT 2
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
-#define CLIENT_NODE_CNT 2
-#define CLIENT_THREAD_CNT 4
-#define CLIENT_REM_THREAD_CNT 2
-#define CLIENT_SEND_THREAD_CNT 2
+#define CLIENT_NODE_CNT NODE_CNT
+#define CLIENT_THREAD_CNT 1
+#define CLIENT_REM_THREAD_CNT 1
+#define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
 
 #define LOAD_METHOD LOAD_MAX
@@ -52,7 +73,9 @@
 // AA (Active-Active), AP (Active-Passive)
 #define REPL_TYPE AP
 
-// each transaction only accesses only 1 virtual partition. But the lock/ts manager and index are not aware of such partitioning. VIRTUAL_PART_CNT describes the request distribution and is only used to generate queries. For HSTORE, VIRTUAL_PART_CNT should be the same as PART_CNT.
+// each transaction only accesses only 1 virtual partition. But the lock/ts manager and index are
+// not aware of such partitioning. VIRTUAL_PART_CNT describes the request distribution and is only
+// used to generate queries. For HSTORE, VIRTUAL_PART_CNT should be the same as PART_CNT.
 #define VIRTUAL_PART_CNT    PART_CNT  
 #define PAGE_SIZE         4096 
 #define CL_SIZE           64
@@ -62,7 +85,7 @@
 
 // # of transactions to run for warmup
 #define WARMUP            0
-// YCSB or TPCC or PPS
+// YCSB or TPCC or PPS or DA
 #define WORKLOAD YCSB
 // print the transaction latency distribution
 #define PRT_LAT_DISTR false
@@ -101,9 +124,6 @@
 #define TPORT_TYPE tcp
 #define TPORT_PORT 7000
 #define SET_AFFINITY true
-#define TPORT_TYPE tcp
-#define TPORT_PORT 7000
-#define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
 #define MSG_SIZE 128 // in bytes
@@ -123,11 +143,13 @@
 /***********************************************/
 // Concurrency Control
 /***********************************************/
-// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC
-#define CC_ALG OCC
+
+// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
+#define CC_ALG WOOKONG
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
+// all transactions acquire tuples according to the primary key order.
 #define KEY_ORDER         false
 // transaction roll back changes after abort
 #define ROLL_BACK         true
@@ -196,9 +218,9 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
 #define SYNTH_TABLE_SIZE 16777216
-#define ZIPF_THETA 0.0
-#define TXN_WRITE_PERC 0.5
-#define TUP_WRITE_PERC 0.5
+#define ZIPF_THETA 0.3
+#define TXN_WRITE_PERC 0.0
+#define TUP_WRITE_PERC 0.0
 #define SCAN_PERC           0
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
@@ -226,7 +248,8 @@
 #define MPR 1.0
 #define MPIR 0.01
 #define MPR_NEWORDER      20 // In %
-enum TPCCTable {TPCC_WAREHOUSE, 
+enum TPCCTable {
+  TPCC_WAREHOUSE,
           TPCC_DISTRICT,
           TPCC_CUSTOMER,
           TPCC_HISTORY,
@@ -234,15 +257,27 @@ enum TPCCTable {TPCC_WAREHOUSE,
           TPCC_ORDER,
           TPCC_ORDERLINE,
           TPCC_ITEM,
-          TPCC_STOCK};
-enum TPCCTxnType {TPCC_ALL, 
+  TPCC_STOCK
+};
+enum TPCCTxnType {
+  TPCC_ALL,
           TPCC_PAYMENT, 
           TPCC_NEW_ORDER, 
           TPCC_ORDER_STATUS, 
           TPCC_DELIVERY, 
-          TPCC_STOCK_LEVEL};
-extern TPCCTxnType          g_tpcc_txn_type;
+  TPCC_STOCK_LEVEL
+};
+enum DATxnType {
+  DA_READ,
+  DA_WRITE,
+  DA_COMMIT,
+  DA_ABORT,
+  DA_SCAN
+};
+#define MAX_DA_TABLE_SIZE 10000
 
+
+extern TPCCTxnType g_tpcc_txn_type;
 //#define TXN_TYPE          TPCC_ALL
 #define PERC_PAYMENT 0.0
 #define FIRSTNAME_MINLEN      8
@@ -270,7 +305,8 @@ extern TPCCTxnType          g_tpcc_txn_type;
 #define PERC_PPS_UPDATEPRODUCTPART 0.2
 #define PERC_PPS_UPDATEPART 0.0
 
-enum PPSTxnType {PPS_ALL = 0, 
+enum PPSTxnType {
+  PPS_ALL = 0,
           PPS_GETPART, 
           PPS_GETSUPPLIER, 
           PPS_GETPRODUCT, 
@@ -321,6 +357,7 @@ enum PPSTxnType {PPS_ALL = 0,
 #define TPCC            2
 #define PPS             3
 #define TEST            4
+#define DA 5
 // Concurrency Control Algorithm
 #define NO_WAIT           1
 #define WAIT_DIE          2
@@ -339,7 +376,15 @@ enum PPSTxnType {PPS_ALL = 0,
 #define FOCC       15
 #define BOCC       16
 #define SSI        17
-#define WSI        17
+#define WSI        18
+#define DLI_BASE 19
+#define DLI_OCC 20
+#define DLI_MVCC_OCC 21
+#define DTA 22
+#define DLI_DTA 23
+#define DLI_MVCC 24
+#define DLI_DTA2 25
+#define DLI_DTA3 26
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
@@ -387,7 +432,7 @@ enum PPSTxnType {PPS_ALL = 0,
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
 #define DONE_TIMER 1 * 60 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 60 * BILLION    // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false

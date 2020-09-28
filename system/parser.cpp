@@ -140,8 +140,7 @@ void parser(int argc, char * argv[]) {
     else if (argv[i][1] == 't'&& argv[i][2] == 'w') {
 			g_txn_write_perc = atof( &argv[i][3] );
 			g_txn_read_perc = 1.0 - atof( &argv[i][3] );
-    }
-    else if (argv[i][1] == 'p')
+    } else if (argv[i][1] == 'p')
       g_part_cnt = atoi( &argv[i][2] );
     else if (argv[i][1] == 'n')
       g_node_cnt = atoi( &argv[i][2] );
@@ -164,8 +163,7 @@ void parser(int argc, char * argv[]) {
     else if (argv[i][1] == 'w') {
 			g_tup_write_perc = atof( &argv[i][2] );
 			g_tup_read_perc = 1.0 - atof( &argv[i][2] );
-    }
-    else if (argv[i][1] == 's')
+    } else if (argv[i][1] == 's')
 			g_synth_table_size = atoi( &argv[i][2] );
     else if (argv[i][1] == 'f')
 			g_field_per_tuple = atoi( &argv[i][2] );
@@ -188,7 +186,8 @@ void parser(int argc, char * argv[]) {
   g_abort_thread_cnt = 0;
   g_total_thread_cnt -= 1;
 #endif
-  g_total_client_thread_cnt = g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
+  g_total_client_thread_cnt =
+      g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
   g_total_node_cnt = g_node_cnt + g_client_node_cnt + g_repl_cnt*g_node_cnt;
   if(ISCLIENT) {
     g_this_thread_cnt = g_client_thread_cnt;
@@ -256,7 +255,6 @@ void parser(int argc, char * argv[]) {
       printf("g_seq_batch_time_limit %ld\n",g_seq_batch_time_limit);
 
     // Initialize client-specific globals
-    if (g_node_id >= g_node_cnt)
-        init_client_globals();
+  if (g_node_id >= g_node_cnt) init_client_globals();
     init_globals();
 }

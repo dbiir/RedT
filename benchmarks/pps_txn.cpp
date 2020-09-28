@@ -91,15 +91,9 @@ RC PPSTxnManager::run_txn() {
 #endif
 
   if(IS_LOCAL(txn->txn_id) && 
-      (state == PPS_GETPART0 || 
-       state == PPS_GETPRODUCT0 ||
-       state == PPS_GETSUPPLIER0 ||
-       state == PPS_GETPARTBYSUPPLIER0 ||
-       state == PPS_GETPARTBYPRODUCT0 ||
-       state == PPS_ORDERPRODUCT0 ||
-       state == PPS_UPDATEPRODUCTPART0 ||
-       state == PPS_UPDATEPART0 
-       )) {
+      (state == PPS_GETPART0 || state == PPS_GETPRODUCT0 || state == PPS_GETSUPPLIER0 ||
+       state == PPS_GETPARTBYSUPPLIER0 || state == PPS_GETPARTBYPRODUCT0 ||
+       state == PPS_ORDERPRODUCT0 || state == PPS_UPDATEPRODUCTPART0 || state == PPS_UPDATEPART0)) {
     DEBUG("Running txn %ld, type %d\n",txn->txn_id,((PPSQuery*)query)->txn_type);
 #if DISTR_DEBUG
     query->print();
@@ -157,8 +151,7 @@ RC PPSTxnManager::acquire_locks() {
         item = index_read(index, part_key, partition_id_part);
         row_t * row = ((row_t *)item->location);
         rc2 = get_lock(row,RD);
-        if(rc2 != RCOK)
-          rc = rc2;
+        if (rc2 != RCOK) rc = rc2;
       }
       break;
     case PPS_GETPRODUCT:
@@ -167,8 +160,7 @@ RC PPSTxnManager::acquire_locks() {
         item = index_read(index, product_key, partition_id_product);
         row_t * row = ((row_t *)item->location);
         rc2 = get_lock(row,RD);
-        if(rc2 != RCOK)
-          rc = rc2;
+        if (rc2 != RCOK) rc = rc2;
       }
       break;
     case PPS_GETSUPPLIER:
@@ -177,8 +169,7 @@ RC PPSTxnManager::acquire_locks() {
         item = index_read(index, supplier_key, partition_id_supplier);
         row_t * row = ((row_t *)item->location);
         rc2 = get_lock(row,RD);
-        if(rc2 != RCOK)
-          rc = rc2;
+        if (rc2 != RCOK) rc = rc2;
       }
       break;
     case PPS_GETPARTBYSUPPLIER:
@@ -187,8 +178,7 @@ RC PPSTxnManager::acquire_locks() {
         item = index_read(index, supplier_key, partition_id_supplier);
         row_t * row = ((row_t *)item->location);
         rc2 = get_lock(row,RD);
-        if(rc2 != RCOK)
-          rc = rc2;
+        if (rc2 != RCOK) rc = rc2;
 
         index = _wl->i_supplies;
         int count = 0;
@@ -197,8 +187,7 @@ RC PPSTxnManager::acquire_locks() {
             count++;
             row_t * row = ((row_t *)item->location);
             rc2 = get_lock(row,RD);
-            if(rc2 != RCOK)
-              rc = rc2;
+          if (rc2 != RCOK) rc = rc2;
             item = index_read(index, supplier_key, partition_id_product,count);
         }
       }
@@ -210,8 +199,7 @@ RC PPSTxnManager::acquire_locks() {
             item = index_read(index, key, pid);
             row_t * row = ((row_t *)item->location);
             rc2 = get_lock(row,RD);
-            if(rc2 != RCOK)
-              rc = rc2;
+          if (rc2 != RCOK) rc = rc2;
           }
       }
 
@@ -222,8 +210,7 @@ RC PPSTxnManager::acquire_locks() {
           item = index_read(index, product_key, partition_id_product);
           row_t * row = ((row_t *)item->location);
           rc2 = get_lock(row,RD);
-          if(rc2 != RCOK)
-            rc = rc2;
+        if (rc2 != RCOK) rc = rc2;
 
           index = _wl->i_uses;
           int count = 0;
@@ -232,8 +219,7 @@ RC PPSTxnManager::acquire_locks() {
               count++;
               row_t * row = ((row_t *)item->location);
               rc2 = get_lock(row,RD);
-              if(rc2 != RCOK)
-                rc = rc2;
+          if (rc2 != RCOK) rc = rc2;
               item = index_read(index, product_key, partition_id_product,count);
           }
         }
@@ -245,8 +231,7 @@ RC PPSTxnManager::acquire_locks() {
               item = index_read(index, key, pid);
               row_t * row = ((row_t *)item->location);
               rc2 = get_lock(row,RD);
-              if(rc2 != RCOK)
-                rc = rc2;
+          if (rc2 != RCOK) rc = rc2;
             }
         }
 
@@ -257,8 +242,7 @@ RC PPSTxnManager::acquire_locks() {
         item = index_read(index, product_key, partition_id_product);
         row_t * row = ((row_t *)item->location);
         rc2 = get_lock(row,RD);
-        if(rc2 != RCOK)
-          rc = rc2;
+        if (rc2 != RCOK) rc = rc2;
 
         index = _wl->i_uses;
         int count = 0;
@@ -267,8 +251,7 @@ RC PPSTxnManager::acquire_locks() {
             count++;
             row_t * row = ((row_t *)item->location);
             rc2 = get_lock(row,RD);
-            if(rc2 != RCOK)
-              rc = rc2;
+          if (rc2 != RCOK) rc = rc2;
             item = index_read(index, product_key, partition_id_product,count);
         }
       }
@@ -280,8 +263,7 @@ RC PPSTxnManager::acquire_locks() {
             item = index_read(index, key, pid);
             row_t * row = ((row_t *)item->location);
             rc2 = get_lock(row,WR);
-            if(rc2 != RCOK)
-              rc = rc2;
+          if (rc2 != RCOK) rc = rc2;
           }
       }
 
@@ -292,8 +274,7 @@ RC PPSTxnManager::acquire_locks() {
         item = index_read(index, product_key, partition_id_product);
         row_t * row = ((row_t *)item->location);
         rc2 = get_lock(row,WR);
-        if(rc2 != RCOK)
-          rc = rc2;
+        if (rc2 != RCOK) rc = rc2;
       }
       break;
     case PPS_UPDATEPART:
@@ -302,16 +283,15 @@ RC PPSTxnManager::acquire_locks() {
         item = index_read(index, part_key, partition_id_part);
         row_t * row = ((row_t *)item->location);
         rc2 = get_lock(row,WR);
-        if(rc2 != RCOK)
-          rc = rc2;
+        if (rc2 != RCOK) rc = rc2;
       }
       break;
 
-    default: assert(false);
+    default:
+      assert(false);
   }
   if(decr_lr() == 0) {
-    if(ATOM_CAS(lock_ready,0,1))
-      rc = RCOK;
+    if (ATOM_CAS(lock_ready, 0, 1)) rc = RCOK;
   }
   txn_stats.wait_starttime = get_sys_clock();
   locking_done = true;
@@ -361,8 +341,7 @@ void PPSTxnManager::next_pps_state() {
     case PPS_GETPARTBYSUPPLIER2:
       if (row == NULL) {
         state = PPS_FIN;
-      }
-      else {
+      } else {
         ++parts_processed_count;
         state = PPS_GETPARTBYSUPPLIER3;
       }
@@ -391,8 +370,7 @@ void PPSTxnManager::next_pps_state() {
     case PPS_GETPARTBYPRODUCT2:
       if (row == NULL) {
         state = PPS_FIN;
-      }
-      else {
+      } else {
         ++parts_processed_count;
         state = PPS_GETPARTBYPRODUCT3;
       }
@@ -423,8 +401,7 @@ void PPSTxnManager::next_pps_state() {
         if(!IS_LOCAL(txn->txn_id) && row != NULL) {
             ++parts_processed_count;
             state = PPS_ORDERPRODUCT3;
-        }
-        else {
+      } else {
             state = PPS_FIN;
         }
         break;
@@ -624,8 +601,7 @@ RC PPSTxnManager::run_txn_state() {
     default:
       assert(false);
   }
-  if(rc == RCOK)
-    next_pps_state();
+  if (rc == RCOK) next_pps_state();
   return rc;
 }
 
@@ -918,7 +894,8 @@ inline RC PPSTxnManager::run_getpartsbysupplier_2(uint64_t supplier_key, row_t *
     RC rc;
     itemid_t * item;
     INDEX * index = _wl->i_supplies;
-    item = index_read(index, supplier_key, suppliers_to_partition(supplier_key),parts_processed_count);
+  item =
+      index_read(index, supplier_key, suppliers_to_partition(supplier_key), parts_processed_count);
     if (item == NULL) {
         r_local = NULL;
         return RCOK;
@@ -1005,13 +982,12 @@ inline RC PPSTxnManager::run_updatepart_1(row_t *& r_local) {
   return RCOK;
 }
 
-
-
 RC PPSTxnManager::run_calvin_txn() {
   RC rc = RCOK;
   uint64_t starttime = get_sys_clock();
   PPSQuery* pps_query = (PPSQuery*) query;
-  DEBUG("(%ld,%ld) Run calvin txn %d (recon: %d)\n",txn->txn_id,txn->batch_id,pps_query->txn_type,isRecon());
+  DEBUG("(%ld,%ld) Run calvin txn %d (recon: %d)\n", txn->txn_id, txn->batch_id,
+        pps_query->txn_type, isRecon());
   while(!calvin_exec_phase_done() && rc == RCOK) {
     DEBUG("(%ld,%ld) phase %d\n",txn->txn_id,txn->batch_id,this->phase);
     switch(this->phase) {
@@ -1022,7 +998,9 @@ RC PPSTxnManager::run_calvin_txn() {
           calvin_expected_rsp_cnt--;
         }
 
-        DEBUG("(%ld,%ld) expects %d responses; %ld participants, %ld active\n",txn->txn_id,txn->batch_id,calvin_expected_rsp_cnt,query->participant_nodes.size(),query->active_nodes.size());
+        DEBUG("(%ld,%ld) expects %d responses; %ld participants, %ld active\n", txn->txn_id,
+              txn->batch_id, calvin_expected_rsp_cnt, query->participant_nodes.size(),
+              query->active_nodes.size());
 
         this->phase = CALVIN_LOC_RD;
         break;
@@ -1033,8 +1011,7 @@ RC PPSTxnManager::run_calvin_txn() {
         //release_read_locks(pps_query);
         if (isRecon()) {
             this->phase = CALVIN_DONE;
-        }
-        else {
+        } else {
             this->phase = CALVIN_SERVE_RD;
         }
 
@@ -1050,7 +1027,8 @@ RC PPSTxnManager::run_calvin_txn() {
             rc = RCOK;
           } else {
             assert(calvin_expected_rsp_cnt > 0);
-            DEBUG("(%ld,%ld) wait in collect phase; %d / %d rfwds received\n",txn->txn_id,txn->batch_id,rsp_cnt,calvin_expected_rsp_cnt);
+            DEBUG("(%ld,%ld) wait in collect phase; %d / %d rfwds received\n", txn->txn_id,
+                  txn->batch_id, rsp_cnt, calvin_expected_rsp_cnt);
             rc = WAIT;
           }
         } else { // Done
@@ -1123,8 +1101,7 @@ RC PPSTxnManager::run_pps_phase2() {
                 rc = run_getpartsbysupplier_3(part_key, row);
                 if (isRecon()) {
                     pps_query->part_keys.add(part_key);
-                }
-                else {
+          } else {
                     break;
                     // check if the parts have changed since we did recon
                     if (!pps_query->part_keys.contains(part_key)) {
@@ -1160,8 +1137,7 @@ RC PPSTxnManager::run_pps_phase2() {
                 rc = run_getpartsbyproduct_3(part_key, row);
                 if (isRecon()) {
                     pps_query->part_keys.add(part_key);
-                }
-                else {
+          } else {
                     // check if the parts have changed since we did recon
                     if (!pps_query->part_keys.contains(part_key)) {
                         txn->rc = Abort;
@@ -1196,8 +1172,7 @@ RC PPSTxnManager::run_pps_phase2() {
                 rc = run_orderproduct_3(part_key, row);
                 if (isRecon()) {
                     pps_query->part_keys.add(part_key);
-                }
-                else {
+          } else {
                     // check if the parts have changed since we did recon
                     if (!pps_query->part_keys.contains(part_key)) {
                         txn->rc = Abort;
@@ -1206,14 +1181,14 @@ RC PPSTxnManager::run_pps_phase2() {
                 }
                 rc = run_orderproduct_2(product_key, row);
             }
-
         }
         break;
     case PPS_UPDATEPRODUCTPART:
         break;
     case PPS_UPDATEPART:
         break;
-    default: assert(false);
+    default:
+      assert(false);
     }
     return rc;
 }
@@ -1264,9 +1239,8 @@ RC PPSTxnManager::run_pps_phase5() {
           rc = run_updatepart_1(row);
       }
       break;
-  default: assert(false);
+    default:
+      assert(false);
   }
   return rc;
-
 }
-

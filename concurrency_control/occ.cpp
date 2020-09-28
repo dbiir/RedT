@@ -14,14 +14,14 @@
    limitations under the License.
 */
 
+#include "occ.h"
+
 #include "global.h"
 #include "helper.h"
-#include "txn.h"
-#include "occ.h"
 #include "manager.h"
 #include "mem_alloc.h"
 #include "row_occ.h"
-
+#include "txn.h"
 
 set_ent::set_ent() {
 	set_size = 0;
@@ -41,7 +41,6 @@ void OptCC::init() {
 
 RC OptCC::validate(TxnManager * txn) {
 	RC rc;
-	return RCOK;
   uint64_t starttime = get_sys_clock();
 #if PER_ROW_VALID
 	rc = per_row_validate(txn);
@@ -53,7 +52,6 @@ RC OptCC::validate(TxnManager * txn) {
 }
 
 void OptCC::finish(RC rc, TxnManager * txn) {
-	return ;
 #if PER_ROW_VALID
   per_row_finish(rc,txn);
 #else
@@ -61,8 +59,7 @@ void OptCC::finish(RC rc, TxnManager * txn) {
 #endif
 }
 
-RC 
-OptCC::per_row_validate(TxnManager * txn) {
+RC OptCC::per_row_validate(TxnManager *txn) {
 	RC rc = RCOK;
 #if CC_ALG == OCC
 	// sort all rows accessed in primary key order.
@@ -70,7 +67,9 @@ OptCC::per_row_validate(TxnManager * txn) {
 		for (uint64_t j = 0; j < i; j ++) {
 			int tabcmp = strcmp(txn->get_access_original_row(j)->get_table_name(), 
 				txn->get_access_original_row(j+1)->get_table_name());
-			if (tabcmp > 0 || (tabcmp == 0 && txn->get_access_original_row(j)->get_primary_key() > txn->get_access_original_row(j+1)->get_primary_key())) {
+      if (tabcmp > 0 ||
+          (tabcmp == 0 && txn->get_access_original_row(j)->get_primary_key() >
+                              txn->get_access_original_row(j + 1)->get_primary_key())) {
         txn->swap_accesses(j,j+1);
 			}
 		}
@@ -156,20 +155,19 @@ RC OptCC::central_validate(TxnManager * txn) {
 	}
 	his = history;
 	//pthread_mutex_unlock( &latch );
-	DEBUG("Start Validation %ld: start_ts %lu, finish_ts %lu, active size %lu\n",txn->get_txn_id(),start_tn,finish_tn,f_active_len);
+  DEBUG("Start Validation %ld: start_ts %ld, finish_ts %ld, active size %ld\n", txn->get_txn_id(),
+        start_tn, finish_tn, f_active_len);
 	sem_post(&_semaphore);
 	INC_STATS(txn->get_thd_id(),occ_cs_time,get_sys_clock() - starttime);
 	starttime = get_sys_clock();
 	starttime = get_sys_clock();
-
 
   uint64_t checked = 0;
   uint64_t active_checked = 0;
   uint64_t hist_checked = 0;
   stop = 0;
 	if (finish_tn > start_tn) {
-		while (his && his->tn > finish_tn) 
-			his = his->next;
+    while (his && his->tn > finish_tn) his = his->next;
 		while (his && his->tn > start_tn) {
       		++hist_checked;
       		++checked;
@@ -240,7 +238,8 @@ final:
         }
       sem_post(&_semaphore);
 	}
-	DEBUG("End Validation %ld: active# %ld, hist# %ld\n",txn->get_txn_id(),active_checked,hist_checked);
+  DEBUG("End Validation %ld: active# %ld, hist# %ld\n", txn->get_txn_id(), active_checked,
+        hist_checked);
 	INC_STATS(txn->get_thd_id(),occ_validate_time,get_sys_clock() - total_starttime);
 	return rc;
 }

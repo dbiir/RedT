@@ -20,8 +20,7 @@
 #include "abort_thread.h"
 #include "abort_queue.h"
 
-void AbortThread::setup() {
-}
+void AbortThread::setup() {}
 
 RC AbortThread::run() {
   tsetup();

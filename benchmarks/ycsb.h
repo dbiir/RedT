@@ -54,8 +54,7 @@ private:
 	static int next_tid;
 };
 
-class YCSBTxnManager : public TxnManager
-{
+class YCSBTxnManager : public TxnManager {
 public:
 	void init(uint64_t thd_id, Workload * h_wl);
 	void reset();

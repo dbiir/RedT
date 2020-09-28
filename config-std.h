@@ -6,7 +6,9 @@
 /***********************************************/
 #define THREAD_CNT                                      4
 #define PART_CNT                                        1 //CORE_CNT
-// each transaction only accesses only 1 virtual partition. But the lock/ts manager and index are not aware of such partitioning. VIRTUAL_PART_CNT describes the request distribution and is only used to generate queries. For HSTORE, VIRTUAL_PART_CNT should be the same as PART_CNT.
+// each transaction only accesses only 1 virtual partition. But the lock/ts manager and index are
+// not aware of such partitioning. VIRTUAL_PART_CNT describes the request distribution and is only
+// used to generate queries. For HSTORE, VIRTUAL_PART_CNT should be the same as PART_CNT.
 #define VIRTUAL_PART_CNT                        1
 #define PAGE_SIZE                                       4096 
 #define CL_SIZE                                         64
@@ -130,12 +132,14 @@
 #define WH_UPDATE                                       true
 #define NUM_WH                                          4
 //
-enum TPCCTxnType {TPCC_ALL, 
+enum TPCCTxnType {
+  TPCC_ALL,
                                 TPCC_PAYMENT, 
                                 TPCC_NEW_ORDER, 
                                 TPCC_ORDER_STATUS, 
                                 TPCC_DELIVERY, 
-                                TPCC_STOCK_LEVEL};
+  TPCC_STOCK_LEVEL
+};
 extern TPCCTxnType                                      g_tpcc_txn_type;
 
 //#define TXN_TYPE                                      TPCC_ALL

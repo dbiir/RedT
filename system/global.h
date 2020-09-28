@@ -47,6 +47,9 @@
 #include "txn_table.h"
 #include "logger.h"
 #include "sim_manager.h"
+
+#include <boost/lockfree/queue.hpp>
+#include "da_block_queue.h"
 //#include "maat.h"
 
 using namespace std;
@@ -57,11 +60,13 @@ class SimManager;
 class Manager;
 class Query_queue;
 class OptCC;
+class Dli;
 class Focc;
 class Bocc;
 class ssi;
 class wsi;
 class Maat;
+class Dta;
 class Wkdb;
 class Tictoc;
 class Transport;
@@ -84,6 +89,9 @@ class Logger;
 class TimeTable;
 class InOutTable;
 class WkdbTimeTable;
+class DAQuery;
+class DABlockQueue;
+class DtaTimeTable;                                                                                                                            
 class KeyXidCache;
 class RtsCache;
 // class QTcpQueue;
@@ -106,11 +114,13 @@ extern Manager glob_manager;
 extern Query_queue query_queue;
 extern Client_query_queue client_query_queue;
 extern OptCC occ_man;
+extern Dli dli_man;
 extern Focc focc_man;
 extern Bocc bocc_man;
 extern ssi ssi_man;
 extern wsi wsi_man;
 extern Maat maat_man;
+extern Dta dta_man;
 extern Wkdb wkdb_man;
 extern Tictoc tictoc_man;
 extern Transport tport_man;
@@ -129,6 +139,9 @@ extern Client_txn client_man;
 extern Sequencer seq_man;
 extern Logger logger;
 extern TimeTable time_table;
+extern DtaTimeTable dta_time_table;
+extern KeyXidCache dta_key_xid_cache;
+extern RtsCache dta_rts_cache;
 extern InOutTable inout_table;
 extern WkdbTimeTable wkdb_time_table;
 extern KeyXidCache wkdb_key_xid_cache;
@@ -251,6 +264,18 @@ extern double g_perc_orderproduct;
 extern double g_perc_updateproductpart;
 extern double g_perc_updatepart;
 
+//我自己加的
+extern boost::lockfree::queue<DAQuery*, boost::lockfree::fixed_sized<true>> da_query_queue;
+extern DABlockQueue da_gen_qry_queue;
+extern bool is_server;
+extern map<uint64_t, ts_t> da_start_stamp_tab;
+extern set<uint64_t> da_start_trans_tab;
+extern map<uint64_t, ts_t> da_stamp_tab;
+extern set<uint64_t> already_abort_tab;
+extern string DA_history_mem;
+extern bool abort_history;
+extern ofstream commit_file;
+extern ofstream abort_file;
 // CALVIN
 extern UInt32 g_seq_thread_cnt;
 
@@ -262,7 +287,8 @@ extern UInt32 g_repl_type;
 extern UInt32 g_repl_cnt;
 
 enum RC { RCOK=0, Commit, Abort, WAIT, WAIT_REM, ERROR, FINISH, NONE};
-enum RemReqType {INIT_DONE=0,
+enum RemReqType {
+  INIT_DONE = 0,
     RLK,
     RULK,
     CL_QRY,
@@ -287,10 +313,18 @@ enum RemReqType {INIT_DONE=0,
     LOG_MSG_RSP,
     LOG_FLUSHED,
     CALVIN_ACK,
-    NO_MSG};
+  NO_MSG
+};
 
 // Calvin
-enum CALVIN_PHASE {CALVIN_RW_ANALYSIS=0,CALVIN_LOC_RD,CALVIN_SERVE_RD,CALVIN_COLLECT_RD,CALVIN_EXEC_WR,CALVIN_DONE};
+enum CALVIN_PHASE {
+  CALVIN_RW_ANALYSIS = 0,
+  CALVIN_LOC_RD,
+  CALVIN_SERVE_RD,
+  CALVIN_COLLECT_RD,
+  CALVIN_EXEC_WR,
+  CALVIN_DONE
+};
 
 /* Thread */
 typedef uint64_t txnid_t;
@@ -318,6 +352,11 @@ enum lock_t {LOCK_EX = 0, LOCK_SH, LOCK_NONE };
 /* TIMESTAMP */
 enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ}; 
 
+/*DA query build queue*/
+//queue<DAQuery> query_build_queue;
+
+
+
 #define GET_THREAD_ID(id)	(id % g_thread_cnt)
 #define GET_NODE_ID(id)	(id % g_node_cnt)
 #define GET_PART_ID(t,n)	(n) 
@@ -326,8 +365,12 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 #define ISSERVER (g_node_id < g_node_cnt)
 #define ISSERVERN(id) (id < g_node_cnt)
 #define ISCLIENT (g_node_id >= g_node_cnt && g_node_id < g_node_cnt + g_client_node_cnt)
-#define ISREPLICA (g_node_id >= g_node_cnt + g_client_node_cnt && g_node_id < g_node_cnt + g_client_node_cnt + g_repl_cnt * g_node_cnt)
-#define ISREPLICAN(id) (id >= g_node_cnt + g_client_node_cnt && id < g_node_cnt + g_client_node_cnt + g_repl_cnt * g_node_cnt)
+#define ISREPLICA                                 \
+  (g_node_id >= g_node_cnt + g_client_node_cnt && \
+   g_node_id < g_node_cnt + g_client_node_cnt + g_repl_cnt * g_node_cnt)
+#define ISREPLICAN(id)                     \
+  (id >= g_node_cnt + g_client_node_cnt && \
+   id < g_node_cnt + g_client_node_cnt + g_repl_cnt * g_node_cnt)
 #define ISCLIENTN(id) (id >= g_node_cnt && id < g_node_cnt + g_client_node_cnt)
 #define IS_LOCAL(tid) (tid % g_node_cnt == g_node_id || CC_ALG == CALVIN)
 #define IS_REMOTE(tid) (tid % g_node_cnt != g_node_id || CC_ALG == CALVIN)
@@ -339,9 +382,8 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 #define GET_PART_ID(t,n)	(n*g_thread_cnt + t) 
 */
 
-#define MSG(str, args...) { \
-	printf("[%s : %d] " str, __FILE__, __LINE__, args); } \
-//	printf(args); }
+#define MSG(str, args...) \
+  { printf("[%s : %d] " str, __FILE__, __LINE__, args); }  //	printf(args); }
 
 // principal index structure. The workload may decide to use a different 
 // index structure for specific purposes. (e.g. non-primary key access should use hash)

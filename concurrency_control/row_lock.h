@@ -41,7 +41,9 @@ private:
 	LockEntry * get_entry();
 	void 		return_entry(LockEntry * entry);
 	row_t * _row;
-  uint64_t hash(uint64_t id) {return id % owners_size;};
+  uint64_t hash(uint64_t id) {
+    return id % owners_size;
+  };
     lock_t lock_type;
     UInt32 owner_cnt;
     UInt32 waiter_cnt;

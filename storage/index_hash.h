@@ -1,17 +1,17 @@
 /*
-   Copyright 2016 Massachusetts Institute of Technology
+	 Copyright 2016 Massachusetts Institute of Technology
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+	 Licensed under the Apache License, Version 2.0 (the "License");
+	 you may not use this file except in compliance with the License.
+	 You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+			 http://www.apache.org/licenses/LICENSE-2.0
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+	 Unless required by applicable law or agreed to in writing, software
+	 distributed under the License is distributed on an "AS IS" BASIS,
+	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 See the License for the specific language governing permissions and
+	 limitations under the License.
 */
 
 #ifndef _INDEX_HASH_H_
@@ -24,7 +24,9 @@
 // each BucketNode contains items sharing the same key
 class BucketNode {
 public: 
-	BucketNode(idx_key_t key) {	init(key); };
+	BucketNode(idx_key_t key) {
+		init(key);
+	};
 	void init(idx_key_t key) {
 		this->key = key;
 		next = NULL;
@@ -61,7 +63,8 @@ public:
 	RC 			init(int part_cnt, 
 					table_t * table, 
 					uint64_t bucket_cnt);
-  void    index_delete();
+	void    index_delete();
+	void index_reset();
 	bool 		index_exist(idx_key_t key); // check if the key exist.
 	RC 			index_insert(idx_key_t key, itemid_t * item, int part_id=-1);
 	RC 			index_insert_nonunique(idx_key_t key, itemid_t * item, int part_id=-1);
@@ -85,11 +88,11 @@ private:
 	// TODO implement more complex hash function
 	uint64_t hash(idx_key_t key) {	
 #if WORKLOAD == YCSB
-    return (key / g_part_cnt) % _bucket_cnt_per_part; 
+		return (key / g_part_cnt) % _bucket_cnt_per_part; 
 #else
-    return key % _bucket_cnt_per_part; 
+		return key % _bucket_cnt_per_part; 
 #endif
-  }
+	}
 	
 	BucketHeader ** 	_buckets;
 	uint64_t	 		_bucket_cnt;

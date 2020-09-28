@@ -5,7 +5,7 @@
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+	   http://www.apache.org/licenses/LICENSE-2.0
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
@@ -105,12 +105,12 @@ RC TPCCWorkload::init_table() {
 	pthread_t * p_thds = new pthread_t[g_init_parallelism - 1];
   thr_args * tt = new thr_args[g_init_parallelism];
 	for (UInt32 i = 0; i < g_init_parallelism ; i++) {
-    tt[i].wl = this;
-    tt[i].id = i;
+	tt[i].wl = this;
+	tt[i].id = i;
   }
   // Stock table
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
-    pthread_create(&p_thds[i], NULL, threadInitStock, &tt[i]);
+	pthread_create(&p_thds[i], NULL, threadInitStock, &tt[i]);
 	}
   threadInitStock(&tt[g_init_parallelism-1]);
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
@@ -124,7 +124,7 @@ RC TPCCWorkload::init_table() {
   fflush(stdout);
   // Item Table
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
-    pthread_create(&p_thds[i], NULL, threadInitItem, &tt[i]);
+	pthread_create(&p_thds[i], NULL, threadInitItem, &tt[i]);
 	}
   threadInitItem(&tt[g_init_parallelism-1]);
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
@@ -138,7 +138,7 @@ RC TPCCWorkload::init_table() {
   fflush(stdout);
   // Customer Table
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
-    pthread_create(&p_thds[i], NULL, threadInitCust, &tt[i]);
+	pthread_create(&p_thds[i], NULL, threadInitCust, &tt[i]);
 	}
   threadInitCust(&tt[g_init_parallelism-1]);
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
@@ -154,7 +154,7 @@ RC TPCCWorkload::init_table() {
   // Order Table
   /*
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
-    pthread_create(&p_thds[i], NULL, threadInitOrder, &tt[i]);
+	pthread_create(&p_thds[i], NULL, threadInitOrder, &tt[i]);
 	}
   threadInitOrder(&tt[g_init_parallelism-1]);
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
@@ -184,9 +184,9 @@ RC TPCCWorkload::init_table() {
 	pthread_create(&p_thds[0], NULL, threadInitStock, this);
 	pthread_create(&p_thds[1], NULL, threadInitHist, this);
   for(UInt32 i=0;i<cust_thr_cnt;i++) {
-    tt[i].wl = this;
-    tt[i].id = i;
-    tt[i].tot = cust_thr_cnt;
+	tt[i].wl = this;
+	tt[i].id = i;
+	tt[i].tot = cust_thr_cnt;
 	  pthread_create(&p_thds[2+i], NULL, threadInitCust, &tt[i]);
   }
 	threadInitOrder(this);
@@ -209,16 +209,14 @@ RC TPCCWorkload::init_table() {
 
 RC TPCCWorkload::get_txn_man(TxnManager *& txn_manager) {
   DEBUG_M("TPCCWorkload::get_txn_man TPCCTxnManager alloc\n");
-	txn_manager = (TPCCTxnManager *)
-		mem_allocator.align_alloc( sizeof(TPCCTxnManager));
+  txn_manager = (TPCCTxnManager *)mem_allocator.align_alloc(sizeof(TPCCTxnManager));
 	new(txn_manager) TPCCTxnManager();
 	//txn_manager->init( this);
 	return RCOK;
 }
 
 void TPCCWorkload::init_tab_item(int id) {
-	if (WL_VERB)
-		printf("[init] loading item table\n");
+  if (WL_VERB) printf("[init] loading item table\n");
 	for (UInt32 i = id+1; i <= g_max_items; i+=g_init_parallelism) {
 		row_t * row;
 		uint64_t row_id;
@@ -231,9 +229,8 @@ void TPCCWorkload::init_tab_item(int id) {
 		row->set_value(I_NAME, name);
 		row->set_value(I_PRICE, URand(1, 100));
 		char data[50];
-    //MakeAlphaString(26, 50, data);
-		if (RAND(10) == 0) 
-			strcpy(data, "original");		
+	//MakeAlphaString(26, 50, data);
+	if (RAND(10) == 0) strcpy(data, "original");
 		row->set_value(I_DATA, data);
 		
 		index_insert(i_item, i, row, 0);
@@ -241,10 +238,9 @@ void TPCCWorkload::init_tab_item(int id) {
 }
 
 void TPCCWorkload::init_tab_wh() {
-	if (WL_VERB)
-		printf("[init] workload table.\n");
+  if (WL_VERB) printf("[init] workload table.\n");
 	for (UInt32 wid = 1; wid <= g_num_wh; wid ++) {
-    if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
+	if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
 		row_t * row;
 		uint64_t row_id;
 		t_warehouse->get_new_row(row, 0, row_id);
@@ -252,23 +248,23 @@ void TPCCWorkload::init_tab_wh() {
 
 		row->set_value(W_ID, wid);
 		char name[10];
-        MakeAlphaString(6, 10, name);
+		MakeAlphaString(6, 10, name);
 		row->set_value(W_NAME, name);
 		char street[20];
-        MakeAlphaString(10, 20, street);
+		MakeAlphaString(10, 20, street);
 		row->set_value(W_STREET_1, street);
-        MakeAlphaString(10, 20, street);
+		MakeAlphaString(10, 20, street);
 		row->set_value(W_STREET_2, street);
-        MakeAlphaString(10, 20, street);
+		MakeAlphaString(10, 20, street);
 		row->set_value(W_CITY, street);
 		char state[2];
 		MakeAlphaString(2, 2, state); /* State */
 		row->set_value(W_STATE, state);
 		char zip[9];
-    	MakeNumberString(9, 9, zip); /* Zip */
+		MakeNumberString(9, 9, zip); /* Zip */
 		row->set_value(W_ZIP, zip);
-    	double tax = (double)URand(0L,200L)/1000.0;
-    	double w_ytd=300000.00;
+		double tax = (double)URand(0L,200L)/1000.0;
+		double w_ytd=300000.00;
 		row->set_value(W_TAX, tax);
 		row->set_value(W_YTD, w_ytd);
 
@@ -291,20 +287,20 @@ void TPCCWorkload::init_tab_dist(uint64_t wid) {
 		MakeAlphaString(6, 10, name);
 		row->set_value(D_NAME, name);
 		char street[20];
-        MakeAlphaString(10, 20, street);
+		MakeAlphaString(10, 20, street);
 		row->set_value(D_STREET_1, street);
-        MakeAlphaString(10, 20, street);
+		MakeAlphaString(10, 20, street);
 		row->set_value(D_STREET_2, street);
-        MakeAlphaString(10, 20, street);
+		MakeAlphaString(10, 20, street);
 		row->set_value(D_CITY, street);
 		char state[2];
 		MakeAlphaString(2, 2, state); /* State */
 		row->set_value(D_STATE, state);
 		char zip[9];
-    	MakeNumberString(9, 9, zip); /* Zip */
+		MakeNumberString(9, 9, zip); /* Zip */
 		row->set_value(D_ZIP, zip);
-    	double tax = (double)URand(0L,200L)/1000.0;
-    	double w_ytd=30000.00;
+		double tax = (double)URand(0L,200L)/1000.0;
+		double w_ytd=30000.00;
 		row->set_value(D_TAX, tax);
 		row->set_value(D_YTD, w_ytd);
 		row->set_value(D_NEXT_O_ID, 3001);
@@ -342,13 +338,13 @@ void TPCCWorkload::init_tab_stock(int id, uint64_t wid) {
 		row->set_value(S_YTD, 0);
 		row->set_value(S_ORDER_CNT, 0);
 		char s_data[50];
-    /*
+	/*
 		int len = MakeAlphaString(26, 50, s_data);
 		if (rand() % 100 < 10) {
 			int idx = URand(0, len - 8);
 			strcpy(&s_data[idx], "original");
 		}
-    */
+	*/
 		row->set_value(S_DATA, s_data);
 #endif
 		index_insert(i_stock, stockKey(sid, wid), row, wh_to_part(wid));
@@ -372,27 +368,27 @@ void TPCCWorkload::init_tab_cust(int id, uint64_t did, uint64_t wid) {
 		else
 			Lastname(NURand(255,0,999), c_last);
 		row->set_value(C_LAST, c_last);
-    /*
+	/*
 #if !TPCC_SMALL
 		char tmp[2];
-    tmp[0] = 'O';
-    tmp[1] = 'E';
+	tmp[0] = 'O';
+	tmp[1] = 'E';
 		row->set_value(C_MIDDLE, tmp);
 		char c_first[FIRSTNAME_LEN];
 		MakeAlphaString(FIRSTNAME_MINLEN, sizeof(c_first), c_first);
 		row->set_value(C_FIRST, c_first);
 		char street[20];
-        MakeAlphaString(10, 20, street);
+		MakeAlphaString(10, 20, street);
 		row->set_value(C_STREET_1, street);
-        MakeAlphaString(10, 20, street);
+		MakeAlphaString(10, 20, street);
 		row->set_value(C_STREET_2, street);
-        MakeAlphaString(10, 20, street);
+		MakeAlphaString(10, 20, street);
 		row->set_value(C_CITY, street); 
 		char state[2];
 		MakeAlphaString(2, 2, state); // State 
 		row->set_value(C_STATE, state);
 		char zip[9];
-    	MakeNumberString(9, 9, zip); // Zip 
+		MakeNumberString(9, 9, zip); // Zip 
 		row->set_value(C_ZIP, zip);
 		char phone[16];
   		MakeNumberString(16, 16, phone); // Zip 
@@ -401,7 +397,7 @@ void TPCCWorkload::init_tab_cust(int id, uint64_t did, uint64_t wid) {
 		row->set_value(C_CREDIT_LIM, 50000);
 		row->set_value(C_DELIVERY_CNT, 0);
 		char c_data[500];
-        MakeAlphaString(300, 500, c_data);
+		MakeAlphaString(300, 500, c_data);
 		row->set_value(C_DATA, c_data);
 
 #endif
@@ -494,7 +490,7 @@ void TPCCWorkload::init_tab_order(int id, uint64_t did, uint64_t wid) {
 			}
 			row->set_value(OL_QUANTITY, 5);
 			char ol_dist_info[24];
-	        MakeAlphaString(24, 24, ol_dist_info);
+			MakeAlphaString(24, 24, ol_dist_info);
 			row->set_value(OL_DIST_INFO, ol_dist_info);
 
 //			uint64_t key = orderlineKey(wid, did, oid);
@@ -570,8 +566,7 @@ void * TPCCWorkload::threadInitWh(void * This) {
 void * TPCCWorkload::threadInitDist(void * This) {
   TPCCWorkload * wl = (TPCCWorkload*) This;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-    if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) 
-      continue;
+	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
 		wl->init_tab_dist(wid);
   }
 	printf("DISTRICT Done\n");
@@ -582,8 +577,7 @@ void * TPCCWorkload::threadInitStock(void * This) {
   TPCCWorkload * wl = ((thr_args*) This)->wl;
   int id = ((thr_args*) This)->id;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-    if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) 
-      continue;
+	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
 		wl->init_tab_stock(id,wid);
   }
 	printf("STOCK Done\n");
@@ -594,11 +588,10 @@ void * TPCCWorkload::threadInitCust(void * This) {
   TPCCWorkload * wl = ((thr_args*) This)->wl;
   int id = ((thr_args*) This)->id;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-    if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) 
-      continue;
+	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
 		for (uint64_t did = 1; did <= g_dist_per_wh; did++) {
 			wl->init_tab_cust(id,did, wid);
-    }
+	}
   }
 	printf("CUSTOMER %d Done\n",((thr_args *)This)->id);
 	return NULL;
@@ -607,11 +600,9 @@ void * TPCCWorkload::threadInitCust(void * This) {
 void * TPCCWorkload::threadInitHist(void * This) {
   TPCCWorkload * wl = (TPCCWorkload*) This;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-    if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) 
-      continue;
+	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
 		for (uint64_t did = 1; did <= g_dist_per_wh; did++)
-			for (uint64_t cid = 1; cid <= g_cust_per_dist; cid++) 
-				wl->init_tab_hist(cid, did, wid);
+	  for (uint64_t cid = 1; cid <= g_cust_per_dist; cid++) wl->init_tab_hist(cid, did, wid);
   }
 	printf("HISTORY Done\n");
 	return NULL;
@@ -621,10 +612,8 @@ void * TPCCWorkload::threadInitOrder(void * This) {
   TPCCWorkload * wl = ((thr_args*) This)->wl;
   int id = ((thr_args*) This)->id;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-    if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) 
-      continue;
-		for (uint64_t did = 1; did <= g_dist_per_wh; did++)
-			wl->init_tab_order(id,did, wid);
+	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
+	for (uint64_t did = 1; did <= g_dist_per_wh; did++) wl->init_tab_order(id, did, wid);
   }
 	printf("ORDER Done\n");
 	return NULL;

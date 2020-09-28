@@ -58,9 +58,9 @@ RC YCSBTxnManager::acquire_locks() {
 	for (uint32_t rid = 0; rid < ycsb_query->requests.size(); rid ++) {
 		ycsb_request * req = ycsb_query->requests[rid];
 		uint64_t part_id = _wl->key_to_part( req->key );
-    DEBUG("LK Acquire (%ld,%ld) %d,%ld -> %ld\n",get_txn_id(),get_batch_id(),req->acctype,req->key,GET_NODE_ID(part_id));
-    if(GET_NODE_ID(part_id) != g_node_id)
-      continue;
+    DEBUG("LK Acquire (%ld,%ld) %d,%ld -> %ld\n", get_txn_id(), get_batch_id(), req->acctype,
+          req->key, GET_NODE_ID(part_id));
+    if (GET_NODE_ID(part_id) != g_node_id) continue;
 		INDEX * index = _wl->the_index;
 		itemid_t * item;
 		item = index_read(index, req->key, part_id);
@@ -71,8 +71,7 @@ RC YCSBTxnManager::acquire_locks() {
     }
 	}
   if(decr_lr() == 0) {
-    if(ATOM_CAS(lock_ready,false,true))
-      rc = RCOK;
+    if (ATOM_CAS(lock_ready, false, true)) rc = RCOK;
   }
   txn_stats.wait_starttime = get_sys_clock();
   /*
@@ -128,9 +127,7 @@ RC YCSBTxnManager::run_txn_post_wait() {
     return RCOK;
 }
 
-bool YCSBTxnManager::is_done() {
-  return next_record_id == ((YCSBQuery*)query)->requests.size();
-}
+bool YCSBTxnManager::is_done() { return next_record_id == ((YCSBQuery*)query)->requests.size(); }
 
 void YCSBTxnManager::next_ycsb_state() {
   switch(state) {
@@ -141,8 +138,7 @@ void YCSBTxnManager::next_ycsb_state() {
       next_record_id++;
       if(!IS_LOCAL(txn->txn_id) || !is_done()) {
         state = YCSB_0;
-      }
-      else {
+      } else {
         state = YCSB_FIN;
       }
       break;
@@ -169,7 +165,8 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
   //msg->requests.init(ycsb_query->requests.size());
   uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
-  while(next_record_id < ycsb_query->requests.size() && !is_local_request(next_record_id) && GET_NODE_ID(ycsb_query->requests[next_record_id]->key) == dest_node_id) {
+  while (next_record_id < ycsb_query->requests.size() && !is_local_request(next_record_id) &&
+         GET_NODE_ID(ycsb_query->requests[next_record_id]->key) == dest_node_id) {
     YCSBQuery::copy_request_to_msg(ycsb_query,msg,next_record_id++);
   }
 }
@@ -202,8 +199,7 @@ RC YCSBTxnManager::run_txn_state() {
 			assert(false);
   }
 
-  if(rc == RCOK)
-    next_ycsb_state();
+  if (rc == RCOK) next_ycsb_state();
 
   return rc;
 }
@@ -241,8 +237,7 @@ RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {
 	  char * data = row_local->get_data();
 	  *(uint64_t *)(&data[fid * 100]) = 0;
 #if YCSB_ABORT_MODE
-    if(data[0] == 'a')
-      return RCOK;
+    if (data[0] == 'a') return RCOK;
 #endif
 
 #if ISOLATION_LEVEL == READ_UNCOMMITTED
@@ -271,7 +266,8 @@ RC YCSBTxnManager::run_calvin_txn() {
 #else
         calvin_expected_rsp_cnt = 0;
 #endif
-        DEBUG("(%ld,%ld) expects %d responses;\n",txn->txn_id,txn->batch_id,calvin_expected_rsp_cnt);
+        DEBUG("(%ld,%ld) expects %d responses;\n", txn->txn_id, txn->batch_id,
+              calvin_expected_rsp_cnt);
 
         this->phase = CALVIN_LOC_RD;
         break;
@@ -294,7 +290,8 @@ RC YCSBTxnManager::run_calvin_txn() {
           if(calvin_collect_phase_done()) {
             rc = RCOK;
           } else {
-            DEBUG("(%ld,%ld) wait in collect phase; %d / %d rfwds received\n",txn->txn_id,txn->batch_id,rsp_cnt,calvin_expected_rsp_cnt);
+            DEBUG("(%ld,%ld) wait in collect phase; %d / %d rfwds received\n", txn->txn_id,
+                  txn->batch_id, rsp_cnt, calvin_expected_rsp_cnt);
             rc = WAIT;
           }
         } else { // Done
@@ -331,16 +328,13 @@ RC YCSBTxnManager::run_ycsb() {
   
   for (uint64_t i = 0; i < ycsb_query->requests.size(); i++) {
 	  ycsb_request * req = ycsb_query->requests[i];
-    if(this->phase == CALVIN_LOC_RD && req->acctype == WR)
-      continue;
-    if(this->phase == CALVIN_EXEC_WR && req->acctype == RD)
-      continue;
+    if (this->phase == CALVIN_LOC_RD && req->acctype == WR) continue;
+    if (this->phase == CALVIN_EXEC_WR && req->acctype == RD) continue;
 
 		uint64_t part_id = _wl->key_to_part( req->key );
     bool loc = GET_NODE_ID(part_id) == g_node_id;
 
-    if(!loc)
-      continue;
+    if (!loc) continue;
 
     rc = run_ycsb_0(req,row);
     assert(rc == RCOK);

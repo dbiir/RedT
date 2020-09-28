@@ -59,8 +59,8 @@ void MessageThread::send_batch(uint64_t dest_node_id) {
     INC_STATS(_thd_id,mbuf_send_intv_time,get_sys_clock() - sbuf->starttime);
 
     DEBUG("Send batch of %ld msgs to %ld\n",sbuf->cnt,dest_node_id);
+    fflush(stdout);
     tport_man.send_msg(_thd_id,dest_node_id,sbuf->buffer,sbuf->ptr);
-
     INC_STATS(_thd_id,msg_batch_size_msgs,sbuf->cnt);
     INC_STATS(_thd_id,msg_batch_size_bytes,sbuf->ptr);
     if(ISSERVERN(dest_node_id)) {
@@ -71,6 +71,24 @@ void MessageThread::send_batch(uint64_t dest_node_id) {
     INC_STATS(_thd_id,msg_batch_cnt,1);
     sbuf->reset(dest_node_id);
   INC_STATS(_thd_id,mtx[12],get_sys_clock() - starttime);
+}
+char type2char1(DATxnType txn_type)
+{
+  switch (txn_type)
+  {
+    case DA_READ:
+      return 'R';
+    case DA_WRITE:
+      return 'W';
+    case DA_COMMIT:
+      return 'C';
+    case DA_ABORT:
+      return 'A';
+    case DA_SCAN:
+      return 'S';
+    default:
+      return 'U';
+  }
 }
 
 void MessageThread::run() {
@@ -98,18 +116,30 @@ void MessageThread::run() {
     send_batch(dest_node_id);
   }
 
+  #if WORKLOAD == DA
+  if(!is_server&&false)
+  printf("cl seq_id:%lu type:%c trans_id:%lu item:%c state:%lu next_state:%lu\n",
+      ((DAClientQueryMessage*)msg)->seq_id,
+      type2char1(((DAClientQueryMessage*)msg)->txn_type),
+      ((DAClientQueryMessage*)msg)->trans_id,
+      static_cast<char>('x'+((DAClientQueryMessage*)msg)->item_id),
+      ((DAClientQueryMessage*)msg)->state,
+      (((DAClientQueryMessage*)msg)->next_state));
+      fflush(stdout);
+  #endif
+  
   uint64_t copy_starttime = get_sys_clock();
   msg->copy_to_buf(&(sbuf->buffer[sbuf->ptr]));
   INC_STATS(_thd_id,msg_copy_output_time,get_sys_clock() - copy_starttime);
-  DEBUG("%ld Buffered Msg %d, (%ld,%ld) to %ld\n",_thd_id,msg->rtype,msg->txn_id,msg->batch_id,dest_node_id);
+  DEBUG("%ld Buffered Msg %d, (%ld,%ld) to %ld\n", _thd_id, msg->rtype, msg->txn_id, msg->batch_id,
+        dest_node_id);
   sbuf->cnt += 1;
   sbuf->ptr += msg->get_size();
   // Free message here, no longer needed unless CALVIN sequencer
   if(CC_ALG != CALVIN) {
     Message::release_message(msg);
   }
-  if(sbuf->starttime == 0)
-    sbuf->starttime = get_sys_clock();
+  if (sbuf->starttime == 0) sbuf->starttime = get_sys_clock();
 
   check_and_send_batches();
   INC_STATS(_thd_id,mtx[10],get_sys_clock() - starttime);

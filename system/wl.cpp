@@ -14,19 +14,18 @@
    limitations under the License.
 */
 
+#include "wl.h"
+#include "config.h"
+#include "catalog.h"
 #include "global.h"
 #include "helper.h"
-#include "wl.h"
+#include "index_btree.h"
+#include "index_hash.h"
+#include "mem_alloc.h"
 #include "row.h"
 #include "table.h"
-#include "index_hash.h"
-#include "index_btree.h"
-#include "catalog.h"
-#include "mem_alloc.h"
 
-RC Workload::init() {
-	return RCOK;
-}
+RC Workload::init() { return RCOK; }
 
 RC Workload::init_schema(const char * schema_file) {
     assert(sizeof(uint64_t) == 8);
@@ -41,13 +40,17 @@ RC Workload::init_schema(const char * schema_file) {
 			void * tmp = new char[CL_SIZE * 2 + sizeof(Catalog)];
             schema = (Catalog *) ((UInt64)tmp + CL_SIZE);
 			getline(fin, line);
+      cout<<"Init table "<<tname<<endl;
 			int col_count = 0;
 			// Read all fields for this table.
 			vector<string> lines;
 			while (line.length() > 1) {
 				lines.push_back(line);
+        cout<<line<<endl;
 				getline(fin, line);
 			}
+      cout<<"Has "<<lines.size()<<" column"<<endl;
+      // line存的是每一行字符串
 			schema->init( tname.c_str(), id++, lines.size() );
 			for (UInt32 i = 0; i < lines.size(); i++) {
 				string line = lines[i];
@@ -69,24 +72,23 @@ RC Workload::init_schema(const char * schema_file) {
         } else if (!line.compare(0, 6, "INDEX=")) {
 			string iname(&line[6]);
 			getline(fin, line);
-
+      cout<<"Init index "<<iname<<endl;
 			vector<string> items;
 			string token;
 			size_t pos;
 			while (line.length() != 0) {
 				pos = line.find(","); // != std::string::npos) {
-				if (pos == string::npos)
-					pos = line.length();
+        if (pos == string::npos) pos = line.length();
 	    		token = line.substr(0, pos);
 				items.push_back(token);
 		    	line.erase(0, pos + 1);
+        cout<<"token "<<token<<endl;
 			}
 			
 			string tname(items[0]);
 			int field_cnt = items.size() - 1;
 			uint64_t * fields = new uint64_t [field_cnt];
-			for (int i = 0; i < field_cnt; i++) 
-				fields[i] = atoi(items[i + 1].c_str());
+      for (int i = 0; i < field_cnt; i++) fields[i] = atoi(items[i + 1].c_str());
 			INDEX * index = new INDEX;
 	    int part_cnt __attribute__ ((unused));
 			part_cnt = (CENTRAL_INDEX)? 1 : g_part_cnt;
@@ -118,18 +120,18 @@ RC Workload::init_schema(const char * schema_file) {
 #elif WORKLOAD == PPS
       if ( !tname.compare(1, 5, "PARTS") ) {
         table_size = MAX_PPS_PART_KEY;
-      }
-      else if ( !tname.compare(1, 8, "PRODUCTS") ) {
+      } else if (!tname.compare(1, 8, "PRODUCTS")) {
         table_size = MAX_PPS_PRODUCT_KEY;
-      }
-      else if ( !tname.compare(1, 9, "SUPPLIERS") ) {
+      } else if (!tname.compare(1, 9, "SUPPLIERS")) {
+        table_size = MAX_PPS_SUPPLIER_KEY;
+      } else if (!tname.compare(1, 8, "SUPPLIES")) {
+        table_size = MAX_PPS_PRODUCT_KEY;
+      } else if (!tname.compare(1, 4, "USES")) {
         table_size = MAX_PPS_SUPPLIER_KEY;
       }
-      else if ( !tname.compare(1, 8, "SUPPLIES") ) {
-        table_size = MAX_PPS_PRODUCT_KEY;
-      }
-      else if ( !tname.compare(1, 4, "USES") ) {
-        table_size = MAX_PPS_SUPPLIER_KEY;
+#elif WORKLOAD == DA
+      if (!tname.compare(1, 5, "DAtab")) {
+        table_size = MAX_DA_TABLE_SIZE;
       }
 #else
       table_size = g_synth_table_size / g_part_cnt;
@@ -142,20 +144,24 @@ RC Workload::init_schema(const char * schema_file) {
 			index->init(part_cnt, tables[tname]);
 #endif
 			indexes[iname] = index;
+      printf("iname:%s init over\n",iname.c_str());
 		}
     }
 	fin.close();
 	return RCOK;
 }
-
-
+//add by ym origin function mark
 void Workload::index_delete_all() {
-  /*
-  for (auto string index_name = indexes.keys(); index_name = index_name.next()) {
+  #if WORKLOAD ==DA
+    for (auto index :indexes) {
+      index.second->index_reset();
+    }
+  #endif
+  /*for (auto index_name = indexes.keys(); index_name = index_name.next()) {
     INDEX * index = (INDEX *) indexes[index_name];
     index->index_delete();
-  }
-  */
+  }*/
+  
 }
 
 void Workload::index_insert(string index_name, uint64_t key, row_t * row) {
@@ -166,10 +172,8 @@ void Workload::index_insert(string index_name, uint64_t key, row_t * row) {
 
 void Workload::index_insert(INDEX * index, uint64_t key, row_t * row, int64_t part_id) {
 	uint64_t pid = part_id;
-	if (part_id == -1)
-		pid = get_part_id(row);
-	itemid_t * m_item =
-		(itemid_t *) mem_allocator.alloc( sizeof(itemid_t));
+  if (part_id == -1) pid = get_part_id(row);
+  itemid_t *m_item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
 	m_item->init();
 	m_item->type = DT_row;
 	m_item->location = row;
@@ -181,10 +185,8 @@ void Workload::index_insert(INDEX * index, uint64_t key, row_t * row, int64_t pa
 
 void Workload::index_insert_nonunique(INDEX * index, uint64_t key, row_t * row, int64_t part_id) {
 	uint64_t pid = part_id;
-	if (part_id == -1)
-		pid = get_part_id(row);
-	itemid_t * m_item =
-		(itemid_t *) mem_allocator.alloc( sizeof(itemid_t));
+  if (part_id == -1) pid = get_part_id(row);
+  itemid_t *m_item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
 	m_item->init();
 	m_item->type = DT_row;
 	m_item->location = row;

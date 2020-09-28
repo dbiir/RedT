@@ -1,17 +1,17 @@
 /*
-   Copyright 2016 Massachusetts Institute of Technology
+	 Copyright 2016 Massachusetts Institute of Technology
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+	 Licensed under the Apache License, Version 2.0 (the "License");
+	 you may not use this file except in compliance with the License.
+	 You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+		 http://www.apache.org/licenses/LICENSE-2.0
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+	 Unless required by applicable law or agreed to in writing, software
+	 distributed under the License is distributed on an "AS IS" BASIS,
+	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 See the License for the specific language governing permissions and
+	 limitations under the License.
 */
 
 #ifndef _ROW_H_
@@ -20,27 +20,24 @@
 #include <cassert>
 #include "global.h"
 
-#define DECL_SET_VALUE(type) \
-	void set_value(int col_id, type value);
+
+#define DECL_SET_VALUE(type) void set_value(int col_id, type value);
 
 #define SET_VALUE(type) \
-	void row_t::set_value(int col_id, type value) { \
-		set_value(col_id, &value); \
-	}
+	void row_t::set_value(int col_id, type value) { set_value(col_id, &value); }
 
-#define DECL_GET_VALUE(type)\
-	void get_value(int col_id, type & value);
+#define DECL_GET_VALUE(type) void get_value(int col_id, type &value);
 
 /*
 #define GET_VALUE(type)\
 	void row_t::get_value(int col_id, type & value) {\
-    value = *(type *)data; \
+	value = *(type *)data; \
 	}
-  */
+	*/
 #define GET_VALUE(type)\
 	void row_t::get_value(int col_id, type & value) {\
 		int pos = get_schema()->get_field_index(col_id);\
-    DEBUG("get_value pos %d -- %lx\n",pos,(uint64_t)this); \
+	DEBUG("get_value pos %d -- %lx\n",pos,(uint64_t)this); \
 		value = *(type *)&data[pos];\
 	}
 
@@ -55,13 +52,14 @@ class Row_ssi;
 class Row_wsi;
 class Row_maat;
 class Row_specex;
+class Row_dli_base;
+class Row_dta;
 class Row_wkdb;
 class Row_tictoc;
+class Row_si;
 
-class row_t
-{
+class row_t {
 public:
-
 	RC init(table_t * host_table, uint64_t part_id, uint64_t row_id = 0);
 	RC switch_schema(table_t * host_table);
 	// not every row has a manager
@@ -105,39 +103,45 @@ public:
 	void free_row();
 
 	// for concurrency control. can be lock, timestamp etc.
-  	RC get_lock(access_t type, TxnManager * txn); 
+	RC get_lock(access_t type, TxnManager * txn); 
 	RC get_ts(uint64_t &orig_wts, uint64_t &orig_rts);
 	RC get_row(access_t type, TxnManager * txn, row_t *& row, uint64_t &orig_wts, uint64_t &orig_rts);
-	RC get_row(access_t type, TxnManager * txn, row_t *& row);
-  	RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row); 
-	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row);
+	RC get_row(access_t type, TxnManager *txn, Access *access);
+	RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row); 
+	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
-  #if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
-    Row_lock * manager;
-  #elif CC_ALG == TIMESTAMP
-   	Row_ts * manager;
-  #elif CC_ALG == MVCC
-  	Row_mvcc * manager;
-  #elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
-  	Row_occ * manager;
-  #elif CC_ALG == MAAT 
-  	Row_maat * manager;
-  #elif CC_ALG == WOOKONG 
-    Row_wkdb * manager;
-  #elif CC_ALG == TICTOC 
-    Row_tictoc * manager;
-  #elif CC_ALG == HSTORE_SPEC
-  	Row_specex * manager;
-  #elif CC_ALG == AVOID
-    Row_avoid * manager;
-  #elif CC_ALG == SSI
-	Row_ssi * manager;
-  #elif CC_ALG == WSI
-	Row_wsi * manager;
-  #endif
+	#if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
+	Row_lock * manager;
+	#elif CC_ALG == TIMESTAMP
+	 	Row_ts * manager;
+	#elif CC_ALG == MVCC
+		Row_mvcc * manager;
+	#elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
+			Row_occ * manager;
+	#elif CC_ALG == DLI_BASE || CC_ALG == DLI_OCC
+		Row_dli_base *manager;
+	#elif CC_ALG == MAAT 
+		Row_maat * manager;
+	#elif CC_ALG == WOOKONG 
+		Row_wkdb * manager;
+	#elif CC_ALG == TICTOC 
+		Row_tictoc * manager;
+	#elif CC_ALG == HSTORE_SPEC
+		Row_specex * manager;
+	#elif CC_ALG == AVOID
+		Row_avoid * manager;
+	#elif CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+		Row_si *manager;
+	#elif CC_ALG == DTA
+		Row_dta *manager;
+	#elif CC_ALG == SSI
+		Row_ssi * manager;
+	#elif CC_ALG == WSI
+		Row_wsi * manager;
+	#endif
 	char * data;
-  int tuple_size;
+	int tuple_size;
 	table_t * table;
 private:
 	// primary key should be calculated from the data stored in the row.

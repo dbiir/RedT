@@ -18,6 +18,7 @@
 #include "ycsb.h"
 #include "tpcc.h"
 #include "pps.h"
+#include "da.h"
 #include "thread.h"
 #include "io_thread.h"
 #include "client_thread.h"
@@ -44,8 +45,7 @@ OutputThread * output_thds;
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char *argv[]) {
     printf("Running client...\n\n");
 	// 0. initialize global data structure
 	parser(argc, argv);
@@ -78,6 +78,8 @@ int main(int argc, char* argv[])
 			m_wl = new TPCCWorkload; break;
 		case PPS :
 			m_wl = new PPSWorkload; break;
+		case DA :
+			m_wl = new DAWorkload; break;
 		default:
 			assert(false);
 	}
@@ -113,6 +115,12 @@ int main(int argc, char* argv[])
   msg_pool.init(m_wl,g_inflight_max);
   printf("Done\n");
   fflush(stdout);
+/*
+	#if WORKLOAD==DA
+  	g_client_rem_thread_cnt=1;
+  	g_client_send_thread_cnt=1;
+  	#endif
+*/
 
 	// 2. spawn multiple threads
 	uint64_t thd_cnt = g_client_thread_cnt;
@@ -122,8 +130,7 @@ int main(int argc, char* argv[])
   uint64_t all_thd_cnt = thd_cnt + rthd_cnt + sthd_cnt;
   assert(all_thd_cnt == g_this_total_thread_cnt);
 
-	pthread_t * p_thds = 
-		(pthread_t *) malloc(sizeof(pthread_t) * (all_thd_cnt));
+  pthread_t *p_thds = (pthread_t *)malloc(sizeof(pthread_t) * (all_thd_cnt));
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 
@@ -156,7 +163,7 @@ int main(int argc, char* argv[])
 	// spawn and run txns again.
 	starttime = get_server_clock();
   simulation->run_starttime = starttime;
-
+  simulation->last_da_query_time = starttime;
   uint64_t id = 0;
 	for (uint64_t i = 0; i < thd_cnt; i++) {
 		CPU_ZERO(&cpus);
@@ -189,8 +196,7 @@ int main(int argc, char* argv[])
 	
   fflush(stdout);
   printf("CLIENT PASS! SimTime = %ld\n", endtime - starttime);
-  if (STATS_ENABLE)
-    stats.print_client(false);
+  if (STATS_ENABLE) stats.print_client(false);
   fflush(stdout);
 	return 0;
 }

@@ -1,17 +1,17 @@
 /*
-   Copyright 2016 Massachusetts Institute of Technology
+	 Copyright 2016 Massachusetts Institute of Technology
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+	 Licensed under the Apache License, Version 2.0 (the "License");
+	 you may not use this file except in compliance with the License.
+	 You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+			 http://www.apache.org/licenses/LICENSE-2.0
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+	 Unless required by applicable law or agreed to in writing, software
+	 distributed under the License is distributed on an "AS IS" BASIS,
+	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 See the License for the specific language governing permissions and
+	 limitations under the License.
 */
 
 //#include "timestamp.h"
@@ -27,14 +27,13 @@ void Row_ts::init(row_t * row) {
 	wts = 0;
 	rts = 0;
 	min_wts = UINT64_MAX;
-    min_rts = UINT64_MAX;
-    min_pts = UINT64_MAX;
+	min_rts = UINT64_MAX;
+	min_pts = UINT64_MAX;
 	readreq = NULL;
-    writereq = NULL;
-    prereq = NULL;
+	writereq = NULL;
+	prereq = NULL;
 	preq_len = 0;
-	latch = (pthread_mutex_t *) 
-		mem_allocator.alloc(sizeof(pthread_mutex_t));
+	latch = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init( latch, NULL );
 	blatch = false;
 }
@@ -61,8 +60,7 @@ void Row_ts::return_req_list(TsReqEntry * list) {
 	}
 }
 
-void Row_ts::buffer_req(TsType type, TxnManager * txn, row_t * row)
-{
+void Row_ts::buffer_req(TsType type, TxnManager *txn, row_t *row) {
 	TsReqEntry * req_entry = get_req_entry();
 	assert(req_entry != NULL);
 	req_entry->txn = txn;
@@ -72,20 +70,17 @@ void Row_ts::buffer_req(TsType type, TxnManager * txn, row_t * row)
 	if (type == R_REQ) {
 		req_entry->next = readreq;
 		readreq = req_entry;
-		if (req_entry->ts < min_rts)
-			min_rts = req_entry->ts;
+		if (req_entry->ts < min_rts) min_rts = req_entry->ts;
 	} else if (type == W_REQ) {
 		assert(row != NULL);
 		req_entry->next = writereq;
 		writereq = req_entry;
-		if (req_entry->ts < min_wts)
-			min_wts = req_entry->ts;
+		if (req_entry->ts < min_wts) min_wts = req_entry->ts;
 	} else if (type == P_REQ) {
 		preq_len ++;
 		req_entry->next = prereq;
 		prereq = req_entry;
-		if (req_entry->ts < min_pts)
-			min_pts = req_entry->ts;
+		if (req_entry->ts < min_pts) min_pts = req_entry->ts;
 	}
 }
 
@@ -93,18 +88,23 @@ TsReqEntry * Row_ts::debuffer_req(TsType type, TxnManager * txn) {
 	return debuffer_req(type, txn, UINT64_MAX);
 }
 	
-TsReqEntry * Row_ts::debuffer_req(TsType type, ts_t ts) {
-	return debuffer_req(type, NULL, ts);
-}
+TsReqEntry *Row_ts::debuffer_req(TsType type, ts_t ts) { return debuffer_req(type, NULL, ts); }
 
 TsReqEntry * Row_ts::debuffer_req( TsType type, TxnManager * txn, ts_t ts ) {
 	TsReqEntry ** queue;
 	TsReqEntry * return_queue = NULL;
 	switch (type) {
-		case R_REQ : queue = &readreq; break;
-		case P_REQ : queue = &prereq; break;
-		case W_REQ : queue = &writereq; break;
-		default: assert(false);
+		case R_REQ:
+			queue = &readreq;
+			break;
+		case P_REQ:
+			queue = &prereq;
+			break;
+		case W_REQ:
+			queue = &writereq;
+			break;
+		default:
+			assert(false);
 	}
 
 	TsReqEntry * req = *queue;
@@ -149,16 +149,22 @@ ts_t Row_ts::cal_min(TsType type) {
 	// update the min_pts
 	TsReqEntry * queue;
 	switch (type) {
-		case R_REQ : queue = readreq; break;
-		case P_REQ : queue = prereq; break;
-		case W_REQ : queue = writereq; break;
-		default: assert(false);
+		case R_REQ:
+			queue = readreq;
+			break;
+		case P_REQ:
+			queue = prereq;
+			break;
+		case W_REQ:
+			queue = writereq;
+			break;
+		default:
+			assert(false);
 	}
 	ts_t new_min_pts = UINT64_MAX;
 	TsReqEntry * req = queue;
 	while (req != NULL) {
-		if (req->ts < new_min_pts)
-			new_min_pts = req->ts;
+		if (req->ts < new_min_pts) new_min_pts = req->ts;
 		req = req->next;
 	}
 	return new_min_pts;
@@ -229,16 +235,15 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 			rc = Abort;
 		} else if (ts > min_pts) { // read would occur after one of the prereqs already queued
 			// insert the req into the read request queue
-      //printf("Buffer R_REQ %ld\n",txn->txn_id);
+			//printf("Buffer R_REQ %ld\n",txn->txn_id);
 			buffer_req(R_REQ, txn, NULL);
 			txn->ts_ready = false;
 			rc = WAIT;
-      //txn->wait_starttime = get_sys_clock();
+			//txn->wait_starttime = get_sys_clock();
 		} else { // read is ok
 			// return the value.
 			txn->cur_row->copy(_row);
-			if (rts < ts)
-				rts = ts;
+			if (rts < ts) rts = ts;
 			rc = RCOK;
 		}
 	} else if (type == P_REQ) {
@@ -252,7 +257,7 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 			if (ts < wts) { //pre-write would occur before most recent write
 				rc = Abort;
 			} else { // pre-write is ok
-        //printf("Buffer P_REQ %ld\n",txn->txn_id);
+				//printf("Buffer P_REQ %ld\n",txn->txn_id);
 				buffer_req(P_REQ, txn, NULL);
 				rc = RCOK;
 			}
@@ -274,21 +279,20 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 		}
 #else
 		if (ts > min_pts) { // write should happen after older writes are processed
-      //printf("Buffer W_REQ %ld\n",txn->txn_id);
+			//printf("Buffer W_REQ %ld\n",txn->txn_id);
 			buffer_req(W_REQ, txn, row);
 			goto final;
 		}
 #endif
 		if (ts > min_rts) { // write should happen after older reads are processed
 			row = txn->cur_row;
-      //printf("Buffer W_REQ %ld\n",txn->txn_id);
+			//printf("Buffer W_REQ %ld\n",txn->txn_id);
 			buffer_req(W_REQ, txn, row);
-            goto final;
+						goto final;
 		} else { // write is ok;
 			// the write is output. 
 			_row->copy(row);
-			if (wts < ts)
-				wts = ts;
+			if (wts < ts) wts = ts;
 			// debuffer the P_REQ
 			TsReqEntry * req = debuffer_req(P_REQ, txn);
 			assert(req != NULL);
@@ -307,9 +311,9 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 		assert(false);
 	
 final:
-    uint64_t timespan = get_sys_clock() - starttime;
-    txn->txn_stats.cc_time += timespan;
-    txn->txn_stats.cc_time_short += timespan;
+		uint64_t timespan = get_sys_clock() - starttime;
+		txn->txn_stats.cc_time += timespan;
+		txn->txn_stats.cc_time_short += timespan;
 	if (g_central_man)
 		glob_manager.release_row(_row);
 	else
@@ -324,7 +328,8 @@ void Row_ts::update_buffer(uint64_t thd_id) {
 		assert(new_min_pts >= min_pts);
 		if (new_min_pts > min_pts)
 			min_pts = new_min_pts;
-		else break; // min_pts is not updated.
+		else
+			break;  // min_pts is not updated.
 		// debuffer readreq. ready_read can be a list
 		TsReqEntry * ready_read = debuffer_req(R_REQ, min_pts);
 		if (ready_read == NULL) break;
@@ -336,10 +341,12 @@ void Row_ts::update_buffer(uint64_t thd_id) {
 				rts = req->ts;
 			}
 			req->txn->ts_ready = true;
-		    uint64_t timespan = get_sys_clock() - req->starttime;
-		    req->txn->txn_stats.cc_block_time += timespan;
-		    req->txn->txn_stats.cc_block_time_short += timespan;
+				uint64_t timespan = get_sys_clock() - req->starttime;
+				req->txn->txn_stats.cc_block_time += timespan;
+				req->txn->txn_stats.cc_block_time_short += timespan;
+			#if WORKLOAD!=DA
 			txn_table.restart_txn(thd_id,req->txn->get_txn_id(),0);
+			#endif
 			req = req->next;
 		}
 		// return all the req_entry back to freelist
@@ -348,7 +355,8 @@ void Row_ts::update_buffer(uint64_t thd_id) {
 		ts_t new_min_rts = cal_min(R_REQ);
 		if (new_min_rts > min_rts)
 			min_rts = new_min_rts;
-		else break;
+		else
+			break;
 		// debuffer writereq
 		TsReqEntry * ready_write = debuffer_req(W_REQ, min_rts);
 		if (ready_write == NULL) break;
@@ -367,10 +375,7 @@ void Row_ts::update_buffer(uint64_t thd_id) {
 		}
 		// perform write.
 		_row->copy(young_req->row);
-		if (wts < young_req->ts)
-			wts = young_req->ts;
+		if (wts < young_req->ts) wts = young_req->ts;
 		return_req_list(ready_write);
-
 	}
 }
-

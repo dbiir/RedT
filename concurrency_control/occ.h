@@ -20,6 +20,13 @@
 #include "row.h"
 #include "semaphore.h"
 
+// For simplicity, the txn hisotry for OCC is oganized as follows:
+// 1. history is never deleted.
+// 2. hisotry forms a single directional list.
+//		history head -> hist_1 -> hist_2 -> hist_3 -> ... -> hist_n
+//    The head is always the latest and the tail the youngest.
+// 	  When history is traversed, always go from head -> tail order.
+
 class TxnManager;
 
 class set_ent{
@@ -39,8 +46,8 @@ public:
 	void finish(RC rc, TxnManager * txn);
 	volatile bool lock_all;
 	uint64_t lock_txn_id;
-private:
 	
+ private:
 	// per row validation similar to Hekaton.
 	RC per_row_validate(TxnManager * txn);
 

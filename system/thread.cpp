@@ -14,16 +14,17 @@
    limitations under the License.
 */
 
-#include "global.h"
-#include "manager.h"
 #include "thread.h"
+
+#include "global.h"
+#include "helper.h"
+#include "manager.h"
+#include "math.h"
+#include "message.h"
+#include "msg_queue.h"
+#include "query.h"
 #include "txn.h"
 #include "wl.h"
-#include "query.h"
-#include "math.h"
-#include "helper.h"
-#include "msg_queue.h"
-#include "message.h"
 
 void Thread::heartbeat() {
   /*

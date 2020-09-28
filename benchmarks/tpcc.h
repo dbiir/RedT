@@ -49,10 +49,11 @@ enum TPCCRemTxnType {
   TPCC_NEWORDER8,
   TPCC_NEWORDER9,
   TPCC_FIN,
-  TPCC_RDONE};
-
+  TPCC_RDONE
+};
 
 class TPCCWorkload : public Workload {
+
 public:
 	RC init();
 	RC init_table();
@@ -117,8 +118,7 @@ private:
     UInt32 tot;
   };
 
-class TPCCTxnManager : public TxnManager
-{
+class TPCCTxnManager : public TxnManager {
 public:
 	void init(uint64_t thd_id, Workload * h_wl);
   void reset();
@@ -143,22 +143,38 @@ RC run_txn_state();
   bool is_local_item(uint64_t idx);
   RC send_remote_request(); 
 
-	RC run_payment_0(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount, row_t *& r_wh_local);
-	RC run_payment_1(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount, row_t * r_wh_local);
-	RC run_payment_2(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount, row_t *& r_dist_local);
-	RC run_payment_3(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount, row_t * r_dist_local);
-	RC run_payment_4(uint64_t w_id, uint64_t d_id,uint64_t c_id,uint64_t c_w_id, uint64_t c_d_id, char * c_last, double h_amount, bool by_last_name, row_t *& r_cust_local); 
-	RC run_payment_5(uint64_t w_id, uint64_t d_id,uint64_t c_id,uint64_t c_w_id, uint64_t c_d_id, char * c_last, double h_amount, bool by_last_name, row_t * r_cust_local); 
-	RC new_order_0(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t  ol_cnt,uint64_t  o_entry_d, uint64_t * o_id, row_t *& r_wh_local);
-	RC new_order_1(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t  ol_cnt,uint64_t  o_entry_d, uint64_t * o_id, row_t * r_wh_local);
-	RC new_order_2(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t  ol_cnt,uint64_t  o_entry_d, uint64_t * o_id, row_t *& r_cust_local);
-	RC new_order_3(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t  ol_cnt,uint64_t  o_entry_d, uint64_t * o_id, row_t * r_cust_local);
-	RC new_order_4(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t  ol_cnt,uint64_t  o_entry_d, uint64_t * o_id, row_t *& r_dist_local);
-	RC new_order_5(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t  ol_cnt,uint64_t  o_entry_d, uint64_t * o_id, row_t * r_dist_local);
+  RC run_payment_0(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
+                   row_t*& r_wh_local);
+  RC run_payment_1(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
+                   row_t* r_wh_local);
+  RC run_payment_2(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
+                   row_t*& r_dist_local);
+  RC run_payment_3(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
+                   row_t* r_dist_local);
+  RC run_payment_4(uint64_t w_id, uint64_t d_id, uint64_t c_id, uint64_t c_w_id, uint64_t c_d_id,
+                   char* c_last, double h_amount, bool by_last_name, row_t*& r_cust_local);
+  RC run_payment_5(uint64_t w_id, uint64_t d_id, uint64_t c_id, uint64_t c_w_id, uint64_t c_d_id,
+                   char* c_last, double h_amount, bool by_last_name, row_t* r_cust_local);
+  RC new_order_0(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
+                 uint64_t o_entry_d, uint64_t* o_id, row_t*& r_wh_local);
+  RC new_order_1(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
+                 uint64_t o_entry_d, uint64_t* o_id, row_t* r_wh_local);
+  RC new_order_2(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
+                 uint64_t o_entry_d, uint64_t* o_id, row_t*& r_cust_local);
+  RC new_order_3(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
+                 uint64_t o_entry_d, uint64_t* o_id, row_t* r_cust_local);
+  RC new_order_4(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
+                 uint64_t o_entry_d, uint64_t* o_id, row_t*& r_dist_local);
+  RC new_order_5(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
+                 uint64_t o_entry_d, uint64_t* o_id, row_t* r_dist_local);
 	RC new_order_6(uint64_t ol_i_id, row_t *& r_item_local);
 	RC new_order_7(uint64_t ol_i_id, row_t * r_item_local);
-	RC new_order_8(uint64_t w_id,uint64_t  d_id,bool remote, uint64_t ol_i_id, uint64_t ol_supply_w_id, uint64_t ol_quantity,uint64_t  ol_number,uint64_t  o_id, row_t *& r_stock_local);
-	RC new_order_9(uint64_t w_id,uint64_t  d_id,bool remote, uint64_t ol_i_id, uint64_t ol_supply_w_id, uint64_t ol_quantity,uint64_t  ol_number,uint64_t ol_amount, uint64_t  o_id, row_t * r_stock_local);
+  RC new_order_8(uint64_t w_id, uint64_t d_id, bool remote, uint64_t ol_i_id,
+                 uint64_t ol_supply_w_id, uint64_t ol_quantity, uint64_t ol_number, uint64_t o_id,
+                 row_t*& r_stock_local);
+  RC new_order_9(uint64_t w_id, uint64_t d_id, bool remote, uint64_t ol_i_id,
+                 uint64_t ol_supply_w_id, uint64_t ol_quantity, uint64_t ol_number,
+                 uint64_t ol_amount, uint64_t o_id, row_t* r_stock_local);
 	RC run_order_status(TPCCQuery * query);
 	RC run_delivery(TPCCQuery * query);
 	RC run_stock_level(TPCCQuery * query);

@@ -32,16 +32,12 @@ void Manager::init() {
 		//all_ts[i] = UINT64_MAX;
 		_all_txns[i] = NULL;
 	}
-	for (UInt32 i = 0; i < BUCKET_CNT; i++)
-		pthread_mutex_init( &mutexes[i], NULL );
-	for (UInt32 i = 0; i < g_thread_cnt * g_node_cnt; ++i)
-		all_ts[i] = 0;
+  for (UInt32 i = 0; i < BUCKET_CNT; i++) pthread_mutex_init(&mutexes[i], NULL);
+  for (UInt32 i = 0; i < g_thread_cnt * g_node_cnt; ++i) all_ts[i] = 0;
 }
 
-uint64_t 
-Manager::get_ts(uint64_t thread_id) {
-	if (g_ts_batch_alloc)
-		assert(g_ts_alloc == TS_CAS);
+uint64_t Manager::get_ts(uint64_t thread_id) {
+  if (g_ts_batch_alloc) assert(g_ts_alloc == TS_CAS);
 	uint64_t time;
 	uint64_t starttime = get_sys_clock();
 	switch(g_ts_alloc) {
@@ -66,17 +62,7 @@ Manager::get_ts(uint64_t thread_id) {
 		time = CurlGetTimeStamp();
 		break;
 	case LTS_TCP_CLOCK:
-		// pthread_mutex_lock( &ts_mutex );
 		time = tcp_ts.TcpGetTimeStamp(thread_id);
-		// pthread_mutex_unlock( &ts_mutex );
-		// if (tcp_queue.is_active) {
-		// 	tcp_queue.enqueue(thread_id, 0, 0);
-		// 	time = tcp_queue.lock_thd(thread_id);
-		// } else {
-		// 	// pthread_mutex_lock( &ts_mutex );
-		// 	time = TcpGetTimeStamp();
-		// 	// pthread_mutex_unlock( &ts_mutex );			
-		// }
 
 		break;
 	default :
@@ -91,8 +77,7 @@ ts_t Manager::get_min_ts(uint64_t tid) {
 	if (now - last_min_ts_time > MIN_TS_INTVL) { 
 		last_min_ts_time = now;
     uint64_t min = txn_table.get_min_ts(tid);
-    if(min > min_ts)
-		  min_ts = min;
+    if (min > min_ts) min_ts = min;
 	} 
 	return min_ts;
 }

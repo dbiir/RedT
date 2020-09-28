@@ -9,8 +9,7 @@ struct QueueEntry {
   QueueEntry * next;
 };
 
-class LockfreeQueue 
-{
+class LockfreeQueue {
 public:
   LockfreeQueue();
   bool enqueue(uintptr_t value);

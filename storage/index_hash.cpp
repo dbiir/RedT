@@ -35,8 +35,7 @@ RC IndexHash::init(uint64_t bucket_cnt) {
 	return RCOK;
 }
 
-RC 
-IndexHash::init(int part_cnt, table_t * table, uint64_t bucket_cnt) {
+RC IndexHash::init(int part_cnt, table_t *table, uint64_t bucket_cnt) {
 	init(bucket_cnt);
 	this->table = table;
 	return RCOK;
@@ -48,6 +47,12 @@ void IndexHash::index_delete() {
   }
   mem_allocator.free(_buckets[0],sizeof(BucketHeader) * _bucket_cnt_per_part);
   delete _buckets;
+}
+
+void IndexHash::index_reset() {
+  for (UInt32 n = 0; n < _bucket_cnt_per_part; n ++) {
+			_buckets[0][n].delete_bucket();
+  }
 }
 
 bool IndexHash::index_exist(idx_key_t key) {
@@ -73,13 +78,13 @@ RC IndexHash::index_insert(idx_key_t key, itemid_t * item, int part_id) {
 	//BucketHeader * cur_bkt = &_buckets[part_id][bkt_idx];
 	BucketHeader * cur_bkt = &_buckets[0][bkt_idx];
 	// 1. get the ex latch
-	get_latch(cur_bkt);
+	get_latch(cur_bkt);//delete by 																	ym
 	
 	// 2. update the latch list
 	cur_bkt->insert_item(key, item, part_id);
 	
 	// 3. release the latch
-	release_latch(cur_bkt);
+	release_latch(cur_bkt);//delete by 																	ym
 	return rc;
 }
 RC IndexHash::index_insert_nonunique(idx_key_t key, itemid_t * item, int part_id) {
@@ -166,6 +171,7 @@ void BucketHeader::delete_bucket() {
     ((row_t *)cur_node->items->location)->free_row();
 		cur_node = cur_node->next;
 	}
+	first_node=NULL;
 }
 
 
@@ -214,12 +220,10 @@ void BucketHeader::insert_item_nonunique(idx_key_t key,
   first_node = new_node;
 }
 
-void BucketHeader::read_item(idx_key_t key, itemid_t * &item) 
-{
+void BucketHeader::read_item(idx_key_t key, itemid_t *&item) {
 	BucketNode * cur_node = first_node;
 	while (cur_node != NULL) {
-		if (cur_node->key == key)
-			break;
+    if (cur_node->key == key) break;
 		cur_node = cur_node->next;
 	}
 	M_ASSERT_V(cur_node != NULL, "Key does not exist! %ld\n",key);
@@ -230,8 +234,7 @@ void BucketHeader::read_item(idx_key_t key, itemid_t * &item)
 	item = cur_node->items;
 }
 
-void BucketHeader::read_item(idx_key_t key, uint32_t count, itemid_t * &item) 
-{
+void BucketHeader::read_item(idx_key_t key, uint32_t count, itemid_t *&item) {
     BucketNode * cur_node = first_node;
     uint32_t ctr = 0;
     while (cur_node != NULL) {

@@ -46,6 +46,10 @@ public:
   uint64_t wq_time;
   uint64_t mq_time;
   uint64_t ntwk_time;
+  //uint64_t txn_type;
+  //uint64_t seq_id;
+  //uint64_t trans_id;
+
 
   // Collect other stats
   double lat_work_queue_time;
@@ -103,10 +107,11 @@ public:
   //uint64_t txn_id;
   //uint64_t batch_id;
   bool readonly;
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_MVCC
   uint64_t commit_timestamp;
 #endif
-
 };
 
 class LogMessage : public Message {
@@ -176,7 +181,7 @@ public:
   void release() {}
 
   RC rc;
-#if CC_ALG == MAAT || CC_ALG == WOOKONG
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
   uint64_t lower;
   uint64_t upper;
 #endif
@@ -342,7 +347,26 @@ public:
   Array<uint64_t> part_keys;
 
   bool recon;
+};
+class DAClientQueryMessage : public ClientQueryMessage {
+ public:
+  void copy_from_buf(char* buf);//ok
+  void copy_to_buf(char* buf);//ok
+  void copy_from_query(BaseQuery* query);//ok
+  void copy_from_txn(TxnManager* txn);//ok
+  void copy_to_txn(TxnManager* txn);
+  uint64_t get_size();
+  void init();
+  void release();
 
+  DATxnType txn_type;
+	uint64_t trans_id;//事务id
+	uint64_t item_id; //操作的变量id
+	uint64_t seq_id;//就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程 
+	uint64_t write_version;//如果是写，从这个变量取写哪个版本
+	uint64_t state;
+	uint64_t next_state;
+	uint64_t last_state;
 };
 
 class QueryMessage : public Message {
@@ -356,13 +380,15 @@ public:
   void release() {}
 
   uint64_t pid;
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == DTA || CC_ALG == WOOKONG
   uint64_t ts;
 #endif
-#if CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
   uint64_t thd_id;
 #endif
-#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
   uint64_t start_ts;
 #endif
 #if MODE==QRY_ONLY_MODE
@@ -443,5 +469,24 @@ public:
   Array<uint64_t> part_keys;
 };
 
+class DAQueryMessage : public QueryMessage {
+ public:
+  void copy_from_buf(char* buf);
+  void copy_to_buf(char* buf);
+  void copy_from_txn(TxnManager* txn);
+  void copy_to_txn(TxnManager* txn);
+  uint64_t get_size();
+  void init();
+  void release();
+
+  DATxnType txn_type;
+	uint64_t trans_id;//事务id
+	uint64_t item_id; //操作的变量id
+	uint64_t seq_id;//就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程 
+	uint64_t write_version;//如果是写，从这个变量取写哪个版本
+	uint64_t state;
+	uint64_t next_state;
+	uint64_t last_state;
+};
 
 #endif

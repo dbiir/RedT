@@ -44,21 +44,14 @@ void TPCCQuery::init() {
 
 void TPCCQuery::print() {
   
-    printf("TPCCQuery: %d "
-        "w_id: %ld, d_id: %ld, c_id: %ld, d_w_id: %ld, c_w_id: %ld, c_d_id: %ld\n"
-        ,(int)txn_type
-        ,w_id
-        ,d_id
-        ,c_id
-        ,d_w_id
-        ,c_w_id
-        ,c_d_id
-        );
+  printf(
+      "TPCCQuery: %d "
+      "w_id: %ld, d_id: %ld, c_id: %ld, d_w_id: %ld, c_w_id: %ld, c_d_id: %ld\n",
+      (int)txn_type, w_id, d_id, c_id, d_w_id, c_w_id, c_d_id);
     if(txn_type == TPCC_NEW_ORDER) {
       printf("items: ");
       for(uint64_t size = 0; size < items.size(); size++) {
-        printf("%ld, "
-            ,items[size]->ol_i_id);
+      printf("%ld, ", items[size]->ol_i_id);
       }
       printf("\n");
     }
@@ -83,18 +76,16 @@ std::set<uint64_t> TPCCQuery::participants(Message * msg, Workload * wl) {
         participant_set.insert(req_nid);
       }
       break;
-    default: assert(false);
+    default:
+      assert(false);
   }
 
   return participant_set;
 }
 
-
-
 uint64_t TPCCQuery::participants(bool *& pps,Workload * wl) {
   int n = 0;
-  for(uint64_t i = 0; i < g_node_cnt; i++)
-    pps[i] = false;
+  for (uint64_t i = 0; i < g_node_cnt; i++) pps[i] = false;
   uint64_t id;
 
   switch(txn_type) {
@@ -136,15 +127,14 @@ uint64_t TPCCQuery::participants(bool *& pps,Workload * wl) {
         }
       }
       break;
-    default: assert(false);
+    default:
+      assert(false);
   }
 
   return n;
 }
 
-bool TPCCQuery::readonly() {
-  return false;
-}
+bool TPCCQuery::readonly() { return false; }
 
 BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
   TPCCQuery * query = new TPCCQuery;
@@ -153,9 +143,9 @@ BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
 	query->txn_type = TPCC_PAYMENT;
   uint64_t home_warehouse;
 	if (FIRST_PART_LOCAL) {
-    while(wh_to_part(home_warehouse = URand(1, g_num_wh)) != home_partition) {}
+    while (wh_to_part(home_warehouse = URand(1, g_num_wh)) != home_partition) {
   }
-	else
+  } else
 		home_warehouse = URand(1, g_num_wh);
   query->w_id =  home_warehouse;
 	query->d_w_id = home_warehouse;
@@ -177,7 +167,8 @@ BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
 		// remote warehouse
 		query->c_d_id = URand(1, g_dist_per_wh);
 		if(g_num_wh > 1) {
-			while((query->c_w_id = URand(1, g_num_wh)) == query->w_id) {}
+      while ((query->c_w_id = URand(1, g_num_wh)) == query->w_id) {
+      }
 			if (wh_to_part(query->w_id) != wh_to_part(query->c_w_id)) {
         partitions_accessed.insert(wh_to_part(query->c_w_id));
 			}
@@ -208,9 +199,9 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
 	query->txn_type = TPCC_NEW_ORDER;
   query->items.init(g_max_items_per_txn);
 	if (FIRST_PART_LOCAL) {
-    while(wh_to_part(query->w_id = URand(1, g_num_wh)) != home_partition) {}
+    while (wh_to_part(query->w_id = URand(1, g_num_wh)) != home_partition) {
   }
-	else
+  } else
 		query->w_id = URand(1, g_num_wh);
 
 	query->d_id = URand(1, g_dist_per_wh);
@@ -234,7 +225,8 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
   while(query->items.size() < query->ol_cnt) {
       Item_no * item = new Item_no;
 
-    while(ol_i_ids.count( item->ol_i_id = NURand(8191, 1, g_max_items)) > 0) {}
+    while (ol_i_ids.count(item->ol_i_id = NURand(8191, 1, g_max_items)) > 0) {
+    }
     ol_i_ids.insert(item->ol_i_id);
     item->ol_quantity = URand(1, 10);
     double r_rem = (double)(rand() % 100000) / 100000;
@@ -247,7 +239,9 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
         partitions_accessed.insert(wh_to_part(item->ol_supply_w_id));
       } else {
         // select warehouse from among those already selected
-        while( partitions_accessed.count(wh_to_part(item->ol_supply_w_id = URand(1, g_num_wh))) == 0) {}
+        while (partitions_accessed.count(wh_to_part(item->ol_supply_w_id = URand(1, g_num_wh))) ==
+               0) {
+        }
       }
     }
 
@@ -322,8 +316,7 @@ void TPCCQuery::release() {
 
 void TPCCQuery::release_items() {
   // A bit of a hack to ensure that original requests in client query queue aren't freed
-  if(SERVER_GENERATE_QUERIES)
-    return;
+  if (SERVER_GENERATE_QUERIES) return;
   for(uint64_t i = 0; i < items.size(); i++) {
     DEBUG_M("TPCCQuery::release() Item_no free\n");
     mem_allocator.free(items[i],sizeof(Item_no));

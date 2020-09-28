@@ -17,13 +17,13 @@
 #ifndef _WORK_QUEUE_H_
 #define _WORK_QUEUE_H_
 
-
 #include "global.h"
 #include "helper.h"
 #include <queue>
 #include <boost/lockfree/queue.hpp>
 #include <boost/circular_buffer.hpp>  
 #include "semaphore.h"
+//#include "message.h"
 
 class BaseQuery;
 class Workload;
@@ -35,14 +35,11 @@ struct work_queue_entry {
   uint64_t txn_id;
   RemReqType rtype;
   uint64_t starttime;
-
 };
-
 
 struct CompareSchedEntry {
   bool operator()(const work_queue_entry* lhs, const work_queue_entry* rhs) {
-    if(lhs->batch_id == rhs->batch_id)
-      return lhs->starttime > rhs->starttime;
+    if (lhs->batch_id == rhs->batch_id) return lhs->starttime > rhs->starttime;
     return lhs->batch_id < rhs->batch_id;
   }
 };
@@ -53,22 +50,17 @@ struct CompareWQEntry {
   }
 #elif PRIORITY == PRIORITY_ACTIVE
   bool operator()(const work_queue_entry* lhs, const work_queue_entry* rhs) {
-    if(lhs->rtype == CL_QRY && rhs->rtype != CL_QRY)
-      return true;
-    if(rhs->rtype == CL_QRY && lhs->rtype != CL_QRY)
-      return false;
+    if (lhs->rtype == CL_QRY && rhs->rtype != CL_QRY) return true;
+    if (rhs->rtype == CL_QRY && lhs->rtype != CL_QRY) return false;
     return lhs->starttime < rhs->starttime;
   }
 #elif PRIORITY == PRIORITY_HOME
   bool operator()(const work_queue_entry* lhs, const work_queue_entry* rhs) {
-    if(ISLOCAL(lhs->txn_id) && !ISLOCAL(rhs->txn_id))
-      return true;
-    if(ISLOCAL(rhs->txn_id) && !ISLOCAL(lhs->txn_id))
-      return false;
+    if (ISLOCAL(lhs->txn_id) && !ISLOCAL(rhs->txn_id)) return true;
+    if (ISLOCAL(rhs->txn_id) && !ISLOCAL(lhs->txn_id)) return false;
     return lhs->starttime < rhs->starttime;
   }
 #endif
-
 };
 typedef boost::circular_buffer<work_queue_entry*> WCircularBuffer;
 class QWorkQueue {
@@ -76,13 +68,15 @@ public:
   void init();
   void enqueue(uint64_t thd_id,Message * msg,bool busy);
   Message * dequeue(uint64_t thd_id);
+  Message * queuetop(uint64_t thd_id);
   void sched_enqueue(uint64_t thd_id, Message * msg);
   Message * sched_dequeue(uint64_t thd_id);
   void sequencer_enqueue(uint64_t thd_id, Message * msg);
   Message * sequencer_dequeue(uint64_t thd_id);
 
   uint64_t get_cnt() {return get_wq_cnt() + get_rem_wq_cnt() + get_new_wq_cnt();}
-  uint64_t get_wq_cnt() {return work_queue_size;}
+  uint64_t get_wq_cnt() {return 0;}
+  //uint64_t get_wq_cnt() {return work_queue.size();}
   uint64_t get_txn_cnt() {return txn_queue_size;}
 
   uint64_t get_enwq_cnt() {return work_enqueue_size;}
@@ -94,10 +88,10 @@ public:
   void set_dewq_cnt() { work_dequeue_size = 0;}
   void set_entxn_cnt() { txn_enqueue_size = 0;}
   void set_detxn_cnt() { txn_dequeue_size = 0;}
-  // uint64_t get_wq_cnt() {return work_queue->size();}
   uint64_t get_sched_wq_cnt() {return 0;}
   uint64_t get_rem_wq_cnt() {return 0;}
   uint64_t get_new_wq_cnt() {return 0;}
+  Message* top_element;//DA新加的
   // uint64_t get_rem_wq_cnt() {return remote_op_queue.size();}
   // uint64_t get_new_wq_cnt() {return new_query_queue.size();}
 
@@ -114,7 +108,7 @@ private:
 #endif
   boost::lockfree::queue<work_queue_entry* > * seq_queue;
   boost::lockfree::queue<work_queue_entry* > ** sched_queue;
-
+  
   uint64_t sched_ptr;
   BaseQuery * last_sched_dq;
   uint64_t curr_epoch;

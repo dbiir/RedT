@@ -38,8 +38,7 @@ void MessageQueue::init() {
     ctr[i] = (uint64_t*) mem_allocator.align_alloc(sizeof(uint64_t));
     *ctr[i] = i % g_thread_cnt;
   }
-  for(uint64_t i = 0; i < g_this_send_thread_cnt;i++)
-    sthd_m_cache.push_back(NULL);
+  for (uint64_t i = 0; i < g_this_send_thread_cnt; i++) sthd_m_cache.push_back(NULL);
 }
 
 void MessageQueue::enqueue(uint64_t thd_id, Message * msg,uint64_t dest) {
@@ -57,20 +56,22 @@ void MessageQueue::enqueue(uint64_t thd_id, Message * msg,uint64_t dest) {
 #if CC_ALG == CALVIN
   // Need to have strict message ordering for sequencer thread
   uint64_t rand = thd_id % g_this_send_thread_cnt;
+#elif WORKLOAD == DA
+  uint64_t rand = 0;
 #else
   uint64_t rand = mtx_time_start % g_this_send_thread_cnt;
 #endif
 #if NETWORK_DELAY_TEST
   if(ISCLIENTN(dest)) {
-    while(!cl_m_queue[rand]->push(entry) && !simulation->is_done()) {}
+    while (!cl_m_queue[rand]->push(entry) && !simulation->is_done()) {
+    }
     return;
   }
 #endif
-  while(!m_queue[rand]->push(entry) && !simulation->is_done()) {}
+  while (!m_queue[rand]->push(entry) && !simulation->is_done()) {
+  }
   INC_STATS(thd_id,mtx[3],get_sys_clock() - mtx_time_start);
   INC_STATS(thd_id,msg_queue_enq_cnt,1);
-
-
 }
 
 uint64_t MessageQueue::dequeue(uint64_t thd_id, Message *& msg) {
@@ -87,6 +88,8 @@ uint64_t MessageQueue::dequeue(uint64_t thd_id, Message *& msg) {
     else
       valid = m_queue[thd_id%g_this_send_thread_cnt]->pop(entry);
   }
+#elif WORKLOAD == DA
+  valid = m_queue[0]->pop(entry);
 #else
   //uint64_t ctr_id = thd_id % g_this_send_thread_cnt;
   //uint64_t start_ctr = *ctr[ctr_id];

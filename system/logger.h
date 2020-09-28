@@ -8,8 +8,19 @@
 #include <queue>
 #include <fstream>
 
-enum LogRecType { LRT_INVALID = 0, LRT_INSERT, LRT_UPDATE, LRT_DELETE, LRT_TRUNCATE };
-enum LogIUD { L_INSERT = 0, L_UPDATE, L_DELETE, L_NOTIFY };
+enum LogRecType {
+  LRT_INVALID = 0,
+  LRT_INSERT,
+  LRT_UPDATE,
+  LRT_DELETE,
+  LRT_TRUNCATE
+};
+enum LogIUD {
+  L_INSERT = 0,
+  L_UPDATE,
+  L_DELETE,
+  L_NOTIFY
+};
 
 // Command log record (logical logging)
 struct CmdLogRecord {
@@ -66,7 +77,9 @@ public:
   LogRecType getType() { return rcd.type; }
   void copyRecord( LogRecord * record);
   // TODO: compute a reasonable checksum
-  uint64_t computeChecksum() {return (uint64_t)rcd.txn_id;};
+  uint64_t computeChecksum() {
+    return (uint64_t)rcd.txn_id;
+  };
 #if LOG_COMMAND
   CmdLogRecord rcd;
 #else
@@ -86,11 +99,9 @@ public:
 
   LogRecord * createRecord(
     //LogRecType type,
-    uint64_t txn_id,
-    LogIUD iud,
+      uint64_t txn_id, LogIUD iud,
     //uint64_t partid,
-    uint64_t table_id,
-    uint64_t key);
+      uint64_t table_id, uint64_t key);
   void enqueueRecord(LogRecord* record); 
   void processRecord(uint64_t thd_id); 
   void writeToBuffer(uint64_t thd_id,char * data, uint64_t size); 

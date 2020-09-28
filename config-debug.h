@@ -26,7 +26,9 @@
 // AA (Active-Active), AP (Active-Passive)
 #define REPL_TYPE AP
 
-// each transaction only accesses only 1 virtual partition. But the lock/ts manager and index are not aware of such partitioning. VIRTUAL_PART_CNT describes the request distribution and is only used to generate queries. For HSTORE, VIRTUAL_PART_CNT should be the same as PART_CNT.
+// each transaction only accesses only 1 virtual partition. But the lock/ts manager and index are
+// not aware of such partitioning. VIRTUAL_PART_CNT describes the request distribution and is only
+// used to generate queries. For HSTORE, VIRTUAL_PART_CNT should be the same as PART_CNT.
 #define VIRTUAL_PART_CNT    PART_CNT  
 #define PAGE_SIZE         4096 
 #define CL_SIZE           64
@@ -197,7 +199,8 @@
 #define MPR 1.0
 #define MPIR 0.01
 #define MPR_NEWORDER      20 // In %
-enum TPCCTable {TPCC_WAREHOUSE, 
+enum TPCCTable {
+  TPCC_WAREHOUSE,
           TPCC_DISTRICT,
           TPCC_CUSTOMER,
           TPCC_HISTORY,
@@ -205,13 +208,16 @@ enum TPCCTable {TPCC_WAREHOUSE,
           TPCC_ORDER,
           TPCC_ORDERLINE,
           TPCC_ITEM,
-          TPCC_STOCK};
-enum TPCCTxnType {TPCC_ALL, 
+  TPCC_STOCK
+};
+enum TPCCTxnType {
+  TPCC_ALL,
           TPCC_PAYMENT, 
           TPCC_NEW_ORDER, 
           TPCC_ORDER_STATUS, 
           TPCC_DELIVERY, 
-          TPCC_STOCK_LEVEL};
+  TPCC_STOCK_LEVEL
+};
 extern TPCCTxnType          g_tpcc_txn_type;
 
 //#define TXN_TYPE          TPCC_ALL
@@ -241,7 +247,8 @@ extern TPCCTxnType          g_tpcc_txn_type;
 #define PERC_PPS_UPDATEPRODUCTPART 0.2
 #define PERC_PPS_UPDATEPART 0.0
 
-enum PPSTxnType {PPS_ALL = 0, 
+enum PPSTxnType {
+  PPS_ALL = 0,
           PPS_GETPART, 
           PPS_GETSUPPLIER, 
           PPS_GETPRODUCT, 

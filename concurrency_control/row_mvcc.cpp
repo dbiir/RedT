@@ -30,8 +30,7 @@ void Row_mvcc::init(row_t * row) {
 	readhistail = NULL;
 	writehistail = NULL;
 	blatch = false;
-	latch = (pthread_mutex_t *) 
-		mem_allocator.alloc(sizeof(pthread_mutex_t));
+  latch = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init(latch, NULL);
 	whis_len = 0;
 	rhis_len = 0;
@@ -43,9 +42,16 @@ row_t * Row_mvcc::clear_history(TsType type, ts_t ts) {
 	MVHisEntry ** queue;
 	MVHisEntry ** tail;
     switch (type) {
-    case R_REQ : queue = &readhis; tail = &readhistail; break;
-    case W_REQ : queue = &writehis; tail = &writehistail; break;
-	default: assert(false);
+    case R_REQ:
+      queue = &readhis;
+      tail = &readhistail;
+      break;
+    case W_REQ:
+      queue = &writehis;
+      tail = &writehistail;
+      break;
+    default:
+      assert(false);
     }
 	MVHisEntry * his = *tail;
 	MVHisEntry * prev = NULL;
@@ -61,14 +67,14 @@ row_t * Row_mvcc::clear_history(TsType type, ts_t ts) {
 		his->row = NULL;
 		return_his_entry(his);
 		his = prev;
-		if (type == R_REQ) rhis_len --;
-		else whis_len --;
+    if (type == R_REQ)
+      rhis_len--;
+    else
+      whis_len--;
 	}
 	*tail = his;
-	if (*tail)
-		(*tail)->next = NULL;
-	if (his == NULL) 
-		*queue = NULL;
+  if (*tail) (*tail)->next = NULL;
+  if (his == NULL) *queue = NULL;
 	return row;
 }
 
@@ -92,8 +98,7 @@ void Row_mvcc::return_his_entry(MVHisEntry * entry) {
 	mem_allocator.free(entry, sizeof(MVHisEntry));
 }
 
-void Row_mvcc::buffer_req(TsType type, TxnManager * txn)
-{
+void Row_mvcc::buffer_req(TsType type, TxnManager *txn) {
 	MVReqEntry * req_entry = get_req_entry();
 	assert(req_entry != NULL);
 	req_entry->txn = txn;
@@ -116,9 +121,14 @@ MVReqEntry * Row_mvcc::debuffer_req( TsType type, TxnManager * txn) {
 	MVReqEntry ** queue;
 	MVReqEntry * return_queue = NULL;
 	switch (type) {
-	case R_REQ : queue = &readreq_mvcc; break;
-	case P_REQ : queue = &prereq_mvcc; break;
-	default: assert(false);
+    case R_REQ:
+      queue = &readreq_mvcc;
+      break;
+    case P_REQ:
+      queue = &prereq_mvcc;
+      break;
+    default:
+      assert(false);
 	}
 	
 	MVReqEntry * req = *queue;
@@ -147,8 +157,7 @@ MVReqEntry * Row_mvcc::debuffer_req( TsType type, TxnManager * txn) {
 		uint64_t min_pts = UINT64_MAX;
 		//uint64_t min_pts = (1UL << 32);
 		for (MVReqEntry * preq = prereq_mvcc; preq != NULL; preq = preq->next)
-			if (preq->ts < min_pts)
-				min_pts = preq->ts;
+      if (preq->ts < min_pts) min_pts = preq->ts;
 		while (req != NULL) {
 			if (req->ts <= min_pts) {
 				if (prev_req == NULL) {
@@ -170,18 +179,16 @@ MVReqEntry * Row_mvcc::debuffer_req( TsType type, TxnManager * txn) {
 	return return_queue;
 }
 
-void Row_mvcc::insert_history( ts_t ts, row_t * row) 
-{
+void Row_mvcc::insert_history(ts_t ts, row_t *row) {
 	MVHisEntry * new_entry = get_his_entry(); 
 	new_entry->ts = ts;
 	new_entry->row = row;
 	if (row != NULL)
 		whis_len ++;
-	else rhis_len ++;
-	MVHisEntry ** queue = (row == NULL)? 
-		&(readhis) : &(writehis);
-	MVHisEntry ** tail = (row == NULL)?
-		&(readhistail) : &(writehistail);
+  else
+    rhis_len++;
+  MVHisEntry **queue = (row == NULL) ? &(readhis) : &(writehis);
+  MVHisEntry **tail = (row == NULL) ? &(readhistail) : &(writehistail);
 	MVHisEntry * his = *queue;
 	while (his != NULL && ts < his->ts) {
 		his = his->next;
@@ -232,8 +239,7 @@ bool Row_mvcc::conflict(TsType type, ts_t ts) {
 	}
 	MVHisEntry * whis = writehis;
     while (whis != NULL && whis->ts > pts) {
-		if (whis->ts < rts) 
-			return false;
+    if (whis->ts < rts) return false;
 		whis = whis->next;
 	}
 	return true;
@@ -337,10 +343,8 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 			// return results immediately.
 			rc = RCOK;
 			MVHisEntry * whis = writehis;
-			while (whis != NULL && whis->ts > ts) 
-				whis = whis->next;
-			row_t * ret = (whis == NULL)? 
-				_row : whis->row;
+      while (whis != NULL && whis->ts > ts) whis = whis->next;
+      row_t *ret = (whis == NULL) ? _row : whis->row;
 			txn->cur_row = ret;
 			insert_history(ts, NULL);
 			assert(strstr(_row->get_table_name(), ret->get_table_name()));
@@ -376,15 +380,13 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 	if (rc == RCOK) {
 		if (whis_len > g_his_recycle_len || rhis_len > g_his_recycle_len) {
 			ts_t t_th = glob_manager.get_min_ts(txn->get_thd_id());
-			if (readhistail && readhistail->ts < t_th)
-				clear_history(R_REQ, t_th);
+      if (readhistail && readhistail->ts < t_th) clear_history(R_REQ, t_th);
 			// Here is a tricky bug. The oldest transaction might be 
 			// reading an even older version whose timestamp < t_th.
 			// But we cannot recycle that version because it is still being used.
 			// So the HACK here is to make sure that the first version older than
 			// t_th not be recycled.
-			if (whis_len > 1 && 
-				writehistail->prev->ts < t_th) {
+      if (whis_len > 1 && writehistail->prev->ts < t_th) {
 				row_t * latest_row = clear_history(W_REQ, t_th);
 				if (latest_row != NULL) {
 					assert(_row != latest_row);
@@ -414,10 +416,8 @@ void Row_mvcc::update_buffer(TxnManager * txn) {
 	while (req != NULL) {
 		// find the version for the request
 		MVHisEntry * whis = writehis;
-		while (whis != NULL && whis->ts > req->ts) 
-			whis = whis->next;
-		row_t * row = (whis == NULL)? 
-			_row : whis->row;
+    while (whis != NULL && whis->ts > req->ts) whis = whis->next;
+    row_t *row = (whis == NULL) ? _row : whis->row;
 		req->txn->cur_row = row;
 		insert_history(req->ts, NULL);
 		assert(row->get_data() != NULL);
@@ -425,10 +425,12 @@ void Row_mvcc::update_buffer(TxnManager * txn) {
 		assert(row->get_schema() == _row->get_schema());
 
 		req->txn->ts_ready = true;
+    #if WORKLOAD!=DA //DA do not need restart
 		uint64_t timespan = get_sys_clock() - req->starttime;
 		req->txn->txn_stats.cc_block_time += timespan;
 		req->txn->txn_stats.cc_block_time_short += timespan;
     txn_table.restart_txn(txn->get_thd_id(),req->txn->get_txn_id(),0);
+    #endif
 		tofree = req;
 		req = req->next;
 		// free ready_read

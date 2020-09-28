@@ -20,8 +20,7 @@
 #include "log_thread.h"
 #include "logger.h"
 
-void LogThread::setup() {
-}
+void LogThread::setup() {}
 
 RC LogThread::run() {
   tsetup();

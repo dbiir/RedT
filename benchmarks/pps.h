@@ -67,7 +67,8 @@ enum PPSRemTxnType {
   PPS_UPDATEPART0,
   PPS_UPDATEPART1,
   PPS_FIN,
-  PPS_RDONE};
+  PPS_RDONE
+};
 
 class PPSWorkload : public Workload {
 public:
@@ -107,8 +108,7 @@ struct pps_thr_args{
     UInt32 tot;
 };
 
-class PPSTxnManager : public TxnManager
-{
+class PPSTxnManager : public TxnManager {
 public:
 	void init(uint64_t thd_id, Workload * h_wl);
   void reset();

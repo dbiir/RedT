@@ -22,12 +22,9 @@
 #include "mem_alloc.h"
 #include "row_maat.h"
 
-void Maat::init() {
-  sem_init(&_semaphore, 0, 1);
-}
+void Maat::init() { sem_init(&_semaphore, 0, 1); }
 
 RC Maat::validate(TxnManager * txn) {
-  return RCOK;
   uint64_t start_time = get_sys_clock();
   uint64_t timespan;
   sem_wait(&_semaphore);
@@ -186,7 +183,8 @@ RC Maat::find_bound(TxnManager * txn) {
     // TODO: can commit_time be selected in a smarter way?
     txn->commit_timestamp = lower; 
   }
-  DEBUG("MAAT Bound %ld: %d [%lu,%lu] %lu\n",txn->get_txn_id(),rc,lower,upper,txn->commit_timestamp);
+  DEBUG("MAAT Bound %ld: %d [%lu,%lu] %lu\n", txn->get_txn_id(), rc, lower, upper,
+        txn->commit_timestamp);
   return rc;
 }
 
@@ -200,15 +198,12 @@ void TimeTable::init() {
   }
 }
 
-uint64_t TimeTable::hash(uint64_t key) {
-  return key % table_size;
-}
+uint64_t TimeTable::hash(uint64_t key) { return key % table_size; }
 
 TimeTableEntry* TimeTable::find(uint64_t key) {
   TimeTableEntry * entry = table[hash(key)].head;
   while(entry) {
-    if(entry->key == key) 
-      break;
+    if (entry->key == key) break;
     entry = entry->next;
   }
   return entry;

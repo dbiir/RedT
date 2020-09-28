@@ -5,7 +5,7 @@
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+	   http://www.apache.org/licenses/LICENSE-2.0
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,8 +47,7 @@ public:
 	bool 		index_exist(idx_key_t key); // check if the key exist. 
 	RC 			index_insert(idx_key_t key, itemid_t * item, int part_id = -1);
 	RC 			index_insert_nonunique(idx_key_t key, itemid_t * item, int part_id = -1) { return RCOK;}
-	RC	 		index_read(idx_key_t key, itemid_t * &item, 
-					uint64_t thd_id, int64_t part_id = -1);
+  RC index_read(idx_key_t key, itemid_t *&item, uint64_t thd_id, int64_t part_id = -1);
 	RC	 		index_read(idx_key_t key, itemid_t * &item, int part_id = -1);
 	RC	 		index_read(idx_key_t key, itemid_t * &item);
 	RC 			index_next(uint64_t thd_id, itemid_t * &item, bool samekey = false);
@@ -61,12 +60,14 @@ private:
 	RC		 	make_node(uint64_t part_id, bt_node *& node);
 	
 	RC 			start_new_tree(glob_param params, idx_key_t key, itemid_t * item);
-	RC 			find_leaf(glob_param params, idx_key_t key, idx_acc_t access_type, bt_node *& leaf, bt_node  *& last_ex);
+ 	RC find_leaf(glob_param params, idx_key_t key, idx_acc_t access_type, bt_node *&leaf,
+			   bt_node *&last_ex);
 	RC 			find_leaf(glob_param params, idx_key_t key, idx_acc_t access_type, bt_node *& leaf);
 	RC			insert_into_leaf(glob_param params, bt_node * leaf, idx_key_t key, itemid_t * item);
 	// handle split
 	RC 			split_lf_insert(glob_param params, bt_node * leaf, idx_key_t key, itemid_t * item);
-	RC 			split_nl_insert(glob_param params, bt_node * node, UInt32 left_index, idx_key_t key, bt_node * right);
+  	RC split_nl_insert(glob_param params, bt_node *node, UInt32 left_index, idx_key_t key,
+					 bt_node *right);
 	RC 			insert_into_parent(glob_param params, bt_node * left, idx_key_t key, bt_node * right);
 	RC 			insert_into_new_root(glob_param params, bt_node * left, idx_key_t key, bt_node * right);
 

@@ -40,8 +40,10 @@ deps:$(CPPS_DB)
 -include obj/deps
 
 unit_test : $(OBJS_UNIT)
+#	$(CC)   -o $@ $^ $(LDFLAGS) $(LIBS)
 	$(CC) -o $@ $^ $(LDFLAGS) $(LIBS)
 ./obj/%.o: transport/%.cpp
+#	$(CC)   -c $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $<
 	$(CC) -c $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $<
 ./obj/%.o: unit_tests/%.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
@@ -61,8 +63,12 @@ unit_test : $(OBJS_UNIT)
 
 rundb : $(OBJS_DB)
 	$(CC) -o $@ $^ $(LDFLAGS) $(LIBS)
+#	$(CC) -o $@ $^ $(LDFLAGS) $(LIBS)
 ./obj/%.o: transport/%.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $<
+#	$(CC) -c $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $<
+#./deps/%.d: %.cpp
+#	$(CC) -MM -MT $*.o -MF $@ $(CFLAGS) $<
 ./obj/%.o: benchmarks/%.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 ./obj/%.o: storage/%.cpp
@@ -81,8 +87,12 @@ rundb : $(OBJS_DB)
 
 runcl : $(OBJS_CL)
 	$(CC) -o $@ $^ $(LDFLAGS) $(LIBS)
+#	$(CC) -o $@ $^ $(LDFLAGS) $(LIBS)
 ./obj/%.o: transport/%.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $<
+#	$(CC) -c $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $<
+#./deps/%.d: %.cpp
+#	$(CC) -MM -MT $*.o -MF $@ $(CFLAGS) $<
 ./obj/%.o: benchmarks/%.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 ./obj/%.o: storage/%.cpp

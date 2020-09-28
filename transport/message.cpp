@@ -25,6 +25,9 @@
 #include "global.h"
 #include "message.h"
 #include "maat.h"
+#include "dta.h"
+#include "da.h"
+#include "da_query.h"
 #include "wkdb.h"
 #include "tictoc.h"
 
@@ -56,6 +59,9 @@ Message * Message::create_message(char * buf) {
  uint64_t ptr = 0;
  COPY_VAL(rtype,buf,ptr);
  Message * msg = create_message(rtype);
+  //printf("buffer is:%s\n",buf);
+  //printf("msg:%lu:%lu %lu %lu\n",((DAQueryMessage*)msg)->seq_id,((DAQueryMessage*)msg)->state,((DAQueryMessage*)msg)->next_state,((DAQueryMessage*)msg)->last_state);
+  fflush(stdout);
  msg->copy_from_buf(buf);
  return msg;
 }
@@ -94,6 +100,8 @@ Message * Message::create_message(BaseQuery * query, RemReqType rtype) {
  ((TPCCClientQueryMessage*)msg)->copy_from_query(query);
 #elif WORKLOAD == PPS 
  ((PPSClientQueryMessage*)msg)->copy_from_query(query);
+#elif  WORKLOAD == DA
+  ((DAClientQueryMessage*)msg)->copy_from_query(query);
 #endif
  return msg;
 }
@@ -125,6 +133,8 @@ Message * Message::create_message(RemReqType rtype) {
       msg = new TPCCQueryMessage;
 #elif WORKLOAD == PPS 
       msg = new PPSQueryMessage;
+#elif WORKLOAD == DA
+      msg = new DAQueryMessage;
 #endif
       msg->init();
       break;
@@ -157,6 +167,8 @@ Message * Message::create_message(RemReqType rtype) {
       msg = new TPCCClientQueryMessage;
 #elif WORKLOAD == PPS 
       msg = new PPSClientQueryMessage;
+#elif WORKLOAD == DA
+      msg = new DAClientQueryMessage;
 #endif
       msg->init();
       break;
@@ -172,7 +184,8 @@ Message * Message::create_message(RemReqType rtype) {
     case CL_RSP:
       msg = new ClientResponseMessage;
       break;
-    default: assert(false);
+    default:
+      assert(false);
   }
   assert(msg);
   msg->rtype = rtype;
@@ -218,10 +231,7 @@ void Message::mcopy_from_txn(TxnManager * txn) {
 #endif
 }
 
-void Message::mcopy_to_txn(TxnManager * txn) {
-  txn->return_id = return_node_id;
-}
-
+void Message::mcopy_to_txn(TxnManager* txn) { txn->return_id = return_node_id; }
 
 void Message::mcopy_from_buf(char * buf) {
   uint64_t ptr = 0;
@@ -239,7 +249,8 @@ void Message::mcopy_from_buf(char * buf) {
   COPY_VAL(lat_process_time,buf,ptr);
   COPY_VAL(lat_network_time,buf,ptr);
   COPY_VAL(lat_other_time,buf,ptr);
-  if ((CC_ALG == CALVIN && rtype == CALVIN_ACK && txn_id % g_node_cnt == g_node_id) || (CC_ALG != CALVIN && IS_LOCAL(txn_id))) {
+  if ((CC_ALG == CALVIN && rtype == CALVIN_ACK && txn_id % g_node_cnt == g_node_id) ||
+      (CC_ALG != CALVIN && IS_LOCAL(txn_id))) {
     lat_network_time = (get_sys_clock() - lat_network_time) - lat_other_time;
   } else {
     lat_other_time = get_sys_clock();
@@ -261,7 +272,8 @@ void Message::mcopy_to_buf(char * buf) {
   COPY_BUF(buf,lat_cc_block_time,ptr);
   COPY_BUF(buf,lat_cc_time,ptr);
   COPY_BUF(buf,lat_process_time,ptr);
-  if ((CC_ALG == CALVIN && rtype == CL_QRY && txn_id % g_node_cnt == g_node_id) || (CC_ALG != CALVIN && IS_LOCAL(txn_id))) {
+  if ((CC_ALG == CALVIN && rtype == CL_QRY && txn_id % g_node_cnt == g_node_id) ||
+      (CC_ALG != CALVIN && IS_LOCAL(txn_id))) {
     lat_network_time = get_sys_clock();
   } else {
     lat_other_time = get_sys_clock() - lat_other_time;
@@ -287,6 +299,8 @@ void Message::release_message(Message * msg) {
       TPCCQueryMessage * m_msg = (TPCCQueryMessage*)msg;
 #elif WORKLOAD == PPS 
       PPSQueryMessage * m_msg = (PPSQueryMessage*)msg;
+#elif WORKLOAD == DA
+      DAQueryMessage* m_msg = (DAQueryMessage*)msg;
 #endif
       m_msg->release();
       delete m_msg;
@@ -339,6 +353,8 @@ void Message::release_message(Message * msg) {
       TPCCClientQueryMessage * m_msg = (TPCCClientQueryMessage*)msg;
 #elif WORKLOAD == PPS 
       PPSClientQueryMessage * m_msg = (PPSClientQueryMessage*)msg;
+#elif WORKLOAD == DA
+      DAClientQueryMessage* m_msg = (DAClientQueryMessage*)msg;
 #endif
       m_msg->release();
       delete m_msg;
@@ -368,17 +384,21 @@ void Message::release_message(Message * msg) {
       delete m_msg;
       break;
                  }
-    default: { assert(false); }
+    default: {
+      assert(false);
+    }
   }
 }
 /************************/
 
 uint64_t QueryMessage::get_size() {
   uint64_t size = Message::mget_size();
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA
   size += sizeof(ts);
 #endif
-#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
   size += sizeof(start_ts);
 #endif  
   return size;
@@ -386,36 +406,41 @@ uint64_t QueryMessage::get_size() {
 
 void QueryMessage::copy_from_txn(TxnManager * txn) {
   Message::mcopy_from_txn(txn);
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA
   ts = txn->get_timestamp();
   assert(ts != 0);
 #endif
-#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
   start_ts = txn->get_start_timestamp();
 #endif
 }
 
 void QueryMessage::copy_to_txn(TxnManager * txn) {
   Message::mcopy_to_txn(txn);
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA
   assert(ts != 0);
   txn->set_timestamp(ts);
 #endif
-#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
   txn->set_start_timestamp(start_ts);
 #endif
-
 }
 
 void QueryMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
   uint64_t ptr __attribute__ ((unused));
   ptr = Message::mget_size();
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA
  COPY_VAL(ts,buf,ptr);
   assert(ts != 0);
 #endif
-#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
  COPY_VAL(start_ts,buf,ptr);
 #endif
 }
@@ -424,19 +449,20 @@ void QueryMessage::copy_to_buf(char * buf) {
   Message::mcopy_to_buf(buf);
   uint64_t ptr __attribute__ ((unused));
   ptr = Message::mget_size();
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA
  COPY_BUF(buf,ts,ptr);
   assert(ts != 0);
 #endif
-#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI
+#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
  COPY_BUF(buf,start_ts,ptr);
 #endif
 }
 
 /************************/
 
-void YCSBClientQueryMessage::init() {
-}
+void YCSBClientQueryMessage::init() {}
 
 void YCSBClientQueryMessage::release() {
   ClientQueryMessage::release();
@@ -528,8 +554,7 @@ void YCSBClientQueryMessage::copy_to_buf(char * buf) {
 }
 /************************/
 
-void TPCCClientQueryMessage::init() {
-}
+void TPCCClientQueryMessage::init() {}
 
 void TPCCClientQueryMessage::release() {
   ClientQueryMessage::release();
@@ -688,18 +713,13 @@ void TPCCClientQueryMessage::copy_to_buf(char * buf) {
  assert(ptr == get_size());
 }
 
+/************************/
 
 /************************/
 
+void PPSClientQueryMessage::init() {}
 
-/************************/
-
-void PPSClientQueryMessage::init() {
-}
-
-void PPSClientQueryMessage::release() {
-  ClientQueryMessage::release();
-}
+void PPSClientQueryMessage::release() { ClientQueryMessage::release(); }
 
 uint64_t PPSClientQueryMessage::get_size() {
   uint64_t size = ClientQueryMessage::get_size();
@@ -768,13 +788,9 @@ void PPSClientQueryMessage::copy_to_txn(TxnManager * txn) {
 #endif
 #if DEBUG_DISTR
   std::cout << "PPSClient::copy_to_txn "
-    << "type " << (PPSTxnType)txn_type
-    << " part_key " << part_key
-    << " product_key " << product_key
-    << " supplier_key " << supplier_key
-    << std::endl;
+            << "type " << (PPSTxnType)txn_type << " part_key " << part_key << " product_key "
+            << product_key << " supplier_key " << supplier_key << std::endl;
 #endif
-
 }
 
 void PPSClientQueryMessage::copy_from_buf(char * buf) {
@@ -803,11 +819,8 @@ void PPSClientQueryMessage::copy_from_buf(char * buf) {
  assert(ptr == get_size());
 #if DEBUG_DISTR
   std::cout << "PPSClient::copy_from_buf "
-    << "type " << (PPSTxnType)txn_type
-    << " part_key " << part_key
-    << " product_key " << product_key
-    << " supplier_key " << supplier_key
-    << std::endl;
+            << "type " << (PPSTxnType)txn_type << " part_key " << part_key << " product_key "
+            << product_key << " supplier_key " << supplier_key << std::endl;
 #endif
 }
 
@@ -835,20 +848,92 @@ void PPSClientQueryMessage::copy_to_buf(char * buf) {
  assert(ptr == get_size());
 #if DEBUG_DISTR
   std::cout << "PPSClient::copy_to_buf "
-    << "type " << (PPSTxnType)txn_type
-    << " part_key " << part_key
-    << " product_key " << product_key
-    << " supplier_key " << supplier_key
-    << std::endl;
+            << "type " << (PPSTxnType)txn_type << " part_key " << part_key << " product_key "
+            << product_key << " supplier_key " << supplier_key << std::endl;
 #endif
 }
 
 
+/***************DA zone*********/
+void DAClientQueryMessage::init() {}
+void DAClientQueryMessage::copy_from_query(BaseQuery* query) {
+  ClientQueryMessage::copy_from_query(query);
+  DAQuery* da_query = (DAQuery*)(query);
+
+  txn_type= da_query->txn_type;
+	trans_id= da_query->trans_id;//事务id
+	item_id= da_query->item_id; //操作的变量id
+	seq_id= da_query->seq_id; //就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程 
+	write_version=da_query->write_version;
+  state= da_query->state;
+	next_state= da_query->next_state;
+	last_state= da_query->last_state;
+}
+void DAClientQueryMessage::copy_to_buf(char* buf) {
+  ClientQueryMessage::copy_to_buf(buf);
+  uint64_t ptr = ClientQueryMessage::get_size();
+
+  COPY_BUF(buf, txn_type, ptr);
+  COPY_BUF(buf, trans_id, ptr);
+  COPY_BUF(buf, item_id, ptr);
+  COPY_BUF(buf, seq_id, ptr);
+  COPY_BUF(buf, write_version, ptr);
+  COPY_BUF(buf, state, ptr);
+  COPY_BUF(buf, next_state, ptr);
+  COPY_BUF(buf, last_state, ptr);
+  assert(ptr == get_size());
+}
+void DAClientQueryMessage::copy_from_txn(TxnManager* txn) {
+  ClientQueryMessage::mcopy_from_txn(txn);
+  copy_from_query(txn->query);
+}
+
+void DAClientQueryMessage::copy_from_buf(char* buf) {
+  ClientQueryMessage::copy_from_buf(buf);
+  uint64_t ptr = ClientQueryMessage::get_size();
+
+  COPY_VAL(txn_type, buf, ptr);
+  // common txn input for both payment & new-order
+  COPY_VAL(trans_id, buf, ptr);
+  COPY_VAL(item_id, buf, ptr);
+  COPY_VAL(seq_id, buf, ptr);
+  COPY_VAL(write_version, buf, ptr);
+  // payment
+  COPY_VAL(state, buf, ptr);
+  COPY_VAL(next_state, buf, ptr);
+  COPY_VAL(last_state, buf, ptr);
+  assert(ptr == get_size());
+}
+
+void DAClientQueryMessage::copy_to_txn(TxnManager* txn) {
+  ClientQueryMessage::copy_to_txn(txn);
+  DAQuery* da_query = (DAQuery*)(txn->query);
+
+
+  txn->client_id = return_node_id;
+  da_query->txn_type = (DATxnType)txn_type;
+  da_query->trans_id = trans_id;
+  da_query->item_id = item_id;
+  da_query->seq_id = seq_id;
+  da_query->write_version = write_version;
+  da_query->state = state;
+  da_query->next_state = next_state;
+  da_query->last_state = last_state;
+  
+}
+
+uint64_t DAClientQueryMessage::get_size() {
+  uint64_t size = ClientQueryMessage::get_size();
+  size += sizeof(DATxnType);
+  size += sizeof(uint64_t) * 7;
+  return size;
+  
+}
+void DAClientQueryMessage::release() { ClientQueryMessage::release(); }
+
 /************************/
 
-void ClientQueryMessage::init() {
-    first_startts = 0;
-}
+void ClientQueryMessage::init() { first_startts = 0; }
 
 void ClientQueryMessage::release() {
   partitions.release();
@@ -952,19 +1037,14 @@ void ClientResponseMessage::copy_to_buf(char * buf) {
 
 /************************/
 
-
 uint64_t DoneMessage::get_size() {
   uint64_t size = Message::mget_size();
   return size;
 }
 
-void DoneMessage::copy_from_txn(TxnManager * txn) {
-  Message::mcopy_from_txn(txn);
-}
+void DoneMessage::copy_from_txn(TxnManager* txn) { Message::mcopy_from_txn(txn); }
 
-void DoneMessage::copy_to_txn(TxnManager * txn) {
-  Message::mcopy_to_txn(txn);
-}
+void DoneMessage::copy_to_txn(TxnManager* txn) { Message::mcopy_to_txn(txn); }
 
 void DoneMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
@@ -1043,11 +1123,9 @@ void PrepareMessage::copy_from_txn(TxnManager * txn) {
   _min_commit_ts = txn->_min_commit_ts;
 #endif
 }
-
 void PrepareMessage::copy_to_txn(TxnManager * txn) {
   Message::mcopy_to_txn(txn);
 }
-
 void PrepareMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
   uint64_t ptr = Message::mget_size();
@@ -1071,7 +1149,7 @@ void PrepareMessage::copy_to_buf(char * buf) {
 uint64_t AckMessage::get_size() {
   uint64_t size = Message::mget_size();
   size += sizeof(RC);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG && 0
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
   size += sizeof(uint64_t) * 2;
 #endif
 #if WORKLOAD == PPS && CC_ALG == CALVIN
@@ -1085,13 +1163,17 @@ void AckMessage::copy_from_txn(TxnManager * txn) {
   Message::mcopy_from_txn(txn);
   //rc = query->rc;
   rc = txn->get_rc();
-#if CC_ALG == MAAT && 0
+#if CC_ALG == MAAT
   lower = time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
   upper = time_table.get_upper(txn->get_thd_id(),txn->get_txn_id());
 #endif
 #if CC_ALG == WOOKONG
   lower = wkdb_time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
   upper = wkdb_time_table.get_upper(txn->get_thd_id(),txn->get_txn_id());
+#endif
+#if CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
+  lower = dta_time_table.get_lower(txn->get_thd_id(), txn->get_txn_id());
+  upper = dta_time_table.get_upper(txn->get_thd_id(), txn->get_txn_id());
 #endif
 
 #if WORKLOAD == PPS && CC_ALG == CALVIN
@@ -1114,7 +1196,7 @@ void AckMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
   uint64_t ptr = Message::mget_size();
   COPY_VAL(rc,buf,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG && 0
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
   COPY_VAL(lower,buf,ptr);
   COPY_VAL(upper,buf,ptr);
 #endif
@@ -1136,7 +1218,7 @@ void AckMessage::copy_to_buf(char * buf) {
   Message::mcopy_to_buf(buf);
   uint64_t ptr = Message::mget_size();
   COPY_BUF(buf,rc,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG && 0
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
   COPY_BUF(buf,lower,ptr);
   COPY_BUF(buf,upper,ptr);
 #endif
@@ -1151,7 +1233,6 @@ void AckMessage::copy_to_buf(char * buf) {
 #endif
  assert(ptr == get_size());
 }
-
 /************************/
 
 uint64_t QueryResponseMessage::get_size() {
@@ -1175,7 +1256,6 @@ void QueryResponseMessage::copy_from_txn(TxnManager * txn) {
 void QueryResponseMessage::copy_to_txn(TxnManager * txn) {
   Message::mcopy_to_txn(txn);
   //query->rc = rc;
-
 }
 
 void QueryResponseMessage::copy_from_buf(char * buf) {
@@ -1201,14 +1281,14 @@ void QueryResponseMessage::copy_to_buf(char * buf) {
 
 /************************/
 
-
-
 uint64_t FinishMessage::get_size() {
   uint64_t size = Message::mget_size();
   size += sizeof(uint64_t); 
   size += sizeof(RC); 
   size += sizeof(bool); 
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI && 0
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
   size += sizeof(uint64_t); 
 #endif
   return size;
@@ -1218,18 +1298,22 @@ void FinishMessage::copy_from_txn(TxnManager * txn) {
   Message::mcopy_from_txn(txn);
   rc = txn->get_rc();
   readonly = txn->query->readonly();
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI && 0
+
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_MVCC
   commit_timestamp = txn->get_commit_timestamp();
 #endif
-
 }
 
 void FinishMessage::copy_to_txn(TxnManager * txn) {
   Message::mcopy_to_txn(txn);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI && 0
+
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_MVCC
   txn->commit_timestamp = commit_timestamp;
 #endif
-
 }
 
 void FinishMessage::copy_from_buf(char * buf) {
@@ -1238,7 +1322,9 @@ void FinishMessage::copy_from_buf(char * buf) {
   COPY_VAL(pid,buf,ptr);
   COPY_VAL(rc,buf,ptr);
   COPY_VAL(readonly,buf,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI && 0
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_MVCC
   COPY_VAL(commit_timestamp,buf,ptr);
 #endif
  assert(ptr == get_size());
@@ -1250,7 +1336,9 @@ void FinishMessage::copy_to_buf(char * buf) {
   COPY_BUF(buf,pid,ptr);
   COPY_BUF(buf,rc,ptr);
   COPY_BUF(buf,readonly,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI && 0
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
+    CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_MVCC
   COPY_BUF(buf,commit_timestamp,ptr);
 #endif
 
@@ -1270,19 +1358,11 @@ uint64_t LogMessage::get_size() {
   return size;
 }
 
-void LogMessage::copy_from_txn(TxnManager * txn) {
-  Message::mcopy_from_txn(txn);
-}
-
-void LogMessage::copy_to_txn(TxnManager * txn) {
-  Message::mcopy_to_txn(txn);
-}
-
-void LogMessage::copy_from_record(LogRecord * record) {
-  this->record.copyRecord(record);
+void LogMessage::copy_from_txn(TxnManager* txn) { Message::mcopy_from_txn(txn); }
   
-}
+void LogMessage::copy_to_txn(TxnManager* txn) { Message::mcopy_to_txn(txn); }
 
+void LogMessage::copy_from_record(LogRecord* record) { this->record.copyRecord(record); }
 
 void LogMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
@@ -1305,13 +1385,9 @@ uint64_t LogRspMessage::get_size() {
   return size;
 }
 
-void LogRspMessage::copy_from_txn(TxnManager * txn) {
-  Message::mcopy_from_txn(txn);
-}
+void LogRspMessage::copy_from_txn(TxnManager* txn) { Message::mcopy_from_txn(txn); }
 
-void LogRspMessage::copy_to_txn(TxnManager * txn) {
-  Message::mcopy_to_txn(txn);
-}
+void LogRspMessage::copy_to_txn(TxnManager* txn) { Message::mcopy_to_txn(txn); }
 
 void LogRspMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
@@ -1332,25 +1408,17 @@ uint64_t InitDoneMessage::get_size() {
   return size;
 }
 
-void InitDoneMessage::copy_from_txn(TxnManager * txn) {
-}
+void InitDoneMessage::copy_from_txn(TxnManager* txn) {}
 
-void InitDoneMessage::copy_to_txn(TxnManager * txn) {
-  Message::mcopy_to_txn(txn);
-}
+void InitDoneMessage::copy_to_txn(TxnManager* txn) { Message::mcopy_to_txn(txn); }
 
-void InitDoneMessage::copy_from_buf(char * buf) {
-  Message::mcopy_from_buf(buf);
-}
+void InitDoneMessage::copy_from_buf(char* buf) { Message::mcopy_from_buf(buf); }
 
-void InitDoneMessage::copy_to_buf(char * buf) {
-  Message::mcopy_to_buf(buf);
-}
+void InitDoneMessage::copy_to_buf(char* buf) { Message::mcopy_to_buf(buf); }
 
 /************************/
 
-void YCSBQueryMessage::init() {
-}
+void YCSBQueryMessage::init() {}
 
 void YCSBQueryMessage::release() {
   QueryMessage::release();
@@ -1385,7 +1453,6 @@ void YCSBQueryMessage::copy_to_txn(TxnManager * txn) {
   ((YCSBQuery*)(txn->query))->orig_request = &requests;
 }
 
-
 void YCSBQueryMessage::copy_from_buf(char * buf) {
   QueryMessage::copy_from_buf(buf);
   uint64_t ptr = QueryMessage::get_size();
@@ -1416,8 +1483,7 @@ void YCSBQueryMessage::copy_to_buf(char * buf) {
 }
 /************************/
 
-void TPCCQueryMessage::init() {
-}
+void TPCCQueryMessage::init() {}
 
 void TPCCQueryMessage::release() {
   QueryMessage::release();
@@ -1605,16 +1671,12 @@ void TPCCQueryMessage::copy_to_buf(char * buf) {
     COPY_BUF(buf,o_entry_d,ptr);
   }
  assert(ptr == get_size());
-
 }
 /************************/
 
-void PPSQueryMessage::init() {
-}
+void PPSQueryMessage::init() {}
 
-void PPSQueryMessage::release() {
-  QueryMessage::release();
-}
+void PPSQueryMessage::release() { QueryMessage::release(); }
 
 uint64_t PPSQueryMessage::get_size() {
   uint64_t size = QueryMessage::get_size();
@@ -1797,6 +1859,90 @@ void PPSQueryMessage::copy_to_buf(char * buf) {
   }
 
  assert(ptr == get_size());
+}
+//---DAquerymessage zone------------
 
+void DAQueryMessage::init() {}
+/*
+void DAQueryMessage::copy_from_query(BaseQuery* query) {
+  QueryMessage::copy_from_query(query);
+  DAQuery* da_query = (DAQuery*)(query);
+
+  txn_type= da_query->txn_type;
+	trans_id= da_query->trans_id;//事务id
+	item_id= da_query->item_id; //操作的变量id
+	seq_id= da_query->seq_id; //就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程 
+	write_version=da_query->write_version;
+  state= da_query->state;
+	next_state= da_query->next_state;
+	last_state= da_query->last_state;
+}*/
+void DAQueryMessage::copy_to_buf(char* buf) {
+  QueryMessage::copy_to_buf(buf);
+  uint64_t ptr = QueryMessage::get_size();
+
+  COPY_BUF(buf, txn_type, ptr);
+  COPY_BUF(buf, trans_id, ptr);
+  COPY_BUF(buf, item_id, ptr);
+  COPY_BUF(buf, seq_id, ptr);
+  COPY_BUF(buf, write_version, ptr);
+  COPY_BUF(buf, state, ptr);
+  COPY_BUF(buf, next_state, ptr);
+  COPY_BUF(buf, last_state, ptr);
+  
+}
+void DAQueryMessage::copy_from_txn(TxnManager* txn) {
+  QueryMessage::mcopy_from_txn(txn);
+  DAQuery* da_query = (DAQuery*)(txn->query);
+
+  txn_type = da_query->txn_type;
+  trans_id = da_query->trans_id;
+  item_id = da_query->item_id;
+  seq_id = da_query->seq_id;
+  write_version = da_query->write_version;
+  state = da_query->state;
+  next_state = da_query->next_state;
+  last_state = da_query->last_state;
 }
 
+void DAQueryMessage::copy_from_buf(char* buf) {
+  QueryMessage::copy_from_buf(buf);
+  uint64_t ptr = QueryMessage::get_size();
+
+  COPY_VAL(txn_type, buf, ptr);
+  // common txn input for both payment & new-order
+  COPY_VAL(trans_id, buf, ptr);
+  COPY_VAL(item_id, buf, ptr);
+  COPY_VAL(seq_id, buf, ptr);
+  COPY_VAL(write_version, buf, ptr);
+  // payment
+  COPY_VAL(state, buf, ptr);
+  COPY_VAL(next_state, buf, ptr);
+  COPY_VAL(last_state, buf, ptr);
+  assert(ptr == get_size());
+}
+
+void DAQueryMessage::copy_to_txn(TxnManager* txn) {
+  QueryMessage::copy_to_txn(txn);
+  DAQuery* da_query = (DAQuery*)(txn->query);
+
+
+  txn->client_id = return_node_id;
+  da_query->txn_type = (DATxnType)txn_type;
+  da_query->trans_id = trans_id;
+  da_query->item_id = item_id;
+  da_query->seq_id = seq_id;
+  da_query->write_version = write_version;
+  da_query->state = state;
+  da_query->next_state = next_state;
+  da_query->last_state = last_state;
+  
+}
+
+uint64_t DAQueryMessage::get_size() {
+  uint64_t size = QueryMessage::get_size();
+  size += sizeof(DATxnType);
+  size += sizeof(uint64_t) * 7;
+  return size;
+}
+void DAQueryMessage::release() { QueryMessage::release(); }

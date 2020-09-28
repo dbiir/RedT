@@ -19,19 +19,16 @@
 #include "row_occ.h"
 #include "mem_alloc.h"
 
-void 
-Row_occ::init(row_t * row) {
+void Row_occ::init(row_t *row) {
 	_row = row;
-	_latch = (pthread_mutex_t *) 
-		mem_allocator.alloc(sizeof(pthread_mutex_t));
-	// pthread_mutex_init( _latch, NULL );
+  _latch = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
+  pthread_mutex_init(_latch, NULL);
   sem_init(&_semaphore, 0, 1);
 	wts = 0;
 	blatch = false;
 }
 
-RC
-Row_occ::access(TxnManager * txn, TsType type) {
+RC Row_occ::access(TxnManager *txn, TsType type) {
 	RC rc = RCOK;
 	//pthread_mutex_lock( _latch );
   sem_wait(&_semaphore);
@@ -39,8 +36,7 @@ Row_occ::access(TxnManager * txn, TsType type) {
 		if (txn->get_start_timestamp() < wts) {
       		INC_STATS(txn->get_thd_id(),occ_ts_abort_cnt,1);
 			rc = Abort;
-   	 	}
-		else { 
+    } else {
 			txn->cur_row->copy(_row);
 			rc = RCOK;
 		}
@@ -51,20 +47,19 @@ Row_occ::access(TxnManager * txn, TsType type) {
 	return rc;
 }
 
-void
-Row_occ::latch() {
+void Row_occ::latch() {
 	//pthread_mutex_lock( _latch );
   sem_wait(&_semaphore);
 }
 
-bool
-Row_occ::validate(uint64_t ts) {
-	if (ts < wts) return false;
-	else return true;
+bool Row_occ::validate(uint64_t ts) {
+  if (ts < wts)
+    return false;
+  else
+    return true;
 }
 
-void
-Row_occ::write(row_t * data, uint64_t ts) {
+void Row_occ::write(row_t *data, uint64_t ts) {
 	_row->copy(data);
 	if (PER_ROW_VALID) {
 		assert(ts > wts);
@@ -72,8 +67,7 @@ Row_occ::write(row_t * data, uint64_t ts) {
 	}
 }
 
-void
-Row_occ::release() {
+void Row_occ::release() {
 	//pthread_mutex_unlock( _latch );
   sem_post(&_semaphore);
 }

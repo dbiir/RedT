@@ -19,8 +19,7 @@
 
 #include "global.h"
 
-class SimManager
-{
+class SimManager {
 public:
 	volatile bool sim_init_done;
 	volatile bool warmup;
@@ -36,6 +35,7 @@ public:
   int64_t epoch_txn_cnt;
   uint64_t txn_cnt;
   uint64_t inflight_cnt;
+  uint64_t last_da_query_time;
 
   void init();
   bool is_setup_done();

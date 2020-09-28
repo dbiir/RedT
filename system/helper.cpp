@@ -23,9 +23,7 @@ bool itemid_t::operator==(const itemid_t &other) const {
 	return (type == other.type && location == other.location);
 }
 
-bool itemid_t::operator!=(const itemid_t &other) const {
-	return !(*this == other);
-}
+bool itemid_t::operator!=(const itemid_t &other) const { return !(*this == other); }
 
 void itemid_t::operator=(const itemid_t &other){
 	this->valid = other.valid;
@@ -41,13 +39,9 @@ void itemid_t::init() {
 	next = NULL;
 }
 
-int get_thdid_from_txnid(uint64_t txnid) {
-	return txnid % g_thread_cnt;
-}
+int get_thdid_from_txnid(uint64_t txnid) { return txnid % g_thread_cnt; }
 
-uint64_t get_part_id(void * addr) {
-	return ((uint64_t)addr / PAGE_SIZE) % g_part_cnt; 
-}
+uint64_t get_part_id(void *addr) { return ((uint64_t)addr / PAGE_SIZE) % g_part_cnt; }
 
 uint64_t key_to_part(uint64_t key) {
 	if (g_part_alloc)
@@ -85,20 +79,21 @@ void init_client_globals() {
   if(g_node_cnt > g_client_node_cnt) {
     g_servers_per_client = g_node_cnt / g_client_node_cnt;
     g_clients_per_server = 1;
-  }
-  else {
+  } else {
     g_servers_per_client = 1;
     g_clients_per_server = g_client_node_cnt / g_node_cnt;
   }
   uint32_t client_node_id = g_node_id - g_node_cnt;
   g_server_start_node = (client_node_id * g_servers_per_client) % g_node_cnt; 
-  if (g_node_cnt >= g_client_node_cnt && g_node_cnt % g_client_node_cnt != 0 && g_node_id == (g_node_cnt + g_client_node_cnt -1)) {
+  if (g_node_cnt >= g_client_node_cnt && g_node_cnt % g_client_node_cnt != 0 &&
+      g_node_id == (g_node_cnt + g_client_node_cnt - 1)) {
       // Have last client pick up any leftover servers if the number of
       // servers cannot be evenly divided between client nodes
       // fix the remainder to be equally distributed among clients
       g_servers_per_client += g_node_cnt % g_client_node_cnt;
   }
-    printf("Node %u: servicing %u total nodes starting with node %u\n", g_node_id, g_servers_per_client, g_server_start_node);
+  printf("Node %u: servicing %u total nodes starting with node %u\n", g_node_id,
+         g_servers_per_client, g_server_start_node);
 }
 
 /****************************************************/
@@ -132,14 +127,11 @@ uint64_t get_server_clock() {
 }
 
 uint64_t get_sys_clock() {
-	if (TIME_ENABLE) 
-		return get_server_clock();
+  if (TIME_ENABLE) return get_server_clock();
 	return 0;
 }
 
-void myrand::init(uint64_t seed) {
-	this->seed = seed;
-}
+void myrand::init(uint64_t seed) { this->seed = seed; }
 
 uint64_t myrand::next() {
 	seed = (seed * 1103515247UL + 12345UL) % (1UL<<63);

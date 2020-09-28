@@ -29,8 +29,7 @@ struct txn_node {
     next = NULL;
     prev = NULL;
   }
-  ~txn_node() {
-  }
+  ~txn_node() {}
   TxnManager * txn_man;
   uint64_t return_id; // Client ID or Home partition ID
   uint64_t client_startts; // For sequencer

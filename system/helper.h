@@ -53,23 +53,16 @@
     fflush(stdout); \
   }
 
-
 /************************************************/
 // atomic operations
 /************************************************/
-#define ATOM_ADD(dest, value) \
-	__sync_fetch_and_add(&(dest), value)
-#define ATOM_SUB(dest, value) \
-	__sync_fetch_and_sub(&(dest), value)
+#define ATOM_ADD(dest, value) __sync_fetch_and_add(&(dest), value)
+#define ATOM_SUB(dest, value) __sync_fetch_and_sub(&(dest), value)
 // returns true if cas is successful
-#define ATOM_CAS(dest, oldval, newval) \
-	__sync_bool_compare_and_swap(&(dest), oldval, newval)
-#define ATOM_ADD_FETCH(dest, value) \
-	__sync_add_and_fetch(&(dest), value)
-#define ATOM_FETCH_ADD(dest, value) \
-	__sync_fetch_and_add(&(dest), value)
-#define ATOM_SUB_FETCH(dest, value) \
-	__sync_sub_and_fetch(&(dest), value)
+#define ATOM_CAS(dest, oldval, newval) __sync_bool_compare_and_swap(&(dest), oldval, newval)
+#define ATOM_ADD_FETCH(dest, value) __sync_add_and_fetch(&(dest), value)
+#define ATOM_FETCH_ADD(dest, value) __sync_fetch_and_add(&(dest), value)
+#define ATOM_SUB_FETCH(dest, value) __sync_sub_and_fetch(&(dest), value)
 
 /************************************************/
 // ASSERT Helper
@@ -90,64 +83,93 @@
 	}
 #define ASSERT(cond) assert(cond)
 
-
 /************************************************/
 // STACK helper (push & pop)
 /************************************************/
-#define STACK_POP(stack, top) { \
-	if (stack == NULL) top = NULL; \
-	else {	top = stack; 	stack=stack->next; } }
-#define STACK_PUSH(stack, entry) {\
-	entry->next = stack; stack = entry; }
+#define STACK_POP(stack, top) \
+  {                           \
+    if (stack == NULL)        \
+      top = NULL;             \
+    else {                    \
+      top = stack;            \
+      stack = stack->next;    \
+    }                         \
+  }
+#define STACK_PUSH(stack, entry) \
+  {                              \
+    entry->next = stack;         \
+    stack = entry;               \
+  }
 
 /************************************************/
 // LIST helper (read from head & write to tail)
 /************************************************/
-#define LIST_GET_HEAD(lhead, ltail, en) {\
+#define LIST_GET_HEAD(lhead, ltail, en) \
+  {                                     \
 	en = lhead; \
 	if (lhead) lhead = lhead->next; \
-	if (lhead) lhead->prev = NULL; \
-	else ltail = NULL; \
-  if (en) en->next = NULL; }
-#define LIST_PUT_TAIL(lhead, ltail, en) {\
+    if (lhead)                          \
+      lhead->prev = NULL;               \
+    else                                \
+      ltail = NULL;                     \
+    if (en) en->next = NULL;            \
+  }
+#define LIST_PUT_TAIL(lhead, ltail, en) \
+  {                                     \
 	en->next = NULL; \
 	en->prev = NULL; \
-	if (ltail) { en->prev = ltail; ltail->next = en; ltail = en; } \
-	else { lhead = en; ltail = en; }}
-#define LIST_INSERT_BEFORE(entry, newentry,lhead) { \
+    if (ltail) {                        \
+      en->prev = ltail;                 \
+      ltail->next = en;                 \
+      ltail = en;                       \
+    } else {                            \
+      lhead = en;                       \
+      ltail = en;                       \
+    }                                   \
+  }
+#define LIST_INSERT_BEFORE(entry, newentry, lhead) \
+  {                                                \
 	newentry->next = entry; \
 	newentry->prev = entry->prev; \
 	if (entry->prev) entry->prev->next = newentry; \
 	entry->prev = newentry; \
-  if (lhead == entry) lhead = newentry;}
-#define LIST_REMOVE(entry) { \
+    if (lhead == entry) lhead = newentry;          \
+  }
+#define LIST_REMOVE(entry)                            \
+  {                                                   \
 	if (entry->next) entry->next->prev = entry->prev; \
-	if (entry->prev) entry->prev->next = entry->next; }
-#define LIST_REMOVE_HT(entry, head, tail) { \
-	if (entry->next) entry->next->prev = entry->prev; \
-	else { assert(entry == tail); tail = entry->prev; } \
 	if (entry->prev) entry->prev->next = entry->next; \
-	else { assert(entry == head); head = entry->next; } \
+  }
+#define LIST_REMOVE_HT(entry, head, tail) \
+  {                                       \
+    if (entry->next)                      \
+      entry->next->prev = entry->prev;    \
+    else {                                \
+      assert(entry == tail);              \
+      tail = entry->prev;                 \
+    }                                     \
+    if (entry->prev)                      \
+      entry->prev->next = entry->next;    \
+    else {                                \
+      assert(entry == head);              \
+      head = entry->next;                 \
+    }                                     \
 }
 
 /************************************************/
 // STATS helper
 /************************************************/
 #define SET_STATS(tid, name, value) \
-	if (STATS_ENABLE && simulation->is_warmup_done()) \
-		stats._stats[tid]->name = value;
+  if (STATS_ENABLE && simulation->is_warmup_done()) stats._stats[tid]->name = value;
 
 #define INC_STATS(tid, name, value) \
-	if (STATS_ENABLE && simulation->is_warmup_done()) \
-		stats._stats[tid]->name += value;
+  if (STATS_ENABLE && simulation->is_warmup_done()) stats._stats[tid]->name += value;
 
 #define INC_STATS_ARR(tid, name, value) \
-	if (STATS_ENABLE && simulation->is_warmup_done()) \
-		stats._stats[tid]->name.insert(value);
+  if (STATS_ENABLE && simulation->is_warmup_done()) stats._stats[tid]->name.insert(value);
 
 #define INC_GLOB_STATS(name, value) \
-	if (STATS_ENABLE && simulation->is_warmup_done()) \
-		stats.name += value;
+  if (STATS_ENABLE && simulation->is_warmup_done()) stats.name += value;
 
 /************************************************/
 // mem copy helper
@@ -168,11 +190,9 @@
   memcpy(&((char*)d)[p],(char*)&v,s); \
   p += s;
 
-#define WRITE_VAL(f,v) \
-  f.write((char*)&v,sizeof(v));
+#define WRITE_VAL(f, v) f.write((char *)&v, sizeof(v));
 
-#define WRITE_VAL_SIZE(f,v,s) \
-  f.write(v,sizeof(char)*s);
+#define WRITE_VAL_SIZE(f, v, s) f.write(v, sizeof(char) * s);
 /************************************************/
 // malloc helper
 /************************************************/
@@ -185,45 +205,41 @@
 	if (g_part_alloc || THREAD_ALLOC) { \
 		for (UInt32 i = 0; i < size; i ++) {\
 			UInt32 padsize = sizeof(type) * (scale); \
-			if (g_mem_pad && padsize % CL_SIZE != 0) \
-				padsize += CL_SIZE - padsize % CL_SIZE; \
+      if (g_mem_pad && padsize % CL_SIZE != 0) padsize += CL_SIZE - padsize % CL_SIZE; \
 			name[i] = (type *) mem_allocator.alloc(padsize); \
-			for (UInt32 j = 0; j < scale; j++) \
-				new (&name[i][j]) type(); \
+      for (UInt32 j = 0; j < scale; j++) new (&name[i][j]) type();                     \
 		}\
 	} else { \
-		for (UInt32 i = 0; i < size; i++) \
-			name[i] = new type[scale]; \
+    for (UInt32 i = 0; i < size; i++) name[i] = new type[scale];                       \
 	}
 
-#define ARR_PTR(type, name, size) \
-	ARR_PTR_MULTI(type, name, size, 1)
+#define ARR_PTR(type, name, size) ARR_PTR_MULTI(type, name, size, 1)
 
 #define ARR_PTR_INIT(type, name, size, value) \
 	name = new type * [size]; \
 	if (g_part_alloc) { \
 		for (UInt32 i = 0; i < size; i ++) {\
 			int padsize = sizeof(type); \
-			if (g_mem_pad && padsize % CL_SIZE != 0) \
-				padsize += CL_SIZE - padsize % CL_SIZE; \
+      if (g_mem_pad && padsize % CL_SIZE != 0) padsize += CL_SIZE - padsize % CL_SIZE; \
 			name[i] = (type *) mem_allocator.alloc(padsize); \
 			new (name[i]) type(); \
 		}\
 	} else \
-		for (UInt32 i = 0; i < size; i++) \
-			name[i] = new type; \
-	for (UInt32 i = 0; i < size; i++) \
-		*name[i] = value; \
+    for (UInt32 i = 0; i < size; i++) name[i] = new type;                              \
+  for (UInt32 i = 0; i < size; i++) *name[i] = value;
 
-#define YCSB_QUERY_FREE(qry) \
-  qry_pool.put(qry);
+#define YCSB_QUERY_FREE(qry) qry_pool.put(qry);
 /*
   ycsb_query * query = (ycsb_query*) qry; \
   mem_allocator.free(query->part_to_access,sizeof(uint64_t)*query->part_num); \
   mem_allocator.free(query->requests,sizeof(ycsb_query)*query->request_cnt); \
   mem_allocator.free(query,sizeof(ycsb_query)); 
   */
-enum Data_type {DT_table, DT_page, DT_row };
+enum Data_type {
+  DT_table,
+  DT_page,
+  DT_row
+};
 
 // TODO currently, only DR_row supported
 // data item type. 

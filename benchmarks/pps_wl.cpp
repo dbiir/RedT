@@ -102,8 +102,7 @@ RC PPSWorkload::init_table() {
 
 RC PPSWorkload::get_txn_man(TxnManager *& txn_manager) {
   DEBUG_M("PPSWorkload::get_txn_man PPSTxnManager alloc\n");
-	txn_manager = (PPSTxnManager *)
-		mem_allocator.align_alloc( sizeof(PPSTxnManager));
+  txn_manager = (PPSTxnManager *)mem_allocator.align_alloc(sizeof(PPSTxnManager));
 	new(txn_manager) PPSTxnManager();
 	//txn_manager->init( this);
 	return RCOK;
@@ -115,8 +114,7 @@ void PPSWorkload::init_tab_parts() {
     padding[i] = 'z';
   }
   for (UInt32 id = 1; id <= g_max_part_key; id++) {
-    if (GET_NODE_ID(parts_to_partition(id)) != g_node_id) 
-      continue;
+    if (GET_NODE_ID(parts_to_partition(id)) != g_node_id) continue;
 		row_t * row;
 		uint64_t row_id;
     t_parts->get_new_row(row, 0, row_id);
@@ -146,8 +144,7 @@ void PPSWorkload::init_tab_suppliers() {
     padding[i] = 'z';
   }
   for (UInt32 id = 1; id <= g_max_supplier_key; id++) {
-    if (GET_NODE_ID(suppliers_to_partition(id)) != g_node_id) 
-      continue;
+    if (GET_NODE_ID(suppliers_to_partition(id)) != g_node_id) continue;
 		row_t * row;
 		uint64_t row_id;
     t_suppliers->get_new_row(row, 0, row_id);
@@ -175,8 +172,7 @@ void PPSWorkload::init_tab_products() {
     padding[i] = 'z';
   }
   for (UInt32 id = 1; id <= g_max_product_key; id++) {
-    if (GET_NODE_ID(products_to_partition(id)) != g_node_id) 
-      continue;
+    if (GET_NODE_ID(products_to_partition(id)) != g_node_id) continue;
 		row_t * row;
 		uint64_t row_id;
     t_products->get_new_row(row, 0, row_id);

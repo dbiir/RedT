@@ -65,16 +65,12 @@ private:
 	static uint64_t the_n;
 	static double denom;
 	double zeta_2_theta;
-
-
 };
 
 class YCSBQuery : public BaseQuery {
 public:
-  YCSBQuery() {
-  }
-  ~YCSBQuery() {
-  }
+  YCSBQuery() {}
+  ~YCSBQuery() {}
 
   void print();
   
@@ -89,7 +85,6 @@ public:
   uint64_t participants(bool *& pps,Workload * wl); 
   bool readonly();
 	
-
   //std::vector<ycsb_request> requests;
   Array<ycsb_request*> requests;
   void* orig_request;

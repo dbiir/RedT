@@ -28,9 +28,7 @@ struct mbuf {
   uint64_t cnt;
   bool wait;
 
-  void init(uint64_t dest_id) {
-    buffer = (char*)nn_allocmsg(g_msg_size,0);
-  }
+  void init(uint64_t dest_id) { buffer = (char *)nn_allocmsg(g_msg_size, 0); }
   void reset(uint64_t dest_id) {
     //buffer = (char*)nn_allocmsg(g_msg_size,0);
     //memset(buffer,0,g_msg_size);
@@ -43,20 +41,15 @@ struct mbuf {
   }
   void copy(char * p, uint64_t s) {
     assert(ptr + s <= g_msg_size);
-    if(cnt == 0)
-      starttime = get_sys_clock();
+    if (cnt == 0) starttime = get_sys_clock();
     COPY_BUF_SIZE(buffer,p,ptr,s);
     //memcpy(&((char*)buffer)[size],p,s);
     //size += s;
   }
-  bool fits(uint64_t s) {
-    return (ptr + s) <= g_msg_size;
-  }
+  bool fits(uint64_t s) { return (ptr + s) <= g_msg_size; }
   bool ready() {
-    if(cnt == 0)
-      return false;
-    if( (get_sys_clock() - starttime) >= g_msg_time_limit )
-      return true;
+    if (cnt == 0) return false;
+    if ((get_sys_clock() - starttime) >= g_msg_time_limit) return true;
     return false;
   }
 };

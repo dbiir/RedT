@@ -18,7 +18,7 @@
 #define _ABORTTHREAD_H_
 
 #include "global.h"
-
+#include "thread.h"
 class Workload;
 
 class AbortThread : public Thread {

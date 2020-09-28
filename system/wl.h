@@ -34,7 +34,6 @@ class Mvcc;
 class Workload
 {
 public:
-//	table_t * table;
 	// tables indexed by table name
   map<string, table_t *> tables;
   map<string, INDEX *> indexes;

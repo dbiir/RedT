@@ -28,9 +28,7 @@ public:
 		this->type = new char[80];
 		this->name = new char[80];
 	}
-	Column(uint64_t size, char * type, char * name, 
-		uint64_t id, uint64_t index) 
-	{
+  	Column(uint64_t size, char *type, char *name, uint64_t id, uint64_t index) {
 		this->size = size;
 		this->id = id;
 		this->index = index;
@@ -59,11 +57,19 @@ public:
  	const char * 	table_name;
  	uint32_t 	  table_id;
 	
-	UInt32 			get_tuple_size() { return tuple_size; };
+  UInt32 get_tuple_size() {
+    return tuple_size;
+  };
 	
-	uint64_t 		get_field_cnt() { return field_cnt; };
-	uint64_t 		get_field_size(int id) { return _columns[id].size; };
-	uint64_t 		get_field_index(int id) { return _columns[id].index; };
+  uint64_t get_field_cnt() {
+    return field_cnt;
+  };
+  uint64_t get_field_size(int id) {
+    return _columns[id].size;
+  };
+  uint64_t get_field_index(int id) {
+    return _columns[id].index;
+  };
 	char * 			get_field_type(uint64_t id);
 	char * 			get_field_name(uint64_t id);
 	uint64_t 		get_field_id(const char * name);

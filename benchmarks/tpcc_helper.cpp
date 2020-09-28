@@ -16,9 +16,7 @@
 
 #include "tpcc_helper.h"
 
-uint64_t distKey(uint64_t d_id, uint64_t d_w_id)  {
-	return d_w_id * g_dist_per_wh + d_id; 
-}
+uint64_t distKey(uint64_t d_id, uint64_t d_w_id) { return d_w_id * g_dist_per_wh + d_id; }
 
 uint64_t custKey(uint64_t c_id, uint64_t c_d_id, uint64_t c_w_id) {
 	return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id);
@@ -35,40 +33,25 @@ uint64_t orderPrimaryKey(uint64_t w_id, uint64_t d_id, uint64_t o_id) {
 uint64_t custNPKey(char * c_last, uint64_t c_d_id, uint64_t c_w_id) {
 	uint64_t key = 0;
 	char offset = 'A';
-	for (uint32_t i = 0; i < strlen(c_last); i++) 
-		key = (key << 1) + (c_last[i] - offset);
+  for (uint32_t i = 0; i < strlen(c_last); i++) key = (key << 1) + (c_last[i] - offset);
 	key = key << 10;
 	key += c_w_id * g_dist_per_wh + c_d_id;
 	return key;
 }
 
-uint64_t stockKey(uint64_t s_i_id, uint64_t s_w_id) {
-	return s_w_id * g_max_items + s_i_id;
-}
+uint64_t stockKey(uint64_t s_i_id, uint64_t s_w_id) { return s_w_id * g_max_items + s_i_id; }
 
-uint64_t w_from_distKey(uint64_t d_key) {
-  return d_key / g_dist_per_wh;
-}
+uint64_t w_from_distKey(uint64_t d_key) { return d_key / g_dist_per_wh; }
 
-uint64_t w_from_custKey(uint64_t c_key) {
-  return w_from_distKey(c_key / g_cust_per_dist);
-}
+uint64_t w_from_custKey(uint64_t c_key) { return w_from_distKey(c_key / g_cust_per_dist); }
 
-uint64_t w_from_orderlineKey(uint64_t s_key) {
-  return w_from_distKey(s_key / g_cust_per_dist);
-}
+uint64_t w_from_orderlineKey(uint64_t s_key) { return w_from_distKey(s_key / g_cust_per_dist); }
 
-uint64_t w_from_orderPrimaryKey(uint64_t s_key) {
-  return w_from_orderlineKey(s_key);
-}
+uint64_t w_from_orderPrimaryKey(uint64_t s_key) { return w_from_orderlineKey(s_key); }
 
-uint64_t w_from_custNPKey(uint64_t cnp_key) {
-  return (cnp_key / g_dist_per_wh) & 0x3ff;
-}
+uint64_t w_from_custNPKey(uint64_t cnp_key) { return (cnp_key / g_dist_per_wh) & 0x3ff; }
 
-uint64_t w_from_stockKey(uint64_t s_key) {
-  return s_key / g_max_items;
-}
+uint64_t w_from_stockKey(uint64_t s_key) { return s_key / g_max_items; }
 /*
 uint64_t orderKey(uint64_t o_id, uint64_t o_d_id, uint64_t o_w_id) {
 	return ((o_w_id * g_dist_per_wh + o_d_id) * ORD_PER_DIST + o_id);
@@ -81,8 +64,7 @@ uint64_t olKey(uint64_t ol_o_id, uint64_t ol_d_id,
 }
 */
 uint64_t Lastname(uint64_t num, char* name) {
-  	static const char *n[] =
-    	{"BAR", "OUGHT", "ABLE", "PRI", "PRES",
+  static const char* n[] = {"BAR", "OUGHT", "ABLE",  "PRI",   "PRES",
      	"ESE", "ANTI", "CALLY", "ATION", "EING"};
   	strcpy(name, n[num/100]);
   	strcat(name, n[(num/10)%10]);
@@ -90,13 +72,9 @@ uint64_t Lastname(uint64_t num, char* name) {
   	return strlen(name);
 }
 
-uint64_t RAND(uint64_t max) {
-	return rand() % max;
-}
+uint64_t RAND(uint64_t max) { return rand() % max; }
 
-uint64_t URand(uint64_t x, uint64_t y) {
-    return x + RAND(y - x + 1);
-}
+uint64_t URand(uint64_t x, uint64_t y) { return x + RAND(y - x + 1); }
 
 uint64_t NURand(uint64_t A, uint64_t x, uint64_t y) {
   static bool C_255_init = false;
@@ -134,16 +112,14 @@ uint64_t NURand(uint64_t A, uint64_t x, uint64_t y) {
 }
 
 uint64_t MakeAlphaString(int min, int max, char* str) {
-    char char_list[] = {'1','2','3','4','5','6','7','8','9','a','b','c',
-                        'd','e','f','g','h','i','j','k','l','m','n','o',
-                        'p','q','r','s','t','u','v','w','x','y','z','A',
-                        'B','C','D','E','F','G','H','I','J','K','L','M',
-                        'N','O','P','Q','R','S','T','U','V','W','X','Y','Z'};
+  char char_list[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd',
+                      'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q',
+                      'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D',
+                      'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
+                      'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'};
     uint64_t cnt = URand(min, max);
-    for (uint32_t i = 0; i < cnt; i++) 
-		str[i] = char_list[URand(0L, 60L)];
-    for (int i = cnt; i < max; i++)
-		str[i] = '\0';
+  for (uint32_t i = 0; i < cnt; i++) str[i] = char_list[URand(0L, 60L)];
+  for (int i = cnt; i < max; i++) str[i] = '\0';
 
     return cnt;
 }

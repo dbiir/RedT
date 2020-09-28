@@ -14,16 +14,18 @@
    limitations under the License.
 */
 
-#include "global.h"
-#include "helper.h"
 #include "stats.h"
-#include "mem_alloc.h"
-#include "client_txn.h"
-#include "work_queue.h"
-#include "stats_array.h"
-#include <time.h>
+
 #include <sys/times.h>
 #include <sys/vtimes.h>
+#include <time.h>
+
+#include "client_txn.h"
+#include "global.h"
+#include "helper.h"
+#include "mem_alloc.h"
+#include "stats_array.h"
+#include "work_queue.h"
 
 void Stats_thd::init(uint64_t thd_id) {
   DEBUG_M("Stats_thd::init part_cnt alloc\n");
@@ -217,8 +219,11 @@ void Stats_thd::clear() {
   sched_txn_table_time=0;
   sched_epoch_cnt=0;
   sched_epoch_diff=0;
-
-
+  // DLI_MVCC_OCC
+  dli_mvcc_occ_validate_time = 0;
+  dli_mvcc_occ_check_cnt = 0;
+  dli_mvcc_occ_abort_check_cnt = 0;
+  dli_mvcc_occ_ts_abort_cnt = 0;
   //OCC
   occ_validate_time=0;
   occ_cs_wait_time=0;
@@ -231,6 +236,7 @@ void Stats_thd::clear() {
   occ_abort_check_cnt=0;
   occ_ts_abort_cnt=0;
   occ_finish_time=0;
+
   // WSI
   wsi_validate_time=0;
   wsi_cs_wait_time=0;
@@ -249,10 +255,17 @@ void Stats_thd::clear() {
   maat_range=0;
   maat_commit_cnt=0;
 
-  // // SSI
-  // ssi_validate_cnt=0;
-  // ssi_validate_time=0;
-  // ssi_commit_cnt=0;
+  // DTA
+  dta_validate_cnt = 0;
+  dta_validate_time = 0;
+  dta_cs_wait_time = 0;
+  dta_case1_cnt = 0;
+  dta_case2_cnt = 0;
+  dta_case3_cnt = 0;
+  dta_case4_cnt = 0;
+  dta_case5_cnt = 0;
+  dta_range = 0;
+  dta_commit_cnt = 0;
 
   // WKDB
   wkdb_validate_cnt=0;
@@ -329,21 +342,27 @@ void Stats_thd::clear() {
   lat_s_rem_cc_time=0;
   lat_s_rem_process_time=0;
 
+  ano_2_trans_write_skew_1 = 0;
+  ano_2_trans_write_skew_2 = 0;
+  ano_3_trans_write_skew_1 = 0;
+  ano_3_trans_write_skew_2 = 0;
+  ano_2_trans_read_skew = 0;
+  ano_3_trans_read_skew_1 = 0;
+  ano_3_trans_read_skew_2 = 0;
+  ano_4_trans_read_skew = 0;
+  ano_unknown = 0;
+
   client_client_latency.clear();
     last_start_commit_latency.clear();
     first_start_commit_latency.clear();
     start_abort_commit_latency.clear();
-
-
 }
 
 void Stats_thd::print_client(FILE * outf, bool prog) {
   double txn_run_avg_time = 0;
   double tput = 0;
-  if(txn_cnt > 0)
-    txn_run_avg_time = txn_run_time / txn_cnt;
-  if(total_runtime > 0) 
-    tput = txn_cnt / (total_runtime / BILLION);
+  if (txn_cnt > 0) txn_run_avg_time = txn_run_time / txn_cnt;
+  if (total_runtime > 0) tput = txn_cnt / (total_runtime / BILLION);
   fprintf(outf,
       "total_runtime=%f"
       ",tput=%f"
@@ -351,15 +370,9 @@ void Stats_thd::print_client(FILE * outf, bool prog) {
       ",txn_sent_cnt=%ld"
       ",txn_run_time=%f"
       ",txn_run_avg_time=%f"
-      ",cl_send_intv=%f"
-      ,total_runtime/BILLION
-      ,tput
-      ,txn_cnt
-      ,txn_sent_cnt
-      ,txn_run_time / BILLION
-      ,txn_run_avg_time / BILLION
-      ,cl_send_intv / BILLION
-  );
+          ",cl_send_intv=%f",
+          total_runtime / BILLION, tput, txn_cnt, txn_sent_cnt, txn_run_time / BILLION,
+          txn_run_avg_time / BILLION, cl_send_intv / BILLION);
   // IO
   double mbuf_send_intv_time_avg = 0;
   double msg_unpack_time_avg = 0;
@@ -368,8 +381,7 @@ void Stats_thd::print_client(FILE * outf, bool prog) {
   double msg_batch_size_msgs_avg = 0;
   double msg_batch_size_bytes_avg = 0;
   double msg_queue_delay_time_avg = 0;
-  if(msg_queue_cnt > 0)
-    msg_queue_delay_time_avg = msg_queue_delay_time / msg_queue_cnt;
+  if (msg_queue_cnt > 0) msg_queue_delay_time_avg = msg_queue_delay_time / msg_queue_cnt;
   if(msg_batch_cnt > 0) {
     mbuf_send_intv_time_avg = mbuf_send_intv_time / msg_batch_cnt;
     msg_batch_size_msgs_avg = msg_batch_size_msgs / msg_batch_cnt;
@@ -405,31 +417,15 @@ void Stats_thd::print_client(FILE * outf, bool prog) {
   ",msg_unpack_time_avg=%f"
   ",mbuf_send_intv_time=%f"
   ",mbuf_send_intv_time_avg=%f"
-  ",msg_copy_output_time=%f"
-  ,msg_queue_delay_time / BILLION
-  ,msg_queue_cnt
-  ,msg_queue_enq_cnt
-  ,msg_queue_delay_time_avg / BILLION
-  ,msg_send_time / BILLION
-  ,msg_send_time_avg / BILLION
-  ,msg_recv_time / BILLION
-  ,msg_recv_time_avg / BILLION
-  ,msg_recv_idle_time / BILLION
-  ,msg_batch_cnt
-  ,msg_batch_size_msgs
-  ,msg_batch_size_msgs_avg
-  ,msg_batch_size_bytes
-  ,msg_batch_size_bytes_avg
-  ,msg_batch_size_bytes_to_server
-  ,msg_batch_size_bytes_to_client
-  ,msg_send_cnt
-  ,msg_recv_cnt
-  ,msg_unpack_time / BILLION
-  ,msg_unpack_time_avg / BILLION
-  ,mbuf_send_intv_time / BILLION
-  ,mbuf_send_intv_time_avg / BILLION
-  ,msg_copy_output_time / BILLION
-  );
+          ",msg_copy_output_time=%f",
+          msg_queue_delay_time / BILLION, msg_queue_cnt, msg_queue_enq_cnt,
+          msg_queue_delay_time_avg / BILLION, msg_send_time / BILLION, msg_send_time_avg / BILLION,
+          msg_recv_time / BILLION, msg_recv_time_avg / BILLION, msg_recv_idle_time / BILLION,
+          msg_batch_cnt, msg_batch_size_msgs, msg_batch_size_msgs_avg, msg_batch_size_bytes,
+          msg_batch_size_bytes_avg, msg_batch_size_bytes_to_server, msg_batch_size_bytes_to_client,
+          msg_send_cnt, msg_recv_cnt, msg_unpack_time / BILLION, msg_unpack_time_avg / BILLION,
+          mbuf_send_intv_time / BILLION, mbuf_send_intv_time_avg / BILLION,
+          msg_copy_output_time / BILLION);
 
   if (!prog) {
   client_client_latency.quicksort(0,client_client_latency.cnt-1);
@@ -446,40 +442,34 @@ void Stats_thd::print_client(FILE * outf, bool prog) {
           ",ccl97=%f"
           ",ccl98=%f"
           ",ccl99=%f"
-          ",ccl100=%f"
-          ,(double)client_client_latency.get_idx(0) / BILLION
-          ,(double)client_client_latency.get_percentile(1) / BILLION
-          ,(double)client_client_latency.get_percentile(10) / BILLION
-          ,(double)client_client_latency.get_percentile(25) / BILLION
-          ,(double)client_client_latency.get_percentile(50) / BILLION
-          ,(double)client_client_latency.get_percentile(75) / BILLION
-          ,(double)client_client_latency.get_percentile(90) / BILLION
-          ,(double)client_client_latency.get_percentile(95) / BILLION
-          ,(double)client_client_latency.get_percentile(96) / BILLION
-          ,(double)client_client_latency.get_percentile(97) / BILLION
-          ,(double)client_client_latency.get_percentile(98) / BILLION
-          ,(double)client_client_latency.get_percentile(99) / BILLION
-          ,(double)client_client_latency.get_idx(client_client_latency.cnt-1) / BILLION
-          );
+            ",ccl100=%f",
+            (double)client_client_latency.get_idx(0) / BILLION,
+            (double)client_client_latency.get_percentile(1) / BILLION,
+            (double)client_client_latency.get_percentile(10) / BILLION,
+            (double)client_client_latency.get_percentile(25) / BILLION,
+            (double)client_client_latency.get_percentile(50) / BILLION,
+            (double)client_client_latency.get_percentile(75) / BILLION,
+            (double)client_client_latency.get_percentile(90) / BILLION,
+            (double)client_client_latency.get_percentile(95) / BILLION,
+            (double)client_client_latency.get_percentile(96) / BILLION,
+            (double)client_client_latency.get_percentile(97) / BILLION,
+            (double)client_client_latency.get_percentile(98) / BILLION,
+            (double)client_client_latency.get_percentile(99) / BILLION,
+            (double)client_client_latency.get_idx(client_client_latency.cnt - 1) / BILLION);
   }
 
   //client_client_latency.print(outf);
-
 }
 
 void Stats_thd::print(FILE * outf, bool prog) {
-  fprintf(outf,
-      "total_runtime=%f"
-      ,total_runtime/BILLION
-  );
+  fprintf(outf, "total_runtime=%f", total_runtime / BILLION);
   // Execution
   double tput = 0;
   double txn_run_avg_time = 0;
   double multi_part_txn_avg_time = 0;
   double single_part_txn_avg_time = 0;
   double avg_parts_touched = 0;
-  if(total_runtime > 0) 
-    tput = txn_cnt / (total_runtime / BILLION);
+  if (total_runtime > 0) tput = txn_cnt / (total_runtime / BILLION);
   if(txn_cnt > 0) {
     txn_run_avg_time = txn_run_time / txn_cnt;
     avg_parts_touched = ((double)parts_touched) / txn_cnt;
@@ -498,6 +488,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",local_txn_commit_cnt=%ld"
   ",remote_txn_commit_cnt=%ld"
   ",total_txn_abort_cnt=%ld"
+          ",positive_txn_abort_cnt=%ld"
   ",unique_txn_abort_cnt=%ld"
   ",local_txn_abort_cnt=%ld"
   ",remote_txn_abort_cnt=%ld"
@@ -512,32 +503,14 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",txn_write_cnt=%ld"
   ",record_write_cnt=%ld"
   ",parts_touched=%ld"
-  ",avg_parts_touched=%f"
-  ,tput
-  ,txn_cnt
-  ,remote_txn_cnt
-  ,local_txn_cnt
-  ,local_txn_start_cnt
-  ,total_txn_commit_cnt
-  ,local_txn_commit_cnt
-  ,remote_txn_commit_cnt
-  ,total_txn_abort_cnt
-  ,unique_txn_abort_cnt
-  ,local_txn_abort_cnt
-  ,remote_txn_abort_cnt
-  ,txn_run_time / BILLION
-  ,txn_run_avg_time / BILLION
-  ,multi_part_txn_cnt
-  ,multi_part_txn_run_time / BILLION
-  ,multi_part_txn_avg_time / BILLION
-  ,single_part_txn_cnt
-  ,single_part_txn_run_time / BILLION
-  ,single_part_txn_avg_time / BILLION
-  ,txn_write_cnt
-  ,record_write_cnt
-  ,parts_touched
-  ,avg_parts_touched
-  );
+          ",avg_parts_touched=%f",
+          tput, txn_cnt, remote_txn_cnt, local_txn_cnt, local_txn_start_cnt, total_txn_commit_cnt,
+          local_txn_commit_cnt, remote_txn_commit_cnt, total_txn_abort_cnt,positive_txn_abort_cnt, unique_txn_abort_cnt,
+          local_txn_abort_cnt, remote_txn_abort_cnt, txn_run_time / BILLION,
+          txn_run_avg_time / BILLION, multi_part_txn_cnt, multi_part_txn_run_time / BILLION,
+          multi_part_txn_avg_time / BILLION, single_part_txn_cnt,
+          single_part_txn_run_time / BILLION, single_part_txn_avg_time / BILLION, txn_write_cnt,
+          record_write_cnt, parts_touched, avg_parts_touched);
 
   // Breakdown
   fprintf(outf,
@@ -546,14 +519,9 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",txn_manager_time=%f"
   ",txn_index_time=%f"
   ",txn_validate_time=%f"
-  ",txn_cleanup_time=%f"
-  ,ts_alloc_time / BILLION
-  ,abort_time / BILLION
-  ,txn_manager_time / BILLION
-  ,txn_index_time / BILLION
-  ,txn_validate_time / BILLION
-  ,txn_cleanup_time / BILLION
-  );
+          ",txn_cleanup_time=%f",
+          ts_alloc_time / BILLION, abort_time / BILLION, txn_manager_time / BILLION,
+          txn_index_time / BILLION, txn_validate_time / BILLION, txn_cleanup_time / BILLION);
 
   // Transaction stats
   double txn_total_process_time_avg=0;
@@ -590,24 +558,15 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",txn_total_remote_wait_time_avg=%f"
   ",txn_remote_wait_time_avg=%f"
   ",txn_total_twopc_time_avg=%f"
-  ",txn_twopc_time_avg=%f"
-  ,txn_total_process_time / BILLION
-  ,txn_process_time / BILLION
-  ,txn_total_local_wait_time / BILLION
-  ,txn_local_wait_time / BILLION
-  ,txn_total_remote_wait_time / BILLION
-  ,txn_remote_wait_time / BILLION
-  ,txn_total_twopc_time / BILLION
-  ,txn_twopc_time / BILLION
-  ,txn_total_process_time_avg / BILLION
-  ,txn_process_time_avg / BILLION
-  ,txn_total_local_wait_time_avg / BILLION
-  ,txn_local_wait_time_avg / BILLION
-  ,txn_total_remote_wait_time_avg / BILLION
-  ,txn_remote_wait_time_avg / BILLION
-  ,txn_total_twopc_time_avg / BILLION
-  ,txn_twopc_time_avg / BILLION
-  );
+          ",txn_twopc_time_avg=%f",
+          txn_total_process_time / BILLION, txn_process_time / BILLION,
+          txn_total_local_wait_time / BILLION, txn_local_wait_time / BILLION,
+          txn_total_remote_wait_time / BILLION, txn_remote_wait_time / BILLION,
+          txn_total_twopc_time / BILLION, txn_twopc_time / BILLION,
+          txn_total_process_time_avg / BILLION, txn_process_time_avg / BILLION,
+          txn_total_local_wait_time_avg / BILLION, txn_local_wait_time_avg / BILLION,
+          txn_total_remote_wait_time_avg / BILLION, txn_remote_wait_time_avg / BILLION,
+          txn_total_twopc_time_avg / BILLION, txn_twopc_time_avg / BILLION);
 
   // Abort queue
   double abort_queue_penalty_avg = 0;
@@ -626,16 +585,11 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",abort_queue_penalty_avg=%f"
   ",abort_queue_penalty_extra_avg=%f"
   // Abort queue
-  ,abort_queue_enqueue_cnt
-  ,abort_queue_dequeue_cnt
-  ,abort_queue_enqueue_time / BILLION
-  ,abort_queue_dequeue_time / BILLION
-  ,abort_queue_penalty / BILLION
-  ,abort_queue_penalty_extra / BILLION
-  ,abort_queue_penalty_avg / BILLION
-  ,abort_queue_penalty_extra_avg / BILLION
-  );
-
+          ,
+          abort_queue_enqueue_cnt, abort_queue_dequeue_cnt, abort_queue_enqueue_time / BILLION,
+          abort_queue_dequeue_time / BILLION, abort_queue_penalty / BILLION,
+          abort_queue_penalty_extra / BILLION, abort_queue_penalty_avg / BILLION,
+          abort_queue_penalty_extra_avg / BILLION);
 
   double work_queue_wait_avg_time = 0;
   double work_queue_mtx_wait_avg = 0;
@@ -665,29 +619,18 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",work_queue_old_wait_avg_time=%f"
   ",work_queue_enqueue_time=%f"
   ",work_queue_dequeue_time=%f"
-  ",work_queue_conflict_cnt=%ld"
-  ,work_queue_wait_time / BILLION
-  ,work_queue_cnt
-  ,work_queue_enq_cnt
-  ,work_queue_wait_avg_time / BILLION
-  ,work_queue_mtx_wait_time / BILLION
-  ,work_queue_mtx_wait_avg / BILLION
-  ,work_queue_new_cnt
-  ,work_queue_new_wait_time / BILLION
-  ,work_queue_new_wait_avg_time / BILLION
-  ,work_queue_old_cnt
-  ,work_queue_old_wait_time / BILLION
-  ,work_queue_old_wait_avg_time / BILLION
-  ,work_queue_enqueue_time / BILLION
-  ,work_queue_dequeue_time / BILLION
-  ,work_queue_conflict_cnt
-  );
-
+          ",work_queue_conflict_cnt=%ld",
+          work_queue_wait_time / BILLION, work_queue_cnt, work_queue_enq_cnt,
+          work_queue_wait_avg_time / BILLION, work_queue_mtx_wait_time / BILLION,
+          work_queue_mtx_wait_avg / BILLION, work_queue_new_cnt, work_queue_new_wait_time / BILLION,
+          work_queue_new_wait_avg_time / BILLION, work_queue_old_cnt,
+          work_queue_old_wait_time / BILLION, work_queue_old_wait_avg_time / BILLION,
+          work_queue_enqueue_time / BILLION, work_queue_dequeue_time / BILLION,
+          work_queue_conflict_cnt);
 
   // Worker thread
   double worker_process_avg_time = 0;
-  if(worker_process_cnt > 0)
-    worker_process_avg_time = worker_process_time / worker_process_cnt;
+  if (worker_process_cnt > 0) worker_process_avg_time = worker_process_time / worker_process_cnt;
   fprintf(outf,
     ",worker_idle_time=%f"
     ",worker_activate_txn_time=%f"
@@ -695,24 +638,15 @@ void Stats_thd::print(FILE * outf, bool prog) {
     ",worker_release_msg_time=%f"
     ",worker_process_time=%f"
     ",worker_process_cnt=%ld"
-    ",worker_process_avg_time=%f"
-    ,worker_idle_time / BILLION
-    ,worker_activate_txn_time / BILLION
-    ,worker_deactivate_txn_time / BILLION
-    ,worker_release_msg_time / BILLION
-    ,worker_process_time / BILLION
-    ,worker_process_cnt
-    ,worker_process_avg_time / BILLION
-  );
+          ",worker_process_avg_time=%f",
+          worker_idle_time / BILLION, worker_activate_txn_time / BILLION,
+          worker_deactivate_txn_time / BILLION, worker_release_msg_time / BILLION,
+          worker_process_time / BILLION, worker_process_cnt, worker_process_avg_time / BILLION);
   for(uint64_t i = 0; i < NO_MSG; i ++) {
     fprintf(outf,
       ",proc_cnt_type%ld=%ld"
-      ",proc_time_type%ld=%f"
-      ,i
-      ,worker_process_cnt_by_type[i]
-      ,i
-      ,worker_process_time_by_type[i] / BILLION
-    );
+            ",proc_time_type%ld=%f",
+            i, worker_process_cnt_by_type[i], i, worker_process_time_by_type[i] / BILLION);
   }
 
   for(uint64_t i = 0; i < SECOND; i ++) {
@@ -756,8 +690,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   double msg_batch_size_msgs_avg = 0;
   double msg_batch_size_bytes_avg = 0;
   double msg_queue_delay_time_avg = 0;
-  if(msg_queue_cnt > 0)
-    msg_queue_delay_time_avg = msg_queue_delay_time / msg_queue_cnt;
+  if (msg_queue_cnt > 0) msg_queue_delay_time_avg = msg_queue_delay_time / msg_queue_cnt;
   if(msg_batch_cnt > 0) {
     mbuf_send_intv_time_avg = mbuf_send_intv_time / msg_batch_cnt;
     msg_batch_size_msgs_avg = msg_batch_size_msgs / msg_batch_cnt;
@@ -793,49 +726,28 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",msg_unpack_time_avg=%f"
   ",mbuf_send_intv_time=%f"
   ",mbuf_send_intv_time_avg=%f"
-  ",msg_copy_output_time=%f"
-  ,msg_queue_delay_time / BILLION
-  ,msg_queue_cnt
-  ,msg_queue_enq_cnt
-  ,msg_queue_delay_time_avg / BILLION
-  ,msg_send_time / BILLION
-  ,msg_send_time_avg / BILLION
-  ,msg_recv_time / BILLION
-  ,msg_recv_time_avg / BILLION
-  ,msg_recv_idle_time / BILLION
-  ,msg_batch_cnt
-  ,msg_batch_size_msgs
-  ,msg_batch_size_msgs_avg
-  ,msg_batch_size_bytes
-  ,msg_batch_size_bytes_avg
-  ,msg_batch_size_bytes_to_server
-  ,msg_batch_size_bytes_to_client
-  ,msg_send_cnt
-  ,msg_recv_cnt
-  ,msg_unpack_time / BILLION
-  ,msg_unpack_time_avg / BILLION
-  ,mbuf_send_intv_time / BILLION
-  ,mbuf_send_intv_time_avg / BILLION
-  ,msg_copy_output_time / BILLION
-  );
+          ",msg_copy_output_time=%f",
+          msg_queue_delay_time / BILLION, msg_queue_cnt, msg_queue_enq_cnt,
+          msg_queue_delay_time_avg / BILLION, msg_send_time / BILLION, msg_send_time_avg / BILLION,
+          msg_recv_time / BILLION, msg_recv_time_avg / BILLION, msg_recv_idle_time / BILLION,
+          msg_batch_cnt, msg_batch_size_msgs, msg_batch_size_msgs_avg, msg_batch_size_bytes,
+          msg_batch_size_bytes_avg, msg_batch_size_bytes_to_server, msg_batch_size_bytes_to_client,
+          msg_send_cnt, msg_recv_cnt, msg_unpack_time / BILLION, msg_unpack_time_avg / BILLION,
+          mbuf_send_intv_time / BILLION, mbuf_send_intv_time_avg / BILLION,
+          msg_copy_output_time / BILLION);
 
   // Concurrency control, general
   fprintf(outf,
     ",cc_conflict_cnt=%ld"
     ",txn_wait_cnt=%ld"
-    ",txn_conflict_cnt=%ld"
-    ,cc_conflict_cnt
-    ,txn_wait_cnt
-    ,txn_conflict_cnt
-  );
+          ",txn_conflict_cnt=%ld",
+          cc_conflict_cnt, txn_wait_cnt, txn_conflict_cnt);
 
   // 2PL
   double twopl_sh_owned_avg_time = 0;
-  if(twopl_sh_owned_cnt > 0)
-    twopl_sh_owned_avg_time = twopl_sh_owned_time / twopl_sh_owned_cnt;
+  if (twopl_sh_owned_cnt > 0) twopl_sh_owned_avg_time = twopl_sh_owned_time / twopl_sh_owned_cnt;
   double twopl_ex_owned_avg_time = 0;
-  if(twopl_ex_owned_cnt > 0)
-    twopl_ex_owned_avg_time = twopl_ex_owned_time / twopl_ex_owned_cnt;
+  if (twopl_ex_owned_cnt > 0) twopl_ex_owned_avg_time = twopl_ex_owned_time / twopl_ex_owned_cnt;
   fprintf(outf,
     ",twopl_already_owned_cnt=%ld"
     ",twopl_owned_cnt=%ld"
@@ -852,32 +764,19 @@ void Stats_thd::print(FILE * outf, bool prog) {
     ",twopl_getlock_cnt=%ld"
     ",twopl_getlock_time=%f"
     ",twopl_release_cnt=%ld"
-    ",twopl_release_time=%f"
-    ,twopl_already_owned_cnt
-    ,twopl_owned_cnt
-    ,twopl_sh_owned_cnt
-    ,twopl_ex_owned_cnt
-    ,twopl_sh_bypass_cnt
-    ,twopl_owned_time / BILLION
-    ,twopl_sh_owned_time / BILLION
-    ,twopl_ex_owned_time / BILLION
-    ,twopl_sh_owned_avg_time / BILLION
-    ,twopl_ex_owned_avg_time / BILLION
-    ,twopl_diff_time / BILLION
-    ,twopl_wait_time / BILLION
-    ,twopl_getlock_cnt
-    ,twopl_getlock_time / BILLION
-    ,twopl_release_cnt 
-    ,twopl_release_time / BILLION
-  );
+          ",twopl_release_time=%f",
+          twopl_already_owned_cnt, twopl_owned_cnt, twopl_sh_owned_cnt, twopl_ex_owned_cnt,
+          twopl_sh_bypass_cnt, twopl_owned_time / BILLION, twopl_sh_owned_time / BILLION,
+          twopl_ex_owned_time / BILLION, twopl_sh_owned_avg_time / BILLION,
+          twopl_ex_owned_avg_time / BILLION, twopl_diff_time / BILLION, twopl_wait_time / BILLION,
+          twopl_getlock_cnt, twopl_getlock_time / BILLION, twopl_release_cnt,
+          twopl_release_time / BILLION);
 
   // Calvin
   double seq_queue_wait_avg_time = 0;
-  if(seq_queue_cnt > 0)
-    seq_queue_wait_avg_time = seq_queue_wait_time / seq_queue_cnt;
+  if (seq_queue_cnt > 0) seq_queue_wait_avg_time = seq_queue_wait_time / seq_queue_cnt;
   double sched_queue_wait_avg_time = 0;
-  if(sched_queue_cnt > 0)
-    sched_queue_wait_avg_time = sched_queue_wait_time / sched_queue_cnt;
+  if (sched_queue_cnt > 0) sched_queue_wait_avg_time = sched_queue_wait_time / sched_queue_cnt;
   fprintf(outf,
   ",seq_txn_cnt=%ld"
   ",seq_batch_cnt=%ld"
@@ -905,35 +804,25 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",sched_idle_time=%f"
   ",sched_txn_table_time=%f"
   ",sched_epoch_cnt=%ld"
-  ",sched_epoch_diff=%f"
-  ,seq_txn_cnt
-  ,seq_batch_cnt
-  ,seq_full_batch_cnt
-  ,seq_ack_time /BILLION
-  ,seq_batch_time /BILLION
-  ,seq_process_cnt 
-  ,seq_complete_cnt 
-  ,seq_process_time /BILLION
-  ,seq_prep_time /BILLION
-  ,seq_idle_time /BILLION
-  ,seq_queue_wait_time /BILLION
-  ,seq_queue_cnt
-  ,seq_queue_enq_cnt
-  ,seq_queue_wait_avg_time /BILLION
-  ,seq_queue_enqueue_time /BILLION
-  ,seq_queue_dequeue_time /BILLION
-  ,sched_queue_wait_time /BILLION
-  ,sched_queue_cnt
-  ,sched_queue_enq_cnt
-  ,sched_queue_wait_avg_time /BILLION
-  ,sched_queue_enqueue_time /BILLION
-  ,sched_queue_dequeue_time /BILLION
-  ,calvin_sched_time /BILLION
-  ,sched_idle_time /BILLION
-  ,sched_txn_table_time /BILLION
-  ,sched_epoch_cnt
-  ,sched_epoch_diff /BILLION
-  );
+          ",sched_epoch_diff=%f",
+          seq_txn_cnt, seq_batch_cnt, seq_full_batch_cnt, seq_ack_time / BILLION,
+          seq_batch_time / BILLION, seq_process_cnt, seq_complete_cnt, seq_process_time / BILLION,
+          seq_prep_time / BILLION, seq_idle_time / BILLION, seq_queue_wait_time / BILLION,
+          seq_queue_cnt, seq_queue_enq_cnt, seq_queue_wait_avg_time / BILLION,
+          seq_queue_enqueue_time / BILLION, seq_queue_dequeue_time / BILLION,
+          sched_queue_wait_time / BILLION, sched_queue_cnt, sched_queue_enq_cnt,
+          sched_queue_wait_avg_time / BILLION, sched_queue_enqueue_time / BILLION,
+          sched_queue_dequeue_time / BILLION, calvin_sched_time / BILLION,
+          sched_idle_time / BILLION, sched_txn_table_time / BILLION, sched_epoch_cnt,
+          sched_epoch_diff / BILLION);
+  // DLI_MVCC_OCC
+  fprintf(outf,
+          ",dli_mvcc_occ_validate_time=%f"
+          ",dli_mvcc_occ_check_cnt=%ld"
+          ",dli_mvcc_occ_abort_check_cnt=%ld"
+          ",dli_mvcc_occ_ts_abort_cnt=%ld",
+          dli_mvcc_occ_validate_time / BILLION, dli_mvcc_occ_check_cnt,
+          dli_mvcc_occ_abort_check_cnt, dli_mvcc_occ_ts_abort_cnt);
   //OCC
   fprintf(outf,
   ",occ_validate_time=%f"
@@ -946,27 +835,18 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",occ_check_cnt=%ld"
   ",occ_abort_check_cnt=%ld"
   ",occ_ts_abort_cnt=%ld"
-  ",occ_finish_time=%f"
-  ,occ_validate_time / BILLION
-  ,occ_cs_wait_time / BILLION
-  ,occ_cs_time / BILLION
-  ,occ_hist_validate_time / BILLION
-  ,occ_act_validate_time / BILLION
-  ,occ_hist_validate_fail_time / BILLION
-  ,occ_act_validate_fail_time / BILLION
-  ,occ_check_cnt
-  ,occ_abort_check_cnt
-  ,occ_ts_abort_cnt
-  ,occ_finish_time / BILLION
-  );
+          ",occ_finish_time=%f",
+          occ_validate_time / BILLION, occ_cs_wait_time / BILLION, occ_cs_time / BILLION,
+          occ_hist_validate_time / BILLION, occ_act_validate_time / BILLION,
+          occ_hist_validate_fail_time / BILLION, occ_act_validate_fail_time / BILLION,
+          occ_check_cnt, occ_abort_check_cnt, occ_ts_abort_cnt, occ_finish_time / BILLION);
 
   //MAAT
   double maat_range_avg = 0;
   double maat_validate_avg = 0;
   double maat_cs_wait_avg = 0;
   uint64_t maat_commit_avg = 0;
-  if(maat_commit_cnt > 0)
-    maat_range_avg = maat_range / maat_commit_cnt;
+  if (maat_commit_cnt > 0) maat_range_avg = maat_range / maat_commit_cnt;
   if(maat_validate_cnt > 0) {
     maat_validate_avg = maat_validate_time / maat_validate_cnt;
     maat_cs_wait_avg = maat_cs_wait_time / maat_validate_cnt;
@@ -986,73 +866,46 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",maat_range=%f"
   ",maat_commit_cnt=%ld"
   ",maat_commit_avg=%ld"
-  ",maat_range_avg=%f"
-  ,maat_validate_cnt
-  ,maat_validate_time / BILLION
-  ,maat_validate_avg / BILLION
-  ,maat_cs_wait_time / BILLION
-  ,maat_cs_wait_avg / BILLION
-  ,maat_case1_cnt
-  ,maat_case2_cnt
-  ,maat_case3_cnt
-  ,maat_case4_cnt
-  ,maat_case5_cnt
-  ,maat_range / BILLION
-  ,maat_commit_cnt
-  ,maat_commit_avg
-  ,maat_range_avg
-  );
-
-  //WKDB
-  double wkdb_range_avg = 0;
-  double wkdb_validate_avg = 0;
-  double wkdb_cs_wait_avg = 0;
-  uint64_t wkdb_commit_avg = 0;
-  if(wkdb_commit_cnt > 0)
-    wkdb_range_avg = wkdb_range / wkdb_commit_cnt;
-  if(wkdb_validate_cnt > 0) {
-    wkdb_validate_avg = wkdb_validate_time / wkdb_validate_cnt;
-    wkdb_cs_wait_avg = wkdb_cs_wait_time / wkdb_validate_cnt;
-    wkdb_commit_avg = wkdb_commit_cnt / wkdb_validate_cnt;
+          ",maat_range_avg=%f",
+          maat_validate_cnt, maat_validate_time / BILLION, maat_validate_avg / BILLION,
+          maat_cs_wait_time / BILLION, maat_cs_wait_avg / BILLION, maat_case1_cnt, maat_case2_cnt,
+          maat_case3_cnt, maat_case4_cnt, maat_case5_cnt, maat_range / BILLION, maat_commit_cnt,
+          maat_commit_avg, maat_range_avg);
+  // DTA
+  double dta_range_avg = 0;
+  double dta_validate_avg = 0;
+  double dta_cs_wait_avg = 0;
+  uint64_t dta_commit_avg = 0;
+  if (dta_commit_cnt > 0) dta_range_avg = dta_range / dta_commit_cnt;
+  if (dta_validate_cnt > 0) {
+    dta_validate_avg = dta_validate_time / dta_validate_cnt;
+    dta_cs_wait_avg = dta_cs_wait_time / dta_validate_cnt;
+    dta_commit_avg = dta_commit_cnt / dta_validate_cnt;
   }
   fprintf(outf,
-  ",wkdb_validate_cnt=%ld"
-  ",wkdb_validate_time=%f"
-  ",wkdb_validate_avg=%f"
-  ",wkdb_cs_wait_time=%f"
-  ",wkdb_cs_wait_avg=%f"
-  ",wkdb_case1_cnt=%ld"
-  ",wkdb_case2_cnt=%ld"
-  ",wkdb_case3_cnt=%ld"
-  ",wkdb_case4_cnt=%ld"
-  ",wkdb_case5_cnt=%ld"
-  ",wkdb_range=%f"
-  ",wkdb_commit_cnt=%ld"
-  ",wkdb_commit_avg=%ld"
-  ",wkdb_range_avg=%f"
-  ,wkdb_validate_cnt
-  ,wkdb_validate_time / BILLION
-  ,wkdb_validate_avg / BILLION
-  ,wkdb_cs_wait_time / BILLION
-  ,wkdb_cs_wait_avg / BILLION
-  ,wkdb_case1_cnt
-  ,wkdb_case2_cnt
-  ,wkdb_case3_cnt
-  ,wkdb_case4_cnt
-  ,wkdb_case5_cnt
-  ,wkdb_range / BILLION
-  ,wkdb_commit_cnt
-  ,wkdb_commit_avg
-  ,wkdb_range_avg
-  );
-
+          ",dta_validate_cnt=%ld"
+          ",dta_validate_time=%f"
+          ",dta_validate_avg=%f"
+          ",dta_cs_wait_time=%f"
+          ",dta_cs_wait_avg=%f"
+          ",dta_case1_cnt=%ld"
+          ",dta_case2_cnt=%ld"
+          ",dta_case3_cnt=%ld"
+          ",dta_case4_cnt=%ld"
+          ",dta_case5_cnt=%ld"
+          ",dta_range=%f"
+          ",dta_commit_cnt=%ld"
+          ",dta_commit_avg=%ld"
+          ",dta_range_avg=%f",
+          dta_validate_cnt, dta_validate_time / BILLION, dta_validate_avg / BILLION,
+          dta_cs_wait_time / BILLION, dta_cs_wait_avg / BILLION, dta_case1_cnt, dta_case2_cnt,
+          dta_case3_cnt, dta_case4_cnt, dta_case5_cnt, dta_range / BILLION, dta_commit_cnt,
+          dta_commit_avg, dta_range_avg);
   // Logging
   double log_write_avg_time = 0;
-  if(log_write_cnt > 0)
-    log_write_avg_time = log_write_time / log_write_cnt;
+  if (log_write_cnt > 0) log_write_avg_time = log_write_time / log_write_cnt;
   double log_flush_avg_time = 0;
-  if(log_flush_cnt > 0)
-    log_flush_avg_time = log_flush_time / log_flush_cnt;
+  if (log_flush_cnt > 0) log_flush_avg_time = log_flush_time / log_flush_cnt;
   fprintf(outf,
     ",log_write_cnt=%ld"
     ",log_write_time=%f"
@@ -1060,20 +913,13 @@ void Stats_thd::print(FILE * outf, bool prog) {
     ",log_flush_cnt=%ld"
     ",log_flush_time=%f"
     ",log_flush_avg_time=%f"
-    ",log_process_time=%f"
-    ,log_write_cnt
-    ,log_write_time / BILLION
-    ,log_write_avg_time / BILLION
-    ,log_flush_cnt
-    ,log_flush_time / BILLION
-    ,log_flush_avg_time / BILLION
-    ,log_process_time / BILLION
-  );
+          ",log_process_time=%f",
+          log_write_cnt, log_write_time / BILLION, log_write_avg_time / BILLION, log_flush_cnt,
+          log_flush_time / BILLION, log_flush_avg_time / BILLION, log_process_time / BILLION);
 
   // Transaction Table
   double txn_table_get_avg_time = 0;
-  if(txn_table_get_cnt > 0)
-    txn_table_get_avg_time = txn_table_get_time / txn_table_get_cnt;
+  if (txn_table_get_cnt > 0) txn_table_get_avg_time = txn_table_get_time / txn_table_get_cnt;
   double txn_table_release_avg_time = 0;
   if(txn_table_release_cnt > 0)
     txn_table_release_avg_time = txn_table_release_time / txn_table_release_cnt;
@@ -1089,24 +935,14 @@ void Stats_thd::print(FILE * outf, bool prog) {
     ",txn_table_get_avg_time=%f"
     ",txn_table_release_avg_time=%f"
     // Transaction Table
-    ,txn_table_new_cnt
-    ,txn_table_get_cnt
-    ,txn_table_release_cnt
-    ,txn_table_cflt_cnt
-    ,txn_table_cflt_size
-    ,txn_table_get_time / BILLION
-    ,txn_table_release_time / BILLION
-    ,txn_table_min_ts_time / BILLION
-    ,txn_table_get_avg_time / BILLION
-    ,txn_table_release_avg_time / BILLION
-  );
+          ,
+          txn_table_new_cnt, txn_table_get_cnt, txn_table_release_cnt, txn_table_cflt_cnt,
+          txn_table_cflt_size, txn_table_get_time / BILLION, txn_table_release_time / BILLION,
+          txn_table_min_ts_time / BILLION, txn_table_get_avg_time / BILLION,
+          txn_table_release_avg_time / BILLION);
 
   for(uint64_t i = 0; i < 40; i ++) {
-    fprintf(outf,
-      ",mtx%ld=%f"
-      ,i
-      ,mtx[i] / BILLION
-      );
+    fprintf(outf, ",mtx%ld=%f", i, mtx[i] / BILLION);
   }
   fprintf(outf,
           ",lat_work_queue_time=%f"
@@ -1144,62 +980,49 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",lat_l_rem_cc_block_time=%f"
   ",lat_l_rem_cc_time=%f"
   ",lat_l_rem_process_time=%f"
-
   ",lat_s_rem_work_queue_time=%f"
   ",lat_s_rem_msg_queue_time=%f"
   ",lat_s_rem_cc_block_time=%f"
   ",lat_s_rem_cc_time=%f"
-  ",lat_s_rem_process_time=%f"
-
-          ,lat_work_queue_time/BILLION
-          ,lat_msg_queue_time/BILLION
-          ,lat_cc_block_time/BILLION
-          ,lat_cc_time/BILLION
-          ,lat_process_time/BILLION
-          ,lat_abort_time/BILLION
-          ,lat_network_time/BILLION
-          ,lat_other_time/BILLION
-
-  ,lat_l_loc_work_queue_time/BILLION
-  ,lat_l_loc_msg_queue_time/BILLION
-  ,lat_l_loc_cc_block_time/BILLION
-  ,lat_l_loc_cc_time/BILLION
-  ,lat_l_loc_process_time/BILLION
-  ,lat_l_loc_abort_time/BILLION
-
-  ,lat_short_work_queue_time/BILLION
-  ,lat_short_msg_queue_time/BILLION
-  ,lat_short_cc_block_time/BILLION
-  ,lat_short_cc_time/BILLION
-  ,lat_short_process_time/BILLION
-  ,lat_short_network_time/BILLION
-  ,lat_short_batch_time/BILLION
-
-  ,lat_s_loc_work_queue_time/BILLION
-  ,lat_s_loc_msg_queue_time/BILLION
-  ,lat_s_loc_cc_block_time/BILLION
-  ,lat_s_loc_cc_time/BILLION
-  ,lat_s_loc_process_time/BILLION
-
-  ,lat_l_rem_work_queue_time/BILLION
-  ,lat_l_rem_msg_queue_time/BILLION
-  ,lat_l_rem_cc_block_time/BILLION
-  ,lat_l_rem_cc_time/BILLION
-  ,lat_l_rem_process_time/BILLION
-
-  ,lat_s_rem_work_queue_time/BILLION
-  ,lat_s_rem_msg_queue_time/BILLION
-  ,lat_s_rem_cc_block_time/BILLION
-  ,lat_s_rem_cc_time/BILLION
-  ,lat_s_rem_process_time/BILLION
-      );
+          ",lat_s_rem_process_time=%f",
+          lat_work_queue_time / BILLION, lat_msg_queue_time / BILLION, lat_cc_block_time / BILLION,
+          lat_cc_time / BILLION, lat_process_time / BILLION, lat_abort_time / BILLION,
+          lat_network_time / BILLION, lat_other_time / BILLION, lat_l_loc_work_queue_time / BILLION,
+          lat_l_loc_msg_queue_time / BILLION, lat_l_loc_cc_block_time / BILLION,
+          lat_l_loc_cc_time / BILLION, lat_l_loc_process_time / BILLION,
+          lat_l_loc_abort_time / BILLION, lat_short_work_queue_time / BILLION,
+          lat_short_msg_queue_time / BILLION, lat_short_cc_block_time / BILLION,
+          lat_short_cc_time / BILLION, lat_short_process_time / BILLION,
+          lat_short_network_time / BILLION, lat_short_batch_time / BILLION,
+          lat_s_loc_work_queue_time / BILLION, lat_s_loc_msg_queue_time / BILLION,
+          lat_s_loc_cc_block_time / BILLION, lat_s_loc_cc_time / BILLION,
+          lat_s_loc_process_time / BILLION, lat_l_rem_work_queue_time / BILLION,
+          lat_l_rem_msg_queue_time / BILLION, lat_l_rem_cc_block_time / BILLION,
+          lat_l_rem_cc_time / BILLION, lat_l_rem_process_time / BILLION,
+          lat_s_rem_work_queue_time / BILLION, lat_s_rem_msg_queue_time / BILLION,
+          lat_s_rem_cc_block_time / BILLION, lat_s_rem_cc_time / BILLION,
+          lat_s_rem_process_time / BILLION);
+  fprintf(outf,
+          ",ano_2_trans_write_skew_1=%ld"
+          ",ano_2_trans_write_skew_2=%ld"
+          ",ano_3_trans_write_skew_1=%ld"
+          ",ano_3_trans_write_skew_2=%ld"
+          ",ano_2_trans_read_skew=%ld"
+          ",ano_3_trans_read_skew_1=%ld"
+          ",ano_3_trans_read_skew_2=%ld"
+          ",ano_4_trans_read_skew=%ld"
+          ",ano_unknown=%ld",
+          ano_2_trans_write_skew_1, ano_2_trans_write_skew_2, ano_3_trans_write_skew_1,
+          ano_3_trans_write_skew_2, ano_2_trans_read_skew, ano_3_trans_read_skew_1,
+          ano_3_trans_read_skew_2, ano_4_trans_read_skew, ano_unknown);
 
   if (!prog) {
       last_start_commit_latency.quicksort(0,last_start_commit_latency.cnt-1);
   first_start_commit_latency.quicksort(0,first_start_commit_latency.cnt-1);
   start_abort_commit_latency.quicksort(0,start_abort_commit_latency.cnt-1);
 
-  fprintf(outf,
+    fprintf(
+        outf,
           ",fscl0=%f"
           ",fscl1=%f"
           ",fscl10=%f"
@@ -1214,23 +1037,21 @@ void Stats_thd::print(FILE * outf, bool prog) {
           ",fscl99=%f"
           ",fscl100=%f"
           ",fscl_avg=%f"
-          ",fscl_cnt=%ld"
-          ,(double)first_start_commit_latency.get_idx(0) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(1) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(10) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(25) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(50) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(75) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(90) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(95) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(96) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(97) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(98) / BILLION
-          ,(double)first_start_commit_latency.get_percentile(99) / BILLION
-          ,(double)first_start_commit_latency.get_idx(first_start_commit_latency.cnt-1) / BILLION
-          ,(double)first_start_commit_latency.get_avg() / BILLION
-          ,first_start_commit_latency.cnt
-          );
+        ",fscl_cnt=%ld",
+        (double)first_start_commit_latency.get_idx(0) / BILLION,
+        (double)first_start_commit_latency.get_percentile(1) / BILLION,
+        (double)first_start_commit_latency.get_percentile(10) / BILLION,
+        (double)first_start_commit_latency.get_percentile(25) / BILLION,
+        (double)first_start_commit_latency.get_percentile(50) / BILLION,
+        (double)first_start_commit_latency.get_percentile(75) / BILLION,
+        (double)first_start_commit_latency.get_percentile(90) / BILLION,
+        (double)first_start_commit_latency.get_percentile(95) / BILLION,
+        (double)first_start_commit_latency.get_percentile(96) / BILLION,
+        (double)first_start_commit_latency.get_percentile(97) / BILLION,
+        (double)first_start_commit_latency.get_percentile(98) / BILLION,
+        (double)first_start_commit_latency.get_percentile(99) / BILLION,
+        (double)first_start_commit_latency.get_idx(first_start_commit_latency.cnt - 1) / BILLION,
+        (double)first_start_commit_latency.get_avg() / BILLION, first_start_commit_latency.cnt);
 
   fprintf(outf,
           ",lscl0=%f"
@@ -1247,26 +1068,24 @@ void Stats_thd::print(FILE * outf, bool prog) {
           ",lscl99=%f"
           ",lscl100=%f"
           ",lscl_avg=%f"
-          ",lscl_cnt=%ld"
-          ,(double)last_start_commit_latency.get_idx(0) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(1) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(10) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(25) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(50) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(75) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(90) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(95) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(96) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(97) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(98) / BILLION
-          ,(double)last_start_commit_latency.get_percentile(99) / BILLION
-          ,(double)last_start_commit_latency.get_idx(last_start_commit_latency.cnt-1) / BILLION
-          ,(double)last_start_commit_latency.get_avg() / BILLION
-          ,last_start_commit_latency.cnt
-          );
+            ",lscl_cnt=%ld",
+            (double)last_start_commit_latency.get_idx(0) / BILLION,
+            (double)last_start_commit_latency.get_percentile(1) / BILLION,
+            (double)last_start_commit_latency.get_percentile(10) / BILLION,
+            (double)last_start_commit_latency.get_percentile(25) / BILLION,
+            (double)last_start_commit_latency.get_percentile(50) / BILLION,
+            (double)last_start_commit_latency.get_percentile(75) / BILLION,
+            (double)last_start_commit_latency.get_percentile(90) / BILLION,
+            (double)last_start_commit_latency.get_percentile(95) / BILLION,
+            (double)last_start_commit_latency.get_percentile(96) / BILLION,
+            (double)last_start_commit_latency.get_percentile(97) / BILLION,
+            (double)last_start_commit_latency.get_percentile(98) / BILLION,
+            (double)last_start_commit_latency.get_percentile(99) / BILLION,
+            (double)last_start_commit_latency.get_idx(last_start_commit_latency.cnt - 1) / BILLION,
+            (double)last_start_commit_latency.get_avg() / BILLION, last_start_commit_latency.cnt);
 
-
-  fprintf(outf,
+    fprintf(
+        outf,
           ",sacl0=%f"
           ",sacl1=%f"
           ",sacl10=%f"
@@ -1281,23 +1100,21 @@ void Stats_thd::print(FILE * outf, bool prog) {
           ",sacl99=%f"
           ",sacl100=%f"
           ",sacl_avg=%f"
-          ",sacl_cnt=%ld"
-          ,(double)start_abort_commit_latency.get_idx(0) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(1) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(10) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(25) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(50) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(75) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(90) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(95) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(96) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(97) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(98) / BILLION
-          ,(double)start_abort_commit_latency.get_percentile(99) / BILLION
-          ,(double)start_abort_commit_latency.get_idx(start_abort_commit_latency.cnt-1) / BILLION
-          ,(double)start_abort_commit_latency.get_avg() / BILLION
-          ,start_abort_commit_latency.cnt
-          );
+        ",sacl_cnt=%ld",
+        (double)start_abort_commit_latency.get_idx(0) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(1) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(10) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(25) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(50) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(75) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(90) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(95) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(96) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(97) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(98) / BILLION,
+        (double)start_abort_commit_latency.get_percentile(99) / BILLION,
+        (double)start_abort_commit_latency.get_idx(start_abort_commit_latency.cnt - 1) / BILLION,
+        (double)start_abort_commit_latency.get_avg() / BILLION, start_abort_commit_latency.cnt);
   }
 
   //first_start_commit_latency.print(outf);
@@ -1306,8 +1123,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
 }
 
 void Stats_thd::combine(Stats_thd * stats) {
-  if(stats->total_runtime > total_runtime)
-    total_runtime = stats->total_runtime;
+  if (stats->total_runtime > total_runtime) total_runtime = stats->total_runtime;
 
   last_start_commit_latency.append(stats->first_start_commit_latency);
   first_start_commit_latency.append(stats->first_start_commit_latency);
@@ -1322,6 +1138,7 @@ void Stats_thd::combine(Stats_thd * stats) {
   local_txn_commit_cnt+=stats->local_txn_commit_cnt;
   remote_txn_commit_cnt+=stats->remote_txn_commit_cnt;
   total_txn_abort_cnt+=stats->total_txn_abort_cnt;
+  positive_txn_abort_cnt += stats->positive_txn_abort_cnt;
   unique_txn_abort_cnt+=stats->unique_txn_abort_cnt;
   local_txn_abort_cnt+=stats->local_txn_abort_cnt;
   remote_txn_abort_cnt+=stats->remote_txn_abort_cnt;
@@ -1462,6 +1279,11 @@ void Stats_thd::combine(Stats_thd * stats) {
   sched_txn_table_time+=stats->sched_txn_table_time;
   sched_epoch_cnt+=stats->sched_epoch_cnt;
   sched_epoch_diff+=stats->sched_epoch_diff;
+  // DLI_MVCC_OCC
+  dli_mvcc_occ_validate_time += stats->dli_mvcc_occ_validate_time;
+  dli_mvcc_occ_check_cnt += stats->dli_mvcc_occ_check_cnt;
+  dli_mvcc_occ_abort_check_cnt += stats->dli_mvcc_occ_abort_check_cnt;
+  dli_mvcc_occ_ts_abort_cnt += stats->dli_mvcc_occ_ts_abort_cnt;
   //OCC
   occ_validate_time+=stats->occ_validate_time;
   occ_cs_wait_time+=stats->occ_cs_wait_time;
@@ -1487,6 +1309,18 @@ void Stats_thd::combine(Stats_thd * stats) {
   maat_range+=stats->maat_range;
   maat_commit_cnt+=stats->maat_commit_cnt;
 
+  // DTA
+  dta_validate_cnt += stats->dta_validate_cnt;
+  dta_validate_time += stats->dta_validate_time;
+  dta_cs_wait_time += stats->dta_cs_wait_time;
+  dta_case1_cnt += stats->dta_case1_cnt;
+  dta_case2_cnt += stats->dta_case2_cnt;
+  dta_case3_cnt += stats->dta_case3_cnt;
+  dta_case4_cnt += stats->dta_case4_cnt;
+  dta_case5_cnt += stats->dta_case5_cnt;
+  dta_range += stats->dta_range;
+  dta_commit_cnt += stats->dta_commit_cnt;
+
   // WKDB
   wkdb_validate_cnt+=stats->wkdb_validate_cnt;
   wkdb_validate_time+=stats->wkdb_validate_time;
@@ -1498,7 +1332,6 @@ void Stats_thd::combine(Stats_thd * stats) {
   wkdb_case5_cnt+=stats->wkdb_case5_cnt;
   wkdb_range+=stats->wkdb_range;
   wkdb_commit_cnt+=stats->wkdb_commit_cnt;
-
 
   // Logging
   log_write_cnt+=stats->log_write_cnt;
@@ -1564,41 +1397,43 @@ void Stats_thd::combine(Stats_thd * stats) {
   lat_s_rem_cc_block_time+=stats->lat_s_rem_cc_block_time;
   lat_s_rem_cc_time+=stats->lat_s_rem_cc_time;
   lat_s_rem_process_time+=stats->lat_s_rem_process_time;
+
+  ano_2_trans_write_skew_1 += stats->ano_2_trans_write_skew_1;
+  ano_2_trans_write_skew_2 += stats->ano_2_trans_write_skew_2;
+  ano_3_trans_write_skew_1 += stats->ano_3_trans_write_skew_1;
+  ano_3_trans_write_skew_2 += stats->ano_3_trans_write_skew_2;
+  ano_2_trans_read_skew += stats->ano_2_trans_read_skew;
+  ano_3_trans_read_skew_1 += stats->ano_3_trans_read_skew_1;
+  ano_3_trans_read_skew_2 += stats->ano_3_trans_read_skew_2;
+  ano_4_trans_read_skew += stats->ano_4_trans_read_skew;
+  ano_unknown += stats->ano_unknown;
 }
 
-
 void Stats::init(uint64_t thread_cnt) {
-	if (!STATS_ENABLE) 
-		return;
+  if (!STATS_ENABLE) return;
 
   thd_cnt = thread_cnt;
 	_stats = new Stats_thd * [thread_cnt];
 	totals = new Stats_thd;
 
   for(uint64_t i = 0; i < thread_cnt; i++) {
-    _stats[i] = (Stats_thd *) 
-      mem_allocator.align_alloc(sizeof(Stats_thd));
+    _stats[i] = (Stats_thd *)mem_allocator.align_alloc(sizeof(Stats_thd));
     _stats[i]->init(i);
     _stats[i]->clear();
   }
 
   totals->init(0);
   totals->clear();
-
 }
 
-void Stats::clear(uint64_t tid) {
-}
+void Stats::clear(uint64_t tid) {}
 
 void Stats::print_client(bool prog) {
   fflush(stdout);
-  if(!STATS_ENABLE)
-    return;
+  if (!STATS_ENABLE) return;
 
   totals->clear();
-  for(uint64_t i = 0; i < thd_cnt; i++)
-    totals->combine(_stats[i]);
-
+  for (uint64_t i = 0; i < thd_cnt; i++) totals->combine(_stats[i]);
 
 	FILE * outf;
 	if (output_file != NULL) 
@@ -1617,9 +1452,7 @@ void Stats::print_client(bool prog) {
       fprintf(outf,"\n");
 		  //for (uint32_t k = 0; k < g_node_id; ++k) {
 		  for (uint32_t k = 0; k < g_servers_per_client; ++k) {
-        printf("tif_node%u=%d, "
-            ,k,client_man.get_inflight(k)
-            );
+      printf("tif_node%u=%d, ", k, client_man.get_inflight(k));
       }
       printf("\n");
     } else {
@@ -1680,14 +1513,11 @@ void Stats::print_client(bool prog) {
 }
 
 void Stats::print(bool prog) {
-
   fflush(stdout);
-  if(!STATS_ENABLE)
-    return;
+  if (!STATS_ENABLE) return;
 	
   totals->clear();
-  for(uint64_t i = 0; i < thd_cnt; i++) 
-    totals->combine(_stats[i]);
+  for (uint64_t i = 0; i < thd_cnt; i++) totals->combine(_stats[i]);
 	FILE * outf;
 	if (output_file != NULL) 
 		outf = fopen(output_file, "w");
@@ -1712,12 +1542,10 @@ void Stats::print(bool prog) {
 	if (output_file != NULL) {
 		fclose(outf);
   }
-
 }
 
 uint64_t Stats::get_txn_cnts() {
-    if(!STATS_ENABLE || g_node_id >= g_node_cnt)
-        return 0;
+  if (!STATS_ENABLE || g_node_id >= g_node_cnt) return 0;
     uint64_t limit =  g_thread_cnt + g_rem_thread_cnt;
     uint64_t total_txn_cnt = 0;
 	for (uint64_t tid = 0; tid < limit; tid ++) {
@@ -1814,8 +1642,7 @@ void Stats::print_lat_distr() {
     limit = g_thread_cnt;
   else
     limit = g_client_thread_cnt;
-	for (UInt32 tid = 0; tid < limit; tid ++) 
-    _stats[tid]->all_lat.print(stdout);
+  for (UInt32 tid = 0; tid < limit; tid++) _stats[tid]->all_lat.print(stdout);
 #endif
 }
 
@@ -1833,8 +1660,7 @@ void Stats::util_init() {
   lastUserCPU = timeSample.tms_utime;
 }
 
-void Stats::print_util() {
-}
+void Stats::print_util() {}
 
 int Stats::parseLine(char* line){
   int i = strlen(line);
@@ -1853,17 +1679,11 @@ void Stats::mem_util(FILE * outf) {
   while (fgets(line, 128, file) != NULL){
       if (strncmp(line, "VmRSS:", 6) == 0){
           result = parseLine(line);
-          fprintf(outf,
-            ",phys_mem_usage=%d"
-            ,result
-            );
+      fprintf(outf, ",phys_mem_usage=%d", result);
       }
       if (strncmp(line, "VmSize:", 7) == 0){
           result = parseLine(line);
-          fprintf(outf,
-            ",virt_mem_usage=%d"
-            ,result
-            );
+      fprintf(outf, ",virt_mem_usage=%d", result);
       }
   }
   fclose(file);
@@ -1876,14 +1696,11 @@ void Stats::cpu_util(FILE * outf) {
   double percent;
 
   now = times(&timeSample);
-  if (now <= lastCPU || timeSample.tms_stime < lastSysCPU ||
-      timeSample.tms_utime < lastUserCPU){
+  if (now <= lastCPU || timeSample.tms_stime < lastSysCPU || timeSample.tms_utime < lastUserCPU) {
       //Overflow detection. Just skip this value.
       percent = -1.0;
-  }
-  else{
-      percent = (timeSample.tms_stime - lastSysCPU) +
-          (timeSample.tms_utime - lastUserCPU);
+  } else {
+    percent = (timeSample.tms_stime - lastSysCPU) + (timeSample.tms_utime - lastUserCPU);
       percent /= (now - lastCPU);
       if(ISSERVER) {
         percent /= (g_total_thread_cnt);//numProcessors;
@@ -1892,10 +1709,7 @@ void Stats::cpu_util(FILE * outf) {
       }
       percent *= 100;
   }
-  fprintf(outf,
-      ",cpu_ttl=%f"
-      ,percent
-    );
+  fprintf(outf, ",cpu_ttl=%f", percent);
   lastCPU = now;
   lastSysCPU = timeSample.tms_stime;
   lastUserCPU = timeSample.tms_utime;

@@ -16,17 +16,11 @@
 
 #include "pps_helper.h"
 
-uint64_t parts_to_partition(uint64_t part_key) {
-	return (part_key) % g_part_cnt ;
-}
+uint64_t parts_to_partition(uint64_t part_key) { return (part_key) % g_part_cnt; }
 
-uint64_t products_to_partition(uint64_t product_key) {
-	return (product_key) % g_part_cnt ;
-}
+uint64_t products_to_partition(uint64_t product_key) { return (product_key) % g_part_cnt; }
 
-uint64_t suppliers_to_partition(uint64_t supplier_key) {
-	return (supplier_key) % g_part_cnt ;
-}
+uint64_t suppliers_to_partition(uint64_t supplier_key) { return (supplier_key) % g_part_cnt; }
 
 /*
 uint64_t URand(uint64_t x, uint64_t y) {

@@ -54,8 +54,7 @@ public:
     uint64_t get_participants(Workload * wl);
     bool readonly();
     virtual bool isReconQuery() {
-        bool result = (txn_type == PPS_GETPARTBYSUPPLIER) ||
-                (txn_type == PPS_GETPARTBYPRODUCT) ||
+    bool result = (txn_type == PPS_GETPARTBYSUPPLIER) || (txn_type == PPS_GETPARTBYPRODUCT) ||
                 (txn_type == PPS_ORDERPRODUCT);
         return result;
     }

@@ -17,7 +17,10 @@
 #ifndef _STATS_ARR_H_
 #define _STATS_ARR_H_
 
-enum StatsArrType {ArrInsert, ArrIncr};
+enum StatsArrType {
+  ArrInsert,
+  ArrIncr
+};
 class StatsArr {
     public:
       void init(uint64_t size,StatsArrType type);

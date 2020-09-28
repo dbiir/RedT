@@ -19,9 +19,7 @@
 #include "message.h"
 #include "work_queue.h"
 
-void AbortQueue::init() {
-  pthread_mutex_init(&mtx,NULL);
-}
+void AbortQueue::init() { pthread_mutex_init(&mtx, NULL); }
 
 uint64_t AbortQueue::enqueue(uint64_t thd_id, uint64_t txn_id, uint64_t abort_cnt) {
   uint64_t starttime = get_sys_clock();
@@ -38,7 +36,8 @@ uint64_t AbortQueue::enqueue(uint64_t thd_id, uint64_t txn_id, uint64_t abort_cn
   uint64_t mtx_time_start = get_sys_clock();
   pthread_mutex_lock(&mtx);
   INC_STATS(thd_id,mtx[0],get_sys_clock() - mtx_time_start);
-  DEBUG("AQ Enqueue %ld %f -- %f\n",entry->txn_id,float(penalty - starttime)/BILLION,simulation->seconds_from_start(starttime));
+  DEBUG("AQ Enqueue %ld %f -- %f\n", entry->txn_id, float(penalty - starttime) / BILLION,
+        simulation->seconds_from_start(starttime));
   INC_STATS(thd_id,abort_queue_penalty,penalty - starttime);
   INC_STATS(thd_id,abort_queue_enqueue_cnt,1);
   queue.push(entry);
@@ -50,8 +49,7 @@ uint64_t AbortQueue::enqueue(uint64_t thd_id, uint64_t txn_id, uint64_t abort_cn
 }
 
 void AbortQueue::process(uint64_t thd_id) {
-  if(queue.empty())
-    return;
+  if (queue.empty()) return;
   abort_entry * entry;
   uint64_t mtx_time_start = get_sys_clock();
   pthread_mutex_lock(&mtx);
@@ -61,7 +59,9 @@ void AbortQueue::process(uint64_t thd_id) {
     entry = queue.top();
     if(entry->penalty_end < starttime) {
       queue.pop();
-      DEBUG("AQ Dequeue %ld %f -- %f\n",entry->txn_id,float(starttime - entry->penalty_end)/BILLION,simulation->seconds_from_start(starttime));
+      DEBUG("AQ Dequeue %ld %f -- %f\n", entry->txn_id,
+            float(starttime - entry->penalty_end) / BILLION,
+            simulation->seconds_from_start(starttime));
       INC_STATS(thd_id,abort_queue_penalty_extra,starttime - entry->penalty_end);
       INC_STATS(thd_id,abort_queue_dequeue_cnt,1);
       Message * msg = Message::create_message(RTXN);

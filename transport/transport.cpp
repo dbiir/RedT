@@ -13,6 +13,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "transport.h"
+
+#include <stdio.h>
+
+#include <iostream>
+
+#include "global.h"
+#include "manager.h"
+#include "message.h"
+#include "nn.hpp"
+#include "query.h"
+#include "tpcc_query.h"
 #include <stdio.h>
 #include <iostream>
 #include "global.h"
@@ -94,14 +106,16 @@ uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id) {
 }
 
 #if NETWORK_DELAY_TEST || !ENVIRONMENT_EC2
-uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id) {
+uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id,
+                                uint64_t send_thread_id) {
   uint64_t port_id = 0;
   DEBUG("Calc port id %ld %ld %ld\n",src_node_id,dest_node_id,send_thread_id);
   port_id += g_total_node_cnt * dest_node_id;
   DEBUG("%ld\n",port_id);
   port_id += src_node_id;
   DEBUG("%ld\n",port_id);
-//  uint64_t max_send_thread_cnt = g_send_thread_cnt > g_client_send_thread_cnt ? g_send_thread_cnt : g_client_send_thread_cnt;
+  //  uint64_t max_send_thread_cnt = g_send_thread_cnt > g_client_send_thread_cnt ?
+  // g_send_thread_cnt : g_client_send_thread_cnt;
 //  port_id *= max_send_thread_cnt;
   port_id += send_thread_id * g_total_node_cnt * g_total_node_cnt;
   DEBUG("%ld\n",port_id);
@@ -112,7 +126,8 @@ uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id, uin
 }
 #else
 
-uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id) {
+uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id,
+                                uint64_t send_thread_id) {
   uint64_t port_id = 0;
   DEBUG("Calc port id %ld %ld %ld\n",src_node_id,dest_node_id,send_thread_id);
   port_id += dest_node_id + src_node_id;
@@ -180,18 +195,23 @@ void Transport::init() {
 	read_ifconfig(path.c_str());
 
   for(uint64_t node_id = 0; node_id < g_total_node_cnt; node_id++) {
-    if(node_id == g_node_id)
-      continue;
+    if (node_id == g_node_id) continue;
     // Listening ports
     if(ISCLIENTN(node_id)) {
-      for(uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt; client_thread_id < g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt; client_thread_id++) {
-        uint64_t port_id = get_port_id(node_id,g_node_id,client_thread_id % g_client_send_thread_cnt);
+      for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
+           client_thread_id <
+               g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
+           client_thread_id++) {
+        uint64_t port_id =
+            get_port_id(node_id, g_node_id, client_thread_id % g_client_send_thread_cnt);
         Socket * sock = bind(port_id);
         recv_sockets.push_back(sock);
         DEBUG("Socket insert: {%ld}: %ld\n",node_id,(uint64_t)sock);
       }
     } else {
-      for(uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt; server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt; server_thread_id++) {
+      for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
+           server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
+           server_thread_id++) {
         uint64_t port_id = get_port_id(node_id,g_node_id,server_thread_id % g_send_thread_cnt);
         Socket * sock = bind(port_id);
         recv_sockets.push_back(sock);
@@ -200,15 +220,21 @@ void Transport::init() {
     }
     // Sending ports
     if(ISCLIENTN(g_node_id)) {
-      for(uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt; client_thread_id < g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt; client_thread_id++) {
-        uint64_t port_id = get_port_id(g_node_id,node_id,client_thread_id % g_client_send_thread_cnt);
+      for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
+           client_thread_id <
+               g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
+           client_thread_id++) {
+        uint64_t port_id =
+            get_port_id(g_node_id, node_id, client_thread_id % g_client_send_thread_cnt);
         std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,client_thread_id);
         Socket * sock = connect(node_id,port_id);
         send_sockets.insert(std::make_pair(sender,sock));
         DEBUG("Socket insert: {%ld,%ld}: %ld\n",node_id,client_thread_id,(uint64_t)sock);
       }
     } else {
-      for(uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt; server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt; server_thread_id++) {
+      for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
+           server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
+           server_thread_id++) {
         uint64_t port_id = get_port_id(g_node_id,node_id,server_thread_id % g_send_thread_cnt);
         std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,server_thread_id);
         Socket * sock = connect(node_id,port_id);
@@ -230,10 +256,12 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * 
   // Copy messages to nanomsg buffer
 	void * buf = nn_allocmsg(size,0);
 	memcpy(buf,sbuf,size);
-  DEBUG("%ld Sending batch of %d bytes to node %ld on socket %ld\n",send_thread_id,size,dest_node_id,(uint64_t)socket);
+  DEBUG("%ld Sending batch of %d bytes to node %ld on socket %ld\n", send_thread_id, size,
+        dest_node_id, (uint64_t)socket);
 
   int rc = -1;
-  while(rc < 0 && (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))) {
+  while (rc < 0 && (!simulation->is_setup_done() ||
+                    (simulation->is_setup_done() && !simulation->is_done()))) {
     rc= socket->sock.send(&buf,NN_MSG,NN_DONTWAIT);
   }
   //nn_freemsg(sbuf);
@@ -251,10 +279,10 @@ std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
   std::vector<Message*> * msgs = NULL;
   //uint64_t ctr = starttime % recv_sockets.size();
   uint64_t rand = (starttime % recv_sockets.size()) / g_this_rem_thread_cnt;
-  //uint64_t ctr = ((thd_id % g_this_rem_thread_cnt) % recv_sockets.size()) + rand * g_this_rem_thread_cnt;
+  // uint64_t ctr = ((thd_id % g_this_rem_thread_cnt) % recv_sockets.size()) + rand *
+  // g_this_rem_thread_cnt;
   uint64_t ctr = thd_id % g_this_rem_thread_cnt;
-  if(ctr >= recv_sockets.size())
-    return msgs;
+  if (ctr >= recv_sockets.size()) return msgs;
   if(g_this_rem_thread_cnt < g_total_node_cnt) {
     ctr += rand * g_this_rem_thread_cnt;
     while(ctr >= recv_sockets.size()) {
@@ -264,26 +292,22 @@ std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
   assert(ctr < recv_sockets.size());
   uint64_t start_ctr = ctr;
   
-	
-  while(bytes <= 0 && (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))) {
+  while (bytes <= 0 && (!simulation->is_setup_done() ||
+                        (simulation->is_setup_done() && !simulation->is_done()))) {
     Socket * socket = recv_sockets[ctr];
 		bytes = socket->sock.recv(&buf, NN_MSG, NN_DONTWAIT);
-
     //++ctr;
     ctr = (ctr + g_this_rem_thread_cnt);
 
-    if(ctr >= recv_sockets.size())
-      ctr = (thd_id % g_this_rem_thread_cnt) % recv_sockets.size();
-    if(ctr == start_ctr)
-      break;
+    if (ctr >= recv_sockets.size()) ctr = (thd_id % g_this_rem_thread_cnt) % recv_sockets.size();
+    if (ctr == start_ctr) break;
 
 		if(bytes <= 0 && errno != 11) {
 		  printf("Recv Error %d %s\n",errno,strerror(errno));
 			nn::freemsg(buf);	
 		}
 
-		if(bytes>0)
-			break;
+    if (bytes > 0) break;
 	}
 
 	if(bytes <= 0 ) {
@@ -297,7 +321,8 @@ std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
 	starttime = get_sys_clock();
 
   msgs = Message::create_messages((char*)buf);
-  DEBUG("Batch of %d bytes recv from node %ld; Time: %f\n",bytes,msgs->front()->return_node_id,simulation->seconds_from_start(get_sys_clock()));
+  DEBUG("Batch of %d bytes recv from node %ld; Time: %f\n", bytes, msgs->front()->return_node_id,
+        simulation->seconds_from_start(get_sys_clock()));
 
 	nn::freemsg(buf);	
 

@@ -18,7 +18,7 @@
 #define _WORKERTHREAD_H_
 
 #include "global.h"
-
+#include "thread.h"
 class Workload;
 class Message;
 
@@ -53,14 +53,12 @@ public:
     RC init_phase();
     uint64_t get_next_txn_id();
     bool is_cc_new_timestamp();
-
+  bool is_mine(Message* msg);
 private:
     uint64_t _thd_txn_id;
     ts_t        _curr_ts;
     ts_t        get_next_ts();
     TxnManager * txn_man;
-
-
 };
 
 class WorkerNumThread : public Thread {

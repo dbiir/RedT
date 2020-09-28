@@ -16,6 +16,7 @@
 
 #ifndef ROW_OCC_H
 #define ROW_OCC_H
+#include "semaphore.h"
 
 class table_t;
 class Catalog;

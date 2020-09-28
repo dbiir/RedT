@@ -29,9 +29,23 @@
 #include "transport.h"
 #include "work_queue.h"
 #include "abort_queue.h"
+#include "client_query.h"
+#include "client_txn.h"
+#include "logger.h"
+#include "maat.h"
+#include "manager.h"
+#include "mem_alloc.h"
 #include "msg_queue.h"
 #include "pool.h"
+#include "query.h"
+#include "sequencer.h"
+#include "dli.h"
+#include "sim_manager.h"
+#include "stats.h"
+#include "transport.h"
 #include "txn_table.h"
+#include "work_queue.h"
+#include "dta.h"
 #include "client_txn.h"
 #include "sequencer.h"
 #include "logger.h"
@@ -42,6 +56,11 @@
 #include "rts_cache.h"
 #include "http.h"
 
+
+#include <boost/lockfree/queue.hpp>
+#include "da_block_queue.h"
+
+
 mem_alloc mem_allocator;
 Stats stats;
 SimManager * simulation;
@@ -49,9 +68,11 @@ Manager glob_manager;
 Query_queue query_queue;
 Client_query_queue client_query_queue;
 OptCC occ_man;
+Dli dli_man;
 Focc focc_man;
 Bocc bocc_man;
 Maat maat_man;
+Dta dta_man;
 Wkdb wkdb_man;
 ssi ssi_man;
 wsi wsi_man;
@@ -72,12 +93,27 @@ Client_txn client_man;
 Sequencer seq_man;
 Logger logger;
 TimeTable time_table;
+DtaTimeTable dta_time_table;
+KeyXidCache dta_key_xid_cache;
+RtsCache dta_rts_cache;
 InOutTable inout_table;
 WkdbTimeTable wkdb_time_table;
 KeyXidCache wkdb_key_xid_cache;
 RtsCache wkdb_rts_cache;
 // QTcpQueue tcp_queue;
 TcpTimestamp tcp_ts;
+//我自己加的
+boost::lockfree::queue<DAQuery*, boost::lockfree::fixed_sized<true>> da_query_queue{100};
+DABlockQueue da_gen_qry_queue(50);
+bool is_server=false;
+map<uint64_t, ts_t> da_start_stamp_tab;
+set<uint64_t> da_start_trans_tab;
+map<uint64_t, ts_t> da_stamp_tab;
+set<uint64_t> already_abort_tab;
+string DA_history_mem;
+bool abort_history;
+ofstream commit_file;
+ofstream abort_file;
 
 bool volatile warmup_done = false;
 bool volatile enable_thread_mem_pool = false;

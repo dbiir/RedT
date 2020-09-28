@@ -20,10 +20,14 @@
 #include "row.h"
 #include "semaphore.h"
 
-
 class TxnManager;
 
-enum MAATState { MAAT_RUNNING=0,MAAT_VALIDATED,MAAT_COMMITTED,MAAT_ABORTED};
+enum MAATState {
+  MAAT_RUNNING = 0,
+  MAAT_VALIDATED,
+  MAAT_COMMITTED,
+  MAAT_ABORTED
+};
 
 class Maat {
 public:

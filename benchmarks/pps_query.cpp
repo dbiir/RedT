@@ -37,16 +37,21 @@ BaseQuery * PPSQueryGenerator::create_query(Workload * h_wl,uint64_t home_partit
 	if (x < g_perc_getparts + g_perc_getsuppliers + g_perc_getproducts + g_perc_getpartbysupplier) {
 		return gen_requests_partsbysupplier(home_partition_id);
   }
-	if (x < g_perc_getparts + g_perc_getsuppliers + g_perc_getproducts + g_perc_getpartbysupplier + g_perc_getpartbyproduct) {
+  if (x < g_perc_getparts + g_perc_getsuppliers + g_perc_getproducts + g_perc_getpartbysupplier +
+              g_perc_getpartbyproduct) {
 		return gen_requests_partsbyproduct(home_partition_id);
   }
-	if (x < g_perc_getparts + g_perc_getsuppliers + g_perc_getproducts + g_perc_getpartbysupplier + g_perc_getpartbyproduct + g_perc_orderproduct) {
+  if (x < g_perc_getparts + g_perc_getsuppliers + g_perc_getproducts + g_perc_getpartbysupplier +
+              g_perc_getpartbyproduct + g_perc_orderproduct) {
 		return gen_requests_orderproduct(home_partition_id);
   }
-	if (x < g_perc_getparts + g_perc_getsuppliers + g_perc_getproducts + g_perc_getpartbysupplier + g_perc_getpartbyproduct + g_perc_orderproduct + g_perc_updateproductpart) {
+  if (x < g_perc_getparts + g_perc_getsuppliers + g_perc_getproducts + g_perc_getpartbysupplier +
+              g_perc_getpartbyproduct + g_perc_orderproduct + g_perc_updateproductpart) {
 		return gen_requests_updateproductpart(home_partition_id);
   }
-	if (x < g_perc_getparts + g_perc_getsuppliers + g_perc_getproducts + g_perc_getpartbysupplier + g_perc_getpartbyproduct + g_perc_orderproduct + g_perc_updateproductpart + g_perc_updatepart) {
+  if (x < g_perc_getparts + g_perc_getsuppliers + g_perc_getproducts + g_perc_getpartbysupplier +
+              g_perc_getpartbyproduct + g_perc_orderproduct + g_perc_updateproductpart +
+              g_perc_updatepart) {
 		return gen_requests_updatepart(home_partition_id);
   }
   assert(false);
@@ -65,11 +70,8 @@ void PPSQuery::init() {
 }
 
 void PPSQuery::print() {
-  std::cout << "part_key: " << part_key
-    << "supplier_key: " << supplier_key
-    << "product_key: " << product_key
-    << std::endl;
-  
+  std::cout << "part_key: " << part_key << "supplier_key: " << supplier_key
+            << "product_key: " << product_key << std::endl;
 }
 
 std::set<uint64_t> PPSQuery::participants(Message * msg, Workload * wl) {
@@ -125,7 +127,8 @@ std::set<uint64_t> PPSQuery::participants(Message * msg, Workload * wl) {
       id = GET_NODE_ID(parts_to_partition(pps_msg->part_key));
       participant_set.insert(id);
       break;
-    default: assert(false);
+    default:
+      assert(false);
   }
 
   return participant_set;
@@ -134,8 +137,7 @@ std::set<uint64_t> PPSQuery::participants(Message * msg, Workload * wl) {
 // Depreciated
 uint64_t PPSQuery::participants(bool *& pps,Workload * wl) {
   int n = 0;
-  for(uint64_t i = 0; i < g_node_cnt; i++)
-    pps[i] = false;
+  for (uint64_t i = 0; i < g_node_cnt; i++) pps[i] = false;
   uint64_t id;
 
   switch(txn_type) {
@@ -197,16 +199,15 @@ uint64_t PPSQuery::participants(bool *& pps,Workload * wl) {
       }
       break;
 
-
-    default: assert(false);
+    default:
+      assert(false);
   }
 
   return n;
 }
 
 bool PPSQuery::readonly() {
-  if (txn_type == PPS_ORDERPRODUCT ||
-      txn_type == PPS_UPDATEPRODUCTPART ||
+  if (txn_type == PPS_ORDERPRODUCT || txn_type == PPS_UPDATEPRODUCTPART ||
       txn_type == PPS_UPDATEPART) {
     return false;
   }
@@ -221,9 +222,9 @@ BaseQuery * PPSQueryGenerator::gen_requests_parts(uint64_t home_partition) {
   uint64_t part_key;
     // select a part
 	if (FIRST_PART_LOCAL) {
-    while(parts_to_partition(part_key = URand(1, g_max_part_key)) != home_partition) {}
+    while (parts_to_partition(part_key = URand(1, g_max_part_key)) != home_partition) {
   }
-	else
+  } else
 		part_key = URand(1, g_max_part_key);
 
   query->part_key = part_key;
@@ -244,9 +245,9 @@ BaseQuery * PPSQueryGenerator::gen_requests_suppliers(uint64_t home_partition) {
   uint64_t supplier_key;
     // select a part
 	if (FIRST_PART_LOCAL) {
-    while(suppliers_to_partition(supplier_key = URand(1, g_max_supplier_key)) != home_partition) {}
+    while (suppliers_to_partition(supplier_key = URand(1, g_max_supplier_key)) != home_partition) {
   }
-	else
+  } else
 		supplier_key = URand(1, g_max_supplier_key);
 
   query->supplier_key = supplier_key;
@@ -268,9 +269,9 @@ BaseQuery * PPSQueryGenerator::gen_requests_products(uint64_t home_partition) {
   uint64_t product_key;
     // select a part
 	if (FIRST_PART_LOCAL) {
-    while(products_to_partition(product_key = URand(1, g_max_product_key)) != home_partition) {}
+    while (products_to_partition(product_key = URand(1, g_max_product_key)) != home_partition) {
   }
-	else
+  } else
 		product_key = URand(1, g_max_product_key);
 
   query->product_key = product_key;
@@ -291,9 +292,9 @@ BaseQuery * PPSQueryGenerator::gen_requests_partsbysupplier(uint64_t home_partit
   uint64_t supplier_key;
     // select a part
 	if (FIRST_PART_LOCAL) {
-    while(suppliers_to_partition(supplier_key = URand(1, g_max_supplier_key)) != home_partition) {}
+    while (suppliers_to_partition(supplier_key = URand(1, g_max_supplier_key)) != home_partition) {
   }
-	else
+  } else
 		supplier_key = URand(1, g_max_supplier_key);
 
   query->supplier_key = supplier_key;
@@ -314,9 +315,9 @@ BaseQuery * PPSQueryGenerator::gen_requests_partsbyproduct(uint64_t home_partiti
   uint64_t product_key;
     // select a part
 	if (FIRST_PART_LOCAL) {
-    while(products_to_partition(product_key = URand(1, g_max_product_key)) != home_partition) {}
+    while (products_to_partition(product_key = URand(1, g_max_product_key)) != home_partition) {
   }
-	else
+  } else
 		product_key = URand(1, g_max_product_key);
 
   query->product_key = product_key;
@@ -337,9 +338,9 @@ BaseQuery * PPSQueryGenerator::gen_requests_orderproduct(uint64_t home_partition
   uint64_t product_key;
     // select a part
 	if (FIRST_PART_LOCAL) {
-    while(products_to_partition(product_key = URand(1, g_max_product_key)) != home_partition) {}
+    while (products_to_partition(product_key = URand(1, g_max_product_key)) != home_partition) {
   }
-	else
+  } else
 		product_key = URand(1, g_max_product_key);
 
   query->product_key = product_key;
@@ -360,9 +361,9 @@ BaseQuery * PPSQueryGenerator::gen_requests_updateproductpart(uint64_t home_part
   uint64_t product_key;
     // select a part
 	if (FIRST_PART_LOCAL) {
-    while(products_to_partition(product_key = URand(1, g_max_product_key)) != home_partition) {}
+    while (products_to_partition(product_key = URand(1, g_max_product_key)) != home_partition) {
   }
-	else
+  } else
 		product_key = URand(1, g_max_product_key);
 
   query->product_key = product_key;
@@ -385,9 +386,9 @@ BaseQuery * PPSQueryGenerator::gen_requests_updatepart(uint64_t home_partition) 
   uint64_t part_key;
     // select a part
 	if (FIRST_PART_LOCAL) {
-    while(parts_to_partition(part_key = URand(1, g_max_part_key)) != home_partition) {}
+    while (parts_to_partition(part_key = URand(1, g_max_part_key)) != home_partition) {
   }
-	else
+  } else
 		part_key = URand(1, g_max_part_key);
 
   query->part_key = part_key;

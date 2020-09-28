@@ -21,10 +21,10 @@
 #include "helper.h"
 #include "mem_alloc.h"
 
-template <class T> class Array {
+template <class T>
+class Array {
 public:
-  Array() : items(NULL), capacity(0), count(0) {
-  }
+  Array() : items(NULL), capacity(0), count(0) {}
   void init(uint64_t size) {
     /*
     if(!items) {
@@ -41,9 +41,7 @@ public:
     count = 0;
   }
 
-  void clear() {
-    count = 0;
-  }
+  void clear() { count = 0; }
 
   void copy(Array a) {
     init(a.size());
@@ -72,8 +70,7 @@ public:
 
   void add_unique(T item){
     for(uint64_t i = 0; i < count; i++) {
-      if(items[i] == item)
-        return;
+      if (items[i] == item) return;
     }
     add(item);
   }
@@ -123,7 +120,10 @@ public:
     items[i] = items[j];
     items[j] = tmp;
   }
-  T operator[](uint64_t idx) {assert(idx < count); return items[idx];}
+  T operator[](uint64_t idx) {
+    assert(idx < count);
+    return items[idx];
+  }
   uint64_t get_count() {return count;}
   uint64_t size() {return count;}
   bool is_full() { return count == capacity;}

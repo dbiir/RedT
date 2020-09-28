@@ -16,18 +16,19 @@
 
 #ifndef _STATS_H_
 #define _STATS_H_
-#include "stats_array.h"
+#include <sys/times.h>
+#include <sys/vtimes.h>
+#include <time.h>
 
+#include "../system/global.h"
+#include "stats_array.h"
 class StatValue {
 public:
   StatValue() : value(0) {}
-  void operator+=(double value) {
-    this->value += value;
-  }
-  void operator=(double value) {
-    this->value = value;
-  }
+  void operator+=(double value) { this->value += value; }
+  void operator=(double value) { this->value = value; }
   double get() {return value;}
+
 private:
   double value;
 };
@@ -58,6 +59,7 @@ public:
   uint64_t local_txn_commit_cnt;
   uint64_t remote_txn_commit_cnt;
   uint64_t total_txn_abort_cnt;
+  uint64_t positive_txn_abort_cnt;
   uint64_t unique_txn_abort_cnt;
   uint64_t local_txn_abort_cnt;
   uint64_t remote_txn_abort_cnt;
@@ -194,7 +196,11 @@ public:
   double sched_txn_table_time;
   uint64_t sched_epoch_cnt;
   double sched_epoch_diff;
-
+  // DLI_MVCC_OCC
+  double dli_mvcc_occ_validate_time;
+  uint64_t dli_mvcc_occ_check_cnt;
+  uint64_t dli_mvcc_occ_abort_check_cnt;
+  uint64_t dli_mvcc_occ_ts_abort_cnt;
   // OCC
   double occ_validate_time;
   double occ_cs_wait_time;
@@ -242,6 +248,18 @@ public:
   uint64_t wkdb_case5_cnt;
   double wkdb_range;
   uint64_t wkdb_commit_cnt;
+  
+  // DTA
+  uint64_t dta_validate_cnt;
+  double dta_validate_time;
+  double dta_cs_wait_time;
+  uint64_t dta_case1_cnt;
+  uint64_t dta_case2_cnt;
+  uint64_t dta_case3_cnt;
+  uint64_t dta_case4_cnt;
+  uint64_t dta_case5_cnt;
+  double dta_range;
+  uint64_t dta_commit_cnt;
 
   // Logging
   uint64_t log_write_cnt;
@@ -313,6 +331,17 @@ public:
   double lat_s_rem_cc_block_time;
   double lat_s_rem_cc_time;
   double lat_s_rem_process_time;
+
+  // stats for anomaly
+  uint64_t ano_2_trans_write_skew_1;
+  uint64_t ano_2_trans_write_skew_2;
+  uint64_t ano_3_trans_write_skew_1;
+  uint64_t ano_3_trans_write_skew_2;
+  uint64_t ano_2_trans_read_skew;
+  uint64_t ano_3_trans_read_skew_1;
+  uint64_t ano_3_trans_read_skew_2;
+  uint64_t ano_4_trans_read_skew;
+  uint64_t ano_unknown;
 
   double * mtx;
 

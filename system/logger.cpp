@@ -10,19 +10,11 @@ void Logger::init(const char * log_file_name) {
   log_file.open(log_file_name, ios::out | ios::app | ios::binary);
   assert(log_file.is_open());
   pthread_mutex_init(&mtx,NULL);
-
 }
 
-void Logger::release() {
-  log_file.close(); 
-}
+void Logger::release() { log_file.close(); }
 
-LogRecord * Logger::createRecord( 
-    uint64_t txn_id,
-    LogIUD iud,
-    uint64_t table_id,
-    uint64_t key
-    ) {
+LogRecord* Logger::createRecord(uint64_t txn_id, LogIUD iud, uint64_t table_id, uint64_t key) {
   LogRecord * record = (LogRecord*)mem_allocator.alloc(sizeof(LogRecord));
   record->rcd.init();
   record->rcd.lsn = ATOM_FETCH_ADD(lsn,1);
@@ -33,19 +25,14 @@ LogRecord * Logger::createRecord(
   return record;
 }
 
-LogRecord * Logger::createRecord( 
-    LogRecord * record
-    ) {
+LogRecord* Logger::createRecord(LogRecord* record) {
   LogRecord * my_record = (LogRecord*)mem_allocator.alloc(sizeof(LogRecord));
   my_record->rcd.init();
   my_record->copyRecord(record);
   return my_record;
 }
 
-
-void LogRecord::copyRecord( 
-    LogRecord * record
-    ) {
+void LogRecord::copyRecord(LogRecord* record) {
   rcd.init();
   rcd.lsn = record->rcd.lsn;
   rcd.iud = record->rcd.iud;
@@ -64,8 +51,7 @@ void Logger::enqueueRecord(LogRecord* record) {
 }
 
 void Logger::processRecord(uint64_t thd_id) {
-  if(log_queue.empty())
-    return;
+  if (log_queue.empty()) return;
   LogRecord * record = NULL;
   pthread_mutex_lock(&mtx);
   if(!log_queue.empty()) {
@@ -91,10 +77,7 @@ void Logger::processRecord(uint64_t thd_id) {
   
 }
 
-uint64_t Logger::reserveBuffer(uint64_t size) {
-  return ATOM_FETCH_ADD(aries_write_offset,size);
-}
-
+uint64_t Logger::reserveBuffer(uint64_t size) { return ATOM_FETCH_ADD(aries_write_offset, size); }
 
 //void Logger::writeToBuffer(char * data, uint64_t offset, uint64_t size) {
 void Logger::writeToBuffer(uint64_t thd_id, char * data, uint64_t size) {
