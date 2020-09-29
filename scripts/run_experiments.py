@@ -235,7 +235,7 @@ for exp in exps:
     elif 'ycsb_scaling' in exp:
         cmd='./result.sh -a ycsb_scaling -n {} -c {} -t {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow)
     elif 'tpcc_scaling' in exp:
-        cmd='./result.sh -a tpcc_scaling2 -n {} -c {} -t {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow)
+        cmd='./result.sh -a tpcc_scaling -n {} -c {} -t {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow)
     print cmd
     os.system(cmd)
 
@@ -248,6 +248,6 @@ for exp in exps:
     elif 'ycsb_scaling' in exp:
         cmd='./deneva-plot.sh -a ycsb_scaling -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     elif 'tpcc_scaling' in exp:
-        cmd='./deneva-plot.sh -a tpcc_scaling2 -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+        cmd='./deneva-plot.sh -a tpcc_scaling -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     print cmd
     os.system(cmd)

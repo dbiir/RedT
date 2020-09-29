@@ -64,8 +64,8 @@ void QWorkQueue::sequencer_enqueue(uint64_t thd_id, Message * msg) {
 	assert(ISSERVER);
 
 	DEBUG("Seq Enqueue (%ld,%ld)\n",entry->txn_id,entry->batch_id);
-  	while (!seq_queue->push(entry) && !simulation->is_done()) {
-  	}
+		while (!seq_queue->push(entry) && !simulation->is_done()) {
+		}
 
 	INC_STATS(thd_id,seq_queue_enqueue_time,get_sys_clock() - starttime);
 	INC_STATS(thd_id,seq_queue_enq_cnt,1);
@@ -86,8 +86,8 @@ Message * QWorkQueue::sequencer_dequeue(uint64_t thd_id) {
 		uint64_t queue_time = get_sys_clock() - entry->starttime;
 		INC_STATS(thd_id,seq_queue_wait_time,queue_time);
 		INC_STATS(thd_id,seq_queue_cnt,1);
-    // DEBUG("DEQUEUE (%ld,%ld) %ld; %ld; %d,
-    // 0x%lx\n",msg->txn_id,msg->batch_id,msg->return_node_id,queue_time,msg->rtype,(uint64_t)msg);
+		// DEBUG("DEQUEUE (%ld,%ld) %ld; %ld; %d,
+		// 0x%lx\n",msg->txn_id,msg->batch_id,msg->return_node_id,queue_time,msg->rtype,(uint64_t)msg);
 	DEBUG_M("SeqQueue::dequeue work_queue_entry free\n");
 		mem_allocator.free(entry,sizeof(work_queue_entry));
 		INC_STATS(thd_id,seq_queue_dequeue_time,get_sys_clock() - starttime);
@@ -113,8 +113,8 @@ void QWorkQueue::sched_enqueue(uint64_t thd_id, Message * msg) {
 
 	DEBUG("Sched Enqueue (%ld,%ld)\n",entry->txn_id,entry->batch_id);
 	uint64_t mtx_time_start = get_sys_clock();
-  while (!sched_queue[msg->get_return_id()]->push(entry) && !simulation->is_done()) {
-  }
+	while (!sched_queue[msg->get_return_id()]->push(entry) && !simulation->is_done()) {
+	}
 	INC_STATS(thd_id,mtx[37],get_sys_clock() - mtx_time_start);
 
 	INC_STATS(thd_id,sched_queue_enqueue_time,get_sys_clock() - starttime);
@@ -157,8 +157,8 @@ Message * QWorkQueue::sched_dequeue(uint64_t thd_id) {
 
 		} else {
 			simulation->inc_epoch_txn_cnt();
-      DEBUG("Sched msg dequeue %ld (%ld,%ld) %ld\n", sched_ptr, msg->txn_id, msg->batch_id,
-            simulation->get_worker_epoch());
+			DEBUG("Sched msg dequeue %ld (%ld,%ld) %ld\n", sched_ptr, msg->txn_id, msg->batch_id,
+						simulation->get_worker_epoch());
 			assert(msg->batch_id == simulation->get_worker_epoch());
 		}
 
@@ -373,7 +373,7 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 		//DEBUG("DEQUEUE (%ld,%ld) %ld; %ld; %d, 0x%lx\n",msg->txn_id,msg->batch_id,msg->return_node_id,queue_time,msg->rtype,(uint64_t)msg);
 		DEBUG("Work Dequeue (%ld,%ld)\n",entry->txn_id,entry->batch_id);
 		DEBUG_M("QWorkQueue::dequeue work_queue_entry free\n");
-    mem_allocator.free(entry,sizeof(work_queue_entry));
+		mem_allocator.free(entry,sizeof(work_queue_entry));
 		INC_STATS(thd_id,work_queue_dequeue_time,get_sys_clock() - starttime);
 	}
 
@@ -402,15 +402,15 @@ void QWorkQueue::enqueue(uint64_t thd_id, Message * msg,bool busy) {
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	if(msg->rtype == CL_QRY) {
-    while (!new_txn_queue->push(entry) && !simulation->is_done()) {
-    }
+		while (!new_txn_queue->push(entry) && !simulation->is_done()) {
+		}
 		sem_wait(&_semaphore);
 		txn_queue_size ++;
 		txn_enqueue_size ++;
 		sem_post(&_semaphore);
 	} else {
-    while (!work_queue->push(entry) && !simulation->is_done()) {
-    }
+		while (!work_queue->push(entry) && !simulation->is_done()) {
+		}
 		sem_wait(&_semaphore);
 		work_queue_size ++;
 		work_enqueue_size ++;
@@ -433,10 +433,11 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	bool valid = false;
 
-	// if ((thd_id % THREAD_CNT) % 2 == 0)
+	double x = (double)(rand() % 10000) / 10000;
+	if (x > TXN_QUEUE_PERCENT)
 		valid = work_queue->pop(entry);
-	// else
-	//   	valid = new_txn_queue->pop(entry);
+	else
+		valid = new_txn_queue->pop(entry);
 	if(!valid) {
 #if SERVER_GENERATE_QUERIES
 		if(ISSERVER) {
@@ -447,8 +448,12 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 			}
 		}
 #else
-		// if ((thd_id % THREAD_CNT) % 2 == 0)
+		if (x > TXN_QUEUE_PERCENT)
 			valid = new_txn_queue->pop(entry);
+		else
+			valid = work_queue->pop(entry);
+		// if ((thd_id % THREAD_CNT) % 2 == 0)
+			// valid = new_txn_queue->pop(entry);
 		// else
 		// 	valid = work_queue->pop(entry);
 #endif
@@ -478,8 +483,8 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 			INC_STATS(thd_id,work_queue_old_cnt,1);
 		}
 		msg->wq_time = queue_time;
-    // DEBUG("DEQUEUE (%ld,%ld) %ld; %ld; %d,
-    // 0x%lx\n",msg->txn_id,msg->batch_id,msg->return_node_id,queue_time,msg->rtype,(uint64_t)msg);
+		// DEBUG("DEQUEUE (%ld,%ld) %ld; %ld; %d,
+		// 0x%lx\n",msg->txn_id,msg->batch_id,msg->return_node_id,queue_time,msg->rtype,(uint64_t)msg);
 		DEBUG("Work Dequeue (%ld,%ld)\n",entry->txn_id,entry->batch_id);
 		DEBUG_M("QWorkQueue::dequeue work_queue_entry free\n");
 		mem_allocator.free(entry,sizeof(work_queue_entry));
@@ -504,7 +509,7 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 	Message * msg = NULL;
 	work_queue_entry * entry = NULL;
 	uint64_t mtx_wait_starttime = get_sys_clock();
-  	bool valid = work_queue->pop(entry);
+		bool valid = work_queue->pop(entry);
 	if(!valid) {
 #if SERVER_GENERATE_QUERIES
 		if(ISSERVER) {
@@ -515,7 +520,7 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 			}
 		}
 #else
-    valid = new_txn_queue->pop(entry);
+		valid = new_txn_queue->pop(entry);
 #endif
 	}
 	INC_STATS(thd_id,mtx[14],get_sys_clock() - mtx_wait_starttime);
@@ -546,7 +551,7 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 		//DEBUG("DEQUEUE (%ld,%ld) %ld; %ld; %d, 0x%lx\n",msg->txn_id,msg->batch_id,msg->return_node_id,queue_time,msg->rtype,(uint64_t)msg);
 		DEBUG("Work Dequeue (%ld,%ld)\n",entry->txn_id,entry->batch_id);
 		DEBUG_M("QWorkQueue::dequeue work_queue_entry free\n");
-    mem_allocator.free(entry,sizeof(work_queue_entry));
+		mem_allocator.free(entry,sizeof(work_queue_entry));
 		INC_STATS(thd_id,work_queue_dequeue_time,get_sys_clock() - starttime);
 	}
 

@@ -108,7 +108,7 @@ then
             let TMPN--
             for i in $(seq 0 $TMPN)
             do
-                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep _${cc}_ | grep _N-${nn}_ | grep ^${i}_)
+                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${nn}_ | grep ^${i}_)
                 AS=${AS}$(readlink -f ${RESULT_PATH}/$f)" "
                 LS=${LS}$(readlink -f ${RESULT_PATH}/$f)" "
             done
@@ -118,10 +118,8 @@ then
         mv ${TMPFILE} ${RESULT_PATH}/
     done
     echo >> ${LATFILE}
-    echo "abort manager validate cleanup process" >> ${LATFILE}
+    echo "abort manager validate cleanup process local_abort remote_abort" >> ${LATFILE}
     awk -F' ' '{for(i=1;i<=NF;i=i+1){a[NR,i]=$i}}END{for(j=1;j<=NF;j++){str=a[1,j];for(i=2;i<=NR;i++){str=str " " a[i,j]}print str}}' ${LTFILE} >> ${LATFILE}
-    /data/Anaconda3/bin/python getLATENCY.py ${LATFILE} ${PHASE}
-    mv 1.pdf ${RESULT_PATH}/latency.pdf
     mv ${LATFILE} ${RESULT_PATH}/
 elif [[ "${TEST_TYPE}" == 'ycsb_writes' ]]
 then
@@ -165,7 +163,7 @@ then
     /data/Anaconda3/bin/python getLATENCY.py ${LATFILE} ${PHASE}
     mv 1.pdf ${RESULT_PATH}/latency.pdf
     mv ${LATFILE} ${RESULT_PATH}/
-elif [[ "${TEST_TYPE}" == 'tpcc_scaling2' ]]
+elif [[ "${TEST_TYPE}" == 'tpcc_scaling' ]]
 then
     LATFILE=lat
     LTFILE=lt
@@ -192,7 +190,7 @@ then
             let TMPN--
             for i in $(seq 0 $TMPN)
             do
-                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep _${cc}_ | grep _N-${nn}_ | grep ^${i}_)
+                f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${nn}_ | grep ^${i}_)
                 AS=${AS}$(readlink -f ${RESULT_PATH}/$f)" "
                 LS=${LS}$(readlink -f ${RESULT_PATH}/$f)" "
             done
@@ -202,10 +200,8 @@ then
         mv ${TMPFILE} ${RESULT_PATH}/
     done
     echo >> ${LATFILE}
-    echo "abort manager validate cleanup process" >> ${LATFILE}
+    echo "abort manager validate cleanup process local_abort remote_abort" >> ${LATFILE}
     awk -F' ' '{for(i=1;i<=NF;i=i+1){a[NR,i]=$i}}END{for(j=1;j<=NF;j++){str=a[1,j];for(i=2;i<=NR;i++){str=str " " a[i,j]}print str}}' ${LTFILE} >> ${LATFILE}
-    /data/Anaconda3/bin/python getLATENCY.py ${LATFILE} ${PHASE}
-    mv 1.pdf ${RESULT_PATH}/latency.pdf
     mv ${LATFILE} ${RESULT_PATH}/
 fi
 

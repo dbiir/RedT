@@ -159,7 +159,11 @@ BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
 	int y = URand(1, 100);
 
 	// if(x > g_mpr) { 
+#ifdef NO_REMOTE
+  if(x >= 0) { 
+#else
 	if(x > 0.15) { 
+#endif
 		// home warehouse
 		query->c_d_id = query->d_id;
 		query->c_w_id = query->w_id;
@@ -216,7 +220,11 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
 
   double r_mpr = (double)(rand() % 10000) / 10000;
   uint64_t part_limit;
-  if(r_mpr < g_mpr)
+#ifdef NO_REMOTE
+  if(r_mpr < 0) 
+#else
+	if(r_mpr < g_mpr)
+#endif
     part_limit = g_part_per_txn;
   else
     part_limit = 1;

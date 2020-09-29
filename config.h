@@ -47,6 +47,8 @@
 // #define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
 // #define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
 // #define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
+#define NO_REMOTE // remove all remote txn
+#define TXN_QUEUE_PERCENT 0.9 // The proportion of the transaction to take from txn_queue firstly.
 // ! end of these parameters
 
 /***********************************************/

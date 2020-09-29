@@ -169,7 +169,7 @@ ts_t Row_ts::cal_min(TsType type) {
 	}
 	return new_min_pts;
 }
-#if 1
+#if 0
 RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 	RC rc;
 	uint64_t starttime = get_sys_clock();
