@@ -347,6 +347,7 @@ RC WorkerThread::run() {
     //#endif
     if(!msg) {
       if (idle_starttime == 0) idle_starttime = get_sys_clock();
+      //todo: add sleep 0.01ms
       continue;
     }
     simulation->last_da_query_time = get_sys_clock();

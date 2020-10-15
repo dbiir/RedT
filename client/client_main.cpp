@@ -159,13 +159,16 @@ int main(int argc, char *argv[]) {
 	pthread_barrier_init( &warmup_bar, NULL, all_thd_cnt);
 
 	uint64_t cpu_cnt = 0;
+#if SET_AFFINITY
 	cpu_set_t cpus;
+#endif
 	// spawn and run txns again.
 	starttime = get_server_clock();
-  simulation->run_starttime = starttime;
-  simulation->last_da_query_time = starttime;
-  uint64_t id = 0;
+	simulation->run_starttime = starttime;
+	simulation->last_da_query_time = starttime;
+	uint64_t id = 0;
 	for (uint64_t i = 0; i < thd_cnt; i++) {
+#if SET_AFFINITY
 		CPU_ZERO(&cpus);
 #if TPORT_TYPE_IPC
         CPU_SET(g_node_id * thd_cnt + cpu_cnt, &cpus);
@@ -175,8 +178,9 @@ int main(int argc, char *argv[]) {
         CPU_SET(cpu_cnt, &cpus);
 #endif
 		cpu_cnt = (cpu_cnt + 1) % g_servers_per_client;
-    pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-    client_thds[i].init(id,g_node_id,m_wl);
+    	pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+#endif
+    	client_thds[i].init(id,g_node_id,m_wl);
 		pthread_create(&p_thds[id++], &attr, run_thread, (void *)&client_thds[i]);
     }
 
