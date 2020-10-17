@@ -129,6 +129,15 @@ stat_map = OrderedDict([
   ('txn_index_time', []),
   ('txn_validate_time', []),
   ('txn_cleanup_time', []),
+  # trans execution
+  ('trans_total_run_time', []),
+  ('trans_process_time', []),
+  ('trans_2pc_time', []), # include prepare and finish
+  ('trans_prepare_time', []), #include validate
+  ('trans_validate_time', []),
+  ('trans_finish_time', []), #include commit and abort
+  ('trans_commit_time', []),
+  ('trans_abort_time', []),
 
   # Transaction Stats
   ('txn_total_process_time', []),
@@ -475,6 +484,15 @@ stat_map2 = {
   'txn_index_time': [],
   'txn_validate_time': [],
   'txn_cleanup_time': [],
+  # trans execution
+  'trans_total_run_time', [], # include all of above
+  'trans_process_time', [],
+  'trans_2pc_time', [], # include prepare and finish
+  'trans_prepare_time', [], #include validate
+  'trans_validate_time', [],
+  'trans_finish_time', [], #include commit and abort
+  'trans_commit_time', [],
+  'trans_abort_time', [],
 
   # Work queue
   'work_queue_wait_time': [],

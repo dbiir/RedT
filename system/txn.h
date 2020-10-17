@@ -89,6 +89,8 @@ public:
 	uint64_t wait_starttime;
 	uint64_t write_cnt;
 	uint64_t abort_cnt;
+	uint64_t prepare_start_time;
+	uint64_t finish_start_time;
 	double total_process_time;
 	double process_time;
 	double total_local_wait_time;

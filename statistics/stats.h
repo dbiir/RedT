@@ -92,6 +92,15 @@ public:
   double txn_index_time;
   double txn_validate_time;
   double txn_cleanup_time;
+  // trans
+  double trans_total_run_time=0;
+  double trans_process_time=0;
+  double trans_2pc_time=0;
+  double trans_prepare_time=0;
+  double trans_validate_time=0;
+  double trans_finish_time=0;
+  double trans_commit_time=0;
+  double trans_abort_time=0;
 
   // Work queue
   double work_queue_wait_time;

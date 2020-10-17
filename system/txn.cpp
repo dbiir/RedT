@@ -446,7 +446,7 @@ RC TxnManager::commit() {
 	inout_table.set_commit_ts(get_thd_id(), get_txn_id(), get_commit_timestamp());
 	inout_table.set_state(get_thd_id(), get_txn_id(), SSI_COMMITTED);
 #endif
-		commit_stats();
+	commit_stats();
 #if LOGGING
 	LogRecord * record = logger.createRecord(get_txn_id(),L_NOTIFY,0,0);
 	if(g_repl_cnt > 0) {
@@ -456,7 +456,7 @@ RC TxnManager::commit() {
 	logger.enqueueRecord(record);
 	return WAIT;
 #endif
-		return Commit;
+	return Commit;
 }
 
 RC TxnManager::abort() {
@@ -512,6 +512,11 @@ RC TxnManager::abort() {
 }
 
 RC TxnManager::start_abort() {
+	// ! trans process time
+	uint64_t prepare_start_time = get_sys_clock();
+	txn_stats.prepare_start_time = prepare_start_time;
+	uint64_t process_time_span  = prepare_start_time - txn_stats.restart_starttime;
+	INC_STATS(get_thd_id(), trans_process_time, process_time_span);
 	txn->rc = Abort;
 	DEBUG("%ld start_abort\n",get_txn_id());
 	if(query->partitions_touched.size() > 1) {
@@ -544,6 +549,11 @@ RC TxnManager::start_commit() {
 }
 #else
 RC TxnManager::start_commit() {
+	// ! trans process time
+	uint64_t prepare_start_time = get_sys_clock();
+	txn_stats.prepare_start_time = prepare_start_time;
+	uint64_t process_time_span  = prepare_start_time - txn_stats.restart_starttime;
+	INC_STATS(get_thd_id(), trans_process_time, process_time_span);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
 	if(is_multi_part()) {
@@ -559,6 +569,8 @@ RC TxnManager::start_commit() {
 			send_prepare_messages();
 			rc = WAIT_REM;
 		} else {
+			uint64_t finish_start_time = get_sys_clock();
+			txn_stats.finish_start_time = finish_start_time;
 			if(CC_ALG == WSI) {
 				wsi_man.gene_finish_ts(this);
 			}
@@ -568,6 +580,8 @@ RC TxnManager::start_commit() {
 		}
 	} else { // is not multi-part
 		rc = validate();
+		uint64_t finish_start_time = get_sys_clock();
+		txn_stats.finish_start_time = finish_start_time;
 		if(CC_ALG == SSI) {
 			ssi_man.gene_finish_ts(this);
 		}

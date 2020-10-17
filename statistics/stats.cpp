@@ -98,6 +98,15 @@ void Stats_thd::clear() {
   txn_index_time=0;
   txn_validate_time=0;
   txn_cleanup_time=0;
+  
+  trans_total_run_time=0;
+  trans_process_time=0;
+  trans_2pc_time=0;
+  trans_prepare_time=0;
+  trans_validate_time=0;
+  trans_finish_time=0;
+  trans_commit_time=0;
+  trans_abort_time=0;
 
   // Transaction stats
   txn_total_process_time=0;
@@ -522,6 +531,19 @@ void Stats_thd::print(FILE * outf, bool prog) {
           ",txn_cleanup_time=%f",
           ts_alloc_time / BILLION, abort_time / BILLION, txn_manager_time / BILLION,
           txn_index_time / BILLION, txn_validate_time / BILLION, txn_cleanup_time / BILLION);
+  // trans
+  fprintf(outf,
+  ",trans_total_run_time=%f"
+  ",trans_process_time=%f"
+  ",trans_2pc_time=%f"
+  ",trans_prepare_time=%f"
+  ",trans_validate_time=%f"
+  ",trans_finish_time=%f"
+  ",trans_commit_time=%f"
+  ",trans_abort_time=%f",
+          trans_total_run_time / BILLION, trans_process_time / BILLION, trans_2pc_time / BILLION,
+          trans_prepare_time / BILLION, trans_validate_time / BILLION, trans_finish_time / BILLION,
+          trans_commit_time / BILLION, trans_abort_time / BILLION);
 
   // Transaction stats
   double txn_total_process_time_avg=0;
@@ -1158,7 +1180,15 @@ void Stats_thd::combine(Stats_thd * stats) {
   txn_index_time+=stats->txn_index_time;
   txn_validate_time+=stats->txn_validate_time;
   txn_cleanup_time+=stats->txn_cleanup_time;
-
+  // trans
+  trans_total_run_time+=stats->trans_total_run_time;
+  trans_process_time+=stats->trans_process_time;
+  trans_2pc_time+=stats->trans_2pc_time;
+  trans_prepare_time+=stats->trans_prepare_time;
+  trans_validate_time+=stats->trans_validate_time;
+  trans_finish_time+=stats->trans_finish_time;
+  trans_commit_time+=stats->trans_commit_time;
+  trans_abort_time+=stats->trans_abort_time;
   // Transaction stats
   txn_total_process_time+=stats->txn_total_process_time;
   txn_process_time+=stats->txn_process_time;
