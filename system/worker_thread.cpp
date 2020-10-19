@@ -197,8 +197,14 @@ void WorkerThread::process(Message * msg) {
 
 void WorkerThread::check_if_done(RC rc) {
   if (txn_man->waiting_for_response()) return;
-  if (rc == Commit) commit();
-  if (rc == Abort) abort();
+  if (rc == Commit) {
+    txn_man->txn_stats.finish_start_time = get_sys_clock();
+    commit();
+  }
+  if (rc == Abort) {
+    txn_man->txn_stats.finish_start_time = get_sys_clock();
+    abort();
+  }
 }
 
 void WorkerThread::release_txn_man() {
@@ -563,6 +569,8 @@ RC WorkerThread::process_rack_prep(Message * msg) {
   }
   uint64_t finish_start_time = get_sys_clock();
   txn_man->txn_stats.finish_start_time = finish_start_time;
+  uint64_t prepare_timespan  = finish_start_time - txn_man->txn_stats.prepare_start_time;
+  INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
   if(rc == Abort || txn_man->get_rc() == Abort) {
     txn_man->txn->rc = Abort;
     rc = Abort;
