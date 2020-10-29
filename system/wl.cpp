@@ -29,7 +29,7 @@ RC Workload::init() { return RCOK; }
 
 RC Workload::init_schema(const char * schema_file) {
     assert(sizeof(uint64_t) == 8);
-    assert(sizeof(double) == 8);	
+    assert(sizeof(double) == 8);
 	string line;
   uint32_t id = 0;
 	ifstream fin(schema_file);
@@ -64,7 +64,7 @@ RC Workload::init_schema(const char * schema_file) {
 
         schema->add_col(name, size, type);
 				col_count ++;
-			} 
+			}
 			tmp = new char[CL_SIZE * 2 + sizeof(table_t)];
             table_t * cur_tab = (table_t *) ((UInt64)tmp + CL_SIZE);
 			cur_tab->init(schema);
@@ -84,7 +84,7 @@ RC Workload::init_schema(const char * schema_file) {
 		    	line.erase(0, pos + 1);
         cout<<"token "<<token<<endl;
 			}
-			
+
 			string tname(items[0]);
 			int field_cnt = items.size() - 1;
 			uint64_t * fields = new uint64_t [field_cnt];
@@ -161,7 +161,7 @@ void Workload::index_delete_all() {
     INDEX * index = (INDEX *) indexes[index_name];
     index->index_delete();
   }*/
-  
+
 }
 
 void Workload::index_insert(string index_name, uint64_t key, row_t * row) {

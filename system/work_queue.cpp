@@ -78,7 +78,7 @@ Message * QWorkQueue::sequencer_dequeue(uint64_t thd_id) {
 	Message * msg = NULL;
 	work_queue_entry * entry = NULL;
 	bool valid = seq_queue->pop(entry);
-	
+
 	if(valid) {
 		msg = entry->msg;
 		assert(msg);
@@ -185,10 +185,10 @@ void QWorkQueue::enqueue(uint64_t thd_id, Message * msg,bool busy) {
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	if(msg->rtype == CL_QRY) {
-		// boost::unique_lck<boost::mutex> lk(mt);  
-		// cvt.wait(lk);  
+		// boost::unique_lck<boost::mutex> lk(mt);
+		// cvt.wait(lk);
 		sem_wait(&mt);
-		new_txn_queue.push_back(entry);  
+		new_txn_queue.push_back(entry);
 		sem_post(&mt);
 		// cvt.notify_one();
 		// while(!new_txn_queue->push(entry) && !simulation->is_done()) {}
@@ -197,10 +197,10 @@ void QWorkQueue::enqueue(uint64_t thd_id, Message * msg,bool busy) {
 		txn_enqueue_size ++;
 		sem_post(&_semaphore);
 	} else {
-		// boost::unique_lock<boost::mutex> lk(mw);  
-		// cvw.wait(lk);  
+		// boost::unique_lock<boost::mutex> lk(mw);
+		// cvw.wait(lk);
 		sem_wait(&mw);
-		work_queue.push_back(entry);  
+		work_queue.push_back(entry);
 		sem_post(&mw);
 		// cvw.notify_one();
 		// while(!work_queue->push(entry) && !simulation->is_done()) {}
@@ -227,8 +227,8 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 	bool valid = false;
 	// bool iswork = false;
 	// if ((thd_id % THREAD_CNT) % 2 == 0)
-	// std::unique_lock<std::mutex> lk(mw);  
-	// cvw.wait(lk};  
+	// std::unique_lock<std::mutex> lk(mw);
+	// cvw.wait(lk};
 	sem_wait(&mw);
 	valid = work_queue.size() > 0;
 	if (valid) {
@@ -253,8 +253,8 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 #else
 		// if ((thd_id % THREAD_CNT) % 2 == 0)
 			// valid = new_txn_queue->pop(entry);
-		// lk(mt);  
-		// cvt.wait(lk};  
+		// lk(mt);
+		// cvt.wait(lk};
 		sem_wait(&mt);
 		valid = new_txn_queue.size() > 0;
 		if (valid) {
@@ -268,7 +268,7 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 #endif
 	}
 	INC_STATS(thd_id,mtx[14],get_sys_clock() - mtx_wait_starttime);
-	
+
 	if(valid) {
 		msg = entry->msg;
 		assert(msg);
@@ -296,7 +296,7 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 		DEBUG("Work Dequeue (%ld,%ld)\n",entry->txn_id,entry->batch_id);
 		DEBUG_M("QWorkQueue::dequeue work_queue_entry free\n");
 		// mem_allocator.free(entry,sizeof(work_queue_entry));
-			
+
 		INC_STATS(thd_id,work_queue_dequeue_time,get_sys_clock() - starttime);
 	}
 
@@ -346,7 +346,7 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 #endif
 	}
 	INC_STATS(thd_id,mtx[14],get_sys_clock() - mtx_wait_starttime);
-	
+
 	if(valid) {
 		msg = entry->msg;
 		assert(msg);
@@ -459,7 +459,7 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 #endif
 	}
 	INC_STATS(thd_id,mtx[14],get_sys_clock() - mtx_wait_starttime);
-	
+
 	if(valid) {
 		msg = entry->msg;
 		assert(msg);
@@ -524,7 +524,7 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 #endif
 	}
 	INC_STATS(thd_id,mtx[14],get_sys_clock() - mtx_wait_starttime);
-	
+
 	if(valid) {
 		msg = entry->msg;
 		assert(msg);

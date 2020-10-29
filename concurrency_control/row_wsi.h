@@ -29,7 +29,7 @@ struct WSIReqEntry {
 	WSIReqEntry * next;
 };
 
-struct WSIHisEntry {	
+struct WSIHisEntry {
 	// TxnManager * txn;
 	ts_t ts;
 	// only for write history. The value needs to be stored.
@@ -65,7 +65,7 @@ private:
 	void buffer_req(TsType type, TxnManager * txn);
 	WSIReqEntry * debuffer_req( TsType type, TxnManager * txn = NULL);
 
-	row_t * clear_history(TsType type, ts_t ts); 
+	row_t * clear_history(TsType type, ts_t ts);
 
     WSIReqEntry * prereq_mvcc;
     WSIHisEntry * readhis;

@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-#if TPCC_SMALL 
+#if TPCC_SMALL
 enum {
 	W_ID,
 	W_NAME,
@@ -96,7 +96,7 @@ enum {
 	S_QUANTITY,
 	S_REMOTE_CNT
 };
-#else 
+#else
 enum {
 	W_ID,
 	W_NAME,

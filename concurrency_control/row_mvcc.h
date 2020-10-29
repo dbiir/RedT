@@ -28,7 +28,7 @@ struct MVReqEntry {
 	MVReqEntry * next;
 };
 
-struct MVHisEntry {	
+struct MVHisEntry {
 	ts_t ts;
 	// only for write history. The value needs to be stored.
 //	char * data;
@@ -59,7 +59,7 @@ private:
 	void update_buffer(TxnManager * txn);
 	void insert_history( ts_t ts, row_t * row);
 
-	row_t * clear_history(TsType type, ts_t ts); 
+	row_t * clear_history(TsType type, ts_t ts);
 
 	MVReqEntry * readreq_mvcc;
     MVReqEntry * prereq_mvcc;

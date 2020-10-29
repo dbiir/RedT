@@ -15,7 +15,7 @@
 class RtsEnt : public KeyRangeEnt{
 public:
   RtsEnt() : KeyRangeEnt(), rts(0) {};
-  RtsEnt(uint64_t Sk, uint64_t Ek, uint64_t timestamp) : 
+  RtsEnt(uint64_t Sk, uint64_t Ek, uint64_t timestamp) :
     KeyRangeEnt(Sk, Ek), rts(timestamp) { };
   uint64_t rts;
 };
@@ -25,7 +25,7 @@ class RtsCache {
     RtsCache() {};
     void init();
     RC add(uint64_t StartKey, uint64_t EndKey, uint64_t timestamp);
-    
+
     RC addWithMutex(uint64_t StartKey, uint64_t EndKey, uint64_t timestamp);
     uint64_t getRts(uint64_t StartKey, uint64_t EndKey);
   private:

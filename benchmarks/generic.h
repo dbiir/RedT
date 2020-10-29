@@ -33,7 +33,7 @@ enum Anomally
   THREE_TRANS_WRITE_SKEW,
   MULTI_TRANS_ANOMALY,
   //WSI
-  WRITE_SKEW, 
+  WRITE_SKEW,
   WW_CONFLICT,
   //SSI
   RW_CONFLICT,
@@ -43,7 +43,7 @@ enum Anomally
 
 extern std::unordered_map<int, std::string> Anomally2Name;
 
- 
+
 std::ostream& operator<<(std::ostream& os, const Anomally e) ;
 
 

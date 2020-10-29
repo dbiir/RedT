@@ -27,7 +27,7 @@ BaseQuery * TPCCQueryGenerator::create_query(Workload * h_wl,uint64_t home_parti
   double x = (double)(rand() % 100) / 100.0;
 	if (x < g_perc_payment)
 		return gen_payment(home_partition_id);
-	else 
+	else
 		return gen_new_order(home_partition_id);
 
 }
@@ -43,7 +43,7 @@ void TPCCQuery::init() {
 }
 
 void TPCCQuery::print() {
-  
+
   printf(
       "TPCCQuery: %d "
       "w_id: %ld, d_id: %ld, c_id: %ld, d_w_id: %ld, c_w_id: %ld, c_d_id: %ld\n",
@@ -70,7 +70,7 @@ std::set<uint64_t> TPCCQuery::participants(Message * msg, Workload * wl) {
       id = GET_NODE_ID(wh_to_part(tpcc_msg->c_w_id));
       participant_set.insert(id);
       break;
-    case TPCC_NEW_ORDER: 
+    case TPCC_NEW_ORDER:
       for(uint64_t i = 0; i < tpcc_msg->ol_cnt; i++) {
         uint64_t req_nid = GET_NODE_ID(wh_to_part(tpcc_msg->items[i]->ol_supply_w_id));
         participant_set.insert(req_nid);
@@ -101,7 +101,7 @@ uint64_t TPCCQuery::participants(bool *& pps,Workload * wl) {
         n++;
       }
       break;
-    case TPCC_NEW_ORDER: 
+    case TPCC_NEW_ORDER:
       id = GET_NODE_ID(wh_to_part(w_id));
       if(!pps[id]) {
         pps[id] = true;
@@ -158,16 +158,16 @@ BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
 	double x = (double)(rand() % 10000) / 10000;
 	int y = URand(1, 100);
 
-	// if(x > g_mpr) { 
+	// if(x > g_mpr) {
 #ifdef NO_REMOTE
-  if(x >= 0) { 
+  if(x >= 0) {
 #else
-	if(x > 0.15) { 
+	if(x > 0.15) {
 #endif
 		// home warehouse
 		query->c_d_id = query->d_id;
 		query->c_w_id = query->w_id;
-	} else {	
+	} else {
 		// remote warehouse
 		query->c_d_id = URand(1, g_dist_per_wh);
 		if(g_num_wh > 1) {
@@ -176,7 +176,7 @@ BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
 			if (wh_to_part(query->w_id) != wh_to_part(query->c_w_id)) {
         partitions_accessed.insert(wh_to_part(query->c_w_id));
 			}
-		} else 
+		} else
       query->c_w_id = query->w_id;
 	}
 	if(y <= 60) {
@@ -221,7 +221,7 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
   double r_mpr = (double)(rand() % 10000) / 10000;
   uint64_t part_limit;
 #ifdef NO_REMOTE
-  if(r_mpr < 0) 
+  if(r_mpr < 0)
 #else
 	if(r_mpr < g_mpr)
 #endif

@@ -45,7 +45,7 @@ struct AriesLogRecord {
     lsn = UINT64_MAX;
     type = LRT_UPDATE;
     iud = L_UPDATE;
-    txn_id = UINT64_MAX; 
+    txn_id = UINT64_MAX;
     table_id = 0;
     key = UINT64_MAX;
   }
@@ -59,13 +59,13 @@ struct AriesLogRecord {
   uint32_t table_id; // table being updated
   uint64_t key; // primary key (determines the partition ID)
   // TODO: column list
-  
+
   /*lsn
   uint32_t n_cols; //how many columns are being updated
   uint32_t* cols; //ids of modified columns
-  uint32_t before_image_size; 
+  uint32_t before_image_size;
   char * before_image; // data buffer for before image
-  uint32_t after_image_size; 
+  uint32_t after_image_size;
   char * after_image; // data buffer for after image
   */
 
@@ -102,11 +102,11 @@ public:
       uint64_t txn_id, LogIUD iud,
     //uint64_t partid,
       uint64_t table_id, uint64_t key);
-  void enqueueRecord(LogRecord* record); 
-  void processRecord(uint64_t thd_id); 
-  void writeToBuffer(uint64_t thd_id,char * data, uint64_t size); 
-  void writeToBuffer(uint64_t thd_id,LogRecord* record); 
-  uint64_t reserveBuffer(uint64_t size); 
+  void enqueueRecord(LogRecord* record);
+  void processRecord(uint64_t thd_id);
+  void writeToBuffer(uint64_t thd_id,char * data, uint64_t size);
+  void writeToBuffer(uint64_t thd_id,LogRecord* record);
+  uint64_t reserveBuffer(uint64_t size);
   void notify_on_sync(uint64_t txn_id);
 private:
   pthread_mutex_t mtx;

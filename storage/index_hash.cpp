@@ -14,11 +14,11 @@
    limitations under the License.
 */
 
-#include "global.h"	
+#include "global.h"
 #include "index_hash.h"
 #include "mem_alloc.h"
 #include "row.h"
-	
+
 RC IndexHash::init(uint64_t bucket_cnt) {
 	_bucket_cnt = bucket_cnt;
 	_bucket_cnt_per_part = bucket_cnt;
@@ -59,18 +59,18 @@ bool IndexHash::index_exist(idx_key_t key) {
 	assert(false);
 }
 
-void 
+void
 IndexHash::get_latch(BucketHeader * bucket) {
 	while (!ATOM_CAS(bucket->locked, false, true)) {}
 }
 
-void 
+void
 IndexHash::release_latch(BucketHeader * bucket) {
 	bool ok = ATOM_CAS(bucket->locked, true, false);
 	assert(ok);
 }
 
-	
+
 RC IndexHash::index_insert(idx_key_t key, itemid_t * item, int part_id) {
 	RC rc = RCOK;
 	uint64_t bkt_idx = hash(key);
@@ -79,10 +79,10 @@ RC IndexHash::index_insert(idx_key_t key, itemid_t * item, int part_id) {
 	BucketHeader * cur_bkt = &_buckets[0][bkt_idx];
 	// 1. get the ex latch
 	get_latch(cur_bkt);//delete by 																	ym
-	
+
 	// 2. update the latch list
 	cur_bkt->insert_item(key, item, part_id);
-	
+
 	// 3. release the latch
 	release_latch(cur_bkt);//delete by 																	ym
 	return rc;
@@ -95,10 +95,10 @@ RC IndexHash::index_insert_nonunique(idx_key_t key, itemid_t * item, int part_id
 	BucketHeader * cur_bkt = &_buckets[0][bkt_idx];
 	// 1. get the ex latch
 	get_latch(cur_bkt);
-	
+
 	// 2. update the latch list
 	cur_bkt->insert_item_nonunique(key, item, part_id);
-	
+
 	// 3. release the latch
 	release_latch(cur_bkt);
 	return rc;
@@ -114,7 +114,7 @@ RC IndexHash::index_read(idx_key_t key, itemid_t * &item, int part_id) {
 //	get_latch(cur_bkt);
 
 	cur_bkt->read_item(key, item);
-	
+
 	// 3. release the latch
 //	release_latch(cur_bkt);
 	return rc;
@@ -131,7 +131,7 @@ RC IndexHash::index_read(idx_key_t key, int count, itemid_t * &item, int part_id
 //	get_latch(cur_bkt);
 
 	cur_bkt->read_item(key, count, item);
-	
+
 	// 3. release the latch
 //	release_latch(cur_bkt);
 	return rc;
@@ -139,7 +139,7 @@ RC IndexHash::index_read(idx_key_t key, int count, itemid_t * &item, int part_id
 }
 
 
-RC IndexHash::index_read(idx_key_t key, itemid_t * &item, 
+RC IndexHash::index_read(idx_key_t key, itemid_t * &item,
 						int part_id, int thd_id) {
 	uint64_t bkt_idx = hash(key);
 	assert(bkt_idx < _bucket_cnt_per_part);
@@ -149,9 +149,9 @@ RC IndexHash::index_read(idx_key_t key, itemid_t * &item,
 	// 1. get the sh latch
 //	get_latch(cur_bkt);
 
-	
+
 	cur_bkt->read_item(key, item);
-	
+
 	// 3. release the latch
 //	release_latch(cur_bkt);
 	return rc;
@@ -175,9 +175,9 @@ void BucketHeader::delete_bucket() {
 }
 
 
-void BucketHeader::insert_item(idx_key_t key, 
-		itemid_t * item, 
-		int part_id) 
+void BucketHeader::insert_item(idx_key_t key,
+		itemid_t * item,
+		int part_id)
 {
 
 	BucketNode * cur_node = first_node;
@@ -188,9 +188,9 @@ void BucketHeader::insert_item(idx_key_t key,
 		prev_node = cur_node;
 		cur_node = cur_node->next;
 	}
-	if (cur_node == NULL) {		
-		BucketNode * new_node = (BucketNode *) 
-			mem_allocator.alloc(sizeof(BucketNode));		
+	if (cur_node == NULL) {
+		BucketNode * new_node = (BucketNode *)
+			mem_allocator.alloc(sizeof(BucketNode));
 		new_node->init(key);
 		new_node->items = item;
 		if (prev_node != NULL) {
@@ -207,13 +207,13 @@ void BucketHeader::insert_item(idx_key_t key,
 }
 
 
-void BucketHeader::insert_item_nonunique(idx_key_t key, 
-		itemid_t * item, 
-		int part_id) 
+void BucketHeader::insert_item_nonunique(idx_key_t key,
+		itemid_t * item,
+		int part_id)
 {
 
-  BucketNode * new_node = (BucketNode *) 
-    mem_allocator.alloc(sizeof(BucketNode));		
+  BucketNode * new_node = (BucketNode *)
+    mem_allocator.alloc(sizeof(BucketNode));
   new_node->init(key);
   new_node->items = item;
   new_node->next = first_node;

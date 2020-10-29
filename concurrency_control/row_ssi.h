@@ -28,7 +28,7 @@ struct SSIReqEntry {
 	SSIReqEntry * next;
 };
 
-struct SSIHisEntry {	
+struct SSIHisEntry {
 	// TxnManager * txn;
 	txnid_t txn;
 	ts_t ts;
@@ -75,9 +75,9 @@ private:
 	void buffer_req(TsType type, TxnManager * txn);
 	SSIReqEntry * debuffer_req( TsType type, TxnManager * txn = NULL);
 
-	
+
 	SSILockEntry * get_entry();
-	row_t * clear_history(TsType type, ts_t ts); 
+	row_t * clear_history(TsType type, ts_t ts);
 
     SSIReqEntry * prereq_mvcc;
     SSIHisEntry * readhis;

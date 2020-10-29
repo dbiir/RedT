@@ -70,7 +70,7 @@ for exp in exps:
         output_f = get_outfile_name(cfgs, fmt)
 
         output_dir = output_f + "/"
-        output_f = output_f + strnow 
+        output_f = output_f + strnow
 
         lines=None
         f = open("config.h", 'r')
@@ -121,7 +121,7 @@ for exp in exps:
                     for m in machines[:]:
                         machines.append(m)
                 else:
-                    machines = sorted(machines_[:(cfgs["NODE_CNT"] + cfgs["CLIENT_NODE_CNT"])])  
+                    machines = sorted(machines_[:(cfgs["NODE_CNT"] + cfgs["CLIENT_NODE_CNT"])])
                 with open("ifconfig.txt",'w') as f_ifcfg:
                     for m in machines:
                         if cluster == 'local':
@@ -186,7 +186,7 @@ for exp in exps:
                         cmd = 'scp centos@10.77.110.{}:/home/{}/dbresults.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
                         print cmd
                         os.system(cmd)
-                       
+
             else:
                 nnodes = cfgs["NODE_CNT"]
                 nclnodes = cfgs["NODE_CNT"]

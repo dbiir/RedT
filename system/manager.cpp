@@ -24,7 +24,7 @@ __thread uint64_t Manager::_max_cts = 1;
 void Manager::init() {
 	timestamp = 1;
 	last_min_ts_time = 0;
-	min_ts = 0; 
+	min_ts = 0;
 	all_ts = (ts_t *) malloc(sizeof(ts_t) * (g_thread_cnt * g_node_cnt));
 	_all_txns = new TxnManager * [g_thread_cnt + g_rem_thread_cnt];
 	for (UInt32 i = 0; i < g_thread_cnt + g_rem_thread_cnt; i++) {
@@ -49,7 +49,7 @@ uint64_t Manager::get_ts(uint64_t thread_id) {
 	case TS_CAS :
 		if (g_ts_batch_alloc)
 			time = ATOM_FETCH_ADD(timestamp, g_ts_batch_num);
-		else 
+		else
 			time = ATOM_FETCH_ADD(timestamp, 1);
 		break;
 	case TS_HW :
@@ -74,11 +74,11 @@ uint64_t Manager::get_ts(uint64_t thread_id) {
 
 ts_t Manager::get_min_ts(uint64_t tid) {
 	uint64_t now = get_sys_clock();
-	if (now - last_min_ts_time > MIN_TS_INTVL) { 
+	if (now - last_min_ts_time > MIN_TS_INTVL) {
 		last_min_ts_time = now;
     uint64_t min = txn_table.get_min_ts(tid);
     if (min > min_ts) min_ts = min;
-	} 
+	}
 	return min_ts;
 }
 
@@ -92,11 +92,11 @@ uint64_t Manager::hash(row_t * row) {
 	uint64_t addr = (uint64_t)row / MEM_ALLIGN;
     return (addr * 1103515247 + 12345) % BUCKET_CNT;
 }
- 
+
 void Manager::lock_row(row_t * row) {
 	int bid = hash(row);
   uint64_t mtx_time_start = get_sys_clock();
-	pthread_mutex_lock( &mutexes[bid] );	
+	pthread_mutex_lock( &mutexes[bid] );
   INC_STATS(0,mtx[2],get_sys_clock() - mtx_time_start);
 }
 

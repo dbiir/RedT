@@ -30,7 +30,7 @@ class row_t;
 class table_t;
 class BaseQuery;
 class INDEX;
-class TxnQEntry; 
+class TxnQEntry;
 class YCSBQuery;
 class TPCCQuery;
 //class r_query;
@@ -213,7 +213,7 @@ public:
 	std::set<uint64_t> * uncommitted_reads;
 	std::set<uint64_t> * uncommitted_writes;
 	std::set<uint64_t> * uncommitted_writes_y;
-	
+
 	uint64_t twopl_wait_start;
 
 	// For Tictoc

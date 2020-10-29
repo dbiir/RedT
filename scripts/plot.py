@@ -1,5 +1,5 @@
 import os, sys, re, math, os.path, math
-from helper import get_cfgs 
+from helper import get_cfgs
 from experiments import *
 from plot_helper import *
 import latency_stats as ls
@@ -89,7 +89,7 @@ for exp in exps:
         if is_network_test:
             r = {}
             r2 = {}
-            ofile = "{}0_{}*".format(result_dir,output_f) 
+            ofile = "{}0_{}*".format(result_dir,output_f)
             res_list = sorted(glob.glob(ofile),key=os.path.getmtime,reverse=False)
             timestamps = list(set([t.split("_")[5] for t in res_list]))
             exp_cnt = len(timestamps)

@@ -1,5 +1,4 @@
-import re
-import sys
+import re, sys
 
 summary = {}
 
@@ -22,15 +21,19 @@ for arg in sys.argv[1:]:
     get_summary(arg)
 names = summary.keys()
 
-a = sum(summary['abort_time'])/len(summary['abort_time']
-                                   ) if 'abort_time' in summary else 0
-b = sum(summary['txn_manager_time'])/len(summary['txn_manager_time']
-                                         ) if 'txn_manager_time' in summary else 0
-c = sum(summary['txn_validate_time'])/len(summary['txn_validate_time']
-                                          ) if 'txn_validate_time' in summary else 0
-d = sum(summary['txn_cleanup_time'])/len(summary['txn_cleanup_time']
-                                         ) if 'txn_cleanup_time' in summary else 0
-e = sum(summary['txn_total_process_time'])/len(summary['txn_total_process_time']
-                                               ) if 'txn_total_process_time' in summary else 0
+a = sum(summary['trans_total_run_time'])
+b = sum(summary['trans_process_time'])
+c = sum(summary['trans_2pc_time'])
+d = sum(summary['trans_prepare_time'])
+e = sum(summary['trans_validate_time'])
+f = sum(summary['trans_finish_time'])
+g = sum(summary['trans_commit_time'])
+h = sum(summary['trans_abort_time'])
+i = sum(summary['lat_l_loc_cc_block_time'])
+j = sum(summary['lat_l_rem_cc_block_time'])
+k = sum(summary['txn_index_time'])
+l = sum(summary['txn_manager_time'])
+m = sum(summary['lat_l_loc_cc_time'])
+#trans_total_run_time trans_process_time trans_process_time% trans_2pc_time trans_2pc_time% trans_prepare_time trans_prepare_time% trans_validate_time trans_validate_time% trans_finish_time trans_finish_time% trans_commit_time trans_commit_time% trans_abort_time trans_abort_time% trans_block_time trans_block_time% txn_index_time txn_index_time% txn_manager_time txn_manager_time% lat_l_loc_cc_time lat_l_loc_cc_time%
+print a,b,b/a,c,c/a,d,d/a,e,e/a,f,f/a,g,g/a,h,h/a,i+j,(i+j)/a,k,k/a,l,l/a,m,m/a
 
-print a, b, c, d, e

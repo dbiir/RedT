@@ -9,7 +9,7 @@ import glob
 PATH=os.getcwd()
 result_dir = PATH + "/../results/"
 
-llim = 1000 
+llim = 1000
 ulim = 1300#sys.maxint
 
 fmt,exps=experiment_1()
@@ -31,5 +31,5 @@ for e in exps:
     for i in types:
         tids.append(r[i]["tid"])
         times.append(r[i]["time"])
- 
+
     draw_scatter("scatter_{}".format(output_f),tids,times,title=output_f,linenames=types);

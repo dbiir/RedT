@@ -33,7 +33,7 @@ typedef struct
     int thd_id;
 }FUNC_ARGS;
 
-void 
+void
 Client_query_queue::init(Workload * h_wl) {
 	_wl = h_wl;
 
@@ -82,20 +82,20 @@ Client_query_queue::init(Workload * h_wl) {
   }
 }
 
-void * 
+void *
 Client_query_queue::initQueriesHelper(void * args) {
   ((Client_query_queue*)((FUNC_ARGS*)args)->context)->initQueriesParallel(((FUNC_ARGS*)args)->thd_id);
-  
+
   return NULL;
 }
 
-void 
+void
 Client_query_queue::initQueriesParallel(uint64_t thd_id) {
 #if WORKLOAD != DA
 	UInt32 tid = ATOM_FETCH_ADD(next_tid, 1);
   uint64_t request_cnt;
 	request_cnt = g_max_txn_per_part + 4;
-	
+
     uint32_t final_request;
 #if CC_ALG == BOCC || CC_ALG == FOCC
     if (tid == g_init_parallelism-1) {
@@ -111,7 +111,7 @@ Client_query_queue::initQueriesParallel(uint64_t thd_id) {
     }
 #endif
 #endif
-#if WORKLOAD == YCSB	
+#if WORKLOAD == YCSB
     YCSBQueryGenerator * gen = new YCSBQueryGenerator;
     gen->init();
 #elif WORKLOAD == TPCC
@@ -154,14 +154,14 @@ Client_query_queue::initQueriesParallel(uint64_t thd_id) {
 
 bool Client_query_queue::done() { return false; }
 
-BaseQuery * 
-Client_query_queue::get_next_query(uint64_t server_id,uint64_t thread_id) { 	
+BaseQuery *
+Client_query_queue::get_next_query(uint64_t server_id,uint64_t thread_id) {
 #if WORKLOAD == DA
   BaseQuery * query;
   query=da_gen_qry_queue.pop_data();
   //while(!da_query_queue.pop(query));
   return query;
-#else 
+#else
   assert(server_id < size);
   uint64_t query_id = __sync_fetch_and_add(query_cnt[server_id], 1);//返回query_cnt[server_id]，然后query_cnt[server_id]++
   if(query_id > g_max_txn_per_part) {

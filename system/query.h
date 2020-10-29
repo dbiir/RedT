@@ -55,7 +55,7 @@ public:
 class Query_thd {
 public:
 	void init(Workload * h_wl, int thread_id);
-	BaseQuery * get_next_query(); 
+	BaseQuery * get_next_query();
 	int q_idx;
 #if WORKLOAD == YCSB
 	YCSBQuery * queries;
@@ -73,8 +73,8 @@ class Query_queue {
 public:
 	void init(Workload * h_wl);
 	void init(int thread_id);
-	BaseQuery * get_next_query(uint64_t thd_id); 
-	
+	BaseQuery * get_next_query(uint64_t thd_id);
+
 private:
 	Query_thd ** all_queries;
 	Workload * _wl;

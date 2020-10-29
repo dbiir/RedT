@@ -36,9 +36,9 @@ enum {
 };
 
 
-uint64_t parts_to_partition(uint64_t part_key); 
-uint64_t products_to_partition(uint64_t product_key); 
-uint64_t suppliers_to_partition(uint64_t supplier_key); 
+uint64_t parts_to_partition(uint64_t part_key);
+uint64_t products_to_partition(uint64_t product_key);
+uint64_t suppliers_to_partition(uint64_t supplier_key);
 
 /*
 // return random data from [0, max-1]

@@ -31,7 +31,7 @@ class TraversalActionSequenceCreator : public ActionSequenceCreator {
 
   void DeliverActionSequences(const std::function<void(ActionSequence &&,uint64_t)> &handle) const;
   static uint64_t cut_down_;
-  
+
 
  private:
   void HandleActionSeq(const std::function<void(ActionSequence &&,uint64_t)> &handle,uint64_t seq_id,
@@ -71,5 +71,5 @@ class TraversalActionSequenceCreator : public ActionSequenceCreator {
   const bool save_history_with_empty_opt_;
   const bool dynamic_seq_len_;
   mutable uint64_t seq_id_;
-  
+
 };

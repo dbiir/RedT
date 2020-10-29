@@ -145,7 +145,7 @@ void Sequencer::process_ack(Message * msg, uint64_t thd_id) {
 							printf("%ld %d %ld -> %d: %f %f\n",msg->txn_id, msg->rtype,
 					 msg->return_node_id,g_node_id ,msg->lat_network_time/BILLION,
 					 msg->lat_other_time/BILLION);
-					} 
+					}
 					*/
 			INC_STATS(0,lat_short_network_time,msg->lat_network_time);
 		}
@@ -305,7 +305,7 @@ void Sequencer::send_next_batch(uint64_t thd_id) {
 			DEBUG("Seq RDONE %ld\n",simulation->get_seq_epoch())
 		}
 		msg = Message::create_message(RDONE);
-		msg->batch_id = simulation->get_seq_epoch(); 
+		msg->batch_id = simulation->get_seq_epoch();
 		if(j == g_node_id) {
 			work_queue.sched_enqueue(thd_id,msg);
 		} else {

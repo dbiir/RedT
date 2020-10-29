@@ -1,4 +1,4 @@
- 
+
 #include "da_block_queue.h"
 
 
@@ -31,7 +31,7 @@ bool DABlockQueue::IsEmpty()
     return (q.size() == 0 ? true : false);
 }
 bool DABlockQueue::IsFull()
-{                                                                                                                                          
+{
     return (q.size() == cap ? true : false);
 }
 
@@ -40,7 +40,7 @@ DABlockQueue::DABlockQueue(size_t _cap = 50):cap(_cap) //构造函数
     pthread_mutex_init(&mutex,NULL);
     pthread_cond_init(&full,NULL);
     pthread_cond_init(&empty,NULL);
-} 
+}
 DABlockQueue::~DABlockQueue()
 {
     pthread_mutex_destroy(&mutex);
@@ -62,11 +62,11 @@ void DABlockQueue::push_data(BaseQuery* data)
     UnlockQueue();
 }
 BaseQuery* DABlockQueue::pop_data()
-{                     
-    BaseQuery* data;                                                                                                                
+{
+    BaseQuery* data;
     LockQueue();
     while(IsEmpty())  //队列为空
-    { 
+    {
         NotifyProduct();
         std::cout<<"queue empty,notify product data,consume stop!!"<<std::endl;
         list<BaseQuery*>().swap(q);
@@ -79,4 +79,4 @@ BaseQuery* DABlockQueue::pop_data()
     UnlockQueue();
     return data;
 }
-    
+

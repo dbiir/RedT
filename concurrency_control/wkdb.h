@@ -39,7 +39,7 @@ class Wkdb {
 public:
   void init();
   RC validate(TxnManager * txn);
-  RC find_bound(TxnManager * txn); 
+  RC find_bound(TxnManager * txn);
 private:
   RC get_rw_set(TxnManager * txni, wkdb_set_ent * &rset, wkdb_set_ent *& wset);
  	sem_t 	_semaphore;
@@ -92,7 +92,7 @@ private:
   WkdbTimeTableEntry* find(uint64_t key);
 
   WkdbTimeTableEntry * find_entry(uint64_t id);
-	
+
  	sem_t 	_semaphore;
 };
 

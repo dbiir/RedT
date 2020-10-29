@@ -50,7 +50,7 @@ void print_usage() {
 
 	printf("\t-rnINT       ; REPLICA_CNT (0+)\n");
 	printf("\t-rtINT       ; REPL_TYPE (AA: 1, AP: 2)\n");
-	
+
 	printf("\t-o STRING   ; output file\n");
 	printf("\t-i STRING   ; input file\n");
 	printf("\t-cf STRING   ; txn file\n");
@@ -70,7 +70,7 @@ void print_usage() {
 	printf("\t-whINT       ; NUM_WH\n");
 	printf("\t-ppFLOAT    ; PERC_PAYMENT\n");
 	printf("\t-upINT      ; WH_UPDATE\n");
-  
+
 }
 
 void parser(int argc, char * argv[]) {
@@ -209,7 +209,7 @@ void parser(int argc, char * argv[]) {
       printf("CC Alg %d\n",CC_ALG);
       printf("g_done_timer %ld\n",g_done_timer);
 			printf("g_thread_cnt %d\n",g_thread_cnt );
-			printf("g_abort_penalty %ld\n",g_abort_penalty); 
+			printf("g_abort_penalty %ld\n",g_abort_penalty);
 			printf("g_zipf_theta %f\n",g_zipf_theta );
 			printf("g_node_id %d\n",g_node_id );
 			printf("g_client_rem_thread_cnt %d\n",g_client_rem_thread_cnt );

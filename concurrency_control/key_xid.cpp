@@ -16,7 +16,7 @@ bool KeyRangeEnt::getOverlaps(KeyRangeEnt anotherEnt){
 }
 
 void KeyXidCache::init() {
-  lock_ = (pthread_mutex_t *) 
+  lock_ = (pthread_mutex_t *)
 		mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init(lock_, NULL);
 }
@@ -28,7 +28,7 @@ RC KeyXidCache::addReadXidWithMutex( uint64_t StartKey, uint64_t EndKey, uint64_
   pthread_mutex_lock(lock_);
   if (EndKey == 0)
     ret = addReadXid(StartKey, txn);
-  else 
+  else
     ret = addReadXid(StartKey, EndKey, txn);
   pthread_mutex_unlock(lock_);
   return ret;
@@ -43,7 +43,7 @@ std::vector<uint64_t> KeyXidCache::addWriteXidWithMutex(uint64_t StartKey, uint6
   if (result.size() == 0) {
     if (EndKey == 0)
       addWriteXid(StartKey, txn);
-    else 
+    else
       addWriteXid(StartKey, EndKey, txn);
   }
   pthread_mutex_unlock(lock_);
@@ -60,7 +60,7 @@ RC KeyXidCache::addWriteXidTest(uint64_t StartKey, uint64_t EndKey, uint64_t txn
   if (result.size() == 0) {
     if (EndKey == 0)
       addWriteXid(StartKey, txn);
-    else 
+    else
       addWriteXid(StartKey, EndKey, txn);
   }
   pthread_mutex_unlock(lock_);
@@ -76,7 +76,7 @@ RC KeyXidCache::removeReadXidWithMutex(uint64_t StartKey, uint64_t EndKey, uint6
     ret = removeAllReadXid(txn);
   else if (EndKey == 0)
     ret = removeReadXid(StartKey, txn);
-  else 
+  else
     ret = removeReadXid(StartKey, EndKey, txn);
   pthread_mutex_unlock(lock_);
   return ret;
@@ -91,7 +91,7 @@ RC KeyXidCache::removeWriteXidWithMutex(uint64_t StartKey, uint64_t EndKey, uint
     ret = removeAllWriteXid(txn);
   else if (EndKey == 0)
     ret = removeWriteXid(StartKey, txn);
-  else 
+  else
     ret = removeWriteXid(StartKey, EndKey, txn);
   pthread_mutex_unlock(lock_);
   return ret;
@@ -212,7 +212,7 @@ RC KeyXidCache::removeReadXid(uint64_t Key, uint64_t txn){
     xident.readTxn.erase(remove(xident.readTxn.begin(), xident.readTxn.end(), txn), xident.readTxn.end());
     //TRANS_LOG_DEBUG("removeReadXid xid_count:%d Key:%s", xident.readTxn.size(), Key.TO_HEX());
     if (xident.isDelete && xident.readTxn.size() == 0 && xident.writeTxn == 0) {
-      
+
       KeyXids_simple.erase(it);
     }
   }

@@ -50,7 +50,7 @@ BaseQuery * YCSBQueryGenerator::create_query(Workload * h_wl, uint64_t home_part
 }
 
 void YCSBQuery::print() {
-	
+
 	for(uint64_t i = 0; i < requests.size(); i++) {
 		printf("%d %ld, ",requests[i]->acctype,requests[i]->key);
 	}
@@ -168,8 +168,8 @@ bool YCSBQuery::readonly() {
 
 // The following algorithm comes from the paper:
 // Quickly generating billion-record synthetic databases
-// However, it seems there is a small bug. 
-// The original paper says zeta(theta, 2.0). But I guess it should be 
+// However, it seems there is a small bug.
+// The original paper says zeta(theta, 2.0). But I guess it should be
 // zeta(2.0, theta).
 double YCSBQueryGenerator::zeta(uint64_t n, double theta) {
 	double sum = 0;
@@ -183,7 +183,7 @@ uint64_t YCSBQueryGenerator::zipf(uint64_t n, double theta) {
 	double alpha = 1 / (1 - theta);
 	double zetan = denom;
 	double eta = (1 - pow(2.0 / n, 1 - theta)) / (1 - zeta_2_theta / zetan);
-//	double eta = (1 - pow(2.0 / n, 1 - theta)) / 
+//	double eta = (1 - pow(2.0 / n, 1 - theta)) /
 //		(1 - zeta_2_theta / zetan);
 	double u = (double)(mrand->next() % 10000000) / 10000000;
 	double uz = u * zetan;
@@ -200,27 +200,27 @@ BaseQuery * YCSBQueryGenerator::gen_requests_hot(uint64_t home_partition_id, Wor
 	uint64_t access_cnt = 0;
 	set<uint64_t> all_keys;
 	set<uint64_t> partitions_accessed;
-	double r_mpt = (double)(mrand->next() % 10000) / 10000;		
+	double r_mpt = (double)(mrand->next() % 10000) / 10000;
 	uint64_t part_limit;
 	if(r_mpt < g_mpr)
 		part_limit = g_part_per_txn;
 	else
 		part_limit = 1;
 	uint64_t hot_key_max = (uint64_t)g_data_perc;
-	double r_twr = (double)(mrand->next() % 10000) / 10000;		
+	double r_twr = (double)(mrand->next() % 10000) / 10000;
 
 	int rid = 0;
-	for (UInt32 i = 0; i < g_req_per_query; i ++) {		
-		double r = (double)(mrand->next() % 10000) / 10000;		
+	for (UInt32 i = 0; i < g_req_per_query; i ++) {
+		double r = (double)(mrand->next() % 10000) / 10000;
 		double hot =  (double)(mrand->next() % 10000) / 10000;
 		uint64_t partition_id;
 		ycsb_request * req = (ycsb_request*) mem_allocator.alloc(sizeof(ycsb_request));
-		if (r_twr < g_txn_read_perc || r < g_tup_read_perc) 
+		if (r_twr < g_txn_read_perc || r < g_tup_read_perc)
 			req->acctype = RD;
 		else
 			req->acctype = WR;
 
-		uint64_t row_id = 0; 
+		uint64_t row_id = 0;
 		if ( FIRST_PART_LOCAL && rid == 0) {
 			if(hot < g_access_perc) {
 				row_id =
@@ -305,11 +305,11 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 	set<uint64_t> partitions_accessed;
 	uint64_t table_size = g_synth_table_size / g_part_cnt;
 
-	double r_twr = (double)(mrand->next() % 10000) / 10000;		
+	double r_twr = (double)(mrand->next() % 10000) / 10000;
 
 	int rid = 0;
-	for (UInt32 i = 0; i < g_req_per_query; i ++) {		
-		double r = (double)(mrand->next() % 10000) / 10000;		
+	for (UInt32 i = 0; i < g_req_per_query; i ++) {
+		double r = (double)(mrand->next() % 10000) / 10000;
 		uint64_t partition_id;
 #ifdef LESS_DIS
 	if ( rid < 5) {
@@ -317,7 +317,7 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 	} else {
 		partition_id = (home_partition_id + 1) % g_part_cnt;
 	}
-#else 
+#else
 	#ifdef NO_REMOTE
 		partition_id = home_partition_id;
 	#else
@@ -337,7 +337,7 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 	#endif
 #endif
 		ycsb_request * req = (ycsb_request*) mem_allocator.alloc(sizeof(ycsb_request));
-		if (r_twr < g_txn_read_perc || r < g_tup_read_perc) 
+		if (r_twr < g_txn_read_perc || r < g_tup_read_perc)
 			req->acctype = RD;
 		else
 			req->acctype = WR;

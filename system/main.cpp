@@ -290,14 +290,14 @@ int main(int argc, char *argv[]) {
 		printf("Initializing tcp queue... ");
 		fflush(stdout);
 		tcp_ts.init(all_thd_cnt);
-		printf("Done\n");    
+		printf("Done\n");
 	}
-	
+
 	printf("%ld, %ld, %ld, %d \n", thd_cnt, rthd_cnt, sthd_cnt, g_abort_thread_cnt);
 	printf("all_thd_cnt: %ld, g_this_total_thread_cnt: %d \n", all_thd_cnt, g_this_total_thread_cnt);
 	fflush(stdout);
 	assert(all_thd_cnt == g_this_total_thread_cnt);
-	
+
 	pthread_t *p_thds = (pthread_t *)malloc(sizeof(pthread_t) * (all_thd_cnt));
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -424,7 +424,7 @@ int main(int argc, char *argv[]) {
 	for (uint64_t i = 0; i < all_thd_cnt; i++) pthread_join(p_thds[i], NULL);
 
 	endtime = get_server_clock();
-	
+
 	fflush(stdout);
 	printf("PASS! SimTime = %f\n", (float)(endtime - starttime) / BILLION);
 	if (STATS_ENABLE) stats.print(false);
@@ -484,7 +484,7 @@ void network_test() {
 		//time = time/1000;
 		//printf("Network Bytes: %d, s: %f\n",i,time/BILLION);
 		//printf("Network Bytes: %d, ns: %.3f\n",i,time);
-		
+
 	}
 			*/
 

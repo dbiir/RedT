@@ -98,7 +98,7 @@ void Stats_thd::clear() {
   txn_index_time=0;
   txn_validate_time=0;
   txn_cleanup_time=0;
-  
+
   trans_total_run_time=0;
   trans_process_time=0;
   trans_2pc_time=0;
@@ -108,6 +108,15 @@ void Stats_thd::clear() {
   trans_commit_time=0;
   trans_abort_time=0;
 
+  trans_access_lock_wait_time=0;
+  // trans mvcc
+  trans_mvcc_clear_history=0;
+  trans_mvcc_access=0;
+  // trans dli
+  dli_init_time=0;
+  dli_lock_time=0;
+  dli_check_conflict_time=0;
+  dli_final_validate=0;
   // Transaction stats
   txn_total_process_time=0;
   txn_process_time=0;
@@ -540,10 +549,21 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_validate_time=%f"
   ",trans_finish_time=%f"
   ",trans_commit_time=%f"
-  ",trans_abort_time=%f",
+  ",trans_abort_time=%f"
+  ",trans_access_lock_wait_time=%f"
+  ",trans_mvcc_clear_history=%f"
+  ",trans_mvcc_access=%f"
+    // trans dli
+  ",dli_init_time=%f"
+  ",dli_lock_time=%f"
+  ",dli_check_conflict_time=%f"
+  ",dli_final_validate=%f",
           trans_total_run_time / BILLION, trans_process_time / BILLION, trans_2pc_time / BILLION,
           trans_prepare_time / BILLION, trans_validate_time / BILLION, trans_finish_time / BILLION,
-          trans_commit_time / BILLION, trans_abort_time / BILLION);
+          trans_commit_time / BILLION, trans_abort_time / BILLION, trans_access_lock_wait_time / BILLION,
+          trans_mvcc_clear_history / BILLION, trans_mvcc_access / BILLION,
+          dli_init_time / BILLION, dli_lock_time / BILLION, dli_check_conflict_time / BILLION, dli_final_validate / BILLION);
+
 
   // Transaction stats
   double txn_total_process_time_avg=0;
@@ -1189,6 +1209,15 @@ void Stats_thd::combine(Stats_thd * stats) {
   trans_finish_time+=stats->trans_finish_time;
   trans_commit_time+=stats->trans_commit_time;
   trans_abort_time+=stats->trans_abort_time;
+  trans_access_lock_wait_time+=stats->trans_access_lock_wait_time;
+  // trans mvcc
+  trans_mvcc_clear_history+=stats->trans_mvcc_clear_history;
+  trans_mvcc_access+=stats->trans_mvcc_access;
+  // trans dli
+  dli_init_time+=stats->dli_init_time;
+  dli_lock_time+=stats->dli_lock_time;
+  dli_check_conflict_time+=stats->dli_check_conflict_time;
+  dli_final_validate+=stats->dli_final_validate;
   // Transaction stats
   txn_total_process_time+=stats->txn_total_process_time;
   txn_process_time+=stats->txn_process_time;
@@ -1466,9 +1495,9 @@ void Stats::print_client(bool prog) {
   for (uint64_t i = 0; i < thd_cnt; i++) totals->combine(_stats[i]);
 
 	FILE * outf;
-	if (output_file != NULL) 
+	if (output_file != NULL)
 		outf = fopen(output_file, "w");
-  else 
+  else
     outf = stdout;
   if(prog)
 	  fprintf(outf, "[prog] ");
@@ -1493,7 +1522,7 @@ void Stats::print_client(bool prog) {
       if(_stats[tid]->all_lat.cnt > 0)
         max_idx = _stats[tid]->all_lat.cnt -1;
       _stats[tid]->all_lat.quicksort(0,_stats[tid]->all_lat.cnt-1);
-	    fprintf(outf, 
+	    fprintf(outf,
           ",lat_min=%ld"
           ",lat_max=%ld"
           ",lat_mean=%ld"
@@ -1545,11 +1574,11 @@ void Stats::print_client(bool prog) {
 void Stats::print(bool prog) {
   fflush(stdout);
   if (!STATS_ENABLE) return;
-	
+
   totals->clear();
   for (uint64_t i = 0; i < thd_cnt; i++) totals->combine(_stats[i]);
 	FILE * outf;
-	if (output_file != NULL) 
+	if (output_file != NULL)
 		outf = fopen(output_file, "w");
   else
     outf = stdout;
@@ -1618,44 +1647,44 @@ void Stats::print_cnts(FILE * outf) {
    s_abrt_cnt += _stats[tid]->s_abrt.cnt;
   }
   printf("\n[all_abort %ld] ",all_abort_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->all_abort.print(outf);
 #if WORKLOAD == TPCC
   printf("\n[w_cflt %ld] ",w_cflt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->w_cflt.print(outf);
   printf("\n[d_cflt %ld] ",d_cflt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->d_cflt.print(outf);
   printf("\n[cnp_cflt %ld] ",cnp_cflt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->cnp_cflt.print(outf);
   printf("\n[c_cflt %ld] ",c_cflt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->c_cflt.print(outf);
   printf("\n[ol_cflt %ld] ",ol_cflt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->ol_cflt.print(outf);
   printf("\n[s_cflt %ld] ",s_cflt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->s_cflt.print(outf);
   printf("\n[w_abrt %ld] ",w_abrt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->w_abrt.print(outf);
   printf("\n[d_abrt %ld] ",d_abrt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->d_abrt.print(outf);
   printf("\n[cnp_abrt %ld] ",cnp_abrt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->cnp_abrt.print(outf);
   printf("\n[c_abrt %ld] ",c_abrt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->c_abrt.print(outf);
   printf("\n[ol_abrt %ld] ",ol_abrt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->ol_abrt.print(outf);
   printf("\n[s_abrt %ld] ",s_abrt_cnt);
-	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) 
+	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++)
     _stats[tid]->s_abrt.print(outf);
 #endif
 

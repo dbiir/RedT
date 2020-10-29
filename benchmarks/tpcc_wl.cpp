@@ -33,10 +33,10 @@ RC TPCCWorkload::init() {
 	Workload::init();
 	//char * cpath = getenv("GRAPHITE_HOME");
 	char * cpath = getenv("SCHEMA_PATH");
-	string path;	
-	if (cpath == NULL) 
+	string path;
+	if (cpath == NULL)
 		path = "./benchmarks/";
-	else { 
+	else {
 		path = string(cpath);
 		// Graphite:
 		//path += "/tests/apps/dbms/";
@@ -50,7 +50,7 @@ RC TPCCWorkload::init() {
 	delivering = new bool * [g_num_wh + 1];
 	for (UInt32 wid = 1; wid <= g_num_wh; wid ++)
 		delivering[wid] = (bool *) mem_allocator.alloc(CL_SIZE);
-	
+
   printf("Initializing schema... ");
   fflush(stdout);
 	init_schema( path.c_str() );
@@ -97,7 +97,7 @@ RC TPCCWorkload::init_table() {
 // 	- dist
 //  	- cust
 //	  	- hist
-//		- order 
+//		- order
 //		- new order
 //		- order line
 /**********************************/
@@ -232,7 +232,7 @@ void TPCCWorkload::init_tab_item(int id) {
 	//MakeAlphaString(26, 50, data);
 	if (RAND(10) == 0) strcpy(data, "original");
 		row->set_value(I_DATA, data);
-		
+
 		index_insert(i_item, i, row, 0);
 	}
 }
@@ -270,7 +270,7 @@ void TPCCWorkload::init_tab_wh() {
 
 		index_insert(i_warehouse, wid, row, wh_to_part(wid));
 	}
-	
+
 	return;
 }
 
@@ -280,7 +280,7 @@ void TPCCWorkload::init_tab_dist(uint64_t wid) {
 		uint64_t row_id;
 		t_district->get_new_row(row, 0, row_id);
 		row->set_primary_key(did);
-		
+
 		row->set_value(D_ID, did);
 		row->set_value(D_W_ID, wid);
 		char name[10];
@@ -304,13 +304,13 @@ void TPCCWorkload::init_tab_dist(uint64_t wid) {
 		row->set_value(D_TAX, tax);
 		row->set_value(D_YTD, w_ytd);
 		row->set_value(D_NEXT_O_ID, 3001);
-		
+
 		index_insert(i_district, distKey(did, wid), row, wh_to_part(wid));
 	}
 }
 
 void TPCCWorkload::init_tab_stock(int id, uint64_t wid) {
-	
+
 	for (UInt32 sid = id + 1; sid <= g_max_items; sid+=g_init_parallelism) {
 		row_t * row;
 		uint64_t row_id;
@@ -359,7 +359,7 @@ void TPCCWorkload::init_tab_cust(int id, uint64_t did, uint64_t wid) {
 		t_customer->get_new_row(row, 0, row_id);
 		row->set_primary_key(cid);
 
-		row->set_value(C_ID, cid);		
+		row->set_value(C_ID, cid);
 		row->set_value(C_D_ID, did);
 		row->set_value(C_W_ID, wid);
 		char c_last[LASTNAME_LEN];
@@ -383,15 +383,15 @@ void TPCCWorkload::init_tab_cust(int id, uint64_t did, uint64_t wid) {
 		MakeAlphaString(10, 20, street);
 		row->set_value(C_STREET_2, street);
 		MakeAlphaString(10, 20, street);
-		row->set_value(C_CITY, street); 
+		row->set_value(C_CITY, street);
 		char state[2];
-		MakeAlphaString(2, 2, state); // State 
+		MakeAlphaString(2, 2, state); // State
 		row->set_value(C_STATE, state);
 		char zip[9];
-		MakeNumberString(9, 9, zip); // Zip 
+		MakeNumberString(9, 9, zip); // Zip
 		row->set_value(C_ZIP, zip);
 		char phone[16];
-  		MakeNumberString(16, 16, phone); // Zip 
+  		MakeNumberString(16, 16, phone); // Zip
 		row->set_value(C_PHONE, phone);
 		row->set_value(C_SINCE, 0);
 		row->set_value(C_CREDIT_LIM, 50000);
@@ -458,12 +458,12 @@ void TPCCWorkload::init_tab_order(int id, uint64_t did, uint64_t wid) {
 		row->set_value(O_ENTRY_D, o_entry);
 		if (oid < 2101)
 			row->set_value(O_CARRIER_ID, URand(1, 10));
-		else 
+		else
 			row->set_value(O_CARRIER_ID, 0);
 		o_ol_cnt = URand(5, 15);
 		row->set_value(O_OL_CNT, o_ol_cnt);
 		row->set_value(O_ALL_LOCAL, 1);
-		
+
 		// Insert to indexes
 //		uint64_t key = custKey(cid, did, wid);
 //		index_insert(i_order_wdc, key, row, wh_to_part(wid));
@@ -471,7 +471,7 @@ void TPCCWorkload::init_tab_order(int id, uint64_t did, uint64_t wid) {
 //		key = orderPrimaryKey(wid, did, oid);
 //		index_insert(i_order_wdo, key, row, wh_to_part(wid));
 
-		// ORDER-LINE	
+		// ORDER-LINE
 #if !TPCC_SMALL
 		for (uint64_t ol = 1; ol <= o_ol_cnt; ol++) {
 			t_orderline->get_new_row(row, 0, row_id);
@@ -495,7 +495,7 @@ void TPCCWorkload::init_tab_order(int id, uint64_t did, uint64_t wid) {
 
 //			uint64_t key = orderlineKey(wid, did, oid);
 //			index_insert(i_orderline, key, row, wh_to_part(wid));
-			
+
 //			key = distKey(did, wid);
 //			index_insert(i_orderline_wd, key, row, wh_to_part(wid));
 		}
@@ -596,7 +596,7 @@ void * TPCCWorkload::threadInitCust(void * This) {
 	printf("CUSTOMER %d Done\n",((thr_args *)This)->id);
 	return NULL;
 }
-	
+
 void * TPCCWorkload::threadInitHist(void * This) {
   TPCCWorkload * wl = (TPCCWorkload*) This;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {

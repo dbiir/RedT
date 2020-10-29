@@ -50,7 +50,7 @@ void Row_ts::return_req_entry(TsReqEntry * entry) {
 	mem_allocator.free(entry, sizeof(TsReqEntry));
 }
 
-void Row_ts::return_req_list(TsReqEntry * list) {	
+void Row_ts::return_req_list(TsReqEntry * list) {
 	TsReqEntry * req = list;
 	TsReqEntry * prev = NULL;
 	while (req != NULL) {
@@ -87,7 +87,7 @@ void Row_ts::buffer_req(TsType type, TxnManager *txn, row_t *row) {
 TsReqEntry * Row_ts::debuffer_req(TsType type, TxnManager * txn) {
 	return debuffer_req(type, txn, UINT64_MAX);
 }
-	
+
 TsReqEntry *Row_ts::debuffer_req(TsType type, ts_t ts) { return debuffer_req(type, NULL, ts); }
 
 TsReqEntry * Row_ts::debuffer_req( TsType type, TxnManager * txn, ts_t ts ) {
@@ -110,7 +110,7 @@ TsReqEntry * Row_ts::debuffer_req( TsType type, TxnManager * txn, ts_t ts ) {
 	TsReqEntry * req = *queue;
 	TsReqEntry * prev_req = NULL;
 	if (txn != NULL) {
-		while (req != NULL && req->txn != txn) {		
+		while (req != NULL && req->txn != txn) {
 			prev_req = req;
 			req = req->next;
 		}
@@ -184,7 +184,7 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 		if (rts < ts)
 			rts = ts;
 		rc = RCOK;
-		
+
 	} else if (type == P_REQ) {
 		buffer_req(P_REQ, txn, NULL);
 		rc = RCOK;
@@ -203,13 +203,13 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 		// the "row" is freed after hard copy to "_row"
 		row->free_row();
 		mem_allocator.free(row, sizeof(row_t));
-		
+
 	} else if (type == XP_REQ) {
 		TsReqEntry * req = debuffer_req(P_REQ, txn);
 		assert (req != NULL);
 		// update_buffer(txn->get_thd_id());
 		return_req_entry(req);
-	} else 
+	} else
 		assert(false);
 
     uint64_t timespan = get_sys_clock() - starttime;
@@ -230,6 +230,7 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 		glob_manager.lock_row(_row);
 	else
 		pthread_mutex_lock( latch );
+	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - starttime);
 	if (type == R_REQ) {
 		if (ts < wts) { // read would occur before most recent write
 			rc = Abort;
@@ -253,7 +254,7 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 #if TS_TWR
 			buffer_req(P_REQ, txn, NULL);
 			rc = RCOK;
-#else 
+#else
 			if (ts < wts) { //pre-write would occur before most recent write
 				rc = Abort;
 			} else { // pre-write is ok
@@ -267,7 +268,7 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 		// write requests are always accepted.
 		rc = RCOK;
 #if TS_TWR
-		// according to TWR, this write is already stale, ignore. 
+		// according to TWR, this write is already stale, ignore.
 		if (ts < wts) {
 			TsReqEntry * req = debuffer_req(P_REQ, txn);
 			assert(req != NULL);
@@ -290,7 +291,7 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 			buffer_req(W_REQ, txn, row);
 						goto final;
 		} else { // write is ok;
-			// the write is output. 
+			// the write is output.
 			_row->copy(row);
 			if (wts < ts) wts = ts;
 			// debuffer the P_REQ
@@ -307,9 +308,9 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 		assert (req != NULL);
 		update_buffer(txn->get_thd_id());
 		return_req_entry(req);
-	} else 
+	} else
 		assert(false);
-	
+
 final:
 		uint64_t timespan = get_sys_clock() - starttime;
 		txn->txn_stats.cc_time += timespan;
@@ -335,7 +336,7 @@ void Row_ts::update_buffer(uint64_t thd_id) {
 		if (ready_read == NULL) break;
 		// for each debuffered readreq, perform read.
 		TsReqEntry * req = ready_read;
-		while (req != NULL) {			
+		while (req != NULL) {
 			req->txn->cur_row->copy(_row);
 			if (rts < req->ts) {
 				rts = req->ts;

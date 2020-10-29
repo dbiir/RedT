@@ -27,7 +27,7 @@ public:
 	Row_tictoc() : Row_tictoc(NULL) {};
 	Row_tictoc(row_t * row);
 	void    init(row_t * row);
-	RC		access(access_t type, TxnManager * txn, row_t *& row, 
+	RC		access(access_t type, TxnManager * txn, row_t *& row,
 					uint64_t &wts, uint64_t &rts);
 	RC		read(TxnManager * txn, char * data,
 				uint64_t &wts, uint64_t &rts, bool latch = true, bool remote = false);
@@ -45,7 +45,7 @@ public:
 	void	release(TxnManager * txn, RC rc);
 
 
-	
+
 	void	update_ts(uint64_t cts);
 	// void	write_ptr(row_t * data, ts_t wts, char *& data_to_free);
 /////////////////////////////

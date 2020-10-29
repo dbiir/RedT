@@ -1,7 +1,7 @@
 import itertools
 from paper_plots import *
 # Experiments to run and analyze
-# Go to end of file to fill in experiments 
+# Go to end of file to fill in experiments
 SHORTNAMES = {
     "CLIENT_NODE_CNT" : "CN",
     "CLIENT_THREAD_CNT" : "CT",
@@ -461,15 +461,16 @@ def tpcc_cstress():
     wl = 'TPCC'
     nnodes = [1]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
-    # nalgos=['WOOKONG']
+    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
+    # nalgos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
+    nalgos=['MVCC','TIMESTAMP']
     #nalgos=['NO_WAIT']
     npercpay=[0.0]
     # npercpay=[0.0]
     wh=128
     # wh=64
-    load = [1000,2000,3000,4000,5000]
-    #load = [1000]
+    # load = [1000,2000,3000,4000,5000]
+    load = [5000]
     tcnt = [16]
     ctcnt = [16]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
@@ -827,7 +828,7 @@ configs = {
     "PRIORITY":"PRIORITY_ACTIVE",
     "TWOPL_LITE":"false",
 #YCSB
-    "INIT_PARALLELISM" : 8, 
+    "INIT_PARALLELISM" : 8,
     "TUP_WRITE_PERC":0.0,
     "ZIPF_THETA":0.3,
     "ACCESS_PERC":0.03,
@@ -849,7 +850,7 @@ configs = {
     "SKEW_METHOD":"ZIPF",
     "ENVIRONMENT_EC2":"false",
     "YCSB_ABORT_MODE":"false",
-    "LOAD_METHOD": "LOAD_MAX", 
+    "LOAD_METHOD": "LOAD_MAX",
     "ISOLATION_LEVEL":"SERIALIZABLE"
 }
 

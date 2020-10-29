@@ -23,9 +23,9 @@
 
 // For simplicity, the txn hisotry for OCC is oganized as follows:
 // 1. history is never deleted.
-// 2. hisotry forms a single directional list. 
+// 2. hisotry forms a single directional list.
 //		history head -> hist_1 -> hist_2 -> hist_3 -> ... -> hist_n
-//    The head is always the latest and the tail the youngest. 
+//    The head is always the latest and the tail the youngest.
 // 	  When history is traversed, always go from head -> tail order.
 
 class TxnManager;
@@ -54,7 +54,7 @@ private:
 	void central_finish(RC rc, TxnManager * txn);
 	bool test_valid(b_set_ent * set1, b_set_ent * set2);
 	RC get_rw_set(TxnManager * txni, b_set_ent * &rset, b_set_ent *& wset);
-	
+
 	// "history" stores write set of transactions with tn >= smallest running tn
 	b_set_ent * history;
 	uint64_t his_len;

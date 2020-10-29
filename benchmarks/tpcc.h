@@ -79,8 +79,8 @@ public:
 //	INDEX * 	i_order_wdo; // key = (w_id, d_id, o_id)
 //	INDEX * 	i_order_wdc; // key = (w_id, d_id, c_id)
 	INDEX * 	i_orderline; // key = (w_id, d_id, o_id)
-	INDEX * 	i_orderline_wd; // key = (w_id, d_id). 
-	
+	INDEX * 	i_orderline_wd; // key = (w_id, d_id).
+
 	// XXX HACK
 	// For delivary. Only one txn can be delivering a warehouse at a time.
 	// *_delivering[warehouse_id] -> the warehouse is delivering.
@@ -97,7 +97,7 @@ private:
 	void init_tab_cust(int id, uint64_t d_id, uint64_t w_id);
 	void init_tab_hist(uint64_t c_id, uint64_t d_id, uint64_t w_id);
 	void init_tab_order(int id,uint64_t d_id, uint64_t w_id);
-	
+
 	UInt32 perm_count;
 	uint64_t * perm_c_id;
 	void init_permutation();
@@ -122,14 +122,14 @@ class TPCCTxnManager : public TxnManager {
 public:
 	void init(uint64_t thd_id, Workload * h_wl);
   void reset();
-  RC acquire_locks(); 
+  RC acquire_locks();
 	RC run_txn();
 	RC run_txn_post_wait();
-	RC run_calvin_txn(); 
-  RC run_tpcc_phase2(); 
-  RC run_tpcc_phase5(); 
+	RC run_calvin_txn();
+  RC run_tpcc_phase2();
+  RC run_tpcc_phase5();
 	TPCCRemTxnType state;
-  void copy_remote_items(TPCCQueryMessage * msg); 
+  void copy_remote_items(TPCCQueryMessage * msg);
 private:
 	TPCCWorkload * _wl;
 	volatile RC _rc;
@@ -141,7 +141,7 @@ void next_tpcc_state();
 RC run_txn_state();
   bool is_done();
   bool is_local_item(uint64_t idx);
-  RC send_remote_request(); 
+  RC send_remote_request();
 
   RC run_payment_0(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
                    row_t*& r_wh_local);

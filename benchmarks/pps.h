@@ -87,14 +87,14 @@ public:
 	INDEX * 	i_suppliers;
 	INDEX * 	i_supplies;
 	INDEX * 	i_uses;
-	
+
 private:
 	void init_tab_suppliers();
 	void init_tab_products();
 	void init_tab_parts();
 	void init_tab_supplies();
 	void init_tab_uses();
-	
+
 	static void * threadInitSuppliers(void * This);
 	static void * threadInitProducts(void * This);
 	static void * threadInitParts(void * This);
@@ -112,14 +112,14 @@ class PPSTxnManager : public TxnManager {
 public:
 	void init(uint64_t thd_id, Workload * h_wl);
   void reset();
-  RC acquire_locks(); 
+  RC acquire_locks();
 	RC run_txn();
 	RC run_txn_post_wait();
-	RC run_calvin_txn(); 
-  RC run_pps_phase2(); 
-  RC run_pps_phase5(); 
+	RC run_calvin_txn();
+  RC run_pps_phase2();
+  RC run_pps_phase5();
 	PPSRemTxnType state;
-  void copy_remote_items(PPSQueryMessage * msg); 
+  void copy_remote_items(PPSQueryMessage * msg);
 private:
 	PPSWorkload * _wl;
 	volatile RC _rc;
@@ -131,10 +131,10 @@ private:
   RC run_txn_state();
   bool is_done();
   bool is_local_item(uint64_t idx);
-  RC send_remote_request(); 
+  RC send_remote_request();
 
-inline void getThreeFields(row_t *& r_local); 
-inline void getAllFields(row_t *& r_local); 
+inline void getThreeFields(row_t *& r_local);
+inline void getAllFields(row_t *& r_local);
 inline RC run_getpart_0(uint64_t part_key, row_t *& r_local);
 inline RC run_getpart_1(row_t *& r_local);
 inline RC run_getproduct_0(uint64_t product_key, row_t *& r_local);

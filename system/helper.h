@@ -34,7 +34,7 @@
   if(DEBUG_DISTR) { \
     fflush(stdout); \
   }
-    //fprintf(stdout,"[alloc] "); 
+    //fprintf(stdout,"[alloc] ");
 #define DEBUG_M(...) \
   if(DEBUG_ALLOC && warmup_done) { \
     fprintf(stdout,__VA_ARGS__); \
@@ -196,7 +196,7 @@
 /************************************************/
 // malloc helper
 /************************************************/
-// In order to avoid false sharing, any unshared read/write array residing on the same 
+// In order to avoid false sharing, any unshared read/write array residing on the same
 // cache line should be modified to be read only array with pointers to thread local data block.
 // TODO. in order to have per-thread malloc, this needs to be modified !!!
 
@@ -233,7 +233,7 @@
   ycsb_query * query = (ycsb_query*) qry; \
   mem_allocator.free(query->part_to_access,sizeof(uint64_t)*query->part_num); \
   mem_allocator.free(query->requests,sizeof(ycsb_query)*query->request_cnt); \
-  mem_allocator.free(query,sizeof(ycsb_query)); 
+  mem_allocator.free(query,sizeof(ycsb_query));
   */
 enum Data_type {
   DT_table,
@@ -242,7 +242,7 @@ enum Data_type {
 };
 
 // TODO currently, only DR_row supported
-// data item type. 
+// data item type.
 class itemid_t {
 public:
 	itemid_t() { };
@@ -270,8 +270,8 @@ uint64_t merge_idx_key(uint64_t key_cnt, uint64_t * keys);
 uint64_t merge_idx_key(uint64_t key1, uint64_t key2);
 uint64_t merge_idx_key(uint64_t key1, uint64_t key2, uint64_t key3);
 
-void init_client_globals(); 
-void init_globals(); 
+void init_client_globals();
+void init_globals();
 
 extern timespec * res;
 uint64_t get_wall_clock();

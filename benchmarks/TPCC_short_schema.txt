@@ -35,7 +35,7 @@ TABLE=CUSTOMER
 	8,double,C_BALANCE
 	8,double,C_YTD_PAYMENT
 	8,uint64_t,C_PAYMENT_CNT
-	
+
 TABLE=HISTORY
 	8,int64_t,H_C_ID
 	8,int64_t,H_C_D_ID

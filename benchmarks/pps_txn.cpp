@@ -90,7 +90,7 @@ RC PPSTxnManager::run_txn() {
   return rc;
 #endif
 
-  if(IS_LOCAL(txn->txn_id) && 
+  if(IS_LOCAL(txn->txn_id) &&
       (state == PPS_GETPART0 || state == PPS_GETPRODUCT0 || state == PPS_GETSUPPLIER0 ||
        state == PPS_GETPARTBYSUPPLIER0 || state == PPS_GETPARTBYPRODUCT0 ||
        state == PPS_ORDERPRODUCT0 || state == PPS_UPDATEPRODUCTPART0 || state == PPS_UPDATEPART0)) {
@@ -111,7 +111,7 @@ RC PPSTxnManager::run_txn() {
   txn_stats.process_time_short += curr_time - starttime;
 
   if(IS_LOCAL(get_txn_id())) {
-    if(is_done() && rc == RCOK) 
+    if(is_done() && rc == RCOK)
       rc = start_commit();
     else if(rc == Abort)
       rc = start_abort();
@@ -607,7 +607,7 @@ RC PPSTxnManager::run_txn_state() {
 
 inline RC PPSTxnManager::run_getpart_0(uint64_t part_key, row_t *& r_local) {
   /*
-    SELECT * FROM PARTS WHERE PART_KEY = :part_key; 
+    SELECT * FROM PARTS WHERE PART_KEY = :part_key;
    */
     RC rc;
     itemid_t * item;
@@ -620,7 +620,7 @@ inline RC PPSTxnManager::run_getpart_0(uint64_t part_key, row_t *& r_local) {
 }
 inline RC PPSTxnManager::run_getpart_1(row_t *& r_local) {
   /*
-    SELECT * FROM PARTS WHERE PART_KEY = :part_key; 
+    SELECT * FROM PARTS WHERE PART_KEY = :part_key;
    */
   assert(r_local);
   getAllFields(r_local);
@@ -630,7 +630,7 @@ inline RC PPSTxnManager::run_getpart_1(row_t *& r_local) {
 
 inline RC PPSTxnManager::run_getproduct_0(uint64_t product_key, row_t *& r_local) {
   /*
-    SELECT * FROM PRODUCTS WHERE PRODUCT_KEY = :product_key; 
+    SELECT * FROM PRODUCTS WHERE PRODUCT_KEY = :product_key;
    */
     RC rc;
     itemid_t * item;
@@ -643,7 +643,7 @@ inline RC PPSTxnManager::run_getproduct_0(uint64_t product_key, row_t *& r_local
 }
 inline RC PPSTxnManager::run_getproduct_1(row_t *& r_local) {
   /*
-    SELECT * FROM PRODUCTS WHERE PRODUCT_KEY = :product_key; 
+    SELECT * FROM PRODUCTS WHERE PRODUCT_KEY = :product_key;
    */
   assert(r_local);
   getAllFields(r_local);
@@ -679,7 +679,7 @@ inline void PPSTxnManager::getAllFields(row_t *& r_local) {
 
 inline RC PPSTxnManager::run_getsupplier_0(uint64_t supplier_key, row_t *& r_local) {
   /*
-    SELECT * FROM SUPPLIERS WHERE SUPPLIER_KEY = :supplier_key; 
+    SELECT * FROM SUPPLIERS WHERE SUPPLIER_KEY = :supplier_key;
    */
     RC rc;
     itemid_t * item;
@@ -694,7 +694,7 @@ inline RC PPSTxnManager::run_getsupplier_0(uint64_t supplier_key, row_t *& r_loc
 
 inline RC PPSTxnManager::run_getsupplier_1(row_t *& r_local) {
   /*
-    SELECT * FROM SUPPLIERS WHERE SUPPLIER_KEY = :supplier_key; 
+    SELECT * FROM SUPPLIERS WHERE SUPPLIER_KEY = :supplier_key;
    */
   assert(r_local);
   getAllFields(r_local);
@@ -704,7 +704,7 @@ inline RC PPSTxnManager::run_getsupplier_1(row_t *& r_local) {
 
 inline RC PPSTxnManager::run_getpartsbyproduct_0(uint64_t product_key, row_t *& r_local) {
   /*
-    SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ? 
+    SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
     RC rc;
     itemid_t * item;
@@ -717,7 +717,7 @@ inline RC PPSTxnManager::run_getpartsbyproduct_0(uint64_t product_key, row_t *& 
 }
 inline RC PPSTxnManager::run_getpartsbyproduct_1(row_t *& r_local) {
   /*
-    SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ? 
+    SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
   assert(r_local);
   getThreeFields(r_local);
@@ -726,7 +726,7 @@ inline RC PPSTxnManager::run_getpartsbyproduct_1(row_t *& r_local) {
 
 inline RC PPSTxnManager::run_getpartsbyproduct_2(uint64_t product_key, row_t *& r_local) {
   /*
-    SELECT PART_KEY FROM USES WHERE PRODUCT_KEY = ? 
+    SELECT PART_KEY FROM USES WHERE PRODUCT_KEY = ?
    */
   DEBUG("Getting product_key %ld count %ld\n",product_key,parts_processed_count);
     RC rc;
@@ -746,7 +746,7 @@ inline RC PPSTxnManager::run_getpartsbyproduct_2(uint64_t product_key, row_t *& 
 
 inline RC PPSTxnManager::run_getpartsbyproduct_3(uint64_t &part_key, row_t *& r_local) {
   /*
-    SELECT PART_KEY FROM USES WHERE PRODUCT_KEY = ? 
+    SELECT PART_KEY FROM USES WHERE PRODUCT_KEY = ?
    */
   //r_local->get_value(PART_KEY,part_key);
   //char * data __attribute__((unused));
@@ -759,7 +759,7 @@ inline RC PPSTxnManager::run_getpartsbyproduct_3(uint64_t &part_key, row_t *& r_
 
 inline RC PPSTxnManager::run_getpartsbyproduct_4(uint64_t part_key, row_t *& r_local) {
   /*
-   SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ? 
+   SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
    */
   DEBUG("Access part_key %ld\n",part_key);
     RC rc;
@@ -773,7 +773,7 @@ inline RC PPSTxnManager::run_getpartsbyproduct_4(uint64_t part_key, row_t *& r_l
 }
 inline RC PPSTxnManager::run_getpartsbyproduct_5(row_t *& r_local) {
   /*
-   SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ? 
+   SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
    */
   DEBUG("run_getpartsbyproduct_5\n");
   assert(r_local);
@@ -783,7 +783,7 @@ inline RC PPSTxnManager::run_getpartsbyproduct_5(row_t *& r_local) {
 
 inline RC PPSTxnManager::run_orderproduct_0(uint64_t product_key, row_t *& r_local) {
   /*
-    SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ? 
+    SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
     RC rc;
     itemid_t * item;
@@ -796,7 +796,7 @@ inline RC PPSTxnManager::run_orderproduct_0(uint64_t product_key, row_t *& r_loc
 }
 inline RC PPSTxnManager::run_orderproduct_1(row_t *& r_local) {
   /*
-    SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ? 
+    SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
   assert(r_local);
   getThreeFields(r_local);
@@ -825,7 +825,7 @@ inline RC PPSTxnManager::run_orderproduct_2(uint64_t product_key, row_t *& r_loc
 
 inline RC PPSTxnManager::run_orderproduct_3(uint64_t &part_key, row_t *& r_local) {
   /*
-    SELECT PART_KEY FROM USES WHERE PRODUCT_KEY = ? 
+    SELECT PART_KEY FROM USES WHERE PRODUCT_KEY = ?
    */
   //r_local->get_value(PART_KEY,part_key);
   //char * data __attribute__((unused));
@@ -852,7 +852,7 @@ inline RC PPSTxnManager::run_orderproduct_4(uint64_t part_key, row_t *& r_local)
 }
 inline RC PPSTxnManager::run_orderproduct_5(row_t *& r_local) {
   /*
-   SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ? 
+   SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
    */
   DEBUG("run_orderproduct_5\n");
   assert(r_local);
@@ -867,7 +867,7 @@ inline RC PPSTxnManager::run_orderproduct_5(row_t *& r_local) {
 
 inline RC PPSTxnManager::run_getpartsbysupplier_0(uint64_t supplier_key, row_t *& r_local) {
   /*
-    SELECT FIELD1, FIELD2, FIELD3 FROM suppliers WHERE supplier_KEY = ? 
+    SELECT FIELD1, FIELD2, FIELD3 FROM suppliers WHERE supplier_KEY = ?
    */
     RC rc;
     itemid_t * item;
@@ -880,7 +880,7 @@ inline RC PPSTxnManager::run_getpartsbysupplier_0(uint64_t supplier_key, row_t *
 }
 inline RC PPSTxnManager::run_getpartsbysupplier_1(row_t *& r_local) {
   /*
-    SELECT FIELD1, FIELD2, FIELD3 FROM suppliers WHERE supplier_KEY = ? 
+    SELECT FIELD1, FIELD2, FIELD3 FROM suppliers WHERE supplier_KEY = ?
    */
   assert(r_local);
   getThreeFields(r_local);
@@ -889,7 +889,7 @@ inline RC PPSTxnManager::run_getpartsbysupplier_1(row_t *& r_local) {
 
 inline RC PPSTxnManager::run_getpartsbysupplier_2(uint64_t supplier_key, row_t *& r_local) {
   /*
-    SELECT PART_KEY FROM USES WHERE supplier_KEY = ? 
+    SELECT PART_KEY FROM USES WHERE supplier_KEY = ?
    */
     RC rc;
     itemid_t * item;
@@ -907,7 +907,7 @@ inline RC PPSTxnManager::run_getpartsbysupplier_2(uint64_t supplier_key, row_t *
 }
 inline RC PPSTxnManager::run_getpartsbysupplier_3(uint64_t &part_key, row_t *& r_local) {
   /*
-    SELECT PART_KEY FROM USES WHERE supplier_KEY = ? 
+    SELECT PART_KEY FROM USES WHERE supplier_KEY = ?
    */
     r_local->get_value(1,part_key);
     DEBUG("Read part_key %ld\n",part_key);
@@ -915,7 +915,7 @@ inline RC PPSTxnManager::run_getpartsbysupplier_3(uint64_t &part_key, row_t *& r
 }
 inline RC PPSTxnManager::run_getpartsbysupplier_4(uint64_t part_key, row_t *& r_local) {
   /*
-   SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ? 
+   SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
    */
     RC rc;
     itemid_t * item;
@@ -928,7 +928,7 @@ inline RC PPSTxnManager::run_getpartsbysupplier_4(uint64_t part_key, row_t *& r_
 }
 inline RC PPSTxnManager::run_getpartsbysupplier_5(row_t *& r_local) {
   /*
-   SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ? 
+   SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
    */
   assert(r_local);
   getThreeFields(r_local);
@@ -937,7 +937,7 @@ inline RC PPSTxnManager::run_getpartsbysupplier_5(row_t *& r_local) {
 
 inline RC PPSTxnManager::run_updateproductpart_0(uint64_t product_key, row_t *& r_local) {
   /*
-    SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ? 
+    SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
     RC rc;
     itemid_t * item;
@@ -951,7 +951,7 @@ inline RC PPSTxnManager::run_updateproductpart_0(uint64_t product_key, row_t *& 
 }
 inline RC PPSTxnManager::run_updateproductpart_1(uint64_t part_key, row_t *& r_local) {
   /*
-    UPDATE PART_KEY FROM PRODUCTS WHERE PRODUCT_KEY = ? 
+    UPDATE PART_KEY FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
   assert(r_local);
   r_local->set_value(1,part_key);
@@ -960,7 +960,7 @@ inline RC PPSTxnManager::run_updateproductpart_1(uint64_t part_key, row_t *& r_l
 
 inline RC PPSTxnManager::run_updatepart_0(uint64_t part_key, row_t *& r_local) {
   /*
-    SELECT * FROM PARTS WHERE PART_KEY = :part_key; 
+    SELECT * FROM PARTS WHERE PART_KEY = :part_key;
    */
     RC rc;
     itemid_t * item;
@@ -973,7 +973,7 @@ inline RC PPSTxnManager::run_updatepart_0(uint64_t part_key, row_t *& r_local) {
 }
 inline RC PPSTxnManager::run_updatepart_1(row_t *& r_local) {
   /*
-    SELECT * FROM PARTS WHERE PART_KEY = :part_key; 
+    SELECT * FROM PARTS WHERE PART_KEY = :part_key;
    */
   assert(r_local);
   uint64_t amount;
@@ -1057,7 +1057,7 @@ RC PPSTxnManager::run_calvin_txn() {
   txn_stats.process_time_short += curr_time - starttime;
   txn_stats.wait_starttime = get_sys_clock();
   return rc;
-  
+
 }
 
 

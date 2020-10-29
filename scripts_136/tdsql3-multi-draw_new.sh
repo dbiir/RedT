@@ -85,7 +85,7 @@ then
     sed -i 's?OUTPUT?'${RESULT_PATH[1]}'?g' ${RESULT_PATH[1]}/draw-multi.plt
     sed -i "17c $TpmC" ${RESULT_PATH[1]}/draw-multi.plt
     sed -i "22c $Rollback" ${RESULT_PATH[1]}/draw-multi.plt
-    sed -i "29c $Distributed" ${RESULT_PATH[1]}/draw-multi.plt   
+    sed -i "29c $Distributed" ${RESULT_PATH[1]}/draw-multi.plt
 
 
 ../gnuplot-5.2.8/gnuplot/bin/gnuplot ${RESULT_PATH[1]}/draw-multi.plt

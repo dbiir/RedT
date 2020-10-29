@@ -78,7 +78,7 @@ RC Bocc::central_validate(TxnManager * txn) {
 
 	his = history;
 	//pthread_mutex_unlock( &latch );
-	
+
 	INC_STATS(txn->get_thd_id(),occ_cs_time,get_sys_clock() - starttime);
 
 	starttime = get_sys_clock();
@@ -86,7 +86,7 @@ RC Bocc::central_validate(TxnManager * txn) {
 	uint64_t hist_checked = 0;
 	stop = 0;
 	if (finish_tn > start_tn) {
-		while (his && his->tn > finish_tn) 
+		while (his && his->tn > finish_tn)
 			his = his->next;
 		while (his && his->tn > start_tn) {
       		++hist_checked;
@@ -96,7 +96,7 @@ RC Bocc::central_validate(TxnManager * txn) {
 			if (valid)
 				valid = test_valid(his, wset);
 #endif
-			if (!valid) { 
+			if (!valid) {
         		INC_STATS(txn->get_thd_id(),occ_hist_validate_fail_time,get_sys_clock() - starttime);
 				goto final;
       		}
@@ -109,7 +109,7 @@ RC Bocc::central_validate(TxnManager * txn) {
 	starttime = get_sys_clock();
 final:
   /*
-	if (valid) 
+	if (valid)
 		txn->cleanup(RCOK);
     */
 	mem_allocator.free(rset->rows, sizeof(row_t *) * rset->set_size);
@@ -175,7 +175,7 @@ RC Bocc::get_rw_set(TxnManager * txn, b_set_ent * &rset, b_set_ent *& wset) {
 	for (uint64_t i = 0; i < wset->set_size + rset->set_size; i++) {
 		if (txn->get_access_type(i) == WR)
 			wset->rows[n ++] = txn->get_access_original_row(i);
-		else 
+		else
 			rset->rows[m ++] = txn->get_access_original_row(i);
 	}
 

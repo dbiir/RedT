@@ -18,9 +18,9 @@ void CloseToLts(void);
 class TcpTimestamp {
 public:
   void init(int all_thd_num);
-  void ConnectToLts(uint64_t thd_id); 
-  void CloseToLts(uint64_t thd_id); 
-  uint64_t TcpGetTimeStamp(uint64_t thd_id); 
+  void ConnectToLts(uint64_t thd_id);
+  void CloseToLts(uint64_t thd_id);
+  uint64_t TcpGetTimeStamp(uint64_t thd_id);
 private:
   TcpLtsSocket * socket;
   int socket_num;

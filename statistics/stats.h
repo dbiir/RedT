@@ -42,7 +42,7 @@ public:
 	void clear();
 
 	char _pad2[CL_SIZE];
-  
+
   uint64_t* part_cnt;
   uint64_t* part_acc;
 
@@ -102,6 +102,15 @@ public:
   double trans_commit_time=0;
   double trans_abort_time=0;
 
+  double trans_access_lock_wait_time=0;
+  // trans mvcc
+  double trans_mvcc_clear_history=0;
+  double trans_mvcc_access=0;
+  // trans dli
+  double dli_init_time=0;
+  double dli_lock_time=0;
+  double dli_check_conflict_time=0;
+  double dli_final_validate=0;
   // Work queue
   double work_queue_wait_time;
   uint64_t work_queue_cnt;
@@ -257,7 +266,7 @@ public:
   uint64_t wkdb_case5_cnt;
   double wkdb_range;
   uint64_t wkdb_commit_cnt;
-  
+
   // DTA
   uint64_t dta_validate_cnt;
   double dta_validate_time;
@@ -362,17 +371,17 @@ public:
 	// PER THREAD statistics
 	Stats_thd ** _stats;
 	Stats_thd * totals;
-	
+
 	void init(uint64_t thread_cnt);
 	void clear(uint64_t tid);
 	//void add_lat(uint64_t thd_id, uint64_t latency);
 	void commit(uint64_t thd_id);
 	void abort(uint64_t thd_id);
-	void print_client(bool prog); 
+	void print_client(bool prog);
 	void print(bool prog);
 	void print_cnts(FILE * outf);
 	void print_lat_distr();
-  void print_lat_distr(uint64_t min, uint64_t max); 
+  void print_lat_distr(uint64_t min, uint64_t max);
 	void print_abort_distr();
   uint64_t get_txn_cnts();
   void util_init();

@@ -8,19 +8,19 @@ istc_uname = 'rhardin'
 istc_machines=[
 
 #GOOD
-"istc1", 
-"istc3", 
-#"istc4", 
+"istc1",
+"istc3",
+#"istc4",
 "istc6",
 "istc8",
 #OK
 "istc7",
 "istc9",
-"istc10", 
-"istc13", 
+"istc10",
+"istc13",
 #BAD
 "istc11",
-"istc12", 
+"istc12",
 "istc2",
 "istc5",
 ]

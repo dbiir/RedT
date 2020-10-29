@@ -29,15 +29,15 @@ struct Item_no;
 class Message {
 public:
   virtual ~Message(){}
-  static Message * create_message(char * buf); 
-  static Message * create_message(BaseQuery * query, RemReqType rtype); 
-  static Message * create_message(TxnManager * txn, RemReqType rtype); 
-  static Message * create_message(uint64_t txn_id, RemReqType rtype); 
-  static Message * create_message(uint64_t txn_id,uint64_t batch_id, RemReqType rtype); 
-  static Message * create_message(LogRecord * record, RemReqType rtype); 
-  static Message * create_message(RemReqType rtype); 
-  static std::vector<Message*> * create_messages(char * buf); 
-  static void release_message(Message * msg); 
+  static Message * create_message(char * buf);
+  static Message * create_message(BaseQuery * query, RemReqType rtype);
+  static Message * create_message(TxnManager * txn, RemReqType rtype);
+  static Message * create_message(uint64_t txn_id, RemReqType rtype);
+  static Message * create_message(uint64_t txn_id,uint64_t batch_id, RemReqType rtype);
+  static Message * create_message(LogRecord * record, RemReqType rtype);
+  static Message * create_message(RemReqType rtype);
+  static std::vector<Message*> * create_messages(char * buf);
+  static void release_message(Message * msg);
   RemReqType rtype;
   uint64_t txn_id;
   uint64_t batch_id;
@@ -122,7 +122,7 @@ public:
   void copy_to_txn(TxnManager * txn);
   uint64_t get_size();
   void init() {}
-  void release(); 
+  void release();
   void copy_from_record(LogRecord * record);
 
   //Array<LogRecord*> log_records;
@@ -256,7 +256,7 @@ class ClientQueryMessage : public Message {
 public:
   void copy_from_buf(char * buf);
   void copy_to_buf(char * buf);
-  void copy_from_query(BaseQuery * query); 
+  void copy_from_query(BaseQuery * query);
   void copy_from_txn(TxnManager * txn);
   void copy_to_txn(TxnManager * txn);
   uint64_t get_size();
@@ -282,8 +282,8 @@ public:
   void copy_from_txn(TxnManager * txn);
   void copy_to_txn(TxnManager * txn);
   uint64_t get_size();
-  void init(); 
-  void release(); 
+  void init();
+  void release();
 
   Array<ycsb_request*> requests;
 
@@ -297,8 +297,8 @@ public:
   void copy_from_txn(TxnManager * txn);
   void copy_to_txn(TxnManager * txn);
   uint64_t get_size();
-  void init(); 
-  void release(); 
+  void init();
+  void release();
 
   uint64_t txn_type;
 	// common txn input for both payment & new-order
@@ -331,12 +331,12 @@ public:
   void copy_from_txn(TxnManager * txn);
   void copy_to_txn(TxnManager * txn);
   uint64_t get_size();
-  void init(); 
-  void release(); 
+  void init();
+  void release();
 
   uint64_t txn_type;
 
-  // getparts 
+  // getparts
   uint64_t part_key;
   // getproducts / getpartbyproduct
   uint64_t product_key;
@@ -362,7 +362,7 @@ class DAClientQueryMessage : public ClientQueryMessage {
   DATxnType txn_type;
 	uint64_t trans_id;//事务id
 	uint64_t item_id; //操作的变量id
-	uint64_t seq_id;//就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程 
+	uint64_t seq_id;//就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程
 	uint64_t write_version;//如果是写，从这个变量取写哪个版本
 	uint64_t state;
 	uint64_t next_state;
@@ -404,7 +404,7 @@ public:
   void copy_to_txn(TxnManager * txn);
   uint64_t get_size();
   void init();
-  void release(); 
+  void release();
 
  Array<ycsb_request*> requests;
 
@@ -418,10 +418,10 @@ public:
   void copy_to_txn(TxnManager * txn);
   uint64_t get_size();
   void init();
-  void release(); 
+  void release();
 
   uint64_t txn_type;
-  uint64_t state; 
+  uint64_t state;
 
 	// common txn input for both payment & new-order
   uint64_t w_id;
@@ -453,12 +453,12 @@ public:
   void copy_to_txn(TxnManager * txn);
   uint64_t get_size();
   void init();
-  void release(); 
+  void release();
 
   uint64_t txn_type;
-  uint64_t state; 
+  uint64_t state;
 
-  // getparts 
+  // getparts
   uint64_t part_key;
   // getproducts / getpartbyproduct
   uint64_t product_key;
@@ -482,7 +482,7 @@ class DAQueryMessage : public QueryMessage {
   DATxnType txn_type;
 	uint64_t trans_id;//事务id
 	uint64_t item_id; //操作的变量id
-	uint64_t seq_id;//就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程 
+	uint64_t seq_id;//就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程
 	uint64_t write_version;//如果是写，从这个变量取写哪个版本
 	uint64_t state;
 	uint64_t next_state;

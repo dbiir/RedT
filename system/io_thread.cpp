@@ -117,7 +117,7 @@ RC InputThread::client_recv_loop() {
 			assert(return_node_offset < g_servers_per_client);
 			rsp_cnts[return_node_offset]++;
 			INC_STATS(get_thd_id(),txn_cnt,1);
-			uint64_t timespan = get_sys_clock() - ((ClientResponseMessage*)msg)->client_startts; 
+			uint64_t timespan = get_sys_clock() - ((ClientResponseMessage*)msg)->client_startts;
 			INC_STATS(get_thd_id(),txn_run_time, timespan);
 			if (warmup_done) {
 				INC_STATS_ARR(get_thd_id(),client_client_latency, timespan);
@@ -144,7 +144,7 @@ RC InputThread::client_recv_loop() {
 bool InputThread::fakeprocess(Message * msg) {
 	RC rc __attribute__ ((unused));
 	bool eq = false;
-	
+
 	txn_man->set_txn_id(msg->get_txn_id());
 	// txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),0);
 	// txn_man->txn_stats.clear_short();
@@ -165,7 +165,7 @@ bool InputThread::fakeprocess(Message * msg) {
 	// assert(msg->get_rtype() == CL_QRY || msg->get_txn_id() != UINT64_MAX);
 	// uint64_t starttime = get_sys_clock();
 		switch(msg->get_rtype()) {
-			case RPREPARE: 
+			case RPREPARE:
 				rc = RCOK;
 				txn_man->set_rc(rc);
 				msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
@@ -180,7 +180,7 @@ bool InputThread::fakeprocess(Message * msg) {
 				txn_man->set_rc(rc);
 				msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),msg->return_node_id);
 				break;
-			case RFIN: 
+			case RFIN:
 				rc = RCOK;
 				txn_man->set_rc(rc);
 				if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC || CC_ALG == BOCC || CC_ALG == SSI)

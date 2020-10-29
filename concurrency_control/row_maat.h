@@ -27,12 +27,12 @@ public:
   RC abort(access_t type, TxnManager * txn);
   RC commit(access_t type, TxnManager * txn, row_t * data);
   void write(row_t * data);
-	
+
 private:
   volatile bool maat_avail;
-	
+
 	row_t * _row;
-	
+
   std::set<uint64_t> * uncommitted_reads;
   std::set<uint64_t> * uncommitted_writes;
   uint64_t timestamp_last_read;

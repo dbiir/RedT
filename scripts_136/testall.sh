@@ -1,7 +1,7 @@
 #python run_experiments.py -e -c vcloud tpcc_stress1
 #sleep 10
 
- 
+
 python run_experiments.py -e -c vcloud tpcc_cstress
 sleep 10
 python run_experiments.py -e -c vcloud tpcc_cstress1

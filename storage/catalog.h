@@ -56,11 +56,11 @@ public:
 	UInt32 			field_cnt;
  	const char * 	table_name;
  	uint32_t 	  table_id;
-	
+
   UInt32 get_tuple_size() {
     return tuple_size;
   };
-	
+
   uint64_t get_field_cnt() {
     return field_cnt;
   };

@@ -21,7 +21,7 @@
 #include "helper.h"
 #include <queue>
 #include <boost/lockfree/queue.hpp>
-#include <boost/circular_buffer.hpp>  
+#include <boost/circular_buffer.hpp>
 #include "semaphore.h"
 //#include "message.h"
 
@@ -108,14 +108,14 @@ private:
 #endif
   boost::lockfree::queue<work_queue_entry* > * seq_queue;
   boost::lockfree::queue<work_queue_entry* > ** sched_queue;
-  
+
   uint64_t sched_ptr;
   BaseQuery * last_sched_dq;
   uint64_t curr_epoch;
 
   sem_t 	_semaphore;
-  uint64_t work_queue_size;
-  uint64_t txn_queue_size;
+  volatile uint64_t work_queue_size;
+  volatile uint64_t txn_queue_size;
 
   uint64_t work_enqueue_size;
   uint64_t work_dequeue_size;

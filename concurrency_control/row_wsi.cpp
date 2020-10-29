@@ -16,20 +16,21 @@
 
 #include "txn.h"
 #include "row.h"
+#include "helper.h"
 #include "manager.h"
 #include "row_wsi.h"
 #include "mem_alloc.h"
 
 void Row_wsi::init(row_t * row) {
 	_row = row;
-	
+
 	prereq_mvcc = NULL;
 	readhis = NULL;
 	writehis = NULL;
 	readhistail = NULL;
 	writehistail = NULL;
 	blatch = false;
-	latch = (pthread_mutex_t *) 
+	latch = (pthread_mutex_t *)
 		mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init(latch, NULL);
 	whis_len = 0;
@@ -80,7 +81,7 @@ row_t * Row_wsi::clear_history(TsType type, ts_t ts) {
 	*tail = his;
 	if (*tail)
 		(*tail)->next = NULL;
-	if (his == NULL) 
+	if (his == NULL)
 		*queue = NULL;
 	return row;
 }
@@ -118,19 +119,19 @@ void Row_wsi::buffer_req(TsType type, TxnManager * txn)
 	}
 }
 
-// for type == R_REQ 
+// for type == R_REQ
 //	 debuffer all non-conflicting requests
 // for type == P_REQ
 //   debuffer the request with matching txn.
 WSIReqEntry * Row_wsi::debuffer_req( TsType type, TxnManager * txn) {
 	WSIReqEntry ** queue = &prereq_mvcc;
 	WSIReqEntry * return_queue = NULL;
-	
+
 	WSIReqEntry * req = *queue;
 	WSIReqEntry * prev_req = NULL;
 	if (txn != NULL) {
 		assert(type == P_REQ);
-		while (req != NULL && req->txn != txn) {		
+		while (req != NULL && req->txn != txn) {
 			prev_req = req;
 			req = req->next;
 		}
@@ -144,20 +145,20 @@ WSIReqEntry * Row_wsi::debuffer_req( TsType type, TxnManager * txn) {
 		preq_len --;
 		req->next = return_queue;
 		return_queue = req;
-	} 
+	}
 	return return_queue;
 }
 
-void Row_wsi::insert_history(ts_t ts, TxnManager * txn, row_t * row) 
+void Row_wsi::insert_history(ts_t ts, TxnManager * txn, row_t * row)
 {
-	WSIHisEntry * new_entry = get_his_entry(); 
+	WSIHisEntry * new_entry = get_his_entry();
 	new_entry->ts = ts;
 	// new_entry->txnid = txn->get_txn_id();
 	new_entry->row = row;
 	if (row != NULL)
 		whis_len ++;
 	else rhis_len ++;
-	WSIHisEntry ** queue = (row == NULL)? 
+	WSIHisEntry ** queue = (row == NULL)?
 		&(readhis) : &(writehis);
 	WSIHisEntry ** tail = (row == NULL)?
 		&(readhistail) : &(writehistail);
@@ -167,10 +168,10 @@ void Row_wsi::insert_history(ts_t ts, TxnManager * txn, row_t * row)
 	}
 
 	if (his) {
-		LIST_INSERT_BEFORE(his, new_entry,(*queue));					
+		LIST_INSERT_BEFORE(his, new_entry,(*queue));
 		//if (his == *queue)
 		//	*queue = new_entry;
-	} else 
+	} else
 		LIST_PUT_TAIL((*queue), (*tail), new_entry);
 }
 
@@ -184,13 +185,14 @@ RC Row_wsi::access(TxnManager * txn, TsType type, row_t * row) {
 		glob_manager.lock_row(_row);
 	else
 		pthread_mutex_lock( latch );
+	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - starttime);
   	if (type == R_REQ) {
 		// Read the row
 		rc = RCOK;
 		WSIHisEntry * whis = writehis;
-		while (whis != NULL && whis->ts > start_ts) 
+		while (whis != NULL && whis->ts > start_ts)
 			whis = whis->next;
-		row_t * ret = (whis == NULL)? 
+		row_t * ret = (whis == NULL)?
 			_row : whis->row;
 		txn->cur_row = ret;
 		insert_history(start_ts, txn, NULL);
@@ -216,20 +218,20 @@ RC Row_wsi::access(TxnManager * txn, TsType type, row_t * row) {
 		WSIReqEntry * req = debuffer_req(P_REQ, txn);
 		assert (req != NULL);
 		return_req_entry(req);
-	} else 
+	} else
 		assert(false);
-	
+
 	if (rc == RCOK) {
 		if (whis_len > g_his_recycle_len || rhis_len > g_his_recycle_len) {
 			ts_t t_th = glob_manager.get_min_ts(txn->get_thd_id());
 			if (readhistail && readhistail->ts < t_th)
 				clear_history(R_REQ, t_th);
-			// Here is a tricky bug. The oldest transaction might be 
+			// Here is a tricky bug. The oldest transaction might be
 			// reading an even older version whose timestamp < t_th.
 			// But we cannot recycle that version because it is still being used.
 			// So the HACK here is to make sure that the first version older than
 			// t_th not be recycled.
-			if (whis_len > 1 && 
+			if (whis_len > 1 &&
 				writehistail->prev->ts < t_th) {
 				row_t * latest_row = clear_history(W_REQ, t_th);
 				if (latest_row != NULL) {
@@ -247,7 +249,7 @@ RC Row_wsi::access(TxnManager * txn, TsType type, row_t * row) {
 	if (g_central_man)
 		glob_manager.release_row(_row);
 	else
-		pthread_mutex_unlock( latch );	
-		
+		pthread_mutex_unlock( latch );
+
 	return rc;
 }

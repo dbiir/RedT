@@ -110,7 +110,7 @@ uint64_t TcpTimestamp::TcpGetTimeStamp(uint64_t thd_id)
     uint64_t start_ts = get_sys_clock();
     uint64_t ts = 0;
     ts = socket[thd_id].getTimestamp();
-    
+
     if (ts == (uint64_t)-1)
     {
         //core_dump();

@@ -1,7 +1,7 @@
 import os, sys, re, math, os.path
 import numpy as np
 import operator
-from helper import get_cfgs 
+from helper import get_cfgs
 from helper import write_summary_file,get_summary_stats
 from draw import *
 import types
@@ -72,7 +72,7 @@ def progress_diff(summary,ncnt,stat,name=''):
 #        output["avg"] = [0] * len(output["0"])
 
     bbox = [0.4,0.9]
-    draw_line('prog_'+stat+name,output,xval,ylab=stat+'/sec',xlab="Interval",title="Progress "+stat,bbox=bbox,ncol=2) 
+    draw_line('prog_'+stat+name,output,xval,ylab=stat+'/sec',xlab="Interval",title="Progress "+stat,bbox=bbox,ncol=2)
 
 
 def progress(summary,ncnt,stat,name=''):
@@ -104,7 +104,7 @@ def progress(summary,ncnt,stat,name=''):
 #        output["avg"] = [0] * len(output["0"])
 
     bbox = [0.4,0.9]
-    draw_line('prog_'+stat+name,output,xval,ylab=stat+'/sec',xlab="Interval",title="Progress "+stat,bbox=bbox,ncol=2) 
+    draw_line('prog_'+stat+name,output,xval,ylab=stat+'/sec',xlab="Interval",title="Progress "+stat,bbox=bbox,ncol=2)
 
 #Use summary from client nodes
 def tput_v_lat(xval,vval,summary,summary_cl,
@@ -146,9 +146,9 @@ def tput_v_lat(xval,vval,summary,summary_cl,
             print(my_cfg)
             cfgs = get_cfgs(my_cfg_fmt, my_cfg)
             cfgs = get_outfile_name(cfgs,my_cfg_fmt)
-            if cfgs not in summary.keys(): 
+            if cfgs not in summary.keys():
                 print("Not in summary: {}".format(cfgs))
-                continue 
+                continue
             try:
                 tot_run_time = sum(summary[cfgs]['clock_time'])
 #                tot_lat = sum(summary[cfgs]['latency'])
@@ -172,7 +172,7 @@ def tput_v_lat(xval,vval,summary,summary_cl,
 #    bbox = [0.7,0.9]
     bbox = [1.0,0.95]
     print("Created plot {}".format(name))
-    draw_line2(name,tpt,_tpt,ylab='Latency (s/txn)',xlab='Throughput (txn/sec)',title=_title,bbox=bbox,ncol=2) 
+    draw_line2(name,tpt,_tpt,ylab='Latency (s/txn)',xlab='Throughput (txn/sec)',title=_title,bbox=bbox,ncol=2)
 
 def line_general(xval,vval,summary,summary_cl,
         key,
@@ -214,9 +214,9 @@ def line_general(xval,vval,summary,summary_cl,
 
             cfgs = get_cfgs(my_cfg_fmt, my_cfg)
             cfgs = get_outfile_name(cfgs,my_cfg_fmt)
-            if cfgs not in summary.keys(): 
+            if cfgs not in summary.keys():
                 print("Not in summary: {}".format(cfgs))
-                continue 
+                continue
             try:
                 tot = avg(summary[cfgs][key])
             except KeyError:
@@ -239,7 +239,7 @@ def line_general(xval,vval,summary,summary_cl,
     if logscalex:
         _xlab = _xlab + " (Log Scale)"
     print("Created plot {}".format(name))
-    draw_line(name,data,_xval,ylab='',xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname,ylimit=ylimit,logscalex=logscalex) 
+    draw_line(name,data,_xval,ylab='',xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname,ylimit=ylimit,logscalex=logscalex)
 
 def line_rate(xval,vval,summary,summary_cl,
         key,
@@ -279,9 +279,9 @@ def line_rate(xval,vval,summary,summary_cl,
 
             cfgs = get_cfgs(my_cfg_fmt, my_cfg)
             cfgs = get_outfile_name(cfgs,my_cfg_fmt)
-            if cfgs not in summary.keys(): 
+            if cfgs not in summary.keys():
                 print("Not in summary: {}".format(cfgs))
-                continue 
+                continue
             try:
                 tcnt = avg(summary[cfgs]['txn_cnt'])
                 if tcnt == 0:
@@ -296,7 +296,7 @@ def line_rate(xval,vval,summary,summary_cl,
 #    bbox = [0.7,0.9]
     bbox = [1.0,0.95]
     print("Created plot {}".format(name))
-    draw_line(name,data,_xval,ylab='',xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname) 
+    draw_line(name,data,_xval,ylab='',xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname)
 
 def latency(xval,vval,summary,summary_cl,
         cfg_fmt=[],
@@ -383,9 +383,9 @@ def latency(xval,vval,summary,summary_cl,
             cfgs = get_outfile_name(cfgs,my_cfg_fmt)
             print(cfgs)
             tmp = 0
-            if cfgs not in summary.keys(): 
+            if cfgs not in summary.keys():
                 print("Not in summary: {}".format(cfgs))
-                continue 
+                continue
             tmp = 0
             try:
                 s = summary
@@ -441,10 +441,10 @@ def latency(xval,vval,summary,summary_cl,
     if logscale:
         _ylab = 'Latency\n(s, Log Scale)'
     print(_xval)
-    
+
     if "WAIT_DIE" in fscl99.keys():
         fscl99["WAIT_DIE"] = [ 60 if x > 2 else y for x,y in zip(_xval,fscl99["WAIT_DIE"])]
-        
+
     draw_line(name+'ccl50',ccl50,_xval,ylab=_ylab,xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname,ylimit=ylimit,logscale=logscale,logscalex=logscalex,legend=legend,base=base)
     draw_line(name+'ccl99',ccl99,_xval,ylab=_ylab,xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname,ylimit=ylimit,logscale=logscale,logscalex=logscalex,legend=legend,base=base)
     draw_line(name+'fscl50',fscl50,_xval,ylab=_ylab,xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname,ylimit=ylimit,logscale=logscale,logscalex=logscalex,legend=legend,base=base)
@@ -455,7 +455,7 @@ def latency(xval,vval,summary,summary_cl,
     draw_line(name+'sacl99',sacl99,_xval,ylab=_ylab,xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname,ylimit=ylimit,logscale=logscale,logscalex=logscalex,legend=legend,base=base)
 
 
-   
+
 def tput(xval,vval,summary,summary_cl,
         cfg_fmt=[],
         cfg=[],
@@ -529,9 +529,9 @@ def tput(xval,vval,summary,summary_cl,
             cfgs = get_outfile_name(cfgs,my_cfg_fmt)
             print(cfgs)
             tmp = 0
-            if cfgs not in summary.keys(): 
+            if cfgs not in summary.keys():
                 print("Not in summary: {}".format(cfgs))
-                continue 
+                continue
             tmp = 0
             try:
                 s = summary_cl
@@ -593,16 +593,16 @@ def tput(xval,vval,summary,summary_cl,
     if logscale:
         _ylab = 'System Throughput\n(Thousand txn/s, Log Scale)'
     print(_xval)
-    
+
     # FIXME (Dana): MAAT --> OCC quick fix
     print tpt.keys()
     if "MAAT" in tpt.keys():
         occ_tput = tpt["MAAT"]
         del tpt["MAAT"]
         tpt["OCC"] = occ_tput
-        
+
     draw_line(name,tpt,_xval,ylab=_ylab,xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname,ylimit=ylimit,logscale=logscale,logscalex=logscalex,legend=legend,base=base)
-#    draw_line("pn"+name,pntpt,_xval,ylab='Throughput (Txn/sec)',xlab=_xlab,title="Per Node "+_title,bbox=bbox,ncol=2,ltitle=vname) 
+#    draw_line("pn"+name,pntpt,_xval,ylab='Throughput (Txn/sec)',xlab=_xlab,title="Per Node "+_title,bbox=bbox,ncol=2,ltitle=vname)
 
 def speedup(xval,vval,summary,summary_cl,
         cfg_fmt=[],
@@ -669,10 +669,10 @@ def speedup(xval,vval,summary,summary_cl,
             single_node_cfgs = get_outfile_name(single_node_cfgs,my_cfg_fmt)
             print(cfgs)
             print(single_node_cfgs)
-            if cfgs not in summary.keys() or single_node_cfgs not in summary.keys(): 
+            if cfgs not in summary.keys() or single_node_cfgs not in summary.keys():
                 print("Not in summary: {}".format(cfgs))
                 print("Not in summary: {}".format(single_node_cfgs))
-                continue 
+                continue
             try:
                 s = summary_cl
                 tot_txn_cnt = sum(s[cfgs]['txn_cnt'])
@@ -772,7 +772,7 @@ def lat(xval,vval,summary,
 
                 cfgs = get_cfgs(my_cfg_fmt, my_cfg)
                 cfgs = get_outfile_name(cfgs,my_cfg_fmt)
-                if cfgs not in summary.keys(): 
+                if cfgs not in summary.keys():
                     print("Not in summary: {}".format(cfgs))
                     break
                 try:
@@ -786,7 +786,7 @@ def lat(xval,vval,summary,
         if vname == "NETWORK_DELAY":
             bbox = [0.8,0.2]
         print("Created plot {}".format(name))
-        draw_line(name,lat,_xval,ylab='Latency-{}% (Sec)'.format(stat),xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname) 
+        draw_line(name,lat,_xval,ylab='Latency-{}% (Sec)'.format(stat),xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname)
 
 
 def lat(xval,vval,summary,
@@ -850,7 +850,7 @@ def lat(xval,vval,summary,
 
                 cfgs = get_cfgs(my_cfg_fmt, my_cfg)
                 cfgs = get_outfile_name(cfgs,my_cfg_fmt)
-                if cfgs not in summary.keys(): 
+                if cfgs not in summary.keys():
                     print("Not in summary: {}".format(cfgs))
                     break
                 try:
@@ -864,7 +864,7 @@ def lat(xval,vval,summary,
         if vname == "NETWORK_DELAY":
             bbox = [0.8,0.2]
         print("Created plot {}".format(name))
-        draw_line(name,lat,_xval,ylab='Latency-{}% (Sec)'.format(stat),xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname) 
+        draw_line(name,lat,_xval,ylab='Latency-{}% (Sec)'.format(stat),xlab=_xlab,title=_title,bbox=bbox,ncol=2,ltitle=vname)
 
 
 def lat_node_tbls(exp,nodes,msg_bytes,ts,
@@ -897,7 +897,7 @@ def lat_tbl(totals,msg_bytes,ts,
     _title="Latencies Stats(ms), Message Size of {} bytes".format("all")
     name="nlat_{}_{}bytes_{}".format('all-lat',"all-msgs",ts)
     draw_lat_matrix(name,table,lat_types=stats,rows=stats,columns=msg_bytes,title=_title)
-    
+
 
 def abort_rate(xval,
         vval,
@@ -949,9 +949,9 @@ def abort_rate(xval,
             cfgs = get_outfile_name(cfgs,my_cfg_fmt)
             print(cfgs)
             tmp = 0
-            if cfgs not in summary.keys(): 
+            if cfgs not in summary.keys():
                 print("Not in summary: {}".format(cfgs))
-                continue            
+                continue
             try:
                 tot_txn_cnt = sum(summary[cfgs]['txn_cnt'])
                 avg_txn_cnt = avg(summary[cfgs]['txn_cnt'])
@@ -976,11 +976,11 @@ def abort_rate(xval,
     if vname == "NETWORK_DELAY":
         bbox = [0.8,0.95]
     print("Created plot {}".format(name))
-    draw_line(name,tpt,xval,ylab='Average Aborts / Txn',xlab=xname,title=_title,bbox=bbox,ncol=2,ltitle=vname) 
+    draw_line(name,tpt,xval,ylab='Average Aborts / Txn',xlab=xname,title=_title,bbox=bbox,ncol=2,ltitle=vname)
 
 
 
-# Plots Throughput vs. MPR 
+# Plots Throughput vs. MPR
 # mpr: list of MPR values to plot along the x-axis
 # nodes: list of node counts; if more than 1 node count is
 #   provided, each node is plotted as a separate line, and
@@ -1025,9 +1025,9 @@ def tput_mpr(mpr,nodes,algos,max_txn,summary):
                 continue
             tpt[x][i] = (avg_txn_cnt/avg_run_time)
 
-    draw_line(name,tpt,mpr,ylab='Throughput (Txn/sec)',xlab='Multi-Partition Rate',title=_title,bbox=[0.5,0.95],ltitle=vname) 
+    draw_line(name,tpt,mpr,ylab='Throughput (Txn/sec)',xlab='Multi-Partition Rate',title=_title,bbox=[0.5,0.95],ltitle=vname)
 
-# Plots Transport latency vs. MPR 
+# Plots Transport latency vs. MPR
 # mpr: list of MPR values to plot along the x-axis
 # nodes: list of node counts; if more than 1 node count is
 #   provided, each node is plotted as a separate line, and
@@ -1062,7 +1062,7 @@ def tportlat_mpr(mpr,nodes,algos,max_txn,summary):
             avg_tport_lat = avg(summary[cfgs]['tport_lat'])
             tport_lat[x][i] = avg_tport_lat
 
-    draw_line(name,tport_lat,mpr,ylab='Latency (s)',xlab='Multi-Partition Rate',title='Average Message Latency',bbox=[0.5,0.95],ltitle=vname) 
+    draw_line(name,tport_lat,mpr,ylab='Latency (s)',xlab='Multi-Partition Rate',title='Average Message Latency',bbox=[0.5,0.95],ltitle=vname)
 
 def stacks_general(xval,summary,
         keys,
@@ -1099,9 +1099,9 @@ def stacks_general(xval,summary,
 
         cfgs = get_cfgs(my_cfg_fmt, my_cfg)
         cfgs = get_outfile_name(cfgs,my_cfg_fmt)
-        if cfgs not in summary.keys(): 
+        if cfgs not in summary.keys():
             print("Not in summary: {}".format(cfgs))
-            continue 
+            continue
         print(cfgs)
         total = 0
         for k,ki in zip(keys,range(len(keys))):
@@ -1188,7 +1188,7 @@ def tput_stack(xval,summary,
         cfgs = get_cfgs(my_cfg_fmt, my_cfg)
         cfgs = get_outfile_name(cfgs,my_cfg_fmt)
         print(cfgs)
-        if cfgs not in summary.keys(): 
+        if cfgs not in summary.keys():
             print("Not in summary")
             continue
         try:
@@ -1220,7 +1220,7 @@ def tput_stack(xval,summary,
         tpt
         ]
     pp.pprint(data)
-    
+
     # Quick and dirty label fix by Dana
     if "MAAT" in _xval:
         _xval[_xval.index("MAAT")] = "OCC"
@@ -1299,7 +1299,7 @@ def time_breakdown(xval,summary,
         cfgs = get_cfgs(my_cfg_fmt, my_cfg)
         cfgs = get_outfile_name(cfgs,my_cfg_fmt)
         print(cfgs)
-        if cfgs not in summary.keys(): 
+        if cfgs not in summary.keys():
             print("Not in summary")
             continue
         try:
@@ -1353,11 +1353,11 @@ def time_breakdown(xval,summary,
         time_abort,
         #time_index,
         time_twopc,
-        time_ccman, 
-        time_overhead, 
+        time_ccman,
+        time_overhead,
         time_work]
     pp.pprint(data)
-    
+
     # Quick and dirty label fix by Dana
     if "MAAT" in _xval:
         _xval[_xval.index("MAAT")] = "OCC"
@@ -1448,7 +1448,7 @@ def time_breakdown_line(xval,vval,summary,
             cfgs = get_cfgs(my_cfg_fmt, my_cfg)
             cfgs = get_outfile_name(cfgs,my_cfg_fmt)
             print(cfgs)
-            if cfgs not in summary.keys(): 
+            if cfgs not in summary.keys():
                 print("Not in summary")
                 continue
             try:
@@ -1485,7 +1485,7 @@ def time_breakdown_line(xval,vval,summary,
                 _ymax = 1
             else:
                 twopc[v][i] = time_twopc[i]
-                _ymax = max(_ymax,total[i]) 
+                _ymax = max(_ymax,total[i])
             print("{} {}: {} {} {} {} {} {}".format(v,i,time_idle[i],time_abort[i],time_twopc[i],time_ccman[i], time_overhead[i],time_work[i]))
 
 
@@ -1496,7 +1496,7 @@ def time_breakdown_line(xval,vval,summary,
     print("Created plot {}".format(name))
 
 
-# Stack graph of average txn latency breakdown 
+# Stack graph of average txn latency breakdown
 # nodes: node count to plot
 # algos: CC algo to plot
 # summary: dictionary loaded with results
@@ -1581,7 +1581,7 @@ def latency_breakdown(xval,summary,
         nc = cfgs["NODE_CNT"]
         cfgs = get_outfile_name(cfgs,my_cfg_fmt)
         print(cfgs)
-        if cfgs not in summary.keys(): 
+        if cfgs not in summary.keys():
             print("Not in summary")
             continue
         try:
@@ -1693,7 +1693,7 @@ def latency_breakdown(xval,summary,
         ]
     pp.pprint(data)
 #write_summary_file(name,stats,_xval,[])
-    
+
     # Quick and dirty label fix by Dana
     if "MAAT" in _xval:
         _xval[_xval.index("MAAT")] = "OCC"
@@ -1709,7 +1709,7 @@ def latency_breakdown(xval,summary,
         ltime_work
         ]
 #    pp.pprint(data)
- 
+
 #    draw_stack(data,_xval,stack_names,figname="fs"+name,title=_title,ymax=_ymax,legend=True)
     print("Created plot {}".format(name))
 
@@ -1823,7 +1823,7 @@ def cdf(vval,summary,
                 ys[v][x] = y
 
 
-    draw_line(name,ys,xs,ylab='Percent',xlab=xname,title=_title,bbox=[0.8,0.6],ylimit=1.0,ltitle=vname) 
+    draw_line(name,ys,xs,ylab='Percent',xlab=xname,title=_title,bbox=[0.8,0.6],ylimit=1.0,ltitle=vname)
 
 
 # Bar graph of total number of aborts per transaction
@@ -1865,7 +1865,7 @@ def bar_aborts_mpr(mpr,node,algo,max_txn,summary):
                 print("KeyError: {} {} {} {}".format(algo,node,max_txn,m))
                 ys_mpr[m][x] = 0
 
-    draw_bars(ys_mpr,xs_mpr,ylab='# Transactions',xlab='# Aborts',title=_title,figname=name) 
+    draw_bars(ys_mpr,xs_mpr,ylab='# Transactions',xlab='# Aborts',title=_title,figname=name)
 
 def bar_keys(
         summary,
@@ -1899,10 +1899,10 @@ def bar_keys(
             except KeyError:
                 ys[n] = 0
 
-        draw_bars_single(ys,xs,ylab='# Transactions',xlab='Key',title=_title,figname=name) 
+        draw_bars_single(ys,xs,ylab='# Transactions',xlab='Key',title=_title,figname=name)
 
 
-# Plots Average of a result vs. MPR 
+# Plots Average of a result vs. MPR
 # mpr: list of MPR values to plot along the x-axis
 # nodes: list of node counts; if more than 1 node count is
 #   provided, each node is plotted as a separate line, and
@@ -1944,6 +1944,6 @@ def plot_avg(mpr,nodes,algos,max_txn,summary,value='run_time'):
                 continue
             avgs[x][i] = avg_
 
-    draw_line(name,avgs,mpr,ylab='average ' + value,xlab='Multi-Partition Rate',title='Per Node Throughput',bbox=[0.5,0.95],ltitle=vname) 
+    draw_line(name,avgs,mpr,ylab='average ' + value,xlab='Multi-Partition Rate',title='Per Node Throughput',bbox=[0.5,0.95],ltitle=vname)
 
 

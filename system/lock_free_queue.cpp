@@ -11,8 +11,8 @@
 using namespace std;
 
 LockfreeQueue::LockfreeQueue() {
-  _head = NULL; 
-  _tail = NULL; 
+  _head = NULL;
+  _tail = NULL;
 }
 
 bool LockfreeQueue::enqueue(uintptr_t value) {

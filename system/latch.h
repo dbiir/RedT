@@ -9,18 +9,18 @@
 #include <random>
 #include <chrono>
 
-// static std::default_random_engine e(time(0)); 
+// static std::default_random_engine e(time(0));
 // static std::uniform_int_distribution<unsigned> u(0, 9); //随机数分布对象
 
 class Latch {
 	public:
 		Latch(int limit) {
-			this->limit_ = limit;	
+			this->limit_ = limit;
             this->lt_ = limit;
 		}
-	
+
 		virtual void await() = 0;
-		virtual void count_down() = 0; 
+		virtual void count_down() = 0;
 		virtual int get_unarrived() = 0;
         virtual void reset() = 0;
 	protected:
@@ -31,15 +31,15 @@ class Latch {
 class CountDownLatch : public Latch {
 	public:
 		using Latch::Latch;
-	
+
 	void await() override {
 		std::unique_lock<std::mutex> lk(mtx_);
 		cv_.wait(lk, [&]{
 			//std::cout << "limit_: " << limit_ << std::endl;
 			return (limit_ == 0);
 			});
-	}		
-		
+	}
+
 	void count_down() override {
 		std::unique_lock<std::mutex> lk(mtx_);
 		limit_--;
@@ -48,7 +48,7 @@ class CountDownLatch : public Latch {
 
 	int get_unarrived() override {
 		std::unique_lock<std::mutex> lk(mtx_);
-		return limit_;		
+		return limit_;
 	}
 
     void reset() override {
@@ -79,7 +79,7 @@ class CountDownLatch : public Latch {
 // 			std::this_thread::sleep_for(std::chrono::seconds(sec));
 // 			std::cout << name_ << " arrived." << std::endl;
 // 			latch_->count_down();
-// 		});		
+// 		});
 
 // 	}
 

@@ -46,15 +46,15 @@ public:
   bool timeout();
   void set_starttime(uint64_t starttime);
   void process_setup_msg();
-  void inc_txn_cnt(); 
-  void inc_inflight_cnt(); 
-  void dec_inflight_cnt(); 
-  uint64_t get_worker_epoch(); 
-  void next_worker_epoch(); 
-  uint64_t get_seq_epoch(); 
-  void advance_seq_epoch(); 
-  void inc_epoch_txn_cnt(); 
-  void decr_epoch_txn_cnt(); 
+  void inc_txn_cnt();
+  void inc_inflight_cnt();
+  void dec_inflight_cnt();
+  uint64_t get_worker_epoch();
+  void next_worker_epoch();
+  uint64_t get_seq_epoch();
+  void advance_seq_epoch();
+  void inc_epoch_txn_cnt();
+  void decr_epoch_txn_cnt();
   double seconds_from_start(uint64_t time);
 };
 

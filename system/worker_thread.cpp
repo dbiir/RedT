@@ -58,7 +58,7 @@ void WorkerThread::fakeprocess(Message * msg) {
 			case RPASS:
         //rc = process_rpass(msg);
 				break;
-			case RPREPARE: 
+			case RPREPARE:
         rc = RCOK;
         txn_man->set_rc(rc);
         msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
@@ -79,7 +79,7 @@ void WorkerThread::fakeprocess(Message * msg) {
 			case RQRY_RSP:
         rc = process_rqry_rsp(msg);
 				break;
-			case RFIN: 
+			case RFIN:
         rc = RCOK;
         txn_man->set_rc(rc);
         if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC || CC_ALG == BOCC || CC_ALG == SSI)
@@ -137,7 +137,7 @@ void WorkerThread::process(Message * msg) {
 			case RPASS:
         //rc = process_rpass(msg);
 				break;
-			case RPREPARE: 
+			case RPREPARE:
         rc = process_rprepare(msg);
 				break;
 			case RFWD:
@@ -152,7 +152,7 @@ void WorkerThread::process(Message * msg) {
 			case RQRY_RSP:
         rc = process_rqry_rsp(msg);
 				break;
-			case RFIN: 
+			case RFIN:
         rc = process_rfin(msg);
 				break;
 			case RACK_PREP:
@@ -235,7 +235,7 @@ void WorkerThread::commit() {
   uint64_t timespan = get_sys_clock() - txn_man->txn_stats.starttime;
   DEBUG("COMMIT %ld %f -- %f\n", txn_man->get_txn_id(),
         simulation->seconds_from_start(get_sys_clock()), (double)timespan / BILLION);
-  
+
   // ! trans total time
   uint64_t end_time = get_sys_clock();
   uint64_t timespan_short  = end_time - txn_man->txn_stats.restart_starttime;
@@ -245,7 +245,7 @@ void WorkerThread::commit() {
   INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_commit_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
-	
+
   // Send result back to client
 #if !SERVER_GENERATE_QUERIES
   msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,CL_RSP),txn_man->client_id);
@@ -319,7 +319,7 @@ RC WorkerThread::run() {
     txn_man = NULL;
     heartbeat();
 
-    
+
     progress_stats();
     Message* msg;
 
@@ -413,7 +413,7 @@ RC WorkerThread::run() {
             printf("%ld %d %ld -> %ld: %f %f\n",msg->txn_id, msg->rtype,
           msg->return_node_id,get_node_id() ,msg->lat_network_time/BILLION,
           msg->lat_other_time/BILLION);
-          } 
+          }
           */
           txn_man->txn_stats.network_time_short += msg->lat_network_time;
         }
@@ -489,7 +489,7 @@ RC WorkerThread::process_rfin(Message * msg) {
     msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN),
                       GET_NODE_ID(msg->get_txn_id()));
     return Abort;
-  } 
+  }
   txn_man->commit();
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
   if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == OCC || CC_ALG == DLI_BASE ||
@@ -560,7 +560,7 @@ RC WorkerThread::process_rack_prep(Message * msg) {
 #endif
   if (responses_left > 0) return WAIT;
 
-  // Done waiting 
+  // Done waiting
   if(txn_man->get_rc() == RCOK) {
     if (CC_ALG == TICTOC)
       rc = RCOK;
@@ -600,7 +600,7 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
   assert(responses_left >=0);
   if (responses_left > 0) return WAIT;
 
-  // Done waiting 
+  // Done waiting
   txn_man->txn_stats.twopc_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
 
   if(txn_man->get_rc() == RCOK) {
@@ -627,7 +627,7 @@ RC WorkerThread::process_rqry_rsp(Message * msg) {
   // Integrate bounds
   TxnManager * txn_man = txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),0);
   QueryResponseMessage* qmsg = (QueryResponseMessage*)msg;
-  txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ? 
+  txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ?
                             txn_man->_min_commit_ts : qmsg->_min_commit_ts;
 #endif
   RC rc = txn_man->run_txn();
@@ -641,7 +641,7 @@ RC WorkerThread::process_rqry(Message * msg) {
              msg->get_txn_id() % g_node_cnt, g_node_id);
   assert(!IS_LOCAL(msg->get_txn_id()));
   RC rc = RCOK;
-  
+
   msg->copy_to_txn(txn_man);
 
 #if CC_ALG == MVCC
@@ -708,7 +708,7 @@ RC WorkerThread::process_rprepare(Message * msg) {
     TxnManager * txn_man = txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),0);
     PrepareMessage* pmsg = (PrepareMessage*)msg;
     txn_man->_min_commit_ts = pmsg->_min_commit_ts;
-    // txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ? 
+    // txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ?
     //                         txn_man->_min_commit_ts : qmsg->_min_commit_ts;
 #endif
     // Validate transaction
@@ -798,7 +798,7 @@ RC WorkerThread::process_rtxn(Message * msg) {
       txn_man->set_timestamp(get_next_ts());
     #endif
     }
-  
+
 #if CC_ALG == MVCC
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
 #endif
@@ -893,7 +893,7 @@ RC WorkerThread::process_log_flushed(Message * msg) {
 
   txn_man->log_flushed = true;
   if (g_repl_cnt == 0 || txn_man->repl_finished) commit();
-  return RCOK; 
+  return RCOK;
 }
 
 RC WorkerThread::process_rfwd(Message * msg) {
@@ -908,7 +908,7 @@ RC WorkerThread::process_rfwd(Message * msg) {
     if(rc == RCOK && txn_man->calvin_exec_phase_done()) {
       calvin_wrapup();
       return RCOK;
-    }   
+    }
   }
   return WAIT;
 }
@@ -985,7 +985,7 @@ RC WorkerNumThread::run() {
     work_queue.set_dewq_cnt();
     work_queue.set_entxn_cnt();
     work_queue.set_enwq_cnt();
-  
+
     INC_STATS(_thd_id,work_queue_wq_cnt[i],wq_size);
     INC_STATS(_thd_id,work_queue_tx_cnt[i],tx_size);
 
@@ -998,7 +998,7 @@ RC WorkerNumThread::run() {
     sleep(1);
     // if(idle_starttime ==0)
     //   idle_starttime = get_sys_clock();
-    
+
     // if(get_sys_clock() - idle_starttime > 1000000000) {
     //   i++;
     //   idle_starttime = 0;

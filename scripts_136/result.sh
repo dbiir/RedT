@@ -493,10 +493,13 @@ then
         TMPFILE=tmp-${cc}
         rm -rf ${TMPFILE}
         touch ${TMPFILE}
-
+        CCLATFILE=lat-${cc}
+        rm -rf ${CCLATFILE}
+        touch ${CCLATFILE}
         for load in ${LOAD[@]}
         do
-            echo -n ${nn}" " >> ${TMPFILE}
+            echo -n ${load}" " >> ${TMPFILE}
+            echo -n ${load}" " >> ${CCLATFILE}
             AS=''
 
             TMPN=${NUMBEROFNODE[0]}
@@ -509,6 +512,7 @@ then
             done
             tmpresult=$(python parse_results.py $AS)
             echo ${tmpresult} >> ${TMPFILE}
+            python parse_latency.py $AS >> ${CCLATFILE}
             tput=$(echo ${tmpresult} | awk '{print $1}')
             ar=$(echo ${tmpresult} | awk '{print $2}')
             dr=$(echo ${tmpresult} | awk '{print $3}')
@@ -516,11 +520,14 @@ then
             addContent "<td>${ar}</td>"
             addContent "<td>${dr}</td>"
         done
-        python parse_latency.py $LS >> ${LTFILE}
+        python parse_trans_latency.py $LS >> ${LTFILE}
         mv ${TMPFILE} ${RESULT_PATH}/
+        mv ${CCLATFILE} ${RESULT_PATH}/
+        cp ${LTFILE} ${RESULT_PATH}/
         addContent "</tr>"
     done
     addTableTail
+    addContent "<img src=\"./1tpmc.svg\" />"
     echo >> ${LATFILE}
     echo "abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time" >> ${LATFILE}
     awk -F' ' '{for(i=1;i<=NF;i=i+1){a[NR,i]=$i}}END{for(j=1;j<=NF;j++){str=a[1,j];for(i=2;i<=NR;i++){str=str " " a[i,j]}print str}}' ${LTFILE} >> ${LATFILE}

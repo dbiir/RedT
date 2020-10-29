@@ -226,13 +226,13 @@ lineconfig = {
 
 # data[config] = []
 # config : different configurations
-# under a config, the list has the values for each benchmark 
+# under a config, the list has the values for each benchmark
 # label : the names of benchmarks, matching the list
 
-def draw_bar(filename, data, label, names=None, dots=None, 
+def draw_bar(filename, data, label, names=None, dots=None,
         ylabel='Speedup', xlabel='', rotation=30,
         ncol=1, bbox=[0.95, 0.9], colors=None, hatches=None,
-        figsize=(9, 3), left=0.1, bottom=0.18, right=0.96, top=None, 
+        figsize=(9, 3), left=0.1, bottom=0.18, right=0.96, top=None,
         ylimit=None, xlimit=None,ltitle=''):
 
     index = range(0, len(label))
@@ -280,17 +280,17 @@ def draw_bar(filename, data, label, names=None, dots=None,
 
     if title:
         ax1.set_title("\n".join(wrap(title)))
-    fig.legend([x[0] for x in bars], names, prop={'size':12}, 
-        ncol=ncol, bbox_to_anchor=bbox, labelspacing=0.2) 
+    fig.legend([x[0] for x in bars], names, prop={'size':12},
+        ncol=ncol, bbox_to_anchor=bbox, labelspacing=0.2)
     subplots_adjust(left=left, bottom=bottom, right=right, top=top)
     savefig('../figs/' + filename)
     plt.close()
 
-def draw_line2(fname, data, xticks, 
+def draw_line2(fname, data, xticks,
         title = None,
         xlabels = None,
-        bbox=(0.9,0.95), ncol=1, 
-        ylab='Throughput', logscale=False, 
+        bbox=(0.9,0.95), ncol=1,
+        ylab='Throughput', logscale=False,
         logscalex = False,
         ylimit=0, xlimit=None, xlab='Number of Cores',
         legend=True, linenames = None, figsize=(23/3, 10/3), styles=None,ltitle='') :
@@ -303,7 +303,7 @@ def draw_line2(fname, data, xticks,
         ax.set_xscale('log')
     n = 0
     if xlabels != None :
-        ax.set_xticklabels(xlabels) 
+        ax.set_xticklabels(xlabels)
     if linenames == None :
         print(data.keys())
         linenames = sorted(data.keys())
@@ -355,11 +355,11 @@ def draw_line2(fname, data, xticks,
     plt.close()
 
 
-def draw_line(fname, data, xticks, 
+def draw_line(fname, data, xticks,
         title = None,
         xlabels = None,
-        bbox=(0.9,0.95), ncol=1, 
-        ylab='Throughput', logscale=False, 
+        bbox=(0.9,0.95), ncol=1,
+        ylab='Throughput', logscale=False,
         logscalex = False,
         ylimit=0, xlimit=None, xlab='Number of Cores',
         legend=False, linenames = None, figsize=(23/3, 10/3), styles=None,ltitle=''
@@ -387,7 +387,7 @@ def draw_line(fname, data, xticks,
         ax.set_xscale('log',basex=base)
     n = 0
     if xlabels != None :
-        ax.set_xticklabels([x if i%2 else '' for x,i in zip(xlabels,range(len(xlabels)))]) 
+        ax.set_xticklabels([x if i%2 else '' for x,i in zip(xlabels,range(len(xlabels)))])
     if linenames == None :
         print(data.keys())
         linenames = sorted(data.keys())
@@ -465,8 +465,8 @@ def draw_line(fname, data, xticks,
 #        savefig('../figs/' + fname + 'legend.pdf')
 #        plt.close()
 
-def draw_bars_single(data, xlabels, 
-        figname='stack', 
+def draw_bars_single(data, xlabels,
+        figname='stack',
         figsize=(8, 3),
         ylab = 'Throughput',
         xlab = 'Time',
@@ -484,7 +484,7 @@ def draw_bars_single(data, xlabels,
     clr = itertools.cycle(['#4d4d4d','#F15854','#DECF3F','#5DA5DA','#FAA43A','#60BD68'])
     htch = itertools.cycle(['','//','\\','-','\\\\','/'])
 
-    w = 0.8 
+    w = 0.8
     k = 0
     p = plt.bar([i+(w*k) for i in ind], data, color=clr.next(), hatch=htch.next(),width=w)
     plots = plots + (p,)
@@ -501,8 +501,8 @@ def draw_bars_single(data, xlabels,
     plt.close()
 
 
-def draw_bars(data, xlabels, 
-        figname='stack', 
+def draw_bars(data, xlabels,
+        figname='stack',
         figsize=(8, 3),
         ylab = 'Throughput',
         xlab = 'Time',
@@ -619,11 +619,11 @@ def draw_2line(x, y1, y2, figname="noname", ylimit=None,ltitle=''):
     savefig('../figs/' + figname + '.pdf', bbox_inches='tight')
     plt.close()
 
-def draw_scatter(fname, data, xticks, 
+def draw_scatter(fname, data, xticks,
         title = None,
         xlabels = None,
-        bbox=(0.9,0.95), ncol=1, 
-        ylab='Txn IDs', logscale=False, 
+        bbox=(0.9,0.95), ncol=1,
+        ylab='Txn IDs', logscale=False,
         logscalex = False,
         ylimit=0, xlimit=None, xlab='Time',
         legend=True, linenames = None, figsize=(100,50), styles=None) :
@@ -637,7 +637,7 @@ def draw_scatter(fname, data, xticks,
         ax.set_xscale('log')
     n = 0
     if xlabels != None :
-        ax.set_xticklabels(xlabels) 
+        ax.set_xticklabels(xlabels)
 
 #exec "lines[n], = plot(intlab, data[key], %s)" % style
     for i in range(0,len(linenames)):
@@ -690,7 +690,7 @@ def draw_lat_matrix(fname,data,title="",lat_type=None,lat_types=None,columns=[],
     nrows,ncols=data.shape
     assert nrows==len(rows)
     assert ncols==len(columns)
-    width, height = 1.0 / ncols * 2, 1.0 / nrows * 2 
+    width, height = 1.0 / ncols * 2, 1.0 / nrows * 2
     for (i,j),val in np.ndenumerate(data):
         idx = [j % 2, (j + 1) % 2][i % 2]
         color = bkg_colors[idx]
@@ -702,15 +702,15 @@ def draw_lat_matrix(fname,data,title="",lat_type=None,lat_types=None,columns=[],
                 txt=fmt.format(ls.exec_fn(val,lat_types[i]))
         else:
             txt="-"
-        tb.add_cell(i, j, width, height, text=txt, 
+        tb.add_cell(i, j, width, height, text=txt,
                 loc='center', facecolor=color)
     # Row Labels...
     for i, label in enumerate(rows):
-        tb.add_cell(i, -1, width, height, text=label, loc='right', 
+        tb.add_cell(i, -1, width, height, text=label, loc='right',
                 edgecolor='none', facecolor='none')
     # Column Labels...
     for j, label in enumerate(columns):
-        tb.add_cell(-1, j, width, height/2, text=label, loc='center', 
+        tb.add_cell(-1, j, width, height/2, text=label, loc='center',
                 edgecolor='none', facecolor='none')
     ax.add_table(tb)
 

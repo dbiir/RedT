@@ -31,15 +31,15 @@
 RC PPSWorkload::init() {
 	Workload::init();
 	char * cpath = getenv("SCHEMA_PATH");
-	string path;	
-	if (cpath == NULL) 
+	string path;
+	if (cpath == NULL)
 		path = "./benchmarks/";
-	else { 
+	else {
 		path = string(cpath);
 	}
 	path += "PPS_schema.txt";
 	cout << "reading schema file: " << path << endl;
-	
+
   printf("Initializing schema... ");
   fflush(stdout);
 	init_schema( path.c_str() );
@@ -73,10 +73,10 @@ RC PPSWorkload::init_table() {
 /******** fill in data ************/
 // data filling process:
 // supplies
-// --parts 
+// --parts
 // --suppliers
-// uses 
-// --products 
+// uses
+// --products
 /**********************************/
 
   pps_thr_args * tt = new pps_thr_args[g_init_parallelism];
@@ -131,7 +131,7 @@ void PPSWorkload::init_tab_parts() {
     row->set_value(FIELD8,padding);
     row->set_value(FIELD9,padding);
     row->set_value(FIELD10,padding);
-    
+
 		index_insert(i_parts, id, row, parts_to_partition(id));
     DEBUG("PARTS added (%d, ...)\n",id);
 
@@ -160,7 +160,7 @@ void PPSWorkload::init_tab_suppliers() {
     row->set_value(FIELD8,padding);
     row->set_value(FIELD9,padding);
     row->set_value(FIELD10,padding);
-    
+
 		index_insert(i_suppliers, id, row, suppliers_to_partition(id));
 
   }
@@ -188,7 +188,7 @@ void PPSWorkload::init_tab_products() {
     row->set_value(FIELD8,padding);
     row->set_value(FIELD9,padding);
     row->set_value(FIELD10,padding);
-    
+
 		index_insert(i_products, id, row, products_to_partition(id));
     DEBUG("PRODUCTS added (%d, ...)\n",id);
 

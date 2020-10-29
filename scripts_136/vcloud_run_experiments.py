@@ -86,12 +86,12 @@ for e in experiments[1:]:
 
     output_f = get_outfile_name(cfgs)
     output_dir = output_f + "/"
-    output_f = output_f + strnow 
+    output_f = output_f + strnow
     print output_f
     if len(glob.glob('{}*{}*.out'.format(result_dir,get_outfile_name(cfgs)))) > 0:
         print "Experiment exists in results folder... skipping"
         continue
-    
+
     f = open("config.h",'r');
     lines = f.readlines()
     f.close()

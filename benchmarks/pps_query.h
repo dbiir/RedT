@@ -60,7 +60,7 @@ public:
     }
 
 	PPSTxnType txn_type;
-	// txn input 
+	// txn input
 
     uint64_t rqry_req_cnt;
     uint64_t part_key;

@@ -1,7 +1,7 @@
 import itertools
 from paper_plots import *
 # Experiments to run and analyze
-# Go to end of file to fill in experiments 
+# Go to end of file to fill in experiments
 SHORTNAMES = {
     "CLIENT_NODE_CNT" : "CN",
     "CLIENT_THREAD_CNT" : "CT",
@@ -71,7 +71,7 @@ def ycsb_scaling():
     base_table_size=1048576*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
-    load = [10000] 
+    load = [10000]
     tcnt = [4]
     skew = [0.0]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
@@ -504,7 +504,7 @@ configs = {
     "PRIORITY":"PRIORITY_ACTIVE",
     "TWOPL_LITE":"false",
 #YCSB
-    "INIT_PARALLELISM" : 8, 
+    "INIT_PARALLELISM" : 8,
     "TUP_WRITE_PERC":0.0,
     "ZIPF_THETA":0.3,
     "ACCESS_PERC":0.03,
@@ -526,7 +526,7 @@ configs = {
     "SKEW_METHOD":"ZIPF",
     "ENVIRONMENT_EC2":"false",
     "YCSB_ABORT_MODE":"false",
-    "LOAD_METHOD": "LOAD_MAX", 
+    "LOAD_METHOD": "LOAD_MAX",
     "ISOLATION_LEVEL":"SERIALIZABLE"
 }
 

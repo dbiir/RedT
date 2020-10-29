@@ -42,7 +42,7 @@ uint64_t AbortQueue::enqueue(uint64_t thd_id, uint64_t txn_id, uint64_t abort_cn
   INC_STATS(thd_id,abort_queue_enqueue_cnt,1);
   queue.push(entry);
   pthread_mutex_unlock(&mtx);
-  
+
   INC_STATS(thd_id,abort_queue_enqueue_time,get_sys_clock() - starttime);
 
   return penalty - starttime;

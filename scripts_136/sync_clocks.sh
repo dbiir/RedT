@@ -5,4 +5,4 @@ then
 fi
 #CMD="ntpdate -q clock-1.cs.cmu.edu"
 CMD="ntpdate -b clock-1.cs.cmu.edu"
-./vcloud_cmd.sh "$HOSTS" "$CMD" 
+./vcloud_cmd.sh "$HOSTS" "$CMD"

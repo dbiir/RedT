@@ -57,6 +57,7 @@ class Row_dta;
 class Row_wkdb;
 class Row_tictoc;
 class Row_si;
+class Row_null;
 
 class row_t {
 public:
@@ -83,7 +84,7 @@ public:
 	void set_value(const char * col_name, void * ptr);
 	char * get_value(int id);
 	char * get_value(char * col_name);
-	
+
 	DECL_SET_VALUE(uint64_t);
 	DECL_SET_VALUE(int64_t);
 	DECL_SET_VALUE(double);
@@ -103,11 +104,11 @@ public:
 	void free_row();
 
 	// for concurrency control. can be lock, timestamp etc.
-	RC get_lock(access_t type, TxnManager * txn); 
+	RC get_lock(access_t type, TxnManager * txn);
 	RC get_ts(uint64_t &orig_wts, uint64_t &orig_rts);
 	RC get_row(access_t type, TxnManager * txn, row_t *& row, uint64_t &orig_wts, uint64_t &orig_rts);
 	RC get_row(access_t type, TxnManager *txn, Access *access);
-	RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row); 
+	RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row);
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
@@ -121,11 +122,11 @@ public:
 			Row_occ * manager;
 	#elif CC_ALG == DLI_BASE || CC_ALG == DLI_OCC
 		Row_dli_base *manager;
-	#elif CC_ALG == MAAT 
+	#elif CC_ALG == MAAT
 		Row_maat * manager;
-	#elif CC_ALG == WOOKONG 
+	#elif CC_ALG == WOOKONG
 		Row_wkdb * manager;
-	#elif CC_ALG == TICTOC 
+	#elif CC_ALG == TICTOC
 		Row_tictoc * manager;
 	#elif CC_ALG == HSTORE_SPEC
 		Row_specex * manager;
@@ -139,6 +140,8 @@ public:
 		Row_ssi * manager;
 	#elif CC_ALG == WSI
 		Row_wsi * manager;
+	#elif CC_ALG == CNULL
+		Row_null * manager;
 	#endif
 	char * data;
 	int tuple_size;

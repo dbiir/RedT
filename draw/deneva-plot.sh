@@ -83,6 +83,15 @@ sed -i "6c set xlabel \"Server Count (Log Scale)\"" ${RESULT_PATH}/draw-multi.pl
 elif [[ $TEST_TYPE == "tpcc_scaling2" ]]
 then
 sed -i "6c set xlabel \"Server Count (Log Scale)\"" ${RESULT_PATH}/draw-multi.plt
+elif [[ $TEST_TYPE == "ycsb_stress" ]]
+then
+sed -i "6c set xlabel \"Max Trans In Flight\"" ${RESULT_PATH}/draw-multi.plt
+elif [[ $TEST_TYPE == "tpcc_stress" ]]
+then
+sed -i "6c set xlabel \"Max Trans In Flight\"" ${RESULT_PATH}/draw-multi.plt
+elif [[ $TEST_TYPE == "tpcc_cstress" ]]
+then
+sed -i "6c set xlabel \"Max Trans In Flight\"" ${RESULT_PATH}/draw-multi.plt
 fi
 
 

@@ -44,7 +44,7 @@ std::set<uint64_t> DAQuery::participants(Message * msg, Workload * wl) {
 
 uint64_t DAQueryGenerator::action_2_state(ActionSequence& act_seq,size_t i, uint64_t seq_id)
 {
-  
+
   //turn to 64bit in order to not overflow
   uint64_t ret=0, trans_id2=0, item_id2=0, type2=0, seq_id2=0, number2=0;
   if(i<0||i>=act_seq.actions().size())
@@ -55,7 +55,7 @@ uint64_t DAQueryGenerator::action_2_state(ActionSequence& act_seq,size_t i, uint
   type2=static_cast<int>(act_seq.actions()[i].type());
   seq_id2=seq_id;
   number2=i;
-  
+
 
   ret = ret |  trans_id2;
   ret = ret | (item_id2 <<  8 );
@@ -122,7 +122,7 @@ BaseQuery * DAQueryGenerator::create_query(Workload * h_wl, uint64_t home_partit
         if(pu)
           printf("true ");
         else
-          printf("false ");  
+          printf("false ");
         fflush(stdout);
         */
     }
@@ -132,8 +132,8 @@ BaseQuery * DAQueryGenerator::create_query(Workload * h_wl, uint64_t home_partit
     fflush(stdout);
   };
 
-  
-  
+
+
   creator.DeliverActionSequences(handle);
   printf("history thread exit\n");
   fflush(stdout);

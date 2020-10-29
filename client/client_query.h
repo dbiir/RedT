@@ -27,17 +27,17 @@ class YCSBClientQuery;
 class TPCCQuery;
 class tpcc_client_query;
 
-// We assume a separate task queue for each thread in order to avoid 
-// contention in a centralized query queue. In reality, more sophisticated 
+// We assume a separate task queue for each thread in order to avoid
+// contention in a centralized query queue. In reality, more sophisticated
 // queue model might be implemented.
 class Client_query_queue {
 public:
 	void init(Workload * h_wl);
-  bool done(); 
+  bool done();
 	BaseQuery * get_next_query(uint64_t server_id,uint64_t thread_id);
   void initQueriesParallel(uint64_t thd_id);
   static void * initQueriesHelper(void * context);
-	
+
 private:
 	Workload * _wl;
   uint64_t size;

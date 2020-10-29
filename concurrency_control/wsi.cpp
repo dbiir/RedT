@@ -46,7 +46,7 @@ RC wsi::central_validate(TxnManager * txn) {
 	RC rc;
 	// uint64_t starttime = get_sys_clock();
 	// uint64_t total_starttime = starttime;
-#if CC_ALG == WSI 
+#if CC_ALG == WSI
 	uint64_t start_tn = txn->get_start_timestamp();
 #endif
 	bool valid = true;
@@ -66,7 +66,7 @@ RC wsi::central_validate(TxnManager * txn) {
 	if (!readonly) {
 		for (UInt32 i = 0; i < rset->set_size; i++) {
 			checked++;
-#if CC_ALG == WSI 
+#if CC_ALG == WSI
 			if (rset->rows[i]->manager->get_last_commit() > start_tn)
 				rc = Abort;
 #endif
@@ -76,7 +76,7 @@ RC wsi::central_validate(TxnManager * txn) {
 	sem_post(&_semaphore);
 	// starttime = get_sys_clock();
 	/*
-	if (valid) 
+	if (valid)
 		txn->cleanup(RCOK);
     */
 	mem_allocator.free(rset->rows, sizeof(row_t *) * rset->set_size);
@@ -114,7 +114,7 @@ void wsi::central_finish(RC rc, TxnManager * txn) {
 }
 
 void wsi::gene_finish_ts(TxnManager * txn) {
-	txn->set_commit_timestamp(glob_manager.get_ts(txn->get_thd_id())); 
+	txn->set_commit_timestamp(glob_manager.get_ts(txn->get_thd_id()));
 }
 
 RC wsi::get_rw_set(TxnManager * txn, wsi_set_ent * &rset, wsi_set_ent *& wset) {
@@ -131,7 +131,7 @@ RC wsi::get_rw_set(TxnManager * txn, wsi_set_ent * &rset, wsi_set_ent *& wset) {
 	for (uint64_t i = 0; i < wset->set_size + rset->set_size; i++) {
 		if (txn->get_access_type(i) == WR)
 			wset->rows[n ++] = txn->get_access_original_row(i);
-		else 
+		else
 			rset->rows[m ++] = txn->get_access_original_row(i);
 	}
 

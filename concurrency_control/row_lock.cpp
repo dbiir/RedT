@@ -52,15 +52,15 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
     assert (CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN);
     RC rc;
     uint64_t starttime = get_sys_clock();
-
+    uint64_t lock_get_start_time = starttime;
     if (g_central_man) {
         glob_manager.lock_row(_row);
-  } else {
+    } else {
         uint64_t mtx_wait_starttime = get_sys_clock();
         pthread_mutex_lock( latch );
         INC_STATS(txn->get_thd_id(),mtx[17],get_sys_clock() - mtx_wait_starttime);
     }
-
+    INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - lock_get_start_time);
     if(owner_cnt > 0) {
       INC_STATS(txn->get_thd_id(),twopl_already_owned_cnt,1);
     }
@@ -76,7 +76,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
     if (CC_ALG == CALVIN && !conflict) {
     if (waiters_head) conflict = true;
     }
-	
+
     if (conflict) {
     //printf("conflict! rid%ld txnid%ld ",_row->get_primary_key(),txn->get_txn_id());
         // Cannot be added to the owner list.
@@ -212,7 +212,7 @@ final:
     txn->txn_stats.cc_time_short += timespan;
 INC_STATS(txn->get_thd_id(),twopl_getlock_time,timespan);
 INC_STATS(txn->get_thd_id(),twopl_getlock_cnt,1);
-	
+
     if (g_central_man)
         glob_manager.release_row(_row);
     else
@@ -223,7 +223,7 @@ INC_STATS(txn->get_thd_id(),twopl_getlock_cnt,1);
 }
 
 
-RC Row_lock::lock_release(TxnManager * txn) {	
+RC Row_lock::lock_release(TxnManager * txn) {
 
 #if CC_ALG == CALVIN
     if (txn->isRecon()) {
@@ -308,7 +308,7 @@ RC Row_lock::lock_release(TxnManager * txn) {
 #endif
 
   if (owner_cnt == 0) ASSERT(lock_type == LOCK_NONE);
-#if DEBUG_ASSERT && CC_ALG == WAIT_DIE 
+#if DEBUG_ASSERT && CC_ALG == WAIT_DIE
       for (en = waiters_head; en != NULL && en->next != NULL; en = en->next)
         assert(en->next->txn->get_timestamp() < en->txn->get_timestamp());
       for (en = waiters_head; en != NULL && en->next != NULL; en = en->next)
@@ -335,7 +335,7 @@ RC Row_lock::lock_release(TxnManager * txn) {
 
 #if CC_ALG != NO_WAIT
           STACK_PUSH(owners[hash(entry->txn->get_txn_id())], entry);
-#endif 
+#endif
           owner_cnt ++;
           waiter_cnt --;
           if(entry->txn->get_timestamp() > max_owner_ts) {

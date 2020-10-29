@@ -109,7 +109,7 @@ RC YCSBTxnManager::run_txn() {
   txn_stats.wait_starttime = get_sys_clock();
 
   if(IS_LOCAL(get_txn_id())) {
-    if(is_done() && rc == RCOK) 
+    if(is_done() && rc == RCOK)
       rc = start_commit();
     else if(rc == Abort)
       rc = start_abort();
@@ -185,7 +185,7 @@ RC YCSBTxnManager::run_txn_state() {
         rc = run_ycsb_0(req,row);
       } else {
         rc = send_remote_request();
-        
+
       }
 
       break;
@@ -213,7 +213,7 @@ RC YCSBTxnManager::run_ycsb_0(ycsb_request * req,row_t *& row_local) {
 		m_item = index_read(_wl->the_index, req->key, part_id);
 
 		row_t * row = ((row_t *)m_item->location);
-			
+
 		rc = get_row(row, type,row_local);
 
     return rc;
@@ -228,7 +228,7 @@ RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {
     fval = *(uint64_t *)(&data[fid * 100]);
 #if ISOLATION_LEVEL == READ_COMMITTED || ISOLATION_LEVEL == READ_UNCOMMITTED
     // Release lock after read
-    release_last_row_lock(); 
+    release_last_row_lock();
 #endif
 
   } else {
@@ -242,9 +242,9 @@ RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {
 
 #if ISOLATION_LEVEL == READ_UNCOMMITTED
     // Release lock after write
-    release_last_row_lock(); 
+    release_last_row_lock();
 #endif
-  } 
+  }
   return RCOK;
 }
 RC YCSBTxnManager::run_calvin_txn() {
@@ -325,7 +325,7 @@ RC YCSBTxnManager::run_ycsb() {
   RC rc = RCOK;
   assert(CC_ALG == CALVIN);
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
-  
+
   for (uint64_t i = 0; i < ycsb_query->requests.size(); i++) {
 	  ycsb_request * req = ycsb_query->requests[i];
     if (this->phase == CALVIN_LOC_RD && req->acctype == WR) continue;

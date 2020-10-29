@@ -93,7 +93,7 @@ void Thread::progress_stats() {
 #endif
       if (now_time - prog_time >= g_prog_timer) {
         prog_time = now_time;
-        SET_STATS(get_thd_id(), total_runtime, prog_time - simulation->run_starttime); 
+        SET_STATS(get_thd_id(), total_runtime, prog_time - simulation->run_starttime);
 
         if(ISCLIENT) {
           // stats.print_client(true);

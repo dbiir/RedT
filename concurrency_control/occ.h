@@ -46,7 +46,7 @@ public:
 	void finish(RC rc, TxnManager * txn);
 	volatile bool lock_all;
 	uint64_t lock_txn_id;
-	
+
  private:
 	// per row validation similar to Hekaton.
 	RC per_row_validate(TxnManager * txn);
@@ -57,7 +57,7 @@ public:
 	void central_finish(RC rc, TxnManager * txn);
 	bool test_valid(set_ent * set1, set_ent * set2);
 	RC get_rw_set(TxnManager * txni, set_ent * &rset, set_ent *& wset);
-	
+
 	// "history" stores write set of transactions with tn >= smallest running tn
 	set_ent * history;
 	set_ent * active;

@@ -38,9 +38,9 @@ RC YCSBWorkload::init() {
 	next_tid = 0;
 	char * cpath = getenv("SCHEMA_PATH");
 	string path;
-	if (cpath == NULL) 
+	if (cpath == NULL)
 		path = "./benchmarks/YCSB_schema.txt";
-	else { 
+	else {
 		path = string(cpath);
 		path += "YCSB_schema.txt";
 		//path += "/tests/apps/dbms/YCSB_schema.txt";
@@ -49,7 +49,7 @@ RC YCSBWorkload::init() {
   fflush(stdout);
 	init_schema( path.c_str() );
   printf("Done\n");
-	
+
   printf("Initializing table... ");
   fflush(stdout);
 	init_table_parallel();
@@ -61,12 +61,12 @@ RC YCSBWorkload::init() {
 
 RC YCSBWorkload::init_schema(const char * schema_file) {
 	Workload::init_schema(schema_file);
-	the_table = tables["MAIN_TABLE"]; 	
+	the_table = tables["MAIN_TABLE"];
 	the_index = indexes["MAIN_INDEX"];
 	return RCOK;
 }
-	
-int 
+
+int
 YCSBWorkload::key_to_part(uint64_t key) {
 	//uint64_t rows_per_part = g_synth_table_size / g_part_cnt;
 	//return key / rows_per_part;
@@ -87,7 +87,7 @@ RC YCSBWorkload::init_table() {
             }
             row_t * new_row = NULL;
 			uint64_t row_id;
-            rc = the_table->get_new_row(new_row, part_id, row_id); 
+            rc = the_table->get_new_row(new_row, part_id, row_id);
             // insertion of last row may fail after the table_size
             // is updated. So never access the last record in a table
 			assert(rc == RCOK);
@@ -99,7 +99,7 @@ RC YCSBWorkload::init_table() {
 			for (UInt32 fid = 0; fid < schema->get_field_cnt(); fid ++) {
 				int field_size = schema->get_field_size(fid);
 				char value[field_size];
-				for (int i = 0; i < field_size; i++) 
+				for (int i = 0; i < field_size; i++)
 					value[i] = (char)rand() % (1<<8) ;
 				new_row->set_value(fid, value);
 			}
@@ -150,8 +150,8 @@ void * YCSBWorkload::init_table_slice() {
 	while ((UInt32)ATOM_FETCH_ADD(next_tid, 0) < g_init_parallelism) {}
 	assert((UInt32)ATOM_FETCH_ADD(next_tid, 0) == g_init_parallelism);
 	uint64_t slice_size = g_synth_table_size / g_init_parallelism;
-	for (uint64_t key = slice_size * tid; 
-			key < slice_size * (tid + 1); 
+	for (uint64_t key = slice_size * tid;
+			key < slice_size * (tid + 1);
 			//key ++
 	) {
     if(GET_NODE_ID(key_to_part(key)) != g_node_id) {
@@ -167,19 +167,19 @@ void * YCSBWorkload::init_table_slice() {
 		row_t * new_row = NULL;
 		uint64_t row_id;
 		int part_id = key_to_part(key); // % g_part_cnt;
-		rc = the_table->get_new_row(new_row, part_id, row_id); 
+		rc = the_table->get_new_row(new_row, part_id, row_id);
 		assert(rc == RCOK);
 //		uint64_t value = rand();
 		uint64_t primary_key = key;
 		new_row->set_primary_key(primary_key);
 #if SIM_FULL_ROW
 		new_row->set_value(0, &primary_key,sizeof(uint64_t));
-		
+
 		Catalog * schema = the_table->get_schema();
 		for (UInt32 fid = 0; fid < schema->get_field_cnt(); fid ++) {
 //			int field_size = schema->get_field_size(fid);
 //			char value[field_size];
-//			for (int i = 0; i < field_size; i++) 
+//			for (int i = 0; i < field_size; i++)
 //				value[i] = (char)rand() % (1<<8) ;
 			char value[6] = "hello";
 			new_row->set_value(fid, value,sizeof(value));
@@ -193,7 +193,7 @@ void * YCSBWorkload::init_table_slice() {
 		m_item->location = new_row;
 		m_item->valid = true;
 		uint64_t idx_key = primary_key;
-		
+
 		rc = the_index->index_insert(idx_key, m_item, part_id);
 		assert(rc == RCOK);
     key += g_part_cnt;
@@ -207,7 +207,7 @@ RC YCSBWorkload::get_txn_man(TxnManager *& txn_manager){
 	txn_manager = (YCSBTxnManager *)
 		mem_allocator.align_alloc( sizeof(YCSBTxnManager));
 	new(txn_manager) YCSBTxnManager();
-	//txn_manager->init(this); 
+	//txn_manager->init(this);
 	return RCOK;
 }
 

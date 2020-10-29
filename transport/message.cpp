@@ -96,9 +96,9 @@ Message * Message::create_message(BaseQuery * query, RemReqType rtype) {
  Message * msg = create_message(rtype);
 #if WORKLOAD == YCSB
  ((YCSBClientQueryMessage*)msg)->copy_from_query(query);
-#elif WORKLOAD == TPCC 
+#elif WORKLOAD == TPCC
  ((TPCCClientQueryMessage*)msg)->copy_from_query(query);
-#elif WORKLOAD == PPS 
+#elif WORKLOAD == PPS
  ((PPSClientQueryMessage*)msg)->copy_from_query(query);
 #elif  WORKLOAD == DA
   ((DAClientQueryMessage*)msg)->copy_from_query(query);
@@ -129,9 +129,9 @@ Message * Message::create_message(RemReqType rtype) {
     case RQRY_CONT:
 #if WORKLOAD == YCSB
       msg = new YCSBQueryMessage;
-#elif WORKLOAD == TPCC 
+#elif WORKLOAD == TPCC
       msg = new TPCCQueryMessage;
-#elif WORKLOAD == PPS 
+#elif WORKLOAD == PPS
       msg = new PPSQueryMessage;
 #elif WORKLOAD == DA
       msg = new DAQueryMessage;
@@ -163,9 +163,9 @@ Message * Message::create_message(RemReqType rtype) {
     case RTXN_CONT:
 #if WORKLOAD == YCSB
       msg = new YCSBClientQueryMessage;
-#elif WORKLOAD == TPCC 
+#elif WORKLOAD == TPCC
       msg = new TPCCClientQueryMessage;
-#elif WORKLOAD == PPS 
+#elif WORKLOAD == PPS
       msg = new PPSClientQueryMessage;
 #elif WORKLOAD == DA
       msg = new DAClientQueryMessage;
@@ -295,9 +295,9 @@ void Message::release_message(Message * msg) {
     case RQRY_CONT: {
 #if WORKLOAD == YCSB
       YCSBQueryMessage * m_msg = (YCSBQueryMessage*)msg;
-#elif WORKLOAD == TPCC 
+#elif WORKLOAD == TPCC
       TPCCQueryMessage * m_msg = (TPCCQueryMessage*)msg;
-#elif WORKLOAD == PPS 
+#elif WORKLOAD == PPS
       PPSQueryMessage * m_msg = (PPSQueryMessage*)msg;
 #elif WORKLOAD == DA
       DAQueryMessage* m_msg = (DAQueryMessage*)msg;
@@ -349,9 +349,9 @@ void Message::release_message(Message * msg) {
     case RTXN_CONT: {
 #if WORKLOAD == YCSB
       YCSBClientQueryMessage * m_msg = (YCSBClientQueryMessage*)msg;
-#elif WORKLOAD == TPCC 
+#elif WORKLOAD == TPCC
       TPCCClientQueryMessage * m_msg = (TPCCClientQueryMessage*)msg;
-#elif WORKLOAD == PPS 
+#elif WORKLOAD == PPS
       PPSClientQueryMessage * m_msg = (PPSClientQueryMessage*)msg;
 #elif WORKLOAD == DA
       DAClientQueryMessage* m_msg = (DAClientQueryMessage*)msg;
@@ -400,7 +400,7 @@ uint64_t QueryMessage::get_size() {
     CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
     CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
   size += sizeof(start_ts);
-#endif  
+#endif
   return size;
 }
 
@@ -570,8 +570,8 @@ void TPCCClientQueryMessage::release() {
 
 uint64_t TPCCClientQueryMessage::get_size() {
   uint64_t size = ClientQueryMessage::get_size();
-  size += sizeof(uint64_t) * 10; 
-  size += sizeof(char) * LASTNAME_LEN; 
+  size += sizeof(uint64_t) * 10;
+  size += sizeof(char) * LASTNAME_LEN;
   size += sizeof(bool) * 3;
   size += sizeof(size_t);
   size += sizeof(Item_no) * items.size();
@@ -581,7 +581,7 @@ uint64_t TPCCClientQueryMessage::get_size() {
 void TPCCClientQueryMessage::copy_from_query(BaseQuery * query) {
   ClientQueryMessage::copy_from_query(query);
   TPCCQuery* tpcc_query = (TPCCQuery*)(query);
-  
+
   txn_type = tpcc_query->txn_type;
 	// common txn input for both payment & new-order
   w_id = tpcc_query->w_id;
@@ -620,7 +620,7 @@ void TPCCClientQueryMessage::copy_to_txn(TxnManager * txn) {
   tpcc_query->txn_type = (TPCCTxnType)txn_type;
   if(tpcc_query->txn_type == TPCC_PAYMENT)
     ((TPCCTxnManager*)txn)->state = TPCC_PAYMENT0;
-  else if (tpcc_query->txn_type == TPCC_NEW_ORDER) 
+  else if (tpcc_query->txn_type == TPCC_NEW_ORDER)
     ((TPCCTxnManager*)txn)->state = TPCC_NEWORDER0;
 	// common txn input for both payment & new-order
   tpcc_query->w_id = w_id;
@@ -648,7 +648,7 @@ void TPCCClientQueryMessage::copy_from_buf(char * buf) {
   ClientQueryMessage::copy_from_buf(buf);
   uint64_t ptr = ClientQueryMessage::get_size();
 
-  COPY_VAL(txn_type,buf,ptr); 
+  COPY_VAL(txn_type,buf,ptr);
 	// common txn input for both payment & new-order
   COPY_VAL(w_id,buf,ptr);
   COPY_VAL(d_id,buf,ptr);
@@ -685,7 +685,7 @@ void TPCCClientQueryMessage::copy_to_buf(char * buf) {
   ClientQueryMessage::copy_to_buf(buf);
   uint64_t ptr = ClientQueryMessage::get_size();
 
-  COPY_BUF(buf,txn_type,ptr); 
+  COPY_BUF(buf,txn_type,ptr);
 	// common txn input for both payment & new-order
   COPY_BUF(buf,w_id,ptr);
   COPY_BUF(buf,d_id,ptr);
@@ -724,7 +724,7 @@ void PPSClientQueryMessage::release() { ClientQueryMessage::release(); }
 uint64_t PPSClientQueryMessage::get_size() {
   uint64_t size = ClientQueryMessage::get_size();
   size += sizeof(uint64_t);
-  size += sizeof(uint64_t)*3; 
+  size += sizeof(uint64_t)*3;
   size += sizeof(size_t);
   size += sizeof(uint64_t) * part_keys.size();
 #if CC_ALG == CALVIN
@@ -736,7 +736,7 @@ uint64_t PPSClientQueryMessage::get_size() {
 void PPSClientQueryMessage::copy_from_query(BaseQuery * query) {
   ClientQueryMessage::copy_from_query(query);
   PPSQuery* pps_query = (PPSQuery*)(query);
-  
+
   txn_type = pps_query->txn_type;
 
   part_key = pps_query->part_key;
@@ -797,7 +797,7 @@ void PPSClientQueryMessage::copy_from_buf(char * buf) {
   ClientQueryMessage::copy_from_buf(buf);
   uint64_t ptr = ClientQueryMessage::get_size();
 
-  COPY_VAL(txn_type,buf,ptr); 
+  COPY_VAL(txn_type,buf,ptr);
 	// common txn input for both payment & new-order
   COPY_VAL(part_key,buf,ptr);
   COPY_VAL(product_key,buf,ptr);
@@ -828,7 +828,7 @@ void PPSClientQueryMessage::copy_to_buf(char * buf) {
   ClientQueryMessage::copy_to_buf(buf);
   uint64_t ptr = ClientQueryMessage::get_size();
 
-  COPY_BUF(buf,txn_type,ptr); 
+  COPY_BUF(buf,txn_type,ptr);
 	// common txn input for both payment & new-order
   COPY_BUF(buf,part_key,ptr);
   COPY_BUF(buf,product_key,ptr);
@@ -863,7 +863,7 @@ void DAClientQueryMessage::copy_from_query(BaseQuery* query) {
   txn_type= da_query->txn_type;
 	trans_id= da_query->trans_id;//事务id
 	item_id= da_query->item_id; //操作的变量id
-	seq_id= da_query->seq_id; //就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程 
+	seq_id= da_query->seq_id; //就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程
 	write_version=da_query->write_version;
   state= da_query->state;
 	next_state= da_query->next_state;
@@ -919,7 +919,7 @@ void DAClientQueryMessage::copy_to_txn(TxnManager* txn) {
   da_query->state = state;
   da_query->next_state = next_state;
   da_query->last_state = last_state;
-  
+
 }
 
 uint64_t DAClientQueryMessage::get_size() {
@@ -927,7 +927,7 @@ uint64_t DAClientQueryMessage::get_size() {
   size += sizeof(DATxnType);
   size += sizeof(uint64_t) * 7;
   return size;
-  
+
 }
 void DAClientQueryMessage::release() { ClientQueryMessage::release(); }
 
@@ -1112,7 +1112,7 @@ uint64_t PrepareMessage::get_size() {
   uint64_t size = Message::mget_size();
   //size += sizeof(uint64_t);
 #if CC_ALG == TICTOC
-  size += sizeof(uint64_t); 
+  size += sizeof(uint64_t);
 #endif
   return size;
 }
@@ -1236,10 +1236,10 @@ void AckMessage::copy_to_buf(char * buf) {
 /************************/
 
 uint64_t QueryResponseMessage::get_size() {
-  uint64_t size = Message::mget_size(); 
+  uint64_t size = Message::mget_size();
   size += sizeof(RC);
 #if CC_ALG == TICTOC
-  size += sizeof(uint64_t); 
+  size += sizeof(uint64_t);
 #endif
   //size += sizeof(uint64_t);
   return size;
@@ -1283,13 +1283,13 @@ void QueryResponseMessage::copy_to_buf(char * buf) {
 
 uint64_t FinishMessage::get_size() {
   uint64_t size = Message::mget_size();
-  size += sizeof(uint64_t); 
-  size += sizeof(RC); 
-  size += sizeof(bool); 
+  size += sizeof(uint64_t);
+  size += sizeof(RC);
+  size += sizeof(bool);
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
     CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
-  size += sizeof(uint64_t); 
+  size += sizeof(uint64_t);
 #endif
   return size;
 }
@@ -1359,7 +1359,7 @@ uint64_t LogMessage::get_size() {
 }
 
 void LogMessage::copy_from_txn(TxnManager* txn) { Message::mcopy_from_txn(txn); }
-  
+
 void LogMessage::copy_to_txn(TxnManager* txn) { Message::mcopy_to_txn(txn); }
 
 void LogMessage::copy_from_record(LogRecord* record) { this->record.copyRecord(record); }
@@ -1506,7 +1506,7 @@ uint64_t TPCCQueryMessage::get_size() {
 
   // Payment
   if(txn_type == TPCC_PAYMENT) {
-  
+
     size += sizeof(uint64_t) * 4; // d_w_id, c_w_id, c_d_id;, h_amount
     size += sizeof(char) * LASTNAME_LEN; // c_last[LASTNAME_LEN]
     size += sizeof(bool); // by_last_name
@@ -1527,7 +1527,7 @@ uint64_t TPCCQueryMessage::get_size() {
 void TPCCQueryMessage::copy_from_txn(TxnManager * txn) {
   QueryMessage::copy_from_txn(txn);
   TPCCQuery* tpcc_query = (TPCCQuery*)(txn->query);
-  
+
   txn_type = tpcc_query->txn_type;
   state = (uint64_t)((TPCCTxnManager*)txn)->state;
 	// common txn input for both payment & new-order
@@ -1596,9 +1596,9 @@ void TPCCQueryMessage::copy_from_buf(char * buf) {
   QueryMessage::copy_from_buf(buf);
   uint64_t ptr = QueryMessage::get_size();
 
-  COPY_VAL(txn_type,buf,ptr); 
+  COPY_VAL(txn_type,buf,ptr);
   assert(txn_type == TPCC_PAYMENT || txn_type == TPCC_NEW_ORDER);
-  COPY_VAL(state,buf,ptr); 
+  COPY_VAL(state,buf,ptr);
 	// common txn input for both payment & new-order
   COPY_VAL(w_id,buf,ptr);
   COPY_VAL(d_id,buf,ptr);
@@ -1640,8 +1640,8 @@ void TPCCQueryMessage::copy_to_buf(char * buf) {
   QueryMessage::copy_to_buf(buf);
   uint64_t ptr = QueryMessage::get_size();
 
-  COPY_BUF(buf,txn_type,ptr); 
-  COPY_BUF(buf,state,ptr); 
+  COPY_BUF(buf,txn_type,ptr);
+  COPY_BUF(buf,state,ptr);
 	// common txn input for both payment & new-order
   COPY_BUF(buf,w_id,ptr);
   COPY_BUF(buf,d_id,ptr);
@@ -1683,7 +1683,7 @@ uint64_t PPSQueryMessage::get_size() {
 
   size += sizeof(uint64_t); // txn_type
   size += sizeof(uint64_t); // state
-  size += sizeof(uint64_t); // part/product/supply key 
+  size += sizeof(uint64_t); // part/product/supply key
   size += sizeof(size_t);
   size += sizeof(uint64_t) * part_keys.size();
   return size;
@@ -1692,7 +1692,7 @@ uint64_t PPSQueryMessage::get_size() {
 void PPSQueryMessage::copy_from_txn(TxnManager * txn) {
   QueryMessage::copy_from_txn(txn);
   PPSQuery* pps_query = (PPSQuery*)(txn->query);
-  
+
   txn_type = pps_query->txn_type;
   state = (uint64_t)((PPSTxnManager*)txn)->state;
 
@@ -1771,28 +1771,28 @@ void PPSQueryMessage::copy_from_buf(char * buf) {
   QueryMessage::copy_from_buf(buf);
   uint64_t ptr = QueryMessage::get_size();
 
-  COPY_VAL(txn_type,buf,ptr); 
-  COPY_VAL(state,buf,ptr); 
+  COPY_VAL(txn_type,buf,ptr);
+  COPY_VAL(state,buf,ptr);
   if (txn_type == PPS_GETPART) {
-    COPY_VAL(part_key,buf,ptr); 
+    COPY_VAL(part_key,buf,ptr);
   }
   if (txn_type == PPS_GETPRODUCT) {
-    COPY_VAL(product_key,buf,ptr); 
+    COPY_VAL(product_key,buf,ptr);
   }
   if (txn_type == PPS_GETSUPPLIER) {
-    COPY_VAL(supplier_key,buf,ptr); 
+    COPY_VAL(supplier_key,buf,ptr);
   }
   if (txn_type == PPS_GETPARTBYPRODUCT) {
-    //COPY_VAL(product_key,buf,ptr); 
-    COPY_VAL(part_key,buf,ptr); 
+    //COPY_VAL(product_key,buf,ptr);
+    COPY_VAL(part_key,buf,ptr);
   }
   if (txn_type == PPS_GETPARTBYSUPPLIER) {
-    //COPY_VAL(supplier_key,buf,ptr); 
-    COPY_VAL(part_key,buf,ptr); 
+    //COPY_VAL(supplier_key,buf,ptr);
+    COPY_VAL(part_key,buf,ptr);
   }
   if (txn_type == PPS_ORDERPRODUCT) {
-    //COPY_VAL(product_key,buf,ptr); 
-    COPY_VAL(part_key,buf,ptr); 
+    //COPY_VAL(product_key,buf,ptr);
+    COPY_VAL(part_key,buf,ptr);
   }
   if (txn_type == PPS_UPDATEPRODUCTPART) {
       COPY_VAL(product_key,buf,ptr);
@@ -1818,29 +1818,29 @@ void PPSQueryMessage::copy_to_buf(char * buf) {
   QueryMessage::copy_to_buf(buf);
   uint64_t ptr = QueryMessage::get_size();
 
-  COPY_BUF(buf,txn_type,ptr); 
-  COPY_BUF(buf,state,ptr); 
+  COPY_BUF(buf,txn_type,ptr);
+  COPY_BUF(buf,state,ptr);
 
   if (txn_type == PPS_GETPART) {
-    COPY_BUF(buf,part_key,ptr); 
+    COPY_BUF(buf,part_key,ptr);
   }
   if (txn_type == PPS_GETPRODUCT) {
-    COPY_BUF(buf,product_key,ptr); 
+    COPY_BUF(buf,product_key,ptr);
   }
   if (txn_type == PPS_GETSUPPLIER) {
-    COPY_BUF(buf,supplier_key,ptr); 
+    COPY_BUF(buf,supplier_key,ptr);
   }
   if (txn_type == PPS_GETPARTBYPRODUCT) {
-    //COPY_BUF(buf,product_key,ptr); 
-    COPY_BUF(buf,part_key,ptr); 
+    //COPY_BUF(buf,product_key,ptr);
+    COPY_BUF(buf,part_key,ptr);
   }
   if (txn_type == PPS_GETPARTBYSUPPLIER) {
-    //COPY_BUF(buf,supplier_key,ptr); 
-    COPY_BUF(buf,part_key,ptr); 
+    //COPY_BUF(buf,supplier_key,ptr);
+    COPY_BUF(buf,part_key,ptr);
   }
   if (txn_type == PPS_ORDERPRODUCT) {
-    //COPY_BUF(buf,product_key,ptr); 
-    COPY_BUF(buf,part_key,ptr); 
+    //COPY_BUF(buf,product_key,ptr);
+    COPY_BUF(buf,part_key,ptr);
   }
   if (txn_type == PPS_UPDATEPRODUCTPART) {
     //COPY_BUF(buf,product_key,ptr);
@@ -1871,7 +1871,7 @@ void DAQueryMessage::copy_from_query(BaseQuery* query) {
   txn_type= da_query->txn_type;
 	trans_id= da_query->trans_id;//事务id
 	item_id= da_query->item_id; //操作的变量id
-	seq_id= da_query->seq_id; //就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程 
+	seq_id= da_query->seq_id; //就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程
 	write_version=da_query->write_version;
   state= da_query->state;
 	next_state= da_query->next_state;
@@ -1889,7 +1889,7 @@ void DAQueryMessage::copy_to_buf(char* buf) {
   COPY_BUF(buf, state, ptr);
   COPY_BUF(buf, next_state, ptr);
   COPY_BUF(buf, last_state, ptr);
-  
+
 }
 void DAQueryMessage::copy_from_txn(TxnManager* txn) {
   QueryMessage::mcopy_from_txn(txn);
@@ -1936,7 +1936,7 @@ void DAQueryMessage::copy_to_txn(TxnManager* txn) {
   da_query->state = state;
   da_query->next_state = next_state;
   da_query->last_state = last_state;
-  
+
 }
 
 uint64_t DAQueryMessage::get_size() {

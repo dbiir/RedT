@@ -59,9 +59,9 @@ void TxnTable::dump() {
 bool TxnTable::is_matching_txn_node(txn_node_t t_node, uint64_t txn_id, uint64_t batch_id){
   assert(t_node);
 #if CC_ALG == CALVIN
-    return (t_node->txn_man->get_txn_id() == txn_id && t_node->txn_man->get_batch_id() == batch_id); 
+    return (t_node->txn_man->get_txn_id() == txn_id && t_node->txn_man->get_batch_id() == batch_id);
 #else
-    return (t_node->txn_man->get_txn_id() == txn_id); 
+    return (t_node->txn_man->get_txn_id() == txn_id);
 #endif
 }
 
@@ -223,7 +223,7 @@ void TxnTable::release_transaction_manager(uint64_t thd_id, uint64_t txn_id, uin
   assert(t_node->txn_man);
 
   txn_man_pool.put(thd_id,t_node->txn_man);
-    
+
   INC_STATS(thd_id,mtx[26],get_sys_clock()-prof_starttime);
   prof_starttime = get_sys_clock();
 

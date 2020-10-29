@@ -85,7 +85,7 @@ RC TPCCTxnManager::run_txn() {
   txn_stats.process_time_short += curr_time - starttime;
 
   if(IS_LOCAL(get_txn_id())) {
-    if(is_done() && rc == RCOK) 
+    if(is_done() && rc == RCOK)
       rc = start_commit();
     else if(rc == Abort)
       rc = start_abort();
@@ -155,7 +155,7 @@ RC TPCCTxnManager::acquire_locks() {
       }
       if(GET_NODE_ID(part_id_c_w) == g_node_id) {
       // Cust
-        if (tpcc_query->by_last_name) { 
+        if (tpcc_query->by_last_name) {
 
           key = custNPKey(c_last, c_d_id, c_w_id);
           index = _wl->i_customer_last;
@@ -169,7 +169,7 @@ RC TPCCTxnManager::acquire_locks() {
             if (cnt % 2 == 0) mid = mid->next;
           }
           row = ((row_t *)mid->location);
-          
+
         } else {
           key = custKey(c_id, c_d_id, c_w_id);
           index = _wl->i_customer_id;
@@ -341,7 +341,7 @@ RC TPCCTxnManager::send_remote_request() {
     */
     if(is_done())
       next_state = TPCC_FIN;
-    else 
+    else
       next_state = TPCC_NEWORDER6;
   } else {
     assert(false);
@@ -502,13 +502,13 @@ inline RC TPCCTxnManager::run_payment_0(uint64_t w_id, uint64_t d_id, uint64_t d
 
   RC rc;
 	key = w_id;
-	INDEX * index = _wl->i_warehouse; 
+	INDEX * index = _wl->i_warehouse;
 	item = index_read(index, key, wh_to_part(w_id));
 	assert(item != NULL);
 	row_t * r_wh = ((row_t *)item->location);
 	if (g_wh_update)
 		rc = get_row(r_wh, WR, r_wh_local);
-	else 
+	else
 		rc = get_row(r_wh, RD, r_wh_local);
 
   return rc;
@@ -582,7 +582,7 @@ inline RC TPCCTxnManager::run_payment_4(uint64_t w_id, uint64_t d_id, uint64_t c
 	itemid_t * item;
 	uint64_t key;
 	row_t * r_cust;
-	if (by_last_name) { 
+	if (by_last_name) {
 		/*==========================================================+
 			EXEC SQL SELECT count(c_id) INTO :namecnt
 			FROM customer
@@ -599,12 +599,12 @@ inline RC TPCCTxnManager::run_payment_4(uint64_t w_id, uint64_t d_id, uint64_t c
 		+===========================================================================*/
 
 		key = custNPKey(c_last, c_d_id, c_w_id);
-		// XXX: the list is not sorted. But let's assume it's sorted... 
+		// XXX: the list is not sorted. But let's assume it's sorted...
 		// The performance won't be much different.
 		INDEX * index = _wl->i_customer_last;
 		item = index_read(index, key, wh_to_part(c_w_id));
 		assert(item != NULL);
-		
+
 		int cnt = 0;
 		itemid_t * it = item;
 		itemid_t * mid = item;
@@ -614,7 +614,7 @@ inline RC TPCCTxnManager::run_payment_4(uint64_t w_id, uint64_t d_id, uint64_t c
       if (cnt % 2 == 0) mid = mid->next;
 		}
 		r_cust = ((row_t *)mid->location);
-		
+
 		/*============================================================================+
 			for (n=0; n<namecnt/2; n++) {
 				EXEC SQL FETCH c_byname
@@ -683,7 +683,7 @@ inline RC TPCCTxnManager::run_payment_5(uint64_t w_id, uint64_t d_id, uint64_t c
 	r_hist->set_value(H_C_W_ID, c_w_id);
 	r_hist->set_value(H_D_ID, d_id);
 	r_hist->set_value(H_W_ID, w_id);
-	int64_t date = 2013;		
+	int64_t date = 2013;
 	r_hist->set_value(H_DATE, date);
 	r_hist->set_value(H_AMOUNT, h_amount);
 	insert_row(r_hist, _wl->t_history);
@@ -704,7 +704,7 @@ inline RC TPCCTxnManager::new_order_0(uint64_t w_id, uint64_t d_id, uint64_t c_i
 		WHERE w_id = :w_id AND c_w_id = w_id AND c_d_id = :d_id AND c_id = :c_id;
 	+========================================================================*/
 	key = w_id;
-	INDEX * index = _wl->i_warehouse; 
+	INDEX * index = _wl->i_warehouse;
 	item = index_read(index, key, wh_to_part(w_id));
 	assert(item != NULL);
 	row_t * r_wh = ((row_t *)item->location);
@@ -717,7 +717,7 @@ inline RC TPCCTxnManager::new_order_1(uint64_t w_id, uint64_t d_id, uint64_t c_i
                                       row_t *r_wh_local) {
   assert(r_wh_local != NULL);
 	double w_tax;
-	r_wh_local->get_value(W_TAX, w_tax); 
+	r_wh_local->get_value(W_TAX, w_tax);
   return RCOK;
 }
 
@@ -747,7 +747,7 @@ inline RC TPCCTxnManager::new_order_3(uint64_t w_id, uint64_t d_id, uint64_t c_i
 	//c_credit = r_cust_local->get_value(C_CREDIT);
   return RCOK;
 }
- 	
+
 inline RC TPCCTxnManager::new_order_4(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote,
                                       uint64_t ol_cnt, uint64_t o_entry_d, uint64_t *o_id,
                                       row_t *&r_dist_local) {
@@ -837,7 +837,7 @@ inline RC TPCCTxnManager::new_order_7(uint64_t ol_i_id, row_t * r_item_local) {
 		int64_t i_price;
 		//char * i_name;
 		//char * i_data;
-		
+
 		r_item_local->get_value(I_PRICE, i_price);
 		//i_name = r_item_local->get_value(I_NAME);
 		//i_data = r_item_local->get_value(I_DATA);
@@ -874,7 +874,7 @@ inline RC TPCCTxnManager::new_order_8(uint64_t w_id, uint64_t d_id, bool remote,
     RC rc = get_row(r_stock, WR, r_stock_local);
     return rc;
 }
-		
+
 inline RC TPCCTxnManager::new_order_9(uint64_t w_id, uint64_t d_id, bool remote, uint64_t ol_i_id,
                                       uint64_t ol_supply_w_id, uint64_t ol_quantity,
                                       uint64_t ol_number, uint64_t ol_amount, uint64_t o_id,
@@ -929,7 +929,7 @@ inline RC TPCCTxnManager::new_order_9(uint64_t w_id, uint64_t d_id, bool remote,
 		r_ol->set_value(OL_SUPPLY_W_ID, &ol_supply_w_id);
 		r_ol->set_value(OL_QUANTITY, &ol_quantity);
 		r_ol->set_value(OL_AMOUNT, &ol_amount);
-#endif		
+#endif
 		insert_row(r_ol, _wl->t_orderline);
 
 	return RCOK;
@@ -1004,7 +1004,7 @@ RC TPCCTxnManager::run_calvin_txn() {
   txn_stats.process_time_short += curr_time - starttime;
   txn_stats.wait_starttime = get_sys_clock();
   return rc;
-  
+
 }
 
 
@@ -1038,13 +1038,13 @@ RC TPCCTxnManager::run_tpcc_phase2() {
       break;
 		case TPCC_NEW_ORDER :
       if(w_loc) {
-			  rc = new_order_0( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row); 
-        rc = new_order_1( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row); 
-        rc = new_order_2( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row); 
-        rc = new_order_3( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row); 
-        rc = new_order_4( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row); 
+			  rc = new_order_0( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
+        rc = new_order_1( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
+        rc = new_order_2( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
+        rc = new_order_3( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
+        rc = new_order_4( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
         tpcc_query->o_id = *(int64_t *) row->get_value(D_NEXT_O_ID);
-        //rc = new_order_5( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row); 
+        //rc = new_order_5( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
       }
         for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
 
@@ -1101,14 +1101,14 @@ RC TPCCTxnManager::run_tpcc_phase5() {
         rc = run_payment_3(w_id, d_id, d_w_id, h_amount, row);
       }
       if(c_w_loc) {
-        rc = run_payment_4( w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row); 
-        rc = run_payment_5( w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row); 
+        rc = run_payment_4( w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row);
+        rc = run_payment_5( w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row);
       }
       break;
 		case TPCC_NEW_ORDER :
       if(w_loc) {
-        //rc = new_order_4( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row); 
-        rc = new_order_5( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row); 
+        //rc = new_order_4( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
+        rc = new_order_5( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
       }
         for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
 

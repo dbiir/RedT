@@ -64,7 +64,7 @@ public:
 	bool get_outConflict(uint64_t thd_id, uint64_t key);
 	void set_inConflict(uint64_t thd_id, uint64_t key, uint64_t value);
 	void down_inConflict(uint64_t thd_id, uint64_t key, uint64_t value);
-	
+
 	void set_outConflict(uint64_t thd_id, uint64_t key, uint64_t value);
 	void down_outConflict(uint64_t thd_id, uint64_t key, uint64_t value);
 
@@ -84,7 +84,7 @@ public:
 	InOutTableEntry* find(uint64_t key);
 	pthread_mutex_t mtx;
 	InOutTableEntry * find_entry(uint64_t id);
-		
+
 		sem_t 	_semaphore;
 	};
 

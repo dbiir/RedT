@@ -138,6 +138,10 @@ stat_map = OrderedDict([
   ('trans_finish_time', []), #include commit and abort
   ('trans_commit_time', []),
   ('trans_abort_time', []),
+  ('trans_access_lock_wait_time', []),
+
+  ('trans_mvcc_clear_history', []),
+  ('trans_mvcc_access', []),
 
   # Transaction Stats
   ('txn_total_process_time', []),
@@ -493,7 +497,7 @@ stat_map2 = {
   'trans_finish_time', [], #include commit and abort
   'trans_commit_time', [],
   'trans_abort_time', [],
-
+  'trans_access_lock_wait_time', [],
   # Work queue
   'work_queue_wait_time': [],
   'work_queue_cnt': [],
@@ -725,7 +729,7 @@ def plot_prep(nexp,nfmt,x_name,v_name,extras={},constants={}):
                 exp.remove(e)
                 print("Removed {} ( {} vs {})".format(e,e[fmt.index(x)],constants[x]))
     for x in extras.keys():
-        if x not in fmt: 
+        if x not in fmt:
             del extras[x]
             continue
         for e in exp:
@@ -773,7 +777,7 @@ def get_prog(sfile):
     with open(sfile,'r') as f:
         for line in f:
             if re.search("prog",line):
-                line = line[7:] #remove '[prog] ' from start of line 
+                line = line[7:] #remove '[prog] ' from start of line
                 results = re.split(',',line)
                 process_results(summary,results)
     return summary
@@ -787,7 +791,7 @@ def get_summary(sfile,summary={}):
         for line in f:
             if re.search("prog",line):
                 line = line.rstrip('\n')
-                line = line[7:] #remove '[prog] ' from start of line 
+                line = line[7:] #remove '[prog] ' from start of line
                 results = re.split(',',line)
                 prog_tmp = {}
                 process_results(prog_tmp,results)
@@ -802,7 +806,7 @@ def get_summary(sfile,summary={}):
             if re.search("summary",line):
                 found = True
                 line = line.rstrip('\n')
-                line = line[10:] #remove '[summary] ' from start of line 
+                line = line[10:] #remove '[summary] ' from start of line
                 results = re.split(',',line)
                 process_results(summary,results)
                 continue
@@ -955,7 +959,7 @@ def merge_results_helper(summary,cnt,drop,gap):
         except KeyError:
             continue
     return new_summary
-                
+
 def process_results(summary,results):
     for r in results:
         try:
@@ -969,18 +973,18 @@ def process_results(summary,results):
             summary[name].append(val)
 
 def process_cnts(summary,line,name):
-    
+
     if name not in summary.keys():
         summary[name] = {}
     name_cnt = name + "_cnt"
 
     line = re.split(' |] |,',line)
-    results = line[2:] 
+    results = line[2:]
 
     if name_cnt not in summary.keys():
-        summary[name_cnt] = int(line[1]) 
+        summary[name_cnt] = int(line[1])
     else:
-        summary[name_cnt] =summary[name_cnt] + int(line[1]) 
+        summary[name_cnt] =summary[name_cnt] + int(line[1])
 
 
     for r in results:
@@ -992,18 +996,18 @@ def process_cnts(summary,line,name):
             summary[name][r] = summary[name][r] + 1
 
 def process_cflts(summary,line,name):
-    
+
     if name not in summary.keys():
         summary[name] = {}
     name_cnt = name + "_cnt"
 
     line = re.split(' |] |,',line)
-    results = line[2:] 
+    results = line[2:]
 
     if name_cnt not in summary.keys():
-        summary[name_cnt] = int(line[1]) 
+        summary[name_cnt] = int(line[1])
     else:
-        summary[name_cnt] =summary[name_cnt] + int(line[1]) 
+        summary[name_cnt] =summary[name_cnt] + int(line[1])
 
 
     for r in results:
@@ -1027,7 +1031,7 @@ def process_lats(summary,line,name):
 def get_lstats(summary):
     try:
         latencies = summary['all_lat']
-        summary['all_lat']=ls.LatencyStats(latencies,out_time_unit='ms') 
+        summary['all_lat']=ls.LatencyStats(latencies,out_time_unit='ms')
     except:
         pass
 
@@ -1044,7 +1048,7 @@ def get_args(fmt,exp):
         if not indirect or c not in FLAG or c in CONFIG_PARAMS: continue
         flag = FLAG[c]
         args += "{}{} ".format(flag,cfgs[key])
-            
+
     return args
 
 def get_config_root(c):
@@ -1053,7 +1057,7 @@ def get_config_root(c):
         c = configs[c]
         indirect = True
     return c,indirect
- 
+
 def get_execfile_name(cfgs,fmt,network_hosts=[]):
     output_f = ""
 #for key in sorted(cfgs.keys()):
@@ -1112,7 +1116,7 @@ def print_keys(result_dir="../results",keys=['txn_cnt']):
     bases=[cfg.split('/')[-1][:-4] for cfg in cfgs]
     missing_files = 0
     missing_results = 0
-    
+
     for base in bases:
 #        print base
         node_cnt=int(base.split('NODE_CNT-')[-1].split('_')[0])
@@ -1147,7 +1151,7 @@ def print_keys(result_dir="../results",keys=['txn_cnt']):
     print("Total missing server results (no [summary] or [prog]): {}".format(missing_results))
 
 def get_summary_stats(stats,summary,summary_cl,x,v,cc):
-    sk = OrderedDict() 
+    sk = OrderedDict()
     for k in stat_map.keys():
         try:
             sk[k] = avg(summary[k])
@@ -1157,8 +1161,8 @@ def get_summary_stats(stats,summary,summary_cl,x,v,cc):
         sk["client_runtime"] = avg(summary_cl["total_runtime"])
         sk["client_txn_cnt"] = avg(summary_cl["txn_cnt"]) - avg(summary_cl["post_warmup_txn_cnt"])
     except KeyError:
-        sk["client_runtime"] = 0 
-        sk["client_txn_cnt"] = 0 
+        sk["client_runtime"] = 0
+        sk["client_txn_cnt"] = 0
     if "progress" in summary:
         for p in range(len(summary["progress"])):
             for k in stat_map.keys():
@@ -1174,7 +1178,7 @@ def get_summary_stats(stats,summary,summary_cl,x,v,cc):
         key = (x,v)
     stats[key] = sk
     return stats
-   
+
 def write_summary_file(fname,stats,x_vals,v_vals):
 
     with open('../figs/' + fname+'.csv','w') as f:
@@ -1237,17 +1241,17 @@ def write_breakdown_file(fname,summary,summary_client):
             thd_cnt = 1
         f.write(', ' + ', '.join([str(x) for x in range(thd_cnt)]) +'\n')
         for p in stat_map.keys():
-            s = p 
+            s = p
             try:
-                s += ', ' + ', '.join(['{0:0.6f}'.format(x) for x in summary[p]]) 
+                s += ', ' + ', '.join(['{0:0.6f}'.format(x) for x in summary[p]])
                 if p in summary_client:
-                    s += ', ' + ', '.join(['{0:0.6f}'.format(x) for x in summary_client[p]]) 
+                    s += ', ' + ', '.join(['{0:0.6f}'.format(x) for x in summary_client[p]])
             except KeyError:
                 s = p
             except TypeError:
                 s = p  + ', ' + '{0:0.6f}'.format(summary[p])
                 if p in summary_client:
-                    s += ', ' + '{0:0.6f}'.format(summary_client[p]) 
+                    s += ', ' + '{0:0.6f}'.format(summary_client[p])
             f.write(s + '\n')
         f.write('\n')
- 
+

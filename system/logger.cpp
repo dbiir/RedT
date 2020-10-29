@@ -46,7 +46,7 @@ void LogRecord::copyRecord(LogRecord* record) {
 void Logger::enqueueRecord(LogRecord* record) {
   DEBUG("Enqueue Log Record %ld\n",record->rcd.txn_id);
   pthread_mutex_lock(&mtx);
-  log_queue.push(record); 
+  log_queue.push(record);
   pthread_mutex_unlock(&mtx);
 }
 
@@ -55,7 +55,7 @@ void Logger::processRecord(uint64_t thd_id) {
   LogRecord * record = NULL;
   pthread_mutex_lock(&mtx);
   if(!log_queue.empty()) {
-    record = log_queue.front(); 
+    record = log_queue.front();
     log_queue.pop();
   }
   pthread_mutex_unlock(&mtx);
@@ -74,7 +74,7 @@ void Logger::processRecord(uint64_t thd_id) {
     mem_allocator.free(record,sizeof(LogRecord));
     INC_STATS(thd_id,log_process_time,get_sys_clock() - starttime);
   }
-  
+
 }
 
 uint64_t Logger::reserveBuffer(uint64_t size) { return ATOM_FETCH_ADD(aries_write_offset, size); }

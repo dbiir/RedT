@@ -59,7 +59,7 @@ uint64_t TcpLtsSocket::getTimestamp()
 	ltsrpc::GetTxnTimestampCtx lts;
 
 	lts.set_txn_id(txn);
-	
+
 	std::string message;
 	lts.SerializeToString(&message);
 	auto size = (uint16_t)message.size();
@@ -73,7 +73,7 @@ resend:
 	sendresult = send(s, req, minSendLength, 0);
 
 	ind = 0;
-	
+
 	for (;;)
 	{
 	rerecv:

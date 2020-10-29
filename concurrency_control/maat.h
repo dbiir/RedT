@@ -33,7 +33,7 @@ class Maat {
 public:
   void init();
   RC validate(TxnManager * txn);
-  RC find_bound(TxnManager * txn); 
+  RC find_bound(TxnManager * txn);
 private:
  	sem_t 	_semaphore;
 };
@@ -85,7 +85,7 @@ private:
   TimeTableEntry* find(uint64_t key);
 
   TimeTableEntry * find_entry(uint64_t id);
-	
+
  	sem_t 	_semaphore;
 };
 

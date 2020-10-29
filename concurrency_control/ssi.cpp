@@ -62,7 +62,7 @@ RC ssi::validate(TxnManager * txn) {
 }
 
 void ssi::gene_finish_ts(TxnManager * txn) {
-	txn->set_commit_timestamp(glob_manager.get_ts(txn->get_thd_id())); 
+	txn->set_commit_timestamp(glob_manager.get_ts(txn->get_thd_id()));
 }
 
 void InOutTable::init() {
@@ -83,7 +83,7 @@ uint64_t InOutTable::hash(uint64_t key) {
 InOutTableEntry* InOutTable::find(uint64_t key) {
   InOutTableEntry * entry = table[hash(key)].head;
   while(entry) {
-    if(entry->key == key) 
+    if(entry->key == key)
       break;
     entry = entry->next;
   }

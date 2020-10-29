@@ -12,7 +12,7 @@ echo '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>DBT</
 echo '<hr />' >> $main
 for i in $files; do
   if [ $i != 'index.html' ] && [ $i != 'getindex.sh' ] && [ $i != 'main.html' ]; then
-  # todo add the test desc 
+  # todo add the test desc
   echo '<h2>'$i'</h2>' >> $main
       if [[ -f "$i/1tpmc.svg" ]]; then
         # firstline=$(grep -n "测试情况概述" $i/index.html | cut -d ":" -f 1)

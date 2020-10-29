@@ -26,7 +26,7 @@ public:
   virtual RC init() {
     return RCOK;
   };
-	
+
   virtual RC init(uint64_t size) {
     return RCOK;
   };
@@ -45,7 +45,7 @@ public:
   virtual RC index_remove(idx_key_t key) {
     return RCOK;
   };
-	
+
 	// the index in on "table". The key is the merged key of "fields"
 	table_t * 			table;
 };

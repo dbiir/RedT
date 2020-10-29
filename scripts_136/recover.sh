@@ -1,4 +1,4 @@
-set -x 
+set -x
 rp=$(pwd)
 cd ~/src
 rm -rf zzhdeneva

@@ -260,9 +260,9 @@ void Transaction::init() {
 	txn_id = UINT64_MAX;
 	batch_id = UINT64_MAX;
 	DEBUG_M("Transaction::init array insert_rows\n");
-	insert_rows.init(g_max_items_per_txn + 10); 
+	insert_rows.init(g_max_items_per_txn + 10);
 	DEBUG_M("Transaction::reset array accesses\n");
-	accesses.init(MAX_ROW_PER_TXN);  
+	accesses.init(MAX_ROW_PER_TXN);
 
 	reset(0);
 }
@@ -271,7 +271,7 @@ void Transaction::reset(uint64_t thd_id) {
 	release_accesses(thd_id);
 	accesses.clear();
 	//release_inserts(thd_id);
-	insert_rows.clear();  
+	insert_rows.clear();
 	write_cnt = 0;
 	row_cnt = 0;
 	twopc_state = START;
@@ -481,14 +481,14 @@ RC TxnManager::abort() {
 #if CC_ALG == MAAT
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
 	time_table.release(get_thd_id(),get_txn_id());
-#endif 
+#endif
 #if CC_ALG == WOOKONG
 	wkdb_time_table.release(get_thd_id(),get_txn_id());
-#endif 
+#endif
 #if CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
 	dta_time_table.release(get_thd_id(), get_txn_id());
-#endif 
+#endif
 
 	uint64_t timespan = get_sys_clock() - txn_stats.restart_starttime;
 	if (IS_LOCAL(get_txn_id()) && warmup_done) {
@@ -528,7 +528,7 @@ RC TxnManager::start_abort() {
 		send_finish_messages();
 		abort();
 		return Abort;
-	} 
+	}
 	return abort();
 }
 
@@ -537,7 +537,7 @@ RC TxnManager::start_commit() {
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
 	_is_sub_txn = false;
-	
+
 	rc = validate();
 	if(CC_ALG == SSI) {
 		ssi_man.gene_finish_ts(this);
@@ -599,8 +599,17 @@ RC TxnManager::start_commit() {
 		}
 		if(rc == RCOK)
 			rc = commit();
-		else
-			start_abort();
+		else {
+			txn->rc = Abort;
+			DEBUG("%ld start_abort\n",get_txn_id());
+			if(query->partitions_touched.size() > 1) {
+				send_finish_messages();
+				abort();
+				rc = Abort;
+			}
+			rc = abort();
+		}
+			// start_abort();
 	}
 	return rc;
 }
@@ -864,7 +873,7 @@ void TxnManager::cleanup(RC rc) {
 		txn->insert_rows.clear();
 
 		INC_STATS(get_thd_id(), abort_time, get_sys_clock() - starttime);
-	} 
+	}
 }
 
 RC TxnManager::get_lock(row_t * row, access_t type) {
@@ -1067,10 +1076,10 @@ RC TxnManager::validate() {
 #if MODE != NORMAL_MODE
 	return RCOK;
 #endif
-	if (CC_ALG != OCC && CC_ALG != MAAT  && CC_ALG != WOOKONG && 
-			CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != WSI && 
+	if (CC_ALG != OCC && CC_ALG != MAAT  && CC_ALG != WOOKONG &&
+			CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != WSI &&
 			CC_ALG != SSI && CC_ALG != DLI_BASE && CC_ALG != DLI_OCC &&
-			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA && 
+			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
 			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC) {
 		return RCOK;
 	}
@@ -1094,7 +1103,7 @@ RC TxnManager::validate() {
 		// if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
 		//   rc = tictoc_man.find_bound(this);
 		// }
-	} 
+	}
 	if ((CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 ||
 			 CC_ALG == DLI_MVCC) &&
 			rc == RCOK) {

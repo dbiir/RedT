@@ -69,6 +69,7 @@ RC Row_dta::read_and_write(TsType type, TxnManager* txn, row_t* row, uint64_t& v
   uint64_t mtx_wait_starttime = get_sys_clock();
   while (!ATOM_CAS(dta_avail, true, false)) {
   }
+  INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
   INC_STATS(txn->get_thd_id(), mtx[30], get_sys_clock() - mtx_wait_starttime);
 
   if (type == 0) {
@@ -92,12 +93,12 @@ RC Row_dta::read_and_write(TsType type, TxnManager* txn, row_t* row, uint64_t& v
 
   // Fetch the previous version
   ts_t ts = txn->get_timestamp();
-
+  uint64_t lock_get_start_time = get_sys_clock();
   if (g_central_man)
     glob_manager.lock_row(_row);
   else
     pthread_mutex_lock(latch);
-
+  INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - lock_get_start_time);
   if (type == R_REQ) {
     // figure out if ts is in interval(prewrite(x))
     // bool conf = conflict(type, ts);

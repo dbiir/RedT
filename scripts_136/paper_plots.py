@@ -155,7 +155,7 @@ def ppr_ycsb_partitions_abort_plot(summary,summary_cl):
 
 
 def ppr_ycsb_writes_plot(summary,summary_cl):
-    from experiments import ycsb_writes   
+    from experiments import ycsb_writes
     from helper import plot_prep
     from plot_helper import tput
     nfmt,nexp = ycsb_writes()
@@ -170,7 +170,7 @@ def ppr_ycsb_writes_plot(summary,summary_cl):
     tput(x_vals,v_vals,summary,summary_cl,cfg_fmt=fmt,cfg=list(exp),xname=x_name,vname=v_name,title="",name="tput_ycsb_writes_16_12k",xlab="% of Update Transactions",new_cfgs=lst)
 
 def ppr_ycsb_skew_abort_plot(summary,summary_cl):
-    from experiments import ycsb_skew_abort   
+    from experiments import ycsb_skew_abort
     from helper import plot_prep
     from plot_helper import tput
     nfmt,nexp = ycsb_skew_abort()
@@ -188,7 +188,7 @@ def ppr_ycsb_skew_abort_plot(summary,summary_cl):
 
 
 def ppr_ycsb_skew_plot(summary,summary_cl):
-    from experiments import ycsb_skew   
+    from experiments import ycsb_skew
     from helper import plot_prep
     from plot_helper import tput
     nfmt,nexp = ycsb_skew()
@@ -208,7 +208,7 @@ def ppr_ycsb_skew_plot(summary,summary_cl):
     tput(x_vals,v_vals,summary,summary_cl,cfg_fmt=fmt,cfg=list(exp),xname=x_name,vname=v_name,title="",name="tput_ycsb_skew_16",xlab="Skew Factor (Theta)",new_cfgs=lst)
 
 def ppr_isolation_levels_plot(summary,summary_cl):
-    from experiments import isolation_levels 
+    from experiments import isolation_levels
     from helper import plot_prep
     from plot_helper import tput
     nfmt,nexp = isolation_levels()

@@ -35,7 +35,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
-#include <time.h> 
+#include <time.h>
 #include <sys/time.h>
 #include <math.h>
 
@@ -91,7 +91,7 @@ class InOutTable;
 class WkdbTimeTable;
 class DAQuery;
 class DABlockQueue;
-class DtaTimeTable;                                                                                                                            
+class DtaTimeTable;
 class KeyXidCache;
 class RtsCache;
 // class QTcpQueue;
@@ -105,7 +105,7 @@ typedef int64_t SInt64;
 typedef uint64_t ts_t; // time stamp type
 
 /******************************************/
-// Global Data Structure 
+// Global Data Structure
 /******************************************/
 extern mem_alloc mem_allocator;
 extern Stats stats;
@@ -154,7 +154,7 @@ extern bool volatile enable_thread_mem_pool;
 extern pthread_barrier_t warmup_bar;
 
 /******************************************/
-// Client Global Params 
+// Client Global Params
 /******************************************/
 extern UInt32 g_client_thread_cnt;
 extern UInt32 g_client_rem_thread_cnt;
@@ -189,8 +189,8 @@ extern UInt32 g_logger_thread_cnt;
 extern UInt32 g_tcp_thread_cnt;
 extern UInt32 g_send_thread_cnt;
 extern UInt32 g_rem_thread_cnt;
-extern ts_t g_abort_penalty; 
-extern ts_t g_abort_penalty_max; 
+extern ts_t g_abort_penalty;
+extern ts_t g_abort_penalty_max;
 extern bool g_central_man;
 extern UInt32 g_ts_alloc;
 extern bool g_key_order;
@@ -350,7 +350,7 @@ enum access_t {RD, WR, XP, SCAN};
 /* LOCK */
 enum lock_t {LOCK_EX = 0, LOCK_SH, LOCK_NONE };
 /* TIMESTAMP */
-enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ}; 
+enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 
 /*DA query build queue*/
 //queue<DAQuery> query_build_queue;
@@ -359,9 +359,9 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 
 #define GET_THREAD_ID(id)	(id % g_thread_cnt)
 #define GET_NODE_ID(id)	(id % g_node_cnt)
-#define GET_PART_ID(t,n)	(n) 
-#define GET_PART_ID_FROM_IDX(idx)	(g_node_id + idx * g_node_cnt) 
-#define GET_PART_ID_IDX(p)	(p / g_node_cnt) 
+#define GET_PART_ID(t,n)	(n)
+#define GET_PART_ID_FROM_IDX(idx)	(g_node_id + idx * g_node_cnt)
+#define GET_PART_ID_IDX(p)	(p / g_node_cnt)
 #define ISSERVER (g_node_id < g_node_cnt)
 #define ISSERVERN(id) (id < g_node_cnt)
 #define ISCLIENT (g_node_id >= g_node_cnt && g_node_id < g_node_cnt + g_client_node_cnt)
@@ -379,13 +379,13 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 /*
 #define GET_THREAD_ID(id)	(id % g_thread_cnt)
 #define GET_NODE_ID(id)	(id / g_thread_cnt)
-#define GET_PART_ID(t,n)	(n*g_thread_cnt + t) 
+#define GET_PART_ID(t,n)	(n*g_thread_cnt + t)
 */
 
 #define MSG(str, args...) \
   { printf("[%s : %d] " str, __FILE__, __LINE__, args); }  //	printf(args); }
 
-// principal index structure. The workload may decide to use a different 
+// principal index structure. The workload may decide to use a different
 // index structure for specific purposes. (e.g. non-primary key access should use hash)
 #if (INDEX_STRUCT == IDX_BTREE)
 #define INDEX		index_btree

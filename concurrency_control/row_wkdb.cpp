@@ -37,7 +37,7 @@ void Row_wkdb::init(row_t * row) {
 	prereq_mvcc = NULL;
 	writehis = NULL;
 	writehistail = NULL;
-	latch = (pthread_mutex_t *) 
+	latch = (pthread_mutex_t *)
 		mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init(latch, NULL);
 	whis_len = 0;
@@ -64,7 +64,7 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	while(!ATOM_CAS(wkdb_avail,true,false)) { }
 	INC_STATS(txn->get_thd_id(),mtx[30],get_sys_clock() - mtx_wait_starttime);
-	
+	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
 	if (type == 0) {
 		DEBUG("READ %ld -- %ld: lw %lu, table name: %s \n",txn->get_txn_id(),_row->get_primary_key(),timestamp_last_read,_row->get_table_name());
 	} else if (type == 1) {
@@ -107,7 +107,7 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 			txn->cur_row = _row;
 		} else {
 			WKDBMVHisEntry * whis = writehis;
-			while (whis_len && whis != NULL && whis->ts > ts) 
+			while (whis_len && whis != NULL && whis->ts > ts)
 				whis = whis->next;
 			row_t * ret = (whis == NULL)? _row : whis->row;
 			txn->cur_row = ret;
@@ -125,12 +125,12 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 		if (whis_len > g_his_recycle_len) {
 		//if (whis_len > g_his_recycle_len || rhis_len > g_his_recycle_len) {
 			ts_t t_th = glob_manager.get_min_ts(txn->get_thd_id());
-			// Here is a tricky bug. The oldest transaction might be 
+			// Here is a tricky bug. The oldest transaction might be
 			// reading an even older version whose timestamp < t_th.
 			// But we cannot recycle that version because it is still being used.
 			// So the HACK here is to make sure that the first version older than
 			// t_th not be recycled.
-			if (whis_len > 1 && 
+			if (whis_len > 1 &&
 				writehistail->prev->ts < t_th) {
 				row_t * latest_row = clear_history(W_REQ, t_th);
 				if (latest_row != NULL) {
@@ -142,7 +142,7 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 		}
 	}
 
-	// pthread_mutex_unlock( latch );	
+	// pthread_mutex_unlock( latch );
 
   	ATOM_CAS(wkdb_avail,false,true);
 
@@ -170,7 +170,7 @@ RC Row_wkdb::abort(access_t type, TxnManager * txn) {
   	return Abort;
 }
 
-RC Row_wkdb::commit(access_t type, TxnManager * txn, row_t * data) {	
+RC Row_wkdb::commit(access_t type, TxnManager * txn, row_t * data) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	while(!ATOM_CAS(wkdb_avail,true,false)) { }
 	INC_STATS(txn->get_thd_id(),mtx[33],get_sys_clock() - mtx_wait_starttime);
@@ -234,7 +234,7 @@ row_t * Row_wkdb::clear_history(TsType type, ts_t ts) {
 	*tail = his;
 	if (*tail)
 		(*tail)->next = NULL;
-	if (his == NULL) 
+	if (his == NULL)
 		*queue = NULL;
 	return row;
 }
@@ -275,7 +275,7 @@ void Row_wkdb::buffer_req(TsType type, TxnManager * txn)
 	}
 }
 
-// for type == R_REQ 
+// for type == R_REQ
 //	 debuffer all non-conflicting requests
 // for type == P_REQ
 //   debuffer the request with matching txn.
@@ -286,7 +286,7 @@ WKDBMVReqEntry * Row_wkdb::debuffer_req(TsType type, TxnManager * txn) {
 	WKDBMVReqEntry * req = *queue;
 	WKDBMVReqEntry * prev_req = NULL;
 	if (txn != NULL && req && preq_len) {
-		while (req != NULL && req->txn == txn) {	
+		while (req != NULL && req->txn == txn) {
 			prev_req = req;
 			req = req->next;
 			if (prev_req->txn != txn) {
@@ -322,9 +322,9 @@ WKDBMVReqEntry * Row_wkdb::debuffer_req(TsType type, TxnManager * txn) {
 	return req;
 }
 
-void Row_wkdb::insert_history(ts_t ts, row_t * row) 
+void Row_wkdb::insert_history(ts_t ts, row_t * row)
 {
-	WKDBMVHisEntry * new_entry = get_his_entry(); 
+	WKDBMVHisEntry * new_entry = get_his_entry();
 	new_entry->ts = ts;
 	new_entry->row = row;
 	if (row != NULL)
@@ -339,24 +339,24 @@ void Row_wkdb::insert_history(ts_t ts, row_t * row)
 
 	if (his) {
 		LIST_INSERT_BEFORE(his, new_entry, (*queue));
-	} else 
+	} else
 		LIST_PUT_TAIL((*queue), (*tail), new_entry);
 }
 
 bool Row_wkdb::conflict(TsType type, ts_t ts) {
 	// find the unique prewrite-read couple (prewrite before read)
-	// if no such couple found, no conflict. 
-	// else 
+	// if no such couple found, no conflict.
+	// else
 	// 	 if exists writehis between them, NO conflict!!!!
 	// 	 else, CONFLICT!!!
 	ts_t rts;
 	ts_t pts;
-	if (type == R_REQ) {	
+	if (type == R_REQ) {
 		rts = ts;
 		pts = 0;
 		WKDBMVReqEntry * req = prereq_mvcc;
 		while (req != NULL) {
-			if (req->ts < ts && req->ts > pts) { 
+			if (req->ts < ts && req->ts > pts) {
 				pts = req->ts;
 			}
 			req = req->next;
@@ -370,7 +370,7 @@ bool Row_wkdb::conflict(TsType type, ts_t ts) {
 		// while (his != NULL) {
 		// 	if (his->ts > ts) {
 		// 		rts = his->ts;
-		// 	} else 
+		// 	} else
 		// 		break;
 		// 	his = his->next;
 		// }
@@ -380,7 +380,7 @@ bool Row_wkdb::conflict(TsType type, ts_t ts) {
 	}
 	WKDBMVHisEntry * whis = writehis;
     while (whis != NULL && whis->ts > pts) {
-		if (whis->ts < rts) 
+		if (whis->ts < rts)
 			return false;
 		whis = whis->next;
 	}
@@ -395,9 +395,9 @@ void Row_wkdb::update_buffer(TxnManager * txn) {
 	while (req != NULL) {
 		// find the version for the request
 		WKDBMVHisEntry * whis = writehis;
-		while (whis != NULL && whis->ts > req->ts) 
+		while (whis != NULL && whis->ts > req->ts)
 			whis = whis->next;
-		row_t * row = (whis == NULL)? 
+		row_t * row = (whis == NULL)?
 			_row : whis->row;
 		req->txn->cur_row = row;
 		//insert_history(req->ts, NULL);

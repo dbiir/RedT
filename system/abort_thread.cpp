@@ -30,7 +30,7 @@ RC AbortThread::run() {
     abort_queue.process(get_thd_id());
   }
   return FINISH;
- 
+
 }
 
 

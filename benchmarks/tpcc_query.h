@@ -45,8 +45,8 @@ public:
 
 private:
 	BaseQuery * gen_requests(uint64_t home_partition_id, Workload * h_wl);
-  BaseQuery * gen_payment(uint64_t home_partition); 
-  BaseQuery * gen_new_order(uint64_t home_partition); 
+  BaseQuery * gen_payment(uint64_t home_partition);
+  BaseQuery * gen_new_order(uint64_t home_partition);
 	myrand * mrand;
 };
 
@@ -58,9 +58,9 @@ public:
   void release();
   void release_items();
   void print();
-  static std::set<uint64_t> participants(Message * msg, Workload * wl); 
-  uint64_t participants(bool *& pps,Workload * wl); 
-  uint64_t get_participants(Workload * wl); 
+  static std::set<uint64_t> participants(Message * msg, Workload * wl);
+  uint64_t participants(bool *& pps,Workload * wl);
+  uint64_t get_participants(Workload * wl);
   bool readonly();
 
 	TPCCTxnType txn_type;

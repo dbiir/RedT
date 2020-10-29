@@ -87,8 +87,8 @@ Row_tictoc::unlatch()
     pthread_mutex_unlock( _latch );
 }
 
-RC 
-Row_tictoc::access(access_t type, TxnManager * txn, row_t *& row, 
+RC
+Row_tictoc::access(access_t type, TxnManager * txn, row_t *& row,
 					uint64_t &wts, uint64_t &rts) {
 	uint64_t starttime = get_sys_clock();
 	RC rc = RCOK;
@@ -108,8 +108,10 @@ RC
 Row_tictoc::read(TxnManager * txn, char * data,
 				 uint64_t &wts, uint64_t &rts, bool latch, bool remote)
 {
-	if (latch)
+	uint64_t starttime = get_sys_clock();
+    if (latch)
 		this->latch();
+    INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - starttime);
 	wts = _wts;
 	rts = _rts;
     // txn->cur_row = _row;
@@ -133,8 +135,10 @@ Row_tictoc::write(TxnManager * txn, uint64_t &wts, uint64_t &rts, bool latch)
 	if (_ts_lock)
 		return Abort;
 #endif
+    uint64_t starttime = get_sys_clock();
 	if (latch)
 		pthread_mutex_lock( _latch );
+    INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - starttime);
 	if (!_ts_lock) {
 		_ts_lock = true;
 		_lock_owner = txn;
@@ -147,7 +151,7 @@ Row_tictoc::write(TxnManager * txn, uint64_t &wts, uint64_t &rts, bool latch)
 		// 			"txn=%ld, _lock_owner=%ld. ID=%ld\n", (uint64_t)txn, (uint64_t)_lock_owner, txn->get_txn_id());
 		// txn has higher priority, should wait.
 		// assert (MAN(txn)->get_priority() != MAN(_lock_owner)->get_priority());
-		if (_waiting_set.size() < _max_num_waits && 
+		if (_waiting_set.size() < _max_num_waits &&
             txn->get_priority() < _lock_owner->get_priority())
 		{
 			_waiting_set.insert(txn);
@@ -168,8 +172,8 @@ Row_tictoc::write(TxnManager * txn, uint64_t &wts, uint64_t &rts, bool latch)
 	return rc;
 }
 
-RC 
-Row_tictoc::abort(access_t type, TxnManager * txn) {	
+RC
+Row_tictoc::abort(access_t type, TxnManager * txn) {
   	// uint64_t mtx_wait_starttime = get_sys_clock();
   	// while(!ATOM_CAS(wkdb_avail,true,false)) { }
   	// INC_STATS(txn->get_thd_id(),mtx[32],get_sys_clock() - mtx_wait_starttime);
@@ -178,8 +182,8 @@ Row_tictoc::abort(access_t type, TxnManager * txn) {
   	return Abort;
 }
 
-RC 
-Row_tictoc::commit(access_t type, TxnManager * txn, row_t * data) {	
+RC
+Row_tictoc::commit(access_t type, TxnManager * txn, row_t * data) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	// while(!ATOM_CAS(wkdb_avail,true,false)) { }
 	INC_STATS(txn->get_thd_id(),mtx[33],get_sys_clock() - mtx_wait_starttime);

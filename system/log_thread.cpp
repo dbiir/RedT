@@ -29,7 +29,7 @@ RC LogThread::run() {
     //logger.flushBufferCheck();
   }
   return FINISH;
- 
+
 }
 
 

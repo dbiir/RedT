@@ -34,7 +34,9 @@ void Row_dli_base::init(row_t *row) {
 RC Row_dli_base::access(TxnManager *txn, TsType type, uint64_t &version) {
   RC rc = RCOK;
   // pthread_mutex_lock( _latch );
+  uint64_t lock_get_start_time = get_sys_clock();
   sem_wait(&_semaphore);
+  INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - lock_get_start_time);
   if (type == R_REQ) {
     txn->cur_row->copy(_row);
     version = _cur_version;
@@ -46,6 +48,10 @@ RC Row_dli_base::access(TxnManager *txn, TsType type, uint64_t &version) {
     assert(false);
   // pthread_mutex_unlock( _latch );
   sem_post(&_semaphore);
+  uint64_t timespan = get_sys_clock() - lock_get_start_time;
+  txn->txn_stats.cc_time += timespan;
+  txn->txn_stats.cc_time_short += timespan;
+
   return rc;
 }
 

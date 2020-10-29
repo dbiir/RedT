@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
 
 	// 2. spawn multiple threads
 	uint64_t thd_cnt = g_client_thread_cnt;
-	uint64_t cthd_cnt = thd_cnt; 
+	uint64_t cthd_cnt = thd_cnt;
 	uint64_t rthd_cnt = g_client_rem_thread_cnt;
 	uint64_t sthd_cnt = g_client_send_thread_cnt;
   uint64_t all_thd_cnt = thd_cnt + rthd_cnt + sthd_cnt;
@@ -193,11 +193,11 @@ int main(int argc, char *argv[]) {
     output_thds[i].init(id,g_node_id,m_wl);
 		pthread_create(&p_thds[id++], NULL, run_thread, (void *)&output_thds[i]);
   }
-	for (uint64_t i = 0; i < all_thd_cnt; i++) 
+	for (uint64_t i = 0; i < all_thd_cnt; i++)
 		pthread_join(p_thds[i], NULL);
 
 	endtime = get_server_clock();
-	
+
   fflush(stdout);
   printf("CLIENT PASS! SimTime = %ld\n", endtime - starttime);
   if (STATS_ENABLE) stats.print_client(false);

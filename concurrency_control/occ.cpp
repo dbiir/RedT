@@ -65,7 +65,7 @@ RC OptCC::per_row_validate(TxnManager *txn) {
 	// sort all rows accessed in primary key order.
 	for (uint64_t i = txn->get_access_cnt() - 1; i > 0; i--) {
 		for (uint64_t j = 0; j < i; j ++) {
-			int tabcmp = strcmp(txn->get_access_original_row(j)->get_table_name(), 
+			int tabcmp = strcmp(txn->get_access_original_row(j)->get_table_name(),
 				txn->get_access_original_row(j+1)->get_table_name());
       if (tabcmp > 0 ||
           (tabcmp == 0 && txn->get_access_original_row(j)->get_primary_key() >
@@ -76,9 +76,9 @@ RC OptCC::per_row_validate(TxnManager *txn) {
 	}
 #if DEBUG_ASSERT
 	for (uint64_t i = txn->get_access_cnt() - 1; i > 0; i--) {
-		int tabcmp = strcmp(txn->get_access_original_row(i-1)->get_table_name(), 
+		int tabcmp = strcmp(txn->get_access_original_row(i-1)->get_table_name(),
 			txn->get_access_original_row(i)->get_table_name());
-		assert(tabcmp < 0 || tabcmp == 0 && txn->get_access_original_row(i)->get_primary_key() > 
+		assert(tabcmp < 0 || tabcmp == 0 && txn->get_access_original_row(i)->get_primary_key() >
 			txn->get_access_original_row(i-1)->get_primary_key());
 	}
 #endif
@@ -107,7 +107,7 @@ RC OptCC::per_row_validate(TxnManager *txn) {
 
     */
   /*
-	for (int i = 0; i < lock_cnt; i++) 
+	for (int i = 0; i < lock_cnt; i++)
 		txn->accesses[i]->orig_row->manager->release();
     */
 #endif
@@ -176,7 +176,7 @@ RC OptCC::central_validate(TxnManager * txn) {
 			if (valid)
 				valid = test_valid(his, wset);
 #endif
-			if (!valid) { 
+			if (!valid) {
         		INC_STATS(txn->get_thd_id(),occ_hist_validate_fail_time,get_sys_clock() - starttime);
 				goto final;
       		}
@@ -196,7 +196,7 @@ RC OptCC::central_validate(TxnManager * txn) {
       		++checked;
       		++active_checked;
 			valid = test_valid(wact, wset);
-		} 
+		}
 		if (!valid) {
 			INC_STATS(txn->get_thd_id(),occ_act_validate_fail_time,get_sys_clock() - starttime);
 			goto final;
@@ -206,7 +206,7 @@ RC OptCC::central_validate(TxnManager * txn) {
 	starttime = get_sys_clock();
 final:
   /*
-	if (valid) 
+	if (valid)
 		txn->cleanup(RCOK);
     */
 	mem_allocator.free(rset->rows, sizeof(row_t *) * rset->set_size);
@@ -314,7 +314,7 @@ RC OptCC::get_rw_set(TxnManager * txn, set_ent * &rset, set_ent *& wset) {
 	for (uint64_t i = 0; i < wset->set_size + rset->set_size; i++) {
 		if (txn->get_access_type(i) == WR)
 			wset->rows[n ++] = txn->get_access_original_row(i);
-		else 
+		else
 			rset->rows[m ++] = txn->get_access_original_row(i);
 	}
 

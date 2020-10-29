@@ -131,22 +131,20 @@ static RC validate_main(TxnManager* txn, Dli* dli, const bool final_validate) {
   if (lower >= upper) rc = Abort;
 #endif
 
+  // uint64_t timespan = get_sys_clock() - start_time;
+  // txn->txn_stats.cc_time += timespan;
+  // txn->txn_stats.cc_time_short += timespan;
+  // start_time += timespan;
+
   uint64_t timespan = get_sys_clock() - start_time;
-  txn->txn_stats.cc_time += timespan;
-  txn->txn_stats.cc_time_short += timespan;
+  INC_STATS(txn->get_thd_id(),dli_init_time,get_sys_clock() - start_time);
   start_time += timespan;
-
-  timespan = get_sys_clock() - start_time;
-  txn->txn_stats.cc_block_time += timespan;
-  txn->txn_stats.cc_block_time_short += timespan;
-  start_time += timespan;
-
   if (rc == RCOK) {
     for (auto& i : wset) {
       if (i.first->manager->w_trans != ts) {
         if (!i.first->manager->w_trans.compare_exchange_weak(expect, ts)) {//先写者获胜？
         /*compare_exchange_strong：if w_trans' value == expected. Then w_trans' value = ts
-                                    else expect=w_trans' value 
+                                    else expect=w_trans' value
           #Q: is there means? if P_REQ, row is ok, but its version is 0. Once real write, set version.
                               So w_trans' value != 0, then abort，提交之后之后就又是0了
         */
@@ -156,7 +154,9 @@ static RC validate_main(TxnManager* txn, Dli* dli, const bool final_validate) {
       }
     }
   }
-
+  timespan = get_sys_clock() - start_time;
+  INC_STATS(txn->get_thd_id(),dli_lock_time,get_sys_clock() - start_time);
+  start_time += timespan;
   if (rc == RCOK && !wset.empty()) {
     for (auto& i : wset) {
     /*#Q: Why we set all the write version to UINT64_MAX?*/
@@ -185,6 +185,9 @@ static RC validate_main(TxnManager* txn, Dli* dli, const bool final_validate) {
       }
     }
   }
+  timespan = get_sys_clock() - start_time;
+  INC_STATS(txn->get_thd_id(),dli_check_conflict_time,get_sys_clock() - start_time);
+  start_time += timespan;
 #if CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
   if (lower >= upper) rc = Abort;
 #endif
@@ -201,9 +204,11 @@ static RC validate_main(TxnManager* txn, Dli* dli, const bool final_validate) {
 #endif
   }
   timespan = get_sys_clock() - start_time;
-  txn->txn_stats.cc_time += timespan;
-  txn->txn_stats.cc_time_short += timespan;
-  start_time += timespan;
+  INC_STATS(txn->get_thd_id(),dli_final_validate,get_sys_clock() - start_time);
+  // timespan = get_sys_clock() - start_time;
+  // txn->txn_stats.cc_time += timespan;
+  // txn->txn_stats.cc_time_short += timespan;
+  // start_time += timespan;
 
 #endif
   return rc;

@@ -137,10 +137,10 @@ RC Maat::validate(TxnManager * txn) {
       uint64_t it_upper = time_table.get_upper(txn->get_thd_id(),*it);
       if(it_upper != UINT64_MAX && it_upper > lower + 2 && it_upper < upper ) {
         upper = it_upper - 2;
-      } 
+      }
       if((it_lower < upper && it_lower > lower+1)) {
         upper = it_lower - 1;
-      } 
+      }
     }
     // set all upper and lower bounds to meet inequality
     for(auto it = after.begin(); it != after.end();it++) {
@@ -181,7 +181,7 @@ RC Maat::find_bound(TxnManager * txn) {
   } else {
     time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),MAAT_COMMITTED);
     // TODO: can commit_time be selected in a smarter way?
-    txn->commit_timestamp = lower; 
+    txn->commit_timestamp = lower;
   }
   DEBUG("MAAT Bound %ld: %d [%lu,%lu] %lu\n", txn->get_txn_id(), rc, lower, upper,
         txn->commit_timestamp);

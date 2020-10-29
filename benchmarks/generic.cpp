@@ -18,7 +18,7 @@ std::unordered_map<int, std::string> Anomally2Name=
   //BOCC FOCC UNKNOWN
   {UNKNOWN,"UNKNOWN"}
 };
- 
+
 std::ostream& operator<<(std::ostream& os, const Anomally e) {
   switch (e) {
   case DIRTY_WRITE: \
@@ -327,7 +327,7 @@ void ActionSequence::FillReadVersions<SerializeReadPolicy::UNCOMMITTED_READ>(
   std::vector<std::vector<Optional<uint64_t>>> trans_write_item_versions(
       act_seq.trans_num(), std::vector<Optional<uint64_t>>(act_seq.item_num()));
   std::vector<std::vector<Optional<uint64_t>>> item_version_link(
-      act_seq.item_num(), {0}); 
+      act_seq.item_num(), {0});
 
   const auto latest_version = [&item_version_link](const uint64_t item_id) {
     const std::vector<Optional<uint64_t>>& version_link = item_version_link[item_id];

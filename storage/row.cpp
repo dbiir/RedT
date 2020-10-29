@@ -36,6 +36,7 @@
 #include "row_tictoc.h"
 #include "row_ssi.h"
 #include "row_wsi.h"
+#include "row_null.h"
 #include "mem_alloc.h"
 #include "manager.h"
 
@@ -78,18 +79,20 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_dli_base *)mem_allocator.align_alloc(sizeof(Row_dli_base));
 #elif CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
 	manager = (Row_si *)mem_allocator.align_alloc(sizeof(Row_si));
-#elif CC_ALG == MAAT 
+#elif CC_ALG == MAAT
 	manager = (Row_maat *) mem_allocator.align_alloc(sizeof(Row_maat));
 #elif CC_ALG == DTA
 	manager = (Row_dta *)mem_allocator.align_alloc(sizeof(Row_dta));
-#elif CC_ALG == WOOKONG 
+#elif CC_ALG == WOOKONG
 	manager = (Row_wkdb *) mem_allocator.align_alloc(sizeof(Row_wkdb));
-#elif CC_ALG == TICTOC 
+#elif CC_ALG == TICTOC
 	manager = new Row_tictoc(this);
-#elif CC_ALG == SSI 
+#elif CC_ALG == SSI
 	manager = (Row_ssi *) mem_allocator.align_alloc(sizeof(Row_ssi));
-#elif CC_ALG == WSI 
+#elif CC_ALG == WSI
 	manager = (Row_wsi *) mem_allocator.align_alloc(sizeof(Row_wsi));
+#elif CC_ALG == CNULL
+	manager = (Row_null *) mem_allocator.align_alloc(sizeof(Row_null));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -168,7 +171,7 @@ char * row_t::get_value(char * col_name) {
 
 char *row_t::get_data() { return data; }
 
-void row_t::set_data(char * data) { 
+void row_t::set_data(char * data) {
 	int tuple_size = get_schema()->get_tuple_size();
 #if SIM_FULL_ROW
 	memcpy(this->data, data, tuple_size);
@@ -208,7 +211,7 @@ RC row_t::get_lock(access_t type, TxnManager * txn) {
 
 RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 		RC rc = RCOK;
-#if MODE==NOCC_MODE || MODE==QRY_ONLY_MODE 
+#if MODE==NOCC_MODE || MODE==QRY_ONLY_MODE
 	access->data = this;
 		return rc;
 #endif
@@ -224,6 +227,16 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	}
 #endif
 */
+#if CC_ALG == CNULL // 白板协议
+
+	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row->init(get_table(), get_part_id());
+	rc = this->manager->access(type,txn);
+	txn->cur_row->copy(this);
+	access->data = txn->cur_row;
+	assert(rc == RCOK);
+	goto end;
+#endif
 #if CC_ALG == MAAT
 
 		DEBUG_M("row_t::get_row MAAT alloc \n");
@@ -314,7 +327,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 
 #endif
 
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT 
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT
 	//uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN) ? LOCK_SH : LOCK_EX;//这错了
 	rc = this->manager->lock_get(lt, txn);
@@ -337,7 +350,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
 	txn->cur_row->init(get_table(), this->get_part_id());
 #endif
-	
+
 	if (type == WR) {
 		rc = this->manager->access(txn, P_REQ, NULL);
 		if (rc != RCOK) goto end;
@@ -435,7 +448,7 @@ RC row_t::get_ts(uint64_t &orig_wts, uint64_t &orig_rts) {
 
 RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row, uint64_t &orig_wts, uint64_t &orig_rts) {
 		RC rc = RCOK;
-#if MODE==NOCC_MODE || MODE==QRY_ONLY_MODE 
+#if MODE==NOCC_MODE || MODE==QRY_ONLY_MODE
 		row = this;
 		return rc;
 #endif
@@ -450,7 +463,7 @@ RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row, uint64_t &orig_
 #endif
 	return rc;
 }
-// Return call for get_row if waiting 
+// Return call for get_row if waiting
 RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 	RC rc = RCOK;
 	assert(CC_ALG == WAIT_DIE || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TIMESTAMP || CC_ALG == TICTOC || CC_ALG == SSI || CC_ALG == WSI || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 ||
@@ -490,10 +503,10 @@ RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 	return rc;
 }
 
-// the "row" is the row read out in get_row(). For locking based CC_ALG, 
-// the "row" is the same as "this". For timestamp based CC_ALG, the 
+// the "row" is the row read out in get_row(). For locking based CC_ALG,
+// the "row" is the same as "this". For timestamp based CC_ALG, the
 // "row" != "this", and the "row" must be freed.
-// For MVCC, the row will simply serve as a version. The version will be 
+// For MVCC, the row will simply serve as a version. The version will be
 // delete during history cleanup.
 // For TIMESTAMP, the row will be explicity deleted at the end of access().
 // (c.f. row_ts.cpp)
@@ -522,7 +535,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI
 	// for RD or SCAN or XP, the row should be deleted.
 	// because all WR should be companied by a RD
-	// for MVCC RD, the row is not copied, so no need to free. 
+	// for MVCC RD, the row is not copied, so no need to free.
 	if (CC_ALG == TIMESTAMP && (type == RD || type == SCAN)) {
 		row->free_row();
 			DEBUG_M("row_t::return_row TIMESTAMP free \n");
@@ -567,6 +580,18 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		mem_allocator.free(row, sizeof(row_t));
 	}
 	return version;
+#elif CC_ALG == CNULL
+	assert (row != NULL);
+	if (rc == Abort) {
+		manager->abort(type,txn);
+	} else {
+		manager->commit(type,txn,row);
+	}
+
+		row->free_row();
+	DEBUG_M("row_t::return_row Maat free \n");
+		mem_allocator.free(row, sizeof(row_t));
+	return 0;
 #elif CC_ALG == MAAT
 	assert (row != NULL);
 	if (rc == Abort) {
@@ -623,13 +648,13 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		mem_allocator.free(row, sizeof(row_t));
 	}
 	return version;
-#elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC 
+#elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC
 	assert (row != NULL);
 	if (ROLL_BACK && type == XP) {// recover from previous writes.
 		this->copy(row);
 	}
 	return 0;
-#else 
+#else
 	assert(false);
 #endif
 }

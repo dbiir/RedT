@@ -28,7 +28,7 @@ struct WKDBMVReqEntry {
 	WKDBMVReqEntry * next;
 };
 
-struct WKDBMVHisEntry {	
+struct WKDBMVHisEntry {
 	ts_t ts;
 	// only for write history. The value needs to be stored.
 //	char * data;
@@ -46,13 +46,13 @@ public:
 	RC abort(access_t type, TxnManager * txn);
 	RC commit(access_t type, TxnManager * txn, row_t * data);
 	void write(row_t * data);
-	
+
 	volatile bool wkdb_avail;
 
 private:
 	row_t * _row;
 
-public:	
+public:
 	std::set<uint64_t> * uncommitted_reads;
 	//std::set<uint64_t> * uncommitted_writes;
 
@@ -74,7 +74,7 @@ private:
 	void update_buffer(TxnManager * txn);
 	void insert_history( ts_t ts, row_t * row);
 
-	row_t * clear_history(TsType type, ts_t ts); 
+	row_t * clear_history(TsType type, ts_t ts);
 
 	WKDBMVReqEntry * readreq_mvcc;
   	WKDBMVReqEntry * prereq_mvcc;

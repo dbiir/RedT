@@ -23,7 +23,7 @@
 
 // each BucketNode contains items sharing the same key
 class BucketNode {
-public: 
+public:
 	BucketNode(idx_key_t key) {
 		init(key);
 	};
@@ -33,9 +33,9 @@ public:
 		items = NULL;
 	}
 	idx_key_t 		key;
-	// The node for the next key	
-	BucketNode * 	next;	
-	// NOTE. The items can be a list of items connected by the next pointer. 
+	// The node for the next key
+	BucketNode * 	next;
+	// NOTE. The items can be a list of items connected by the next pointer.
 	itemid_t * 		items;
 };
 
@@ -60,8 +60,8 @@ class IndexHash  : public index_base
 {
 public:
 	RC 			init(uint64_t bucket_cnt);
-	RC 			init(int part_cnt, 
-					table_t * table, 
+	RC 			init(int part_cnt,
+					table_t * table,
 					uint64_t bucket_cnt);
 	void    index_delete();
 	void index_reset();
@@ -69,8 +69,8 @@ public:
 	RC 			index_insert(idx_key_t key, itemid_t * item, int part_id=-1);
 	RC 			index_insert_nonunique(idx_key_t key, itemid_t * item, int part_id=-1);
 	// the following call returns a single item
-	RC	 		index_read(idx_key_t key, itemid_t * &item, int part_id=-1);	
-	RC	 		index_read(idx_key_t key, int count, itemid_t * &item, int part_id=-1);	
+	RC	 		index_read(idx_key_t key, itemid_t * &item, int part_id=-1);
+	RC	 		index_read(idx_key_t key, int count, itemid_t * &item, int part_id=-1);
 	RC	 		index_read(idx_key_t key, itemid_t * &item,
 							int part_id=-1, int thd_id=0);
 
@@ -86,14 +86,14 @@ private:
 	void get_latch(BucketHeader * bucket);
 	void release_latch(BucketHeader * bucket);
 	// TODO implement more complex hash function
-	uint64_t hash(idx_key_t key) {	
+	uint64_t hash(idx_key_t key) {
 #if WORKLOAD == YCSB
-		return (key / g_part_cnt) % _bucket_cnt_per_part; 
+		return (key / g_part_cnt) % _bucket_cnt_per_part;
 #else
-		return key % _bucket_cnt_per_part; 
+		return key % _bucket_cnt_per_part;
 #endif
 	}
-	
+
 	BucketHeader ** 	_buckets;
 	uint64_t	 		_bucket_cnt;
 	uint64_t 			_bucket_cnt_per_part;

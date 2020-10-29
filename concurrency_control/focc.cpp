@@ -33,7 +33,7 @@ f_set_ent::f_set_ent() {
 void Focc::init() {
   	sem_init(&_semaphore, 0, 1);
 	// sem_init(&_active_semaphore, 0, 1);
-	  
+
 	tnc = 0;
 	active_len = 0;
 	active = NULL;
@@ -124,7 +124,7 @@ RC Focc::central_validate(TxnManager * txn) {
 			if (valid) {
 				++checked;
 				++active_checked;
-			} 
+			}
 			if (!valid) {
 				INC_STATS(txn->get_thd_id(),occ_act_validate_fail_time,get_sys_clock() - starttime);
 				goto final;
@@ -135,7 +135,7 @@ RC Focc::central_validate(TxnManager * txn) {
 	starttime = get_sys_clock();
 final:
   /*
-	if (valid) 
+	if (valid)
 		txn->cleanup(RCOK);
     */
 	mem_allocator.free(rset->rows, sizeof(row_t *) * rset->set_size);
@@ -201,7 +201,7 @@ void Focc::central_finish(RC rc, TxnManager * txn) {
 	//	pthread_mutex_unlock( &latch );
 	sem_post(&_semaphore);
 	INC_STATS(txn->get_thd_id(),occ_finish_time,get_sys_clock() - starttime);
-	
+
 }
 
 RC Focc::get_rw_set(TxnManager * txn, f_set_ent * &rset, f_set_ent *& wset) {
@@ -218,7 +218,7 @@ RC Focc::get_rw_set(TxnManager * txn, f_set_ent * &rset, f_set_ent *& wset) {
 	for (uint64_t i = 0; i < wset->set_size + rset->set_size; i++) {
 		if (txn->get_access_type(i) == WR)
 			wset->rows[n ++] = txn->get_access_original_row(i);
-		else 
+		else
 			rset->rows[m ++] = txn->get_access_original_row(i);
 	}
 

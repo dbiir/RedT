@@ -32,7 +32,7 @@ void Row_maat::init(row_t * row) {
   uncommitted_reads = new std::set<uint64_t>();
   assert(uncommitted_writes->begin() == uncommitted_writes->end());
   assert(uncommitted_writes->size() == 0);
-	
+
 }
 
 RC Row_maat::access(access_t type, TxnManager * txn) {
@@ -57,6 +57,7 @@ RC Row_maat::read_and_prewrite(TxnManager * txn) {
   while (!ATOM_CAS(maat_avail, true, false)) {
   }
   INC_STATS(txn->get_thd_id(),mtx[30],get_sys_clock() - mtx_wait_starttime);
+  INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
   DEBUG("READ + PREWRITE %ld -- %ld: lw %ld\n", txn->get_txn_id(), _row->get_primary_key(),
         timestamp_last_write);
 
@@ -68,7 +69,7 @@ RC Row_maat::read_and_prewrite(TxnManager * txn) {
     DEBUG("    UW %ld -- %ld: %ld\n",txn->get_txn_id(),_row->get_primary_key(),txn_id);
   }
 
-  // Copy uncommitted reads 
+  // Copy uncommitted reads
   for(auto it = uncommitted_reads->begin(); it != uncommitted_reads->end(); it++) {
     uint64_t txn_id = *it;
     txn->uncommitted_reads->insert(txn_id);
@@ -103,6 +104,7 @@ RC Row_maat::read(TxnManager * txn) {
   while (!ATOM_CAS(maat_avail, true, false)) {
   }
   INC_STATS(txn->get_thd_id(),mtx[30],get_sys_clock() - mtx_wait_starttime);
+  INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
   DEBUG("READ %ld -- %ld: lw %ld\n", txn->get_txn_id(), _row->get_primary_key(),
         timestamp_last_write);
 
@@ -133,17 +135,18 @@ RC Row_maat::prewrite(TxnManager * txn) {
   while (!ATOM_CAS(maat_avail, true, false)) {
   }
   INC_STATS(txn->get_thd_id(),mtx[31],get_sys_clock() - mtx_wait_starttime);
+  INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
   DEBUG("PREWRITE %ld -- %ld: lw %ld, lr %ld\n", txn->get_txn_id(), _row->get_primary_key(),
         timestamp_last_write, timestamp_last_read);
 
-  // Copy uncommitted reads 
+  // Copy uncommitted reads
   for(auto it = uncommitted_reads->begin(); it != uncommitted_reads->end(); it++) {
     uint64_t txn_id = *it;
     txn->uncommitted_reads->insert(txn_id);
     DEBUG("    UR %ld -- %ld: %ld\n",txn->get_txn_id(),_row->get_primary_key(),txn_id);
   }
 
-  // Copy uncommitted writes 
+  // Copy uncommitted writes
   for(auto it = uncommitted_writes->begin(); it != uncommitted_writes->end(); it++) {
     uint64_t txn_id = *it;
     txn->uncommitted_writes_y->insert(txn_id);
@@ -166,7 +169,7 @@ RC Row_maat::prewrite(TxnManager * txn) {
 	return rc;
 }
 
-RC Row_maat::abort(access_t type, TxnManager * txn) {	
+RC Row_maat::abort(access_t type, TxnManager * txn) {
   uint64_t mtx_wait_starttime = get_sys_clock();
   while (!ATOM_CAS(maat_avail, true, false)) {
   }
@@ -189,7 +192,7 @@ RC Row_maat::abort(access_t type, TxnManager * txn) {
   return Abort;
 }
 
-RC Row_maat::commit(access_t type, TxnManager * txn, row_t * data) {	
+RC Row_maat::commit(access_t type, TxnManager * txn, row_t * data) {
   uint64_t mtx_wait_starttime = get_sys_clock();
   while (!ATOM_CAS(maat_avail, true, false)) {
   }
@@ -209,7 +212,7 @@ RC Row_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 
   uint64_t txn_commit_ts = txn->get_commit_timestamp();
   // Forward validation
-  // Check uncommitted writes against this txn's 
+  // Check uncommitted writes against this txn's
     for(auto it = uncommitted_writes->begin(); it != uncommitted_writes->end();it++) {
       if(txn->uncommitted_writes->count(*it) == 0) {
         // apply timestamps
@@ -254,7 +257,7 @@ RC Row_maat::commit(access_t type, TxnManager * txn, row_t * data) {
     uncommitted_reads->erase(txn->get_txn_id());
 
   // Forward validation
-  // Check uncommitted writes against this txn's 
+  // Check uncommitted writes against this txn's
     for(auto it = uncommitted_writes->begin(); it != uncommitted_writes->end();it++) {
       if(txn->uncommitted_writes->count(*it) == 0) {
         // apply timestamps

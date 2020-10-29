@@ -25,7 +25,7 @@
 #include "pool.h"
 #include "global.h"
 
-void MessageThread::init(uint64_t thd_id) { 
+void MessageThread::init(uint64_t thd_id) {
   buffer_cnt = g_total_node_cnt;
 #if CC_ALG == CALVIN
   buffer_cnt++;
@@ -92,7 +92,7 @@ char type2char1(DATxnType txn_type)
 }
 
 void MessageThread::run() {
-  
+
   uint64_t starttime = get_sys_clock();
   Message * msg = NULL;
   uint64_t dest_node_id;
@@ -127,7 +127,7 @@ void MessageThread::run() {
       (((DAClientQueryMessage*)msg)->next_state));
       fflush(stdout);
   #endif
-  
+
   uint64_t copy_starttime = get_sys_clock();
   msg->copy_to_buf(&(sbuf->buffer[sbuf->ptr]));
   INC_STATS(_thd_id,msg_copy_output_time,get_sys_clock() - copy_starttime);

@@ -12,7 +12,7 @@ CONVERSIONS = {
 class LatencyStats(object):
 
     def __init__(self,latencies,metadata={},in_time_unit='ns',out_time_unit='ms',store=False):
-        self._metadata = metadata 
+        self._metadata = metadata
         self._in_time_unit = in_time_unit.lower()
         self._out_time_unit = out_time_unit.lower()
         self.__set_conversion_factor__()
@@ -24,7 +24,7 @@ class LatencyStats(object):
             self._latencies = latencies
         else:
             self._latencies = None
-    
+
     def get_latencies(self):
         return self._latencies
 
@@ -33,10 +33,10 @@ class LatencyStats(object):
 
     def get_mean(self):
         return self._mean*self._conversion_factor
-    
+
     def get_50th(self):
         return self._percentiles[0]*self._conversion_factor
-    
+
     def get_90th(self):
         return self._percentiles[1]*self._conversion_factor
 
@@ -48,13 +48,13 @@ class LatencyStats(object):
 
     def get_min(self):
         return self._min*self._conversion_factor
-    
+
     def get_max(self):
         return self._max*self._conversion_factor
 
     def get_percentiles(self):
         return [p*self._conversion_factor for p in self._percentiles]
-    
+
     def set_output_time_unit(self,new_unit):
         self._out_time_unit = new_unit
         self.__set_conversion_factor__()

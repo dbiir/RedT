@@ -82,7 +82,7 @@ RC Wkdb::validate(TxnManager * txn) {
       ATOM_CAS(cur_wrow->manager->wkdb_avail,false,true);
       goto VALID_END;
     }
-    
+
     //2. write in the key's write xid
     if (cur_wrow->manager->write_trans) {
       if (cur_wrow->manager->write_trans != txn->get_txn_id()) {
@@ -150,7 +150,7 @@ VALID_END:
     INC_STATS(txn->get_thd_id(),wkdb_range,upper-lower);
     INC_STATS(txn->get_thd_id(),wkdb_commit_cnt,1);
   }
- 
+
   wkdb_time_table.set_lower(txn->get_thd_id(),txn->get_txn_id(),lower);
   wkdb_time_table.set_upper(txn->get_thd_id(),txn->get_txn_id(),upper);
 
@@ -181,7 +181,7 @@ RC Wkdb::get_rw_set(TxnManager * txn, wkdb_set_ent * &rset, wkdb_set_ent *& wset
 	for (uint64_t i = 0; i < wset->set_size + rset->set_size; i++) {
 		if (txn->get_access_type(i) == WR)
 			wset->rows[n ++] = txn->get_access_original_row(i);
-		else 
+		else
 			rset->rows[m ++] = txn->get_access_original_row(i);
 	}
 
@@ -204,7 +204,7 @@ RC Wkdb::find_bound(TxnManager * txn) {
   } else {
     wkdb_time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),WKDB_COMMITTED);
     // TODO: can commit_time be selected in a smarter way?
-    txn->commit_timestamp = lower; 
+    txn->commit_timestamp = lower;
     // wkdb_time_table.set_upper(txn->get_thd_id(),txn->get_txn_id(),txn->commit_timestamp+1);
   }
   DEBUG("WKDB Bound %ld: %d [%lu,%lu] %lu\n",txn->get_txn_id(),rc,lower,upper,txn->commit_timestamp);
@@ -228,7 +228,7 @@ uint64_t WkdbTimeTable::hash(uint64_t key) {
 WkdbTimeTableEntry* WkdbTimeTable::find(uint64_t key) {
   WkdbTimeTableEntry * entry = table[hash(key)].head;
   while(entry) {
-    if(entry->key == key) 
+    if(entry->key == key)
       break;
     entry = entry->next;
   }

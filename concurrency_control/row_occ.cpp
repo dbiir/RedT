@@ -31,7 +31,9 @@ void Row_occ::init(row_t *row) {
 RC Row_occ::access(TxnManager *txn, TsType type) {
 	RC rc = RCOK;
 	//pthread_mutex_lock( _latch );
-  sem_wait(&_semaphore);
+	uint64_t starttime = get_sys_clock();
+  	sem_wait(&_semaphore);
+	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - starttime);
 	if (type == R_REQ) {
 		if (txn->get_start_timestamp() < wts) {
       		INC_STATS(txn->get_thd_id(),occ_ts_abort_cnt,1);
@@ -40,10 +42,10 @@ RC Row_occ::access(TxnManager *txn, TsType type) {
 			txn->cur_row->copy(_row);
 			rc = RCOK;
 		}
-	} else 
+	} else
 		assert(false);
 	// pthread_mutex_unlock( _latch );
-  sem_post(&_semaphore);
+  	sem_post(&_semaphore);
 	return rc;
 }
 

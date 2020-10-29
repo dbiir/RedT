@@ -7,7 +7,7 @@ bool DAQueryQueue::push(DAQuery query)
 {
     if(!queue.push(query))
         return false;
-    else 
+    else
         return true;
 }
 int DAQueryQueue::pop();

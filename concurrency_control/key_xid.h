@@ -66,11 +66,11 @@ class KeyXidEnt : public KeyRangeEnt {
     KeyRangeEnt(Sk, Ek), writeTxn(0), isDelete(false) { };
     KeyXidEnt(uint64_t Sk, uint64_t Ek, const std::vector<uint64_t>& readTxn_, uint64_t writeTxn_) :
     KeyRangeEnt(Sk, Ek), readTxn(readTxn_), writeTxn(writeTxn_), isDelete(false) { };
-    KeyXidEnt(const KeyRangeEnt& ent) { 
+    KeyXidEnt(const KeyRangeEnt& ent) {
       StartKey = ent.StartKey;
       EndKey = ent.EndKey;
     }
-    KeyXidEnt(const KeyRangeEnt& ent, const std::vector<uint64_t>& readTxn_, uint64_t writeTxn_) : readTxn(readTxn_), writeTxn(writeTxn_) { 
+    KeyXidEnt(const KeyRangeEnt& ent, const std::vector<uint64_t>& readTxn_, uint64_t writeTxn_) : readTxn(readTxn_), writeTxn(writeTxn_) {
       StartKey = ent.StartKey;
       EndKey = ent.EndKey;
     }
@@ -86,8 +86,8 @@ class KeyXidCache {
     int getKeyXidSize() { return KeyXids_simple.size() + KeyXids_multi.size(); }
     int getMultiKeyXidSize() { return KeyXids_multi.size(); }
     RC addReadXidWithMutex(uint64_t StartKey, uint64_t EndKey, uint64_t txn, int32_t isolation);
-    std::vector<uint64_t> addWriteXidWithMutex(uint64_t StartKey, uint64_t EndKey, uint64_t txn, int32_t isolation, bool is_delete); 
-    RC addWriteXidTest(uint64_t StartKey, uint64_t EndKey, uint64_t txn, int32_t isolation); 
+    std::vector<uint64_t> addWriteXidWithMutex(uint64_t StartKey, uint64_t EndKey, uint64_t txn, int32_t isolation, bool is_delete);
+    RC addWriteXidTest(uint64_t StartKey, uint64_t EndKey, uint64_t txn, int32_t isolation);
     RC removeReadXidWithMutex(uint64_t StartKey, uint64_t EndKey, uint64_t txn, int32_t isolation);
     RC removeWriteXidWithMutex(uint64_t StartKey, uint64_t EndKey, uint64_t txn, int32_t isolation);
     std::vector<uint64_t> getReadXid(uint64_t StartKey, uint64_t EndKey, bool is_delete);

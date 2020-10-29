@@ -8,7 +8,7 @@ class TcpLtsSocket{
 private:
     int         s;
 
-    
+
     uint64_t    txn;
     char        *req;
     char        *tcpres;

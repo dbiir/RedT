@@ -48,17 +48,17 @@ class Transport {
 	public:
 		void read_ifconfig(const char * ifaddr_file);
 		void init();
-    void shutdown(); 
-    uint64_t get_socket_count(); 
-    string get_path(); 
-    Socket * get_socket(); 
-    uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id); 
-    uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id); 
-    Socket * bind(uint64_t port_id); 
-    Socket * connect(uint64_t dest_id,uint64_t port_id); 
-    void send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * sbuf,int size); 
+    void shutdown();
+    uint64_t get_socket_count();
+    string get_path();
+    Socket * get_socket();
+    uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id);
+    uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id);
+    Socket * bind(uint64_t port_id);
+    Socket * connect(uint64_t dest_id,uint64_t port_id);
+    void send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * sbuf,int size);
     std::vector<Message*> * recv_msg(uint64_t thd_id);
-		void simple_send_msg(int size); 
+		void simple_send_msg(int size);
 		uint64_t simple_recv_msg();
 
 	private:

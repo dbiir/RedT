@@ -28,8 +28,8 @@ class YCSBQueryMessage;
 class YCSBClientQueryMessage;
 
 
-// Each YCSBQuery contains several ycsb_requests, 
-// each of which is a RD, WR or SCAN 
+// Each YCSBQuery contains several ycsb_requests,
+// each of which is a RD, WR or SCAN
 // to a single table
 
 class ycsb_request {
@@ -42,7 +42,7 @@ public:
     this->value = req->value;
   }
 //	char table_name[80];
-	access_t acctype; 
+	access_t acctype;
 	uint64_t key;
 	char value;
 	// only for (qtype == SCAN)
@@ -60,7 +60,7 @@ private:
 	// for Zipfian distribution
 	double zeta(uint64_t n, double theta);
 	uint64_t zipf(uint64_t n, double theta);
-	
+
 	myrand * mrand;
 	static uint64_t the_n;
 	static double denom;
@@ -73,18 +73,18 @@ public:
   ~YCSBQuery() {}
 
   void print();
-  
+
 	void init(uint64_t thd_id, Workload * h_wl) {};
   void init();
   void release();
   void release_requests();
   void reset();
-  uint64_t get_participants(Workload * wl); 
-  static std::set<uint64_t> participants(Message * msg, Workload * wl); 
-  static void copy_request_to_msg(YCSBQuery * ycsb_query, YCSBQueryMessage * msg, uint64_t id); 
-  uint64_t participants(bool *& pps,Workload * wl); 
+  uint64_t get_participants(Workload * wl);
+  static std::set<uint64_t> participants(Message * msg, Workload * wl);
+  static void copy_request_to_msg(YCSBQuery * ycsb_query, YCSBQueryMessage * msg, uint64_t id);
+  uint64_t participants(bool *& pps,Workload * wl);
   bool readonly();
-	
+
   //std::vector<ycsb_request> requests;
   Array<ycsb_request*> requests;
   void* orig_request;

@@ -113,7 +113,7 @@ void Row_mvcc::buffer_req(TsType type, TxnManager *txn) {
 	}
 }
 
-// for type == R_REQ 
+// for type == R_REQ
 //	 debuffer all non-conflicting requests
 // for type == P_REQ
 //   debuffer the request with matching txn.
@@ -130,12 +130,12 @@ MVReqEntry * Row_mvcc::debuffer_req( TsType type, TxnManager * txn) {
     default:
       assert(false);
 	}
-	
+
 	MVReqEntry * req = *queue;
 	MVReqEntry * prev_req = NULL;
 	if (txn != NULL) {
 		assert(type == P_REQ);
-		while (req != NULL && req->txn != txn) {		
+		while (req != NULL && req->txn != txn) {
 			prev_req = req;
 			req = req->next;
 		}
@@ -163,7 +163,7 @@ MVReqEntry * Row_mvcc::debuffer_req( TsType type, TxnManager * txn) {
 				if (prev_req == NULL) {
 					assert(req == *queue);
 					*queue = (*queue)->next;
-				} else 
+				} else
 					prev_req->next = req->next;
 				rreq_len --;
 				req->next = return_queue;
@@ -175,12 +175,12 @@ MVReqEntry * Row_mvcc::debuffer_req( TsType type, TxnManager * txn) {
 			}
 		}
 	}
-	
+
 	return return_queue;
 }
 
 void Row_mvcc::insert_history(ts_t ts, row_t *row) {
-	MVHisEntry * new_entry = get_his_entry(); 
+	MVHisEntry * new_entry = get_his_entry();
 	new_entry->ts = ts;
 	new_entry->row = row;
 	if (row != NULL)
@@ -195,27 +195,27 @@ void Row_mvcc::insert_history(ts_t ts, row_t *row) {
 	}
 
 	if (his) {
-		LIST_INSERT_BEFORE(his, new_entry,(*queue));					
+		LIST_INSERT_BEFORE(his, new_entry,(*queue));
 		//if (his == *queue)
 		//	*queue = new_entry;
-	} else 
+	} else
 		LIST_PUT_TAIL((*queue), (*tail), new_entry);
 }
 
 bool Row_mvcc::conflict(TsType type, ts_t ts) {
 	// find the unique prewrite-read couple (prewrite before read)
-	// if no such couple found, no conflict. 
-	// else 
+	// if no such couple found, no conflict.
+	// else
 	// 	 if exists writehis between them, NO conflict!!!!
 	// 	 else, CONFLICT!!!
 	ts_t rts;
 	ts_t pts;
-	if (type == R_REQ) {	
+	if (type == R_REQ) {
 		rts = ts;
 		pts = 0;
 		MVReqEntry * req = prereq_mvcc;
 		while (req != NULL) {
-			if (req->ts < ts && req->ts > pts) { 
+			if (req->ts < ts && req->ts > pts) {
 				pts = req->ts;
 			}
 			req = req->next;
@@ -229,7 +229,7 @@ bool Row_mvcc::conflict(TsType type, ts_t ts) {
 		while (his != NULL) {
 			if (his->ts > ts) {
 				rts = his->ts;
-			} else 
+			} else
 				break;
 			his = his->next;
 		}
@@ -257,15 +257,15 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
   if (type == R_REQ) {
 		rc = RCOK;
 		MVHisEntry * whis = writehis;
-		while (whis != NULL && whis->ts > ts) 
+		while (whis != NULL && whis->ts > ts)
 			whis = whis->next;
-		row_t * ret = (whis == NULL)? 
+		row_t * ret = (whis == NULL)?
 			_row : whis->row;
-		txn->cur_row = ret;	
+		txn->cur_row = ret;
 	} else if (type == P_REQ) {
         DEBUG("buf P_REQ %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
 		buffer_req(P_REQ, txn);
-		rc = RCOK;	
+		rc = RCOK;
 	} else if (type == W_REQ) {
 		rc = RCOK;
 		// the corresponding prewrite request is debuffered.
@@ -281,20 +281,20 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 		assert (req != NULL);
 		return_req_entry(req);
 		// update_buffer(txn);
-	} else 
+	} else
 		assert(false);
-	
+
 	if (rc == RCOK) {
 		if (whis_len > g_his_recycle_len || rhis_len > g_his_recycle_len) {
 			ts_t t_th = glob_manager.get_min_ts(txn->get_thd_id());
 			if (readhistail && readhistail->ts < t_th)
 				clear_history(R_REQ, t_th);
-			// Here is a tricky bug. The oldest transaction might be 
+			// Here is a tricky bug. The oldest transaction might be
 			// reading an even older version whose timestamp < t_th.
 			// But we cannot recycle that version because it is still being used.
 			// So the HACK here is to make sure that the first version older than
 			// t_th not be recycled.
-			if (whis_len > 1 && 
+			if (whis_len > 1 &&
 				writehistail->prev->ts < t_th) {
 				row_t * latest_row = clear_history(W_REQ, t_th);
 				if (latest_row != NULL) {
@@ -304,7 +304,7 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 			}
 		}
 	}
-	
+
 	uint64_t timespan = get_sys_clock() - starttime;
 	txn->txn_stats.cc_time += timespan;
 	txn->txn_stats.cc_time_short += timespan;
@@ -312,8 +312,8 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 	if (g_central_man)
 		glob_manager.release_row(_row);
 	else
-		pthread_mutex_unlock( latch );	
-		
+		pthread_mutex_unlock( latch );
+
 	return rc;
 }
 
@@ -327,6 +327,8 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 		glob_manager.lock_row(_row);
 	else
 		pthread_mutex_lock( latch );
+	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - starttime);
+  uint64_t acesstime = get_sys_clock();
   if (type == R_REQ) {
 		// figure out if ts is in interval(prewrite(x))
 		bool conf = conflict(type, ts);
@@ -336,15 +338,15 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
         DEBUG("buf R_REQ %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
 			buffer_req(R_REQ, txn);
 			txn->ts_ready = false;
-		} else if (conf) { 
+		} else if (conf) {
 			rc = Abort;
 			printf("\nshould never happen. rreq_len=%ld", rreq_len);
 		} else {
 			// return results immediately.
 			rc = RCOK;
 			MVHisEntry * whis = writehis;
-      while (whis != NULL && whis->ts > ts) whis = whis->next;
-      row_t *ret = (whis == NULL) ? _row : whis->row;
+			while (whis != NULL && whis->ts > ts) whis = whis->next;
+			row_t *ret = (whis == NULL) ? _row : whis->row;
 			txn->cur_row = ret;
 			insert_history(ts, NULL);
 			assert(strstr(_row->get_table_name(), ret->get_table_name()));
@@ -374,19 +376,20 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 		assert (req != NULL);
 		return_req_entry(req);
 		update_buffer(txn);
-	} else 
+	} else
 		assert(false);
-	
+  INC_STATS(txn->get_thd_id(), trans_mvcc_access, get_sys_clock() - acesstime);
 	if (rc == RCOK) {
+		uint64_t clear_his_starttime = get_sys_clock();
 		if (whis_len > g_his_recycle_len || rhis_len > g_his_recycle_len) {
 			ts_t t_th = glob_manager.get_min_ts(txn->get_thd_id());
-      if (readhistail && readhistail->ts < t_th) clear_history(R_REQ, t_th);
-			// Here is a tricky bug. The oldest transaction might be 
-			// reading an even older version whose timestamp < t_th.
-			// But we cannot recycle that version because it is still being used.
-			// So the HACK here is to make sure that the first version older than
-			// t_th not be recycled.
-      if (whis_len > 1 && writehistail->prev->ts < t_th) {
+		if (readhistail && readhistail->ts < t_th) clear_history(R_REQ, t_th);
+				// Here is a tricky bug. The oldest transaction might be
+				// reading an even older version whose timestamp < t_th.
+				// But we cannot recycle that version because it is still being used.
+				// So the HACK here is to make sure that the first version older than
+				// t_th not be recycled.
+		if (whis_len > 1 && writehistail->prev->ts < t_th) {
 				row_t * latest_row = clear_history(W_REQ, t_th);
 				if (latest_row != NULL) {
 					assert(_row != latest_row);
@@ -394,8 +397,10 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 				}
 			}
 		}
+		uint64_t clear_his_timespan = get_sys_clock() - clear_his_starttime;
+		INC_STATS(txn->get_thd_id(), trans_mvcc_clear_history, clear_his_timespan);
 	}
-	
+
 	uint64_t timespan = get_sys_clock() - starttime;
 	txn->txn_stats.cc_time += timespan;
 	txn->txn_stats.cc_time_short += timespan;
@@ -403,8 +408,8 @@ RC Row_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 	if (g_central_man)
 		glob_manager.release_row(_row);
 	else
-		pthread_mutex_unlock( latch );	
-		
+		pthread_mutex_unlock( latch );
+
 	return rc;
 }
 #endif
