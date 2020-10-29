@@ -245,7 +245,7 @@ char * txn_file = NULL;
 #if TPCC_SMALL
 UInt32 g_max_items = MAX_ITEMS_SMALL;
 UInt32 g_cust_per_dist = CUST_PER_DIST_SMALL;
-#else 
+#else
 UInt32 g_max_items = MAX_ITEMS_NORM;
 UInt32 g_cust_per_dist = CUST_PER_DIST_NORM;
 #endif
@@ -254,3 +254,5 @@ UInt32 g_dist_per_wh = DIST_PER_WH;
 
 UInt32 g_repl_type = REPL_TYPE;
 UInt32 g_repl_cnt = REPLICA_CNT;
+
+map<string, string> g_params;

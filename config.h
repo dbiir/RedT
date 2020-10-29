@@ -148,7 +148,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG DLI_DTA3
+#define CC_ALG SILO
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -192,6 +192,10 @@
 #define PRE_ABORT true
 #define OCC_LOCK_TYPE WAIT_DIE
 #define OCC_WAW_LOCK true
+// [SILO]
+#define VALIDATION_LOCK				"no-wait" // no-wait or waiting
+#define PRE_ABORT2					"true"
+#define ATOMIC_WORD					false
 /***********************************************/
 // Logging
 /***********************************************/
@@ -387,6 +391,7 @@ enum PPSTxnType {
 #define DLI_MVCC 24
 #define DLI_DTA2 25
 #define DLI_DTA3 26
+#define SILO 27
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

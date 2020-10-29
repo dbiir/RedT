@@ -58,6 +58,7 @@ class Row_wkdb;
 class Row_tictoc;
 class Row_si;
 class Row_null;
+class Row_silo;
 
 class row_t {
 public:
@@ -142,6 +143,8 @@ public:
 		Row_wsi * manager;
 	#elif CC_ALG == CNULL
 		Row_null * manager;
+  #elif CC_ALG == SILO
+  	Row_silo * manager;
 	#endif
 	char * data;
 	int tuple_size;

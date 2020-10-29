@@ -149,6 +149,8 @@ extern RtsCache wkdb_rts_cache;
 // extern QTcpQueue tcp_queue;
 extern TcpTimestamp tcp_ts;
 
+extern map<string, string> g_params;
+
 extern bool volatile warmup_done;
 extern bool volatile enable_thread_mem_pool;
 extern pthread_barrier_t warmup_bar;

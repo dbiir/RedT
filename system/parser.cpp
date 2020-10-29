@@ -75,6 +75,9 @@ void print_usage() {
 
 void parser(int argc, char * argv[]) {
 
+	g_params["validation_lock"] = VALIDATION_LOCK;
+	g_params["pre_abort"] = PRE_ABORT2;
+
 	for (int i = 1; i < argc; i++) {
 		assert(argv[i][0] == '-');
     if (argv[i][1] == 'n' && argv[i][2] == 'd' && argv[i][3] == 'l' && argv[i][4] == 'y')

@@ -478,7 +478,7 @@ RC WorkerThread::process_rfin(Message * msg) {
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()), "RFIN local: %ld %ld/%d\n", msg->get_txn_id(),
              msg->get_txn_id() % g_node_cnt, g_node_id);
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || \
-    CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_MVCC
+    CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_MVCC || CC_ALG == SILO
   txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
 #endif
 
@@ -492,8 +492,9 @@ RC WorkerThread::process_rfin(Message * msg) {
   }
   txn_man->commit();
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
-  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == OCC || CC_ALG == DLI_BASE ||
-      CC_ALG == DLI_OCC)
+  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC ||
+       CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == DLI_BASE ||
+       CC_ALG == DLI_OCC || CC_ALG == SILO)
     msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN),
                       GET_NODE_ID(msg->get_txn_id()));
   release_txn_man();
@@ -558,6 +559,11 @@ RC WorkerThread::process_rack_prep(Message * msg) {
     dta_time_table.set_state(get_thd_id(), msg->get_txn_id(), DTA_ABORTED);
   }
 #endif
+#if CC_ALG == SILO
+  uint64_t max_tid = ((AckMessage*)msg)->max_tid;
+  txn_man->find_tid_silo(max_tid);
+#endif
+
   if (responses_left > 0) return WAIT;
 
   // Done waiting

@@ -351,6 +351,20 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 #if CC_ALG == DLI_MVCC || CC_ALG == DLI_MVCC_OCC
 	is_abort = nullptr;
 #endif
+#if CC_ALG == SILO
+	_pre_abort = (g_params["pre_abort"] == "true");
+	if (g_params["validation_lock"] == "no-wait")
+		_validation_no_wait = true;
+	else if (g_params["validation_lock"] == "waiting")
+		_validation_no_wait = false;
+	else
+		assert(false);
+  _cur_tid = 0;
+  num_locks = 0;
+  memset(write_set, 0, 100);
+  // write_set = (int *) mem_allocator.alloc(sizeof(int) * 100);
+#endif
+
 	registed_ = false;
 	txn_ready = true;
 	twopl_wait_start = 0;
@@ -416,6 +430,11 @@ void TxnManager::release() {
 
 #if CC_ALG == CALVIN
 	calvin_locked_rows.release();
+#endif
+#if CC_ALG == SILO
+  num_locks = 0;
+  memset(write_set, 0, 100);
+  // mem_allocator.free(write_set, sizeof(int) * 100);
 #endif
 	txn_ready = true;
 }
@@ -569,7 +588,7 @@ RC TxnManager::start_commit() {
 				rc = WAIT_REM;
 			}
 		} else if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == DLI_BASE ||
-				CC_ALG == DLI_OCC) {
+				CC_ALG == DLI_OCC || CC_ALG == SILO) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;
@@ -827,10 +846,16 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 	if (_min_commit_ts > glob_manager.get_max_cts())
 		glob_manager.set_max_cts(_min_commit_ts);
 #endif
-	txn->accesses[rid]->data = NULL;
+
+#if CC_ALG != SILO
+  txn->accesses[rid]->data = NULL;
+#endif
 }
 
 void TxnManager::cleanup(RC rc) {
+#if CC_ALG == SILO
+  finish(rc);
+#endif
 #if CC_ALG == OCC && MODE == NORMAL_MODE
 	occ_man.finish(rc,this);
 #endif
@@ -955,6 +980,10 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	}
 	access->type = type;
 	access->orig_row = row;
+#if CC_ALG == SILO
+	access->tid = last_tid;
+#endif
+
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
 									CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
 	if (type == WR) {
@@ -1080,7 +1109,7 @@ RC TxnManager::validate() {
 			CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != WSI &&
 			CC_ALG != SSI && CC_ALG != DLI_BASE && CC_ALG != DLI_OCC &&
 			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
-			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC) {
+			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO) {
 		return RCOK;
 	}
 	RC rc = RCOK;
@@ -1130,6 +1159,16 @@ RC TxnManager::validate() {
 				rc = dta_man.find_bound(this);
 		}
 	}
+#if CC_ALG == SILO
+  if(CC_ALG == SILO && rc == RCOK) {
+    rc = validate_silo();
+    if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
+      _cur_tid ++;
+      commit_timestamp = _cur_tid;
+      DEBUG("Validate success: %ld, cts: %ld \n", get_txn_id(), commit_timestamp);
+    }
+  }
+#endif
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);
 	return rc;

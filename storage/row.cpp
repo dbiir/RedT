@@ -37,6 +37,7 @@
 #include "row_ssi.h"
 #include "row_wsi.h"
 #include "row_null.h"
+#include "row_silo.h"
 #include "mem_alloc.h"
 #include "manager.h"
 
@@ -93,6 +94,8 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_wsi *) mem_allocator.align_alloc(sizeof(Row_wsi));
 #elif CC_ALG == CNULL
 	manager = (Row_null *) mem_allocator.align_alloc(sizeof(Row_null));
+#elif CC_ALG == SILO
+    manager = (Row_silo *) mem_allocator.align_alloc(sizeof(Row_silo));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -417,6 +420,15 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	rc = dli_man.validate(txn, false);
 #endif
 	goto end;
+#elif CC_ALG == SILO
+	// like OCC, tictoc also makes a local copy for each read/write
+ 	DEBUG_M("row_t::get_row SILO alloc \n");
+	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row->init(get_table(), get_part_id());
+	TsType ts_type = (type == RD)? R_REQ : P_REQ;
+	rc = this->manager->access(txn, ts_type, txn->cur_row);
+  access->data = txn->cur_row;
+	goto end;
 #elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN
 #if CC_ALG == HSTORE_SPEC
 	if(txn_table.spec_mode) {
@@ -653,6 +665,12 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	if (ROLL_BACK && type == XP) {// recover from previous writes.
 		this->copy(row);
 	}
+	return 0;
+#elif CC_ALG == SILO
+	assert (row != NULL);
+	row->free_row();
+    DEBUG_M("row_t::return_row XP free \n");
+	mem_allocator.free(row, sizeof(row_t));
 	return 0;
 #else
 	assert(false);
