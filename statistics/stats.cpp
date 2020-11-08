@@ -99,7 +99,20 @@ void Stats_thd::clear() {
   txn_validate_time=0;
   txn_cleanup_time=0;
 
+  trans_total_count=0;
+  trans_init_count=0;
+  trans_process_count=0;
+  trans_2pc_count=0;
+  trans_prepare_count=0;
+  trans_validate_count=0;
+  trans_finish_count=0;
+  trans_commit_count=0;
+  trans_abort_count=0;
+  trans_get_access_count=0;
+  trans_store_access_count=0;
+
   trans_total_run_time=0;
+  trans_init_time=0;
   trans_process_time=0;
   trans_2pc_time=0;
   trans_prepare_time=0;
@@ -107,6 +120,14 @@ void Stats_thd::clear() {
   trans_finish_time=0;
   trans_commit_time=0;
   trans_abort_time=0;
+  trans_get_access_time=0;
+  trans_store_access_time=0;
+  trans_get_row_time=0;
+
+  trans_benchmark_compute_time=0;
+
+  trans_cur_row_copy_time=0;
+  trans_cur_row_init_time=0;
 
   trans_access_lock_wait_time=0;
   // trans mvcc
@@ -117,6 +138,13 @@ void Stats_thd::clear() {
   dli_lock_time=0;
   dli_check_conflict_time=0;
   dli_final_validate=0;
+  // trans queue
+  trans_local_process=0;
+  trans_remote_process=0;
+  trans_work_local_wait=0;
+  trans_work_remote_wait=0;
+  trans_msg_local_wait=0;
+  trans_msg_remote_wait=0;
   // Transaction stats
   txn_total_process_time=0;
   txn_process_time=0;
@@ -543,7 +571,12 @@ void Stats_thd::print(FILE * outf, bool prog) {
   // trans
   fprintf(outf,
   ",trans_total_run_time=%f"
+  ",trans_init_time=%f"
   ",trans_process_time=%f"
+  ",trans_get_access_time=%f"
+  ",trans_store_access_time=%f"
+  ",trans_get_row_time=%f"
+  ",trans_benchmark_compute_time=%f"
   ",trans_2pc_time=%f"
   ",trans_prepare_time=%f"
   ",trans_validate_time=%f"
@@ -553,18 +586,69 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_access_lock_wait_time=%f"
   ",trans_mvcc_clear_history=%f"
   ",trans_mvcc_access=%f"
+    // trans get row
+  ",trans_cur_row_copy_time=%f"
+  ",trans_cur_row_init_time=%f"
     // trans dli
   ",dli_init_time=%f"
   ",dli_lock_time=%f"
   ",dli_check_conflict_time=%f"
-  ",dli_final_validate=%f",
-          trans_total_run_time / BILLION, trans_process_time / BILLION, trans_2pc_time / BILLION,
+  ",dli_final_validate=%f"
+  // trans queue
+  ",trans_local_process=%f"
+  ",trans_remote_process=%f"
+  ",trans_work_local_wait=%f"
+  ",trans_work_remote_wait=%f"
+  ",trans_msg_local_wait=%f"
+  ",trans_msg_remote_wait=%f",
+          trans_total_run_time / BILLION, trans_init_time / BILLION, trans_process_time / BILLION,
+          trans_get_access_time / BILLION, trans_store_access_time / BILLION, trans_get_row_time /BILLION, trans_benchmark_compute_time /BILLION,
+          trans_2pc_time / BILLION,
           trans_prepare_time / BILLION, trans_validate_time / BILLION, trans_finish_time / BILLION,
           trans_commit_time / BILLION, trans_abort_time / BILLION, trans_access_lock_wait_time / BILLION,
           trans_mvcc_clear_history / BILLION, trans_mvcc_access / BILLION,
-          dli_init_time / BILLION, dli_lock_time / BILLION, dli_check_conflict_time / BILLION, dli_final_validate / BILLION);
+          trans_cur_row_copy_time / BILLION, trans_cur_row_init_time / BILLION,
+          dli_init_time / BILLION, dli_lock_time / BILLION, dli_check_conflict_time / BILLION, dli_final_validate / BILLION,
+          trans_local_process / BILLION, trans_remote_process / BILLION,
+          trans_work_local_wait / BILLION, trans_work_remote_wait / BILLION,
+          trans_msg_local_wait / BILLION, trans_msg_remote_wait / BILLION);
 
-
+  fprintf(outf,
+  ",avg_trans_total_run_time=%f"
+  ",avg_trans_init_time=%f"
+  ",avg_trans_process_time=%f"
+  ",avg_trans_get_access_time=%f"
+  ",avg_trans_store_access_time=%f"
+  ",avg_trans_get_row_time=%f"
+  ",avg_trans_2pc_time=%f"
+  ",avg_trans_prepare_time=%f"
+  ",avg_trans_validate_time=%f"
+  ",avg_trans_finish_time=%f"
+  ",avg_trans_commit_time=%f"
+  ",avg_trans_abort_time=%f",
+          trans_total_run_time / (trans_total_count * BILLION), trans_init_time / (trans_init_count * BILLION), trans_process_time / (trans_process_count * BILLION),
+          trans_get_access_time / (trans_get_access_count * BILLION), trans_store_access_time / (trans_store_access_count * BILLION), trans_get_row_time / (trans_get_row_count * BILLION),
+          trans_2pc_time / (trans_2pc_count * BILLION),
+          trans_prepare_time / (trans_prepare_count * BILLION), trans_validate_time / (trans_validate_count * BILLION), trans_finish_time / (trans_finish_count * BILLION),
+          trans_commit_time / (trans_commit_count * BILLION), trans_abort_time / (trans_abort_count * BILLION));
+  fprintf(outf,
+  ",trans_total_run_count=%ld"
+  ",trans_init_count=%ld"
+  ",trans_process_count=%ld"
+  ",trans_get_access_count=%ld"
+  ",trans_store_access_count=%ld"
+  ",trans_get_row_count=%ld"
+  ",trans_2pc_count=%ld"
+  ",trans_prepare_count=%ld"
+  ",trans_validate_count=%ld"
+  ",trans_finish_count=%ld"
+  ",trans_commit_count=%ld"
+  ",trans_abort_count=%ld",
+          trans_total_count, trans_init_count, trans_process_count,
+          trans_get_access_count, trans_store_access_count, trans_get_row_count,
+          trans_2pc_count,
+          trans_prepare_count, trans_validate_count, trans_finish_count,
+          trans_commit_count, trans_abort_count);
   // Transaction stats
   double txn_total_process_time_avg=0;
   double txn_process_time_avg=0;
@@ -1201,7 +1285,21 @@ void Stats_thd::combine(Stats_thd * stats) {
   txn_validate_time+=stats->txn_validate_time;
   txn_cleanup_time+=stats->txn_cleanup_time;
   // trans
+  trans_total_count+=stats->trans_total_count;
+  trans_init_count+=stats->trans_init_count;
+  trans_process_count+=stats->trans_process_count;
+  trans_2pc_count+=stats->trans_2pc_count;
+  trans_prepare_count+=stats->trans_prepare_count;
+  trans_validate_count+=stats->trans_validate_count;
+  trans_finish_count+=stats->trans_finish_count;
+  trans_commit_count+=stats->trans_commit_count;
+  trans_abort_count+=stats->trans_abort_count;
+  trans_get_row_count+=stats->trans_get_row_count;
+  trans_get_access_count+=stats->trans_get_access_count;
+  trans_store_access_count+=stats->trans_store_access_count;
+
   trans_total_run_time+=stats->trans_total_run_time;
+  trans_init_time+=stats->trans_init_time;
   trans_process_time+=stats->trans_process_time;
   trans_2pc_time+=stats->trans_2pc_time;
   trans_prepare_time+=stats->trans_prepare_time;
@@ -1209,6 +1307,14 @@ void Stats_thd::combine(Stats_thd * stats) {
   trans_finish_time+=stats->trans_finish_time;
   trans_commit_time+=stats->trans_commit_time;
   trans_abort_time+=stats->trans_abort_time;
+  trans_get_row_time+=stats->trans_get_row_time;
+  trans_benchmark_compute_time+=stats->trans_benchmark_compute_time;
+  trans_cur_row_copy_time+=stats->trans_cur_row_copy_time;
+  trans_cur_row_init_time+=stats->trans_cur_row_init_time;
+
+  trans_get_access_time+=stats->trans_get_access_time;
+  trans_store_access_time+=stats->trans_store_access_time;
+
   trans_access_lock_wait_time+=stats->trans_access_lock_wait_time;
   // trans mvcc
   trans_mvcc_clear_history+=stats->trans_mvcc_clear_history;
@@ -1218,6 +1324,13 @@ void Stats_thd::combine(Stats_thd * stats) {
   dli_lock_time+=stats->dli_lock_time;
   dli_check_conflict_time+=stats->dli_check_conflict_time;
   dli_final_validate+=stats->dli_final_validate;
+  // trans queue
+  trans_local_process+=stats->trans_local_process;
+  trans_remote_process+=stats->trans_remote_process;
+  trans_work_local_wait+=stats->trans_work_local_wait;
+  trans_work_remote_wait+=stats->trans_work_remote_wait;
+  trans_msg_local_wait+=stats->trans_msg_local_wait;
+  trans_msg_remote_wait+=stats->trans_msg_remote_wait;
   // Transaction stats
   txn_total_process_time+=stats->txn_total_process_time;
   txn_process_time+=stats->txn_process_time;

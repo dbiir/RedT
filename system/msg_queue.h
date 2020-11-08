@@ -37,6 +37,7 @@ typedef msg_entry * msg_entry_t;
 class MessageQueue {
 public:
   void init();
+  void statqueue(uint64_t thd_id, msg_entry * entry);
   void enqueue(uint64_t thd_id, Message * msg, uint64_t dest);
   uint64_t dequeue(uint64_t thd_id, Message *& msg);
 private:

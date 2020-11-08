@@ -152,7 +152,6 @@ class ActionSequence {
   // update write version, clean up read version
   void FillWriteVersions();
   /*
-  //声明一下更新读的函数
   template <SerializeReadPolicy>
   inline void FillReadVersions(ActionSequence& act_seq);
 */

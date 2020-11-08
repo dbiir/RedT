@@ -122,8 +122,13 @@ RC YCSBTxnManager::run_txn() {
 }
 
 RC YCSBTxnManager::run_txn_post_wait() {
+  uint64_t starttime = get_sys_clock();
     get_row_post_wait(row);
+  uint64_t curr_time = get_sys_clock();
+  txn_stats.process_time += curr_time - starttime;
+  txn_stats.process_time_short += curr_time - starttime;
     next_ycsb_state();
+  INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - curr_time);
     return RCOK;
 }
 
@@ -205,22 +210,24 @@ RC YCSBTxnManager::run_txn_state() {
 }
 
 RC YCSBTxnManager::run_ycsb_0(ycsb_request * req,row_t *& row_local) {
-    RC rc = RCOK;
-		int part_id = _wl->key_to_part( req->key );
-		access_t type = req->acctype;
-	  itemid_t * m_item;
+  uint64_t starttime = get_sys_clock();
+  RC rc = RCOK;
+  int part_id = _wl->key_to_part( req->key );
+  access_t type = req->acctype;
+  itemid_t * m_item;
+  INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
+  m_item = index_read(_wl->the_index, req->key, part_id);
+  starttime = get_sys_clock();
+  row_t * row = ((row_t *)m_item->location);
 
-		m_item = index_read(_wl->the_index, req->key, part_id);
-
-		row_t * row = ((row_t *)m_item->location);
-
-		rc = get_row(row, type,row_local);
-
-    return rc;
+  INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
+  rc = get_row(row, type,row_local);
+  return rc;
 
 }
 
 RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {
+  uint64_t starttime = get_sys_clock();
   if (acctype == RD || acctype == SCAN) {
     int fid = 0;
 		char * data = row_local->get_data();
@@ -245,6 +252,7 @@ RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {
     release_last_row_lock();
 #endif
   }
+  INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
   return RCOK;
 }
 RC YCSBTxnManager::run_calvin_txn() {

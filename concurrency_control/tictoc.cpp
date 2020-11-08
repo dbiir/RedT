@@ -299,8 +299,8 @@ Tictoc::cleanup(RC rc, TxnManager * txn)
 #if CC_ALG == TICTOC
 	tictoc_set_ent * wset;
 	tictoc_set_ent * rset;
-    get_rw_set(txn, rset, wset);
-    unlock_write_set(rc, wset, txn);
+  get_rw_set(txn, rset, wset);
+  unlock_write_set(rc, wset, txn);
 #endif
 }
 

@@ -93,7 +93,20 @@ public:
   double txn_validate_time;
   double txn_cleanup_time;
   // trans
+  uint64_t trans_total_count=0;
+  uint64_t trans_init_count=0;
+  uint64_t trans_process_count=0;
+  uint64_t trans_2pc_count=0;
+  uint64_t trans_prepare_count=0;
+  uint64_t trans_validate_count=0;
+  uint64_t trans_finish_count=0;
+  uint64_t trans_commit_count=0;
+  uint64_t trans_abort_count=0;
+  uint64_t trans_get_access_count=0;
+  uint64_t trans_store_access_count=0;
+  uint64_t trans_get_row_count=0;
   double trans_total_run_time=0;
+  double trans_init_time=0;
   double trans_process_time=0;
   double trans_2pc_time=0;
   double trans_prepare_time=0;
@@ -101,6 +114,14 @@ public:
   double trans_finish_time=0;
   double trans_commit_time=0;
   double trans_abort_time=0;
+  double trans_get_access_time=0;
+  double trans_store_access_time=0;
+  double trans_get_row_time=0;
+
+  double trans_benchmark_compute_time=0;
+
+  double trans_cur_row_copy_time=0;
+  double trans_cur_row_init_time=0;
 
   double trans_access_lock_wait_time=0;
   // trans mvcc
@@ -111,6 +132,14 @@ public:
   double dli_lock_time=0;
   double dli_check_conflict_time=0;
   double dli_final_validate=0;
+  // trans queue
+  double trans_local_process=0;
+  double trans_remote_process=0;
+  double trans_work_local_wait=0;
+  double trans_work_remote_wait=0;
+  double trans_msg_local_wait=0;
+  double trans_msg_remote_wait=0;
+
   // Work queue
   double work_queue_wait_time;
   uint64_t work_queue_cnt;

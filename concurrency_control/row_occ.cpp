@@ -18,7 +18,7 @@
 #include "row.h"
 #include "row_occ.h"
 #include "mem_alloc.h"
-
+#define MUTX
 void Row_occ::init(row_t *row) {
 	_row = row;
   _latch = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
@@ -30,9 +30,12 @@ void Row_occ::init(row_t *row) {
 
 RC Row_occ::access(TxnManager *txn, TsType type) {
 	RC rc = RCOK;
-	//pthread_mutex_lock( _latch );
 	uint64_t starttime = get_sys_clock();
-  	sem_wait(&_semaphore);
+#ifdef MUTX
+	pthread_mutex_lock( _latch );
+#else
+  sem_wait(&_semaphore);
+#endif
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - starttime);
 	if (type == R_REQ) {
 		if (txn->get_start_timestamp() < wts) {
@@ -44,14 +47,20 @@ RC Row_occ::access(TxnManager *txn, TsType type) {
 		}
 	} else
 		assert(false);
-	// pthread_mutex_unlock( _latch );
-  	sem_post(&_semaphore);
+#ifdef MUTX
+	pthread_mutex_unlock( _latch );
+#else
+  sem_post(&_semaphore);
+#endif
 	return rc;
 }
 
 void Row_occ::latch() {
-	//pthread_mutex_lock( _latch );
+#ifdef MUTX
+	pthread_mutex_lock( _latch );
+#else
   sem_wait(&_semaphore);
+#endif
 }
 
 bool Row_occ::validate(uint64_t ts) {
@@ -70,6 +79,9 @@ void Row_occ::write(row_t *data, uint64_t ts) {
 }
 
 void Row_occ::release() {
-	//pthread_mutex_unlock( _latch );
+#ifdef MUTX
+	pthread_mutex_unlock( _latch );
+#else
   sem_post(&_semaphore);
+#endif
 }

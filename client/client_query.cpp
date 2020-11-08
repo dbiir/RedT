@@ -163,9 +163,9 @@ Client_query_queue::get_next_query(uint64_t server_id,uint64_t thread_id) {
   return query;
 #else
   assert(server_id < size);
-  uint64_t query_id = __sync_fetch_and_add(query_cnt[server_id], 1);//返回query_cnt[server_id]，然后query_cnt[server_id]++
+  uint64_t query_id = __sync_fetch_and_add(query_cnt[server_id], 1);//return query_cnt[server_id]，then query_cnt[server_id]++
   if(query_id > g_max_txn_per_part) {
-    __sync_bool_compare_and_swap(query_cnt[server_id],query_id+1,0);//如果query_cnt[server_id]==query_id+1，就把query_cnt[server_id]置为0
+    __sync_bool_compare_and_swap(query_cnt[server_id],query_id+1,0);//if query_cnt[server_id]==query_id+1, then set query_cnt[server_id] to 0
     query_id = __sync_fetch_and_add(query_cnt[server_id], 1);
   }
 	BaseQuery * query = queries[server_id][query_id];

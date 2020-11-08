@@ -253,6 +253,6 @@ for exp in exps:
     elif 'tpcc_stress' in exp:
        cmd='./deneva-plot.sh -a tpcc_stress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     elif 'tpcc_cstress' in exp:
-       cmd='./deneva-plot.sh -a tpcc_cstress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+       cmd='./deneva-plot-his.sh -a tpcc_cstress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     print cmd
     os.system(cmd)

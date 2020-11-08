@@ -246,6 +246,11 @@ void WorkerThread::commit() {
   INC_STATS(get_thd_id(), trans_commit_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
 
+  INC_STATS(get_thd_id(), trans_2pc_count, 1);
+  INC_STATS(get_thd_id(), trans_finish_count, 1);
+  INC_STATS(get_thd_id(), trans_commit_count, 1);
+  INC_STATS(get_thd_id(), trans_total_count, 1);
+
   // Send result back to client
 #if !SERVER_GENERATE_QUERIES
   msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,CL_RSP),txn_man->client_id);
@@ -271,6 +276,11 @@ void WorkerThread::abort() {
   INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_abort_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
+
+  INC_STATS(get_thd_id(), trans_2pc_count, 1);
+  INC_STATS(get_thd_id(), trans_finish_count, 1);
+  INC_STATS(get_thd_id(), trans_abort_count, 1);
+  INC_STATS(get_thd_id(), trans_total_count, 1);
   #if WORKLOAD != DA //actually DA do not need real abort. Just count it and do not send real abort msg.
   uint64_t penalty =
       abort_queue.enqueue(get_thd_id(), txn_man->get_txn_id(), txn_man->get_abort_cnt());
@@ -323,7 +333,7 @@ RC WorkerThread::run() {
     progress_stats();
     Message* msg;
 
-  // DA取msg的逻辑
+  // DA takes msg logic
 
   //#define TEST_MSG_order 1
   #ifdef TEST_MSG_order
@@ -344,7 +354,7 @@ RC WorkerThread::run() {
       fflush(stdout);
     }
   #endif
-  /*下面还有跳回到L1的被注释的逻辑
+  /* There is also annotated logic that jumps back to L1 below
   L1:
     #if WORKLOAD == DA
       while (1) {
@@ -785,11 +795,11 @@ RC WorkerThread::process_rtxn(Message * msg) {
       INC_STATS(get_thd_id(), local_txn_start_cnt, 1);
     #endif
 
-    } else {
-      txn_man->txn_stats.restart_starttime = get_sys_clock();
-      DEBUG("RESTART %ld %f %lu\n", txn_man->get_txn_id(),
-          simulation->seconds_from_start(get_sys_clock()), txn_man->txn_stats.starttime);
-    }
+  } else {
+    txn_man->txn_stats.restart_starttime = get_sys_clock();
+    DEBUG("RESTART %ld %f %lu\n", txn_man->get_txn_id(),
+        simulation->seconds_from_start(get_sys_clock()), txn_man->txn_stats.starttime);
+  }
     // Get new timestamps
     if(is_cc_new_timestamp()) {
     #if WORKLOAD==DA //mvcc use timestamp
@@ -859,6 +869,10 @@ RC WorkerThread::process_rtxn(Message * msg) {
   dta_time_table.init(get_thd_id(), txn_man->get_txn_id(), txn_man->get_start_timestamp());
 #endif
   rc = init_phase();
+
+  txn_man->txn_stats.init_complete_time = get_sys_clock();
+  INC_STATS(get_thd_id(),trans_init_time, txn_man->txn_stats.init_complete_time - txn_man->txn_stats.restart_starttime);
+  INC_STATS(get_thd_id(),trans_init_count, 1);
   if (rc != RCOK) return rc;
 
   // Execute transaction

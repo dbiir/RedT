@@ -1,7 +1,19 @@
 set -x
 
 PHASE=5
-
+Latency="trans_total_run_time
+          trans_process_time trans_process_time_percent
+          trans_2pc_time trans_2pc_time_percent
+          trans_prepare_time trans_prepare_time_percent
+          trans_validate_time trans_validate_time_percent
+          trans_finish_time trans_finish_time_percent
+          trans_commit_time trans_commit_time_percent
+          trans_abort_time trans_abort_time_percent
+          lat_cc_block_time lat_cc_block_time_percent
+          txn_index_time txn_index_time_percent
+          txn_manager_time txn_manager_time_percent
+          lat_l_loc_cc_time lat_l_loc_cc_time_percent
+          trans_init_time trans_init_time_percent"
 while [[ $# -gt 0 ]]
 do
     case $1 in
@@ -118,8 +130,8 @@ initHTMLFile() {
         addHeading 1 'Deneva YCSB性能测试报告'
         addParagraph '本次测试是YCSB测试'
     else
-        addHeading 1 'TDSQLV3 Sysbench性能测试报告'
-        addParagraph "本次测试是Sysbench-${TESTTYPENAME}测试(Provided by Sysbench 1.1.0)"
+        addHeading 1 'WooKongDB 性能测试报告'
+        addParagraph ""
     fi
 }
 
@@ -566,6 +578,68 @@ then
         fi
     done
     addTableTail
+
+    for cc in ${CC[@]}
+    do
+      addHeading 3 "算法${cc} Break Down数据"
+      addTableTitle
+      addContent '<tr>'
+      addContent "<td>Load\\Break Down</td>"
+      for latency in ${Latency[@]}
+      do
+          addContent "<td>${latency}</td>"
+      done
+      addContent '</tr>'
+      for load in ${LOAD[@]}
+      do
+          addContent '<tr>'
+          addContent "<td>${load}</td>"
+          CCLATFILE=lat-${cc}
+          rm -rf ${CCLATFILE}
+          touch ${CCLATFILE}
+
+          echo -n ${load}" " >> ${TMPFILE}
+          echo -n ${load}" " >> ${CCLATFILE}
+          AS=''
+
+          TMPN=${NUMBEROFNODE[0]}
+          let TMPN--
+          for i in $(seq 0 $TMPN)
+          do
+              f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _CT-${CT}_TIF-${load}_ | grep ^${i}_)
+              AS=${AS}$(readlink -f ${RESULT_PATH}/$f)" "
+              LS=${LS}$(readlink -f ${RESULT_PATH}/$f)" "
+          done
+          tmpresult=$(python parse_latency.py $AS)
+          OLD_IFS="$IFS"
+          IFS=" "
+          tmpr=($tmpresult)
+          IFS="$OLD_IFS"
+          count=${#tmpr[@]}
+          count=`expr $count - 1`
+          for i in $(seq 0 $count)
+          do
+            addContent "<td>${tmpr[$i]}</td>"
+          done
+          if [[ "${cc}" == 'MVCC' ]]
+          then
+            alg_tmpresult=$(python pl/parse_latency_mvcc.py $AS)
+            ./draw_latency.sh ${cc} "$tmpresult" "$alg_tmpresult"
+          elif [[ "${cc}" == 'DLI_OCC' ]] || [[ "${cc}" == 'DLI_DTA3' ]] || [[ "${cc}" == 'DLI_DTA' ]] || [[ "${cc}" == 'DLI_DTA2' ]]
+          then
+            alg_tmpresult=$(python pl/parse_latency_dli.py $AS)
+            ./draw_latency.sh ${cc} "$tmpresult" "$alg_tmpresult"
+          else
+            ./draw_latency.sh ${cc} "$tmpresult"
+          fi
+          dot -Tjpg draw_latency_tmp.dot -o draw_latency_${cc}_${load}.jpg
+          mv draw_latency_${cc}_${load}.jpg ${RESULT_PATH}/
+          addHeading 3 "算法${cc} load${load} Break Down数据"
+          addContent "<img src=\"./draw_latency_${cc}_${load}.jpg\" />"
+      done
+      addContent "</tr>"
+      addTableTail
+    done
     addHeading 2 "rundb Perf 图"
     for f in $(ls ${RESULT_PATH}/perf)
     do

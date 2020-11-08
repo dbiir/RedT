@@ -425,6 +425,22 @@ void QWorkQueue::enqueue(uint64_t thd_id, Message * msg,bool busy) {
 	INC_STATS(thd_id,work_queue_enq_cnt,1);
 }
 
+void QWorkQueue::statqueue(uint64_t thd_id, work_queue_entry * entry) {
+  Message *msg = entry->msg;
+  if (msg->rtype == CL_QRY || msg->rtype == RTXN_CONT ||
+      msg->rtype == RQRY_RSP || msg->rtype == RACK_PREP  ||
+      msg->rtype == RACK_FIN || msg->rtype == RTXN  ||
+      msg->rtype == CL_RSP) {
+    uint64_t queue_time = get_sys_clock() - entry->starttime;
+		INC_STATS(thd_id,trans_work_local_wait,queue_time);
+  } else if (msg->rtype == RQRY || msg->rtype == RQRY_CONT ||
+             msg->rtype == RFIN || msg->rtype == RPREPARE ||
+             msg->rtype == RFWD){
+    uint64_t queue_time = get_sys_clock() - entry->starttime;
+		INC_STATS(thd_id,trans_work_remote_wait,queue_time);
+  }
+}
+
 Message * QWorkQueue::dequeue(uint64_t thd_id) {
 	uint64_t starttime = get_sys_clock();
 	assert(ISSERVER || ISREPLICA);
@@ -467,6 +483,7 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 		uint64_t queue_time = get_sys_clock() - entry->starttime;
 		INC_STATS(thd_id,work_queue_wait_time,queue_time);
 		INC_STATS(thd_id,work_queue_cnt,1);
+    statqueue(thd_id, entry);
 		if(msg->rtype == CL_QRY) {
 			sem_wait(&_semaphore);
 			txn_queue_size --;

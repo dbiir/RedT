@@ -44,7 +44,7 @@ RC DAWorkload::init_schema(const char *schema_file) {
   Workload::init_schema(schema_file);
   printf("base Workload init_schema over");
   t_datab = tables["DAtab"];
-  i_datab = indexes["DAtab_IDX"];  //索引的name在da_schema.txt里定义
+  i_datab = indexes["DAtab_IDX"];  //the name of index defined in da_schema.txt
   return RCOK;
 }
 

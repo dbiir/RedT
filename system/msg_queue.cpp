@@ -41,6 +41,24 @@ void MessageQueue::init() {
   for (uint64_t i = 0; i < g_this_send_thread_cnt; i++) sthd_m_cache.push_back(NULL);
 }
 
+void MessageQueue::statqueue(uint64_t thd_id, msg_entry * entry) {
+  Message *msg = entry->msg;
+  if (msg->rtype == CL_QRY || msg->rtype == RTXN_CONT ||
+      msg->rtype == RQRY_RSP || msg->rtype == RACK_PREP  ||
+      msg->rtype == RACK_FIN || msg->rtype == RTXN  ||
+      msg->rtype == CL_RSP) {
+    // these msg will send back to local node
+    uint64_t queue_time = get_sys_clock() - entry->starttime;
+		INC_STATS(thd_id,trans_msg_remote_wait,queue_time);
+  } else if (msg->rtype == RQRY || msg->rtype == RQRY_CONT ||
+             msg->rtype == RFIN || msg->rtype == RPREPARE ||
+             msg->rtype == RFWD){
+    // these msg will send to remote node
+    uint64_t queue_time = get_sys_clock() - entry->starttime;
+		INC_STATS(thd_id,trans_msg_local_wait,queue_time);
+  }
+}
+
 void MessageQueue::enqueue(uint64_t thd_id, Message * msg,uint64_t dest) {
   DEBUG("MQ Enqueue %ld\n",dest)
   assert(dest < g_total_node_cnt);
@@ -129,6 +147,7 @@ uint64_t MessageQueue::dequeue(uint64_t thd_id, Message *& msg) {
     assert(dest < g_total_node_cnt);
     msg = entry->msg;
     DEBUG("MQ Dequeue %ld\n",dest)
+    statqueue(thd_id, entry);
     INC_STATS(thd_id,msg_queue_delay_time,curr_time - entry->starttime);
     INC_STATS(thd_id,msg_queue_cnt,1);
     msg->mq_time = curr_time - entry->starttime;

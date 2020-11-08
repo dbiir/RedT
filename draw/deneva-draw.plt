@@ -1,8 +1,8 @@
-set size ratio 0.50
-set key left bottom
-set key samplen 2
-set key reverse
-set key Left
+set auto x
+set key top outside horizontal center
+set style data histogram
+set style histogram cluster gap 1
+set style fill solid border -1
 set xlabel "# of Threads"
 #set xrange [16:512]
 #set logscale x

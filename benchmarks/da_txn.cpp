@@ -42,30 +42,30 @@ RC DATxnManager::run_txn() {
   }
   DAQuery *da_query = (DAQuery *)query;
   uint64_t trans_id = da_query->trans_id;
-  uint64_t item_id = da_query->item_id;  // item_id从0到 2分别对应X,Y,Z
+  uint64_t item_id = da_query->item_id;  // item_id from 0 to 2 represent X,Y,Z
   //uint64_t seq_id = da_query->seq_id;
   uint64_t state = da_query->state;
   uint64_t version = da_query->write_version;
   //uint64_t next_state = da_query->next_state;
   //uint64_t last_state = da_query->last_state;
-  DATxnType txn_type = da_query->txn_type;  
+  DATxnType txn_type = da_query->txn_type;
   bool jump=false;
 
   switch (txn_type)
   {
-    case DA_WRITE: 
+    case DA_WRITE:
       DA_history_mem.push_back('W');
       break;
-    case DA_READ: 
+    case DA_READ:
       DA_history_mem.push_back('R');
       break;
-    case DA_COMMIT: 
+    case DA_COMMIT:
       DA_history_mem.push_back('C');
       break;
-    case DA_ABORT: 
+    case DA_ABORT:
       DA_history_mem.push_back('A');
       break;
-    case DA_SCAN: 
+    case DA_SCAN:
       DA_history_mem.push_back('S');
       break;
   }
@@ -73,8 +73,8 @@ RC DATxnManager::run_txn() {
   if(txn_type==DA_WRITE || txn_type==DA_READ)
     DA_history_mem.push_back(static_cast<char>('a'+item_id));//item_id
   DA_history_mem.push_back(' ');
-  #if WORKLOAD ==DA 
-    printf("thd_id:%lu check: state:%lu nextstate:%lu \n",h_thd->_thd_id, state, _wl->nextstate);  
+  #if WORKLOAD ==DA
+    printf("thd_id:%lu check: state:%lu nextstate:%lu \n",h_thd->_thd_id, state, _wl->nextstate);
     fflush(stdout);
   #endif
   if(_wl->nextstate!=0)
@@ -104,10 +104,10 @@ RC DATxnManager::run_txn() {
       item = index_read(index, item_id, 0);
       assert(item != NULL);
       row_t *TempRow = ((row_t *)item->location);
-      
+
       switch (txn_type) {
         case DA_WRITE: {
-          rc = get_row(TempRow, WR, row);  
+          rc = get_row(TempRow, WR, row);
           if(rc == RCOK)
             row->set_value(VALUE, version);
           else
@@ -154,7 +154,7 @@ RC DATxnManager::run_txn() {
       //  rc = start_abort();
       //}
   }
-  _wl->nextstate = da_query->next_state; 
+  _wl->nextstate = da_query->next_state;
   if(_wl->nextstate==0)
   {
     if(abort_history)

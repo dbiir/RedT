@@ -66,6 +66,7 @@ typedef boost::circular_buffer<work_queue_entry*> WCircularBuffer;
 class QWorkQueue {
 public:
   void init();
+  void statqueue(uint64_t thd_id, work_queue_entry * entry);
   void enqueue(uint64_t thd_id,Message * msg,bool busy);
   Message * dequeue(uint64_t thd_id);
   Message * queuetop(uint64_t thd_id);
@@ -91,7 +92,7 @@ public:
   uint64_t get_sched_wq_cnt() {return 0;}
   uint64_t get_rem_wq_cnt() {return 0;}
   uint64_t get_new_wq_cnt() {return 0;}
-  Message* top_element;//DA新加的
+  Message* top_element;
   // uint64_t get_rem_wq_cnt() {return remote_op_queue.size();}
   // uint64_t get_new_wq_cnt() {return new_query_queue.size();}
 

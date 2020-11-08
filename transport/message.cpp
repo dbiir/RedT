@@ -861,9 +861,9 @@ void DAClientQueryMessage::copy_from_query(BaseQuery* query) {
   DAQuery* da_query = (DAQuery*)(query);
 
   txn_type= da_query->txn_type;
-	trans_id= da_query->trans_id;//事务id
-	item_id= da_query->item_id; //操作的变量id
-	seq_id= da_query->seq_id; //就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程
+	trans_id= da_query->trans_id;
+	item_id= da_query->item_id;
+	seq_id= da_query->seq_id;
 	write_version=da_query->write_version;
   state= da_query->state;
 	next_state= da_query->next_state;
@@ -1881,9 +1881,9 @@ void DAQueryMessage::copy_from_query(BaseQuery* query) {
   DAQuery* da_query = (DAQuery*)(query);
 
   txn_type= da_query->txn_type;
-	trans_id= da_query->trans_id;//事务id
-	item_id= da_query->item_id; //操作的变量id
-	seq_id= da_query->seq_id; //就是第几个seq，在生成时记录下来，转化为message时也记录，在服务端取走时用于以哈希的形式执行分给哪个线程
+	trans_id= da_query->trans_id;
+	item_id= da_query->item_id;
+	seq_id= da_query->seq_id;
 	write_version=da_query->write_version;
   state= da_query->state;
 	next_state= da_query->next_state;

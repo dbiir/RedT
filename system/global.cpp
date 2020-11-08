@@ -102,7 +102,7 @@ KeyXidCache wkdb_key_xid_cache;
 RtsCache wkdb_rts_cache;
 // QTcpQueue tcp_queue;
 TcpTimestamp tcp_ts;
-//我自己加的
+
 boost::lockfree::queue<DAQuery*, boost::lockfree::fixed_sized<true>> da_query_queue{100};
 DABlockQueue da_gen_qry_queue(50);
 bool is_server=false;

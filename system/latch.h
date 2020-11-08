@@ -10,7 +10,7 @@
 #include <chrono>
 
 // static std::default_random_engine e(time(0));
-// static std::uniform_int_distribution<unsigned> u(0, 9); //随机数分布对象
+// static std::uniform_int_distribution<unsigned> u(0, 9);
 
 class Latch {
 	public:

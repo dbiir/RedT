@@ -266,7 +266,6 @@ extern double g_perc_orderproduct;
 extern double g_perc_updateproductpart;
 extern double g_perc_updatepart;
 
-//我自己加的
 extern boost::lockfree::queue<DAQuery*, boost::lockfree::fixed_sized<true>> da_query_queue;
 extern DABlockQueue da_gen_qry_queue;
 extern bool is_server;

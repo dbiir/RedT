@@ -50,7 +50,7 @@ RC Workload::init_schema(const char * schema_file) {
 				getline(fin, line);
 			}
       cout<<"Has "<<lines.size()<<" column"<<endl;
-      // line存的是每一行字符串
+
 			schema->init( tname.c_str(), id++, lines.size() );
 			for (UInt32 i = 0; i < lines.size(); i++) {
 				string line = lines[i];
