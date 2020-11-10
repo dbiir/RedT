@@ -1,12 +1,9 @@
 /*
    Copyright 2016 Massachusetts Institute of Technology
-
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
-
        http://www.apache.org/licenses/LICENSE-2.0
-
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BAWSIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -185,7 +182,6 @@ RC Row_wsi::access(TxnManager * txn, TsType type, row_t * row) {
 		glob_manager.lock_row(_row);
 	else
 		pthread_mutex_lock( latch );
-	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - starttime);
   	if (type == R_REQ) {
 		// Read the row
 		rc = RCOK;
@@ -194,7 +190,10 @@ RC Row_wsi::access(TxnManager * txn, TsType type, row_t * row) {
 			whis = whis->next;
 		row_t * ret = (whis == NULL)?
 			_row : whis->row;
-		txn->cur_row = ret;
+    if (whis == NULL)
+		  txn->cur_row = _row;
+    else
+      txn->cur_row = whis->row;
 		insert_history(start_ts, txn, NULL);
 		assert(strstr(_row->get_table_name(), ret->get_table_name()));
 	} else if (type == P_REQ) {

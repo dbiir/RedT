@@ -127,7 +127,7 @@ RC YCSBTxnManager::run_txn_post_wait() {
     return RCOK;
 }
 
-bool YCSBTxnManager::is_done() { return next_record_id == ((YCSBQuery*)query)->requests.size(); }
+bool YCSBTxnManager::is_done() { return next_record_id >= ((YCSBQuery*)query)->requests.size(); }
 
 void YCSBTxnManager::next_ycsb_state() {
   switch(state) {

@@ -64,8 +64,8 @@ RC ClientThread::run() {
 		uint32_t next_node = 0;
 	#else
 		uint32_t next_node = (((iters++) * g_client_thread_cnt) + _thd_id )% g_servers_per_client;
-		uint32_t next_node_id = next_node + g_server_start_node;
 	#endif
+		uint32_t next_node_id = next_node + g_server_start_node;
 		// Just in case...
 		if (iters == UINT64_MAX)
 			iters = 0;

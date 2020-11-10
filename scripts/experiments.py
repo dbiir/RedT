@@ -66,7 +66,7 @@ def ycsb_scaling():
     # algos=['TICTOC','CALVIN','NO_WAIT']
     # algos=['OCC','FOCC','BOCC','WSI','SSI']
     # algos=['NO_WAIT','WAIT_DIE']
-    algos=['OCC']
+    algos=['TICTOC']
     # algos=['OCC','MVCC','MAAT','TIMESTAMP','NO_WAIT','WAIT_DIE']
     base_table_size=1048576*8
     txn_write_perc = [0.5]
@@ -246,10 +246,10 @@ def ycsb_partitions_distr():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [4]
+    nnodes = [2]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC']
-    nalgos=['WOOKONG']
+    nalgos=['WSI','SSI','FOCC','BOCC']
     # nalgos=['NO_WAIT']
     npercpay=[1.0]
     # npercpay=[0.0]
