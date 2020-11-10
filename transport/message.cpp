@@ -1460,6 +1460,9 @@ void YCSBQueryMessage::copy_from_txn(TxnManager * txn) {
 
 void YCSBQueryMessage::copy_to_txn(TxnManager * txn) {
   QueryMessage::copy_to_txn(txn);
+#if CC_ALG==TICTOC
+  ((YCSBQuery*)(txn->query))->requests.clear();
+#endif
   //((YCSBQuery*)(txn->query))->requests.copy(requests);
   ((YCSBQuery*)(txn->query))->requests.append(requests);
   ((YCSBQuery*)(txn->query))->orig_request = &requests;
@@ -1593,6 +1596,9 @@ void TPCCQueryMessage::copy_to_txn(TxnManager * txn) {
 
   // new order
   if(txn_type == TPCC_NEW_ORDER) {
+#if CC_ALG==TICTOC
+    tpcc_query->items.clear();
+#endif
     tpcc_query->items.append(items);
     tpcc_query->rbk = rbk;
     tpcc_query->remote = remote;

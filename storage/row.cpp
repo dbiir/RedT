@@ -74,7 +74,7 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_ts *) mem_allocator.align_alloc(sizeof(Row_ts));
 #elif CC_ALG == MVCC
 	manager = (Row_mvcc *) mem_allocator.align_alloc(sizeof(Row_mvcc));
-#elif CC_ALG == OCC
+#elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
 	manager = (Row_occ *) mem_allocator.align_alloc(sizeof(Row_occ));
 #elif CC_ALG == DLI_BASE || CC_ALG == DLI_OCC
 	manager = (Row_dli_base *)mem_allocator.align_alloc(sizeof(Row_dli_base));
@@ -362,9 +362,9 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	}
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
-#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC
-/*uint64_t thd_id = txn->get_thd_id();
-  // For TIMESTAMP RD, a new copy of the access->data will be returned.
+#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI
+	//uint64_t thd_id = txn->get_thd_id();
+// For TIMESTAMP RD, a new copy of the access->data will be returned.
 
 	// for MVCC RD, the version will be returned instead of a copy
 	// So for MVCC RD-WR, the version should be explicitly copied.
@@ -377,6 +377,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 #endif
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
   uint64_t copy_time = get_sys_clock();
+  // row_t * row;
 	if (type == WR) {
 		rc = this->manager->access(txn, P_REQ, NULL);
 		if (rc != RCOK) goto end;
@@ -399,8 +400,8 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
       assert(access->data->get_table_name() != NULL);
     }
 	}
-	if (rc != Abort && CC_ALG == MVCC && type == WR) {
-		DEBUG_M("row_t::get_row MVCC alloc \n");
+	if (rc != Abort && (CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI) && type == WR) {
+			DEBUG_M("row_t::get_row MVCC alloc \n");
 		row_t * newr = (row_t *) mem_allocator.alloc(sizeof(row_t));
 		newr->init(this->get_table(), get_part_id());
 		newr->copy(access->data);
@@ -408,7 +409,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	}
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
-#elif CC_ALG == OCC
+#elif CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC
 	// OCC always make a local copy regardless of read or write
   uint64_t init_time = get_sys_clock();
 	DEBUG_M("row_t::get_row OCC alloc \n");

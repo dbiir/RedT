@@ -591,7 +591,7 @@ RC TxnManager::start_commit() {
 				rc = WAIT_REM;
 			}
 		} else if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == DLI_BASE ||
-				CC_ALG == DLI_OCC || CC_ALG == SILO) {
+				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;
@@ -669,7 +669,8 @@ int TxnManager::received_response(RC rc) {
 #if CC_ALG == CALVIN
 	++rsp_cnt;
 #else
-	--rsp_cnt;
+  if (rsp_cnt > 0)
+	  --rsp_cnt;
 #endif
 	return rsp_cnt;
 }

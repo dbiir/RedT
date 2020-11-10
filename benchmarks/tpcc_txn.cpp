@@ -111,7 +111,7 @@ bool TPCCTxnManager::is_done() {
 			break;
 		case TPCC_NEW_ORDER:
 			//done = next_item_id == tpcc_query->ol_cnt || state == TPCC_FIN;
-			done = next_item_id == tpcc_query->items.size() || state == TPCC_FIN;
+			done = next_item_id >= tpcc_query->items.size() || state == TPCC_FIN;
 			break;
 		default:
 			assert(false);
