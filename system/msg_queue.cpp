@@ -38,6 +38,8 @@ void MessageQueue::init() {
     ctr[i] = (uint64_t*) mem_allocator.align_alloc(sizeof(uint64_t));
     *ctr[i] = i % g_thread_cnt;
   }
+  msg_queue_size=0;
+  sem_init(&_semaphore, 0, 1);
   for (uint64_t i = 0; i < g_this_send_thread_cnt; i++) sthd_m_cache.push_back(NULL);
 }
 
@@ -90,6 +92,11 @@ void MessageQueue::enqueue(uint64_t thd_id, Message * msg,uint64_t dest) {
   }
   INC_STATS(thd_id,mtx[3],get_sys_clock() - mtx_time_start);
   INC_STATS(thd_id,msg_queue_enq_cnt,1);
+  sem_wait(&_semaphore);
+  msg_queue_size++;
+  sem_post(&_semaphore);
+  INC_STATS(thd_id,trans_msg_queue_item_total,msg_queue_size);
+
 }
 
 uint64_t MessageQueue::dequeue(uint64_t thd_id, Message *& msg) {
@@ -154,6 +161,9 @@ uint64_t MessageQueue::dequeue(uint64_t thd_id, Message *& msg) {
     //msg_pool.put(entry);
     DEBUG_M("MessageQueue::enqueue msg_entry free\n");
     mem_allocator.free(entry,sizeof(struct msg_entry));
+    sem_wait(&_semaphore);
+    msg_queue_size--;
+    sem_post(&_semaphore);
   } else {
     msg = NULL;
     dest = UINT64_MAX;

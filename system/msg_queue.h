@@ -50,6 +50,8 @@ private:
   std::vector<msg_entry*> sthd_m_cache;
   uint64_t ** ctr;
 
+  uint64_t msg_queue_size;
+  sem_t 	_semaphore;
 };
 
 #endif

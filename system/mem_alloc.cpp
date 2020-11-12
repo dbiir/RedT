@@ -15,13 +15,16 @@
 */
 
 #include "mem_alloc.h"
-
+#include "config.h"
 #include "global.h"
 #include "helper.h"
-//#include "jemalloc/jemalloc.h"
+#if MALLOC_TYPE != 0
+#include "jemalloc/jemalloc.h"
+#endif
 
+#if MALLOC_TYPE == 0
 #define N_MALLOC
-
+#endif
 void mem_alloc::free(void * ptr, uint64_t size) {
   if (NO_FREE) {
   }

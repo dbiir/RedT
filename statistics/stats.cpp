@@ -147,6 +147,7 @@ void Stats_thd::clear() {
   trans_msg_remote_wait=0;
   // trans work queue
   trans_work_queue_item_total=0;
+  trans_msg_queue_item_total=0;
   // Transaction stats
   txn_total_process_time=0;
   txn_process_time=0;
@@ -647,14 +648,18 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_commit_count=%ld"
   ",trans_abort_count=%ld"
   ",trans_queue_count=%lu"
-  ",per_trans_queue_count=%f",
+  ",trans_msg_queue_item_total=%lu"
+  ",per_trans_queue_count=%f"
+  ",per_trans_msg_queue_item_total=%f",
           trans_total_count, trans_init_count, trans_process_count,
           trans_get_access_count, trans_store_access_count, trans_get_row_count,
           trans_2pc_count,
           trans_prepare_count, trans_validate_count, trans_finish_count,
-          trans_commit_count, trans_abort_count, 
+          trans_commit_count, trans_abort_count,
           trans_work_queue_item_total,
-          ((double)trans_work_queue_item_total / (double)work_queue_enq_cnt));
+          trans_msg_queue_item_total,
+          ((double)trans_work_queue_item_total / (double)work_queue_enq_cnt),
+          ((double)trans_msg_queue_item_total / (double)msg_queue_enq_cnt);
   // Transaction stats
   double txn_total_process_time_avg=0;
   double txn_process_time_avg=0;
@@ -1331,6 +1336,7 @@ void Stats_thd::combine(Stats_thd * stats) {
   dli_check_conflict_time+=stats->dli_check_conflict_time;
   dli_final_validate+=stats->dli_final_validate;
   trans_work_queue_item_total+=stats->trans_work_queue_item_total;
+  trans_msg_queue_item_total+=stats->trans_msg_queue_item_total;
   // trans queue
   trans_local_process+=stats->trans_local_process;
   trans_remote_process+=stats->trans_remote_process;

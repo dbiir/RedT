@@ -49,6 +49,7 @@
 // #define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
 // #define NO_REMOTE // remove all remote txn
 #define TXN_QUEUE_PERCENT 0.9 // The proportion of the transaction to take from txn_queue firstly.
+#define MALLOC_TYPE 0 // 0 represent normal malloc. 1 represent je-malloc
 // ! end of these parameters
 
 /***********************************************/

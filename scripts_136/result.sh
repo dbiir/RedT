@@ -202,9 +202,13 @@ then
         TMPFILE=tmp-${cc}
         rm -rf ${TMPFILE}
         touch ${TMPFILE}
+        CCLATFILE=lat-${cc}
+        rm -rf ${CCLATFILE}
+        touch ${CCLATFILE}
         for nn in ${NUMBEROFNODE[@]}
         do
             echo -n ${nn}" " >> ${TMPFILE}
+            echo -n ${nn}" " >> ${CCLATFILE}
             AS=''
 
             TMPN=${nn}
@@ -217,6 +221,7 @@ then
             done
             tmpresult=$(python parse_results.py $AS)
             echo ${tmpresult} >> ${TMPFILE}
+            python parse_latency.py $AS >> ${CCLATFILE}
             tput=$(echo ${tmpresult} | awk '{print $1}')
             ar=$(echo ${tmpresult} | awk '{print $2}')
             dr=$(echo ${tmpresult} | awk '{print $3}')
@@ -224,11 +229,14 @@ then
             addContent "<td>${ar}</td>"
             addContent "<td>${dr}</td>"
         done
-        python parse_latency.py $LS >> ${LTFILE}
+        python parse_trans_latency.py $LS >> ${LTFILE}
         mv ${TMPFILE} ${RESULT_PATH}/
+        mv ${CCLATFILE} ${RESULT_PATH}/
+        cp ${LTFILE} ${RESULT_PATH}/
         addContent "</tr>"
     done
     addTableTail
+    addContent "<img src=\"./1tpmc.svg\" />"
     echo >> ${LATFILE}
     echo "abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time" >> ${LATFILE}
     awk -F' ' '{for(i=1;i<=NF;i=i+1){a[NR,i]=$i}}END{for(j=1;j<=NF;j++){str=a[1,j];for(i=2;i<=NR;i++){str=str " " a[i,j]}print str}}' ${LTFILE} >> ${LATFILE}
@@ -267,6 +275,68 @@ then
         fi
     done
     addTableTail
+
+    for cc in ${CC[@]}
+    do
+      addHeading 3 "算法${cc} Break Down数据"
+      addTableTitle
+      addContent '<tr>'
+      addContent "<td>NodeCount\\Break Down</td>"
+      for latency in ${Latency[@]}
+      do
+          addContent "<td>${latency}</td>"
+      done
+      addContent '</tr>'
+      for nn in ${NUMBEROFNODE[@]}
+      do
+          addContent '<tr>'
+          addContent "<td>${nn}</td>"
+          CCLATFILE=lat-${cc}
+          rm -rf ${CCLATFILE}
+          touch ${CCLATFILE}
+
+          echo -n ${nn}" " >> ${TMPFILE}
+          echo -n ${nn}" " >> ${CCLATFILE}
+          AS=''
+
+          TMPN=${NUMBEROFNODE[0]}
+          let TMPN--
+          for i in $(seq 0 $TMPN)
+          do
+              f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${nn}_ | grep ^${i}_)
+              AS=${AS}$(readlink -f ${RESULT_PATH}/$f)" "
+              LS=${LS}$(readlink -f ${RESULT_PATH}/$f)" "
+          done
+          tmpresult=$(python parse_latency.py $AS)
+          OLD_IFS="$IFS"
+          IFS=" "
+          tmpr=($tmpresult)
+          IFS="$OLD_IFS"
+          count=${#tmpr[@]}
+          count=`expr $count - 1`
+          for i in $(seq 0 $count)
+          do
+            addContent "<td>${tmpr[$i]}</td>"
+          done
+          if [[ "${cc}" == 'MVCC' ]]
+          then
+            alg_tmpresult=$(python pl/parse_latency_mvcc.py $AS)
+            ./draw_latency.sh ${cc} "$tmpresult" "$alg_tmpresult"
+          elif [[ "${cc}" == 'DLI_OCC' ]] || [[ "${cc}" == 'DLI_DTA3' ]] || [[ "${cc}" == 'DLI_DTA' ]] || [[ "${cc}" == 'DLI_DTA2' ]]
+          then
+            alg_tmpresult=$(python pl/parse_latency_dli.py $AS)
+            ./draw_latency.sh ${cc} "$tmpresult" "$alg_tmpresult"
+          else
+            ./draw_latency.sh ${cc} "$tmpresult"
+          fi
+          dot -Tjpg draw_latency_tmp.dot -o draw_latency_${cc}_${nn}.jpg
+          mv draw_latency_${cc}_${nn}.jpg ${RESULT_PATH}/
+          addHeading 3 "算法${cc} nn${nn} Break Down数据"
+          addContent "<img src=\"./draw_latency_${cc}_${nn}.jpg\" />"
+      done
+      addContent "</tr>"
+      addTableTail
+    done
     addHeading 2 "rundb Perf 图"
     for f in $(ls ${RESULT_PATH}/perf)
     do
@@ -274,6 +344,7 @@ then
         addContent "<img src=\"./perf/$f\" />"
     done
     EndHtmlFile
+
 elif [[ "${TEST_TYPE}" == 'ycsb_writes' ]]
 then
     LATFILE=lat
