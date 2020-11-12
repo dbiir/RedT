@@ -139,6 +139,7 @@ public:
   double trans_work_remote_wait=0;
   double trans_msg_local_wait=0;
   double trans_msg_remote_wait=0;
+  double trans_network_wait=0;
   // trans work queue count
   uint64_t trans_work_queue_item_total=0;
   uint64_t trans_msg_queue_item_total=0;

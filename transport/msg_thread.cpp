@@ -60,6 +60,7 @@ void MessageThread::send_batch(uint64_t dest_node_id) {
 
     DEBUG("Send batch of %ld msgs to %ld\n",sbuf->cnt,dest_node_id);
     fflush(stdout);
+    sbuf->set_send_time(get_sys_clock());
     tport_man.send_msg(_thd_id,dest_node_id,sbuf->buffer,sbuf->ptr);
     INC_STATS(_thd_id,msg_batch_size_msgs,sbuf->cnt);
     INC_STATS(_thd_id,msg_batch_size_bytes,sbuf->ptr);

@@ -35,12 +35,15 @@ std::vector<Message*> * Message::create_messages(char * buf) {
   std::vector<Message*> * all_msgs = new std::vector<Message*>;
   char * data = buf;
 	uint64_t ptr = 0;
+  uint64_t starttime = 0;
   uint32_t dest_id;
   uint32_t return_id;
   uint32_t txn_cnt;
   COPY_VAL(dest_id,data,ptr);
   COPY_VAL(return_id,data,ptr);
   COPY_VAL(txn_cnt,data,ptr);
+  COPY_VAL(starttime,data,ptr);
+  INC_STATS(0,trans_network_wait,get_sys_clock()-starttime);
   assert(dest_id == g_node_id);
   assert(return_id != g_node_id);
   assert(ISCLIENTN(return_id) || ISSERVERN(return_id) || ISREPLICAN(return_id));

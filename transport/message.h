@@ -49,7 +49,8 @@ public:
   //uint64_t txn_type;
   //uint64_t seq_id;
   //uint64_t trans_id;
-
+  // network part
+  uint64_t send_time;
 
   // Collect other stats
   double lat_work_queue_time;

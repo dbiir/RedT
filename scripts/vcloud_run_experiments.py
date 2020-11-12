@@ -9,7 +9,7 @@ from helper import *
 
 uname = "root"
 local_uname = "benchpress"
-identity = "/usr0/home/" + local_uname + "/.ssh/id_rsa_vcloud"
+identity = "/usr0/data1/" + local_uname + "/.ssh/id_rsa_vcloud"
 
 now = datetime.datetime.now()
 strnow=now.strftime("%Y%m%d-%H%M%S")

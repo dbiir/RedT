@@ -21,31 +21,31 @@ for arg in sys.argv[1:]:
     get_summary(arg)
 names = summary.keys()
 
-a = sum(summary['abort_time'])/len(summary['abort_time']) if 'abort_time' in summary else 0
-b = sum(summary['txn_manager_time'])/len(summary['txn_manager_time']) if 'txn_manager_time' in summary else 0
-c = sum(summary['txn_validate_time'])/len(summary['txn_validate_time']) if 'txn_validate_time' in summary else 0
-d = sum(summary['txn_cleanup_time'])/len(summary['txn_cleanup_time']) if 'txn_cleanup_time' in summary else 0
-e = sum(summary['txn_total_process_time'])/len(summary['txn_total_process_time']) if 'txn_total_process_time' in summary else 0
+a = sum(summary['trans_total_run_time'])
+b = sum(summary['trans_process_time'])
+c = sum(summary['trans_2pc_time'])
+d = sum(summary['trans_prepare_time'])
+e = sum(summary['trans_validate_time'])
+f = sum(summary['trans_finish_time'])
+g = sum(summary['trans_commit_time'])
+h = sum(summary['trans_abort_time'])
+i = sum(summary['lat_l_loc_cc_block_time'])
+j = sum(summary['lat_l_rem_cc_block_time'])
+k = sum(summary['txn_index_time'])
+l = sum(summary['txn_manager_time'])
+m = sum(summary['lat_l_loc_cc_time'])
+n = sum(summary['trans_init_time'])
 
-local_txn_abort_cnt = sum(summary['local_txn_abort_cnt'])
-local_txn_commit_cnt = sum(summary['local_txn_commit_cnt'])
-if local_txn_abort_cnt + local_txn_abort_cnt == 0:
-    f = 0
-else:
-    f = local_txn_abort_cnt / (local_txn_abort_cnt + local_txn_commit_cnt)
+o = sum(summary['trans_get_access_time'])
+p = sum(summary['trans_store_access_time'])
+q = sum(summary['trans_get_row_time'])
 
-remote_txn_abort_cnt = sum(summary['remote_txn_abort_cnt'])
-remote_txn_commit_cnt = sum(summary['remote_txn_commit_cnt'])
-if remote_txn_abort_cnt + remote_txn_abort_cnt == 0:
-    g = 0
-else:
-    g = remote_txn_abort_cnt / (remote_txn_abort_cnt + remote_txn_commit_cnt)
+r = sum(summary['trans_cur_row_copy_time'])
+s = sum(summary['trans_cur_row_init_time'])
 
-t = a+b+c+d+e
-a = a/t
-b = b/t
-c = c/t
-d = d/t
-e = e/t
+t = sum(summary['txn_process_time'])
+u = sum(summary['trans_benchmark_compute_time'])
 
-print a, b, c, d, e, f, g
+#trans_total_run_time trans_process_time trans_process_time% trans_2pc_time trans_2pc_time% trans_prepare_time trans_prepare_time% trans_validate_time trans_validate_time% trans_finish_time trans_finish_time% trans_commit_time trans_commit_time% trans_abort_time trans_abort_time% trans_block_time trans_block_time% txn_index_time txn_index_time% txn_manager_time txn_manager_time% lat_l_loc_cc_time lat_l_loc_cc_time%
+print "%.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f" % (a,b,(b*100/a),c,(c*100/a),d,(d*100/a),e,(e*100/a),f,(f*100/a),g,(g*100/a),h,(h*100/a),(i+j),((i+j)*100/a),k,(k*100/a),l,(l*100/a),m,(m*100/a),n,(n*100/a),o,(o*100/a),p,(p*100/a),q,(q*100/a),r,(r*100/a),s,(s*100/a),t,(t*100/a),u,(u*100/a))
+

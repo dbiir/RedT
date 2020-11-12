@@ -145,6 +145,7 @@ void Stats_thd::clear() {
   trans_work_remote_wait=0;
   trans_msg_local_wait=0;
   trans_msg_remote_wait=0;
+  trans_network_wait=0;
   // trans work queue
   trans_work_queue_item_total=0;
   trans_msg_queue_item_total=0;
@@ -603,7 +604,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_work_local_wait=%f"
   ",trans_work_remote_wait=%f"
   ",trans_msg_local_wait=%f"
-  ",trans_msg_remote_wait=%f",
+  ",trans_msg_remote_wait=%f"
+  ",trans_network_wait=%f",
           trans_total_run_time / BILLION, trans_init_time / BILLION, trans_process_time / BILLION,
           trans_get_access_time / BILLION, trans_store_access_time / BILLION, trans_get_row_time /BILLION, trans_benchmark_compute_time /BILLION,
           trans_2pc_time / BILLION,
@@ -614,7 +616,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
           dli_init_time / BILLION, dli_lock_time / BILLION, dli_check_conflict_time / BILLION, dli_final_validate / BILLION,
           trans_local_process / BILLION, trans_remote_process / BILLION,
           trans_work_local_wait / BILLION, trans_work_remote_wait / BILLION,
-          trans_msg_local_wait / BILLION, trans_msg_remote_wait / BILLION);
+          trans_msg_local_wait / BILLION, trans_msg_remote_wait / BILLION,
+          trans_network_wait / BILLION);
 
   fprintf(outf,
   ",avg_trans_total_run_time=%f"
@@ -650,7 +653,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_queue_count=%lu"
   ",trans_msg_queue_item_total=%lu"
   ",per_trans_queue_count=%f"
-  ",per_trans_msg_queue_item_total=%f",
+  ",per_trans_msg_queue_count=%f",
           trans_total_count, trans_init_count, trans_process_count,
           trans_get_access_count, trans_store_access_count, trans_get_row_count,
           trans_2pc_count,
@@ -659,7 +662,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
           trans_work_queue_item_total,
           trans_msg_queue_item_total,
           ((double)trans_work_queue_item_total / (double)work_queue_enq_cnt),
-          ((double)trans_msg_queue_item_total / (double)msg_queue_enq_cnt);
+          ((double)trans_msg_queue_item_total / (double)msg_queue_enq_cnt));
   // Transaction stats
   double txn_total_process_time_avg=0;
   double txn_process_time_avg=0;
@@ -1344,6 +1347,7 @@ void Stats_thd::combine(Stats_thd * stats) {
   trans_work_remote_wait+=stats->trans_work_remote_wait;
   trans_msg_local_wait+=stats->trans_msg_local_wait;
   trans_msg_remote_wait+=stats->trans_msg_remote_wait;
+  trans_network_wait+=stats->trans_network_wait;
   // Transaction stats
   txn_total_process_time+=stats->txn_total_process_time;
   txn_process_time+=stats->txn_process_time;

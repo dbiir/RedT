@@ -22,7 +22,7 @@
 #include "concurrentqueue.h"
 #include "lock_free_queue.h"
 #include <boost/lockfree/queue.hpp>
-
+#include "semaphore.h"
 class BaseQuery;
 class Message;
 

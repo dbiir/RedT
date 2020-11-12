@@ -2,7 +2,7 @@ import os,glob
 
 user="rhardin"
 machine = "schroedinger.csail.mit.edu"
-project_dir = "/data1/rhardin/research/ddbms/distDBX/"
+project_dir = "/home/rhardin/research/ddbms/distDBX/"
 
 PATH=os.getcwd()
 result_dir = PATH + "/results/"

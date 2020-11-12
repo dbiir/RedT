@@ -43,12 +43,13 @@
 
 // ! Parameters used to locate distributed performance bottlenecks.
 #define SECOND 100 // Set the queue monitoring time.
-// #define LESS_DIS // Reduce the number of yCSB remote data to 1
+#define LESS_DIS // Reduce the number of yCSB remote data to 1
+#define LESS_DIS_NUM 9 // Reduce the number of yCSB remote data to 1
 // #define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
-// #define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
+#define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
 // #define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
 // #define NO_REMOTE // remove all remote txn
-#define TXN_QUEUE_PERCENT 0.9 // The proportion of the transaction to take from txn_queue firstly.
+#define TXN_QUEUE_PERCENT 0.0 // The proportion of the transaction to take from txn_queue firstly.
 #define MALLOC_TYPE 0 // 0 represent normal malloc. 1 represent je-malloc
 // ! end of these parameters
 
@@ -57,15 +58,15 @@
 /***********************************************/
 #define NODE_CNT 2
 #define THREAD_CNT 4
-#define REM_THREAD_CNT 2
-#define SEND_THREAD_CNT 2
+#define REM_THREAD_CNT 1
+#define SEND_THREAD_CNT 1
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
-#define CLIENT_NODE_CNT 2
+#define CLIENT_NODE_CNT NODE_CNT
 #define CLIENT_THREAD_CNT 4
-#define CLIENT_REM_THREAD_CNT 2
-#define CLIENT_SEND_THREAD_CNT 2
+#define CLIENT_REM_THREAD_CNT 1
+#define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
 
 #define LOAD_METHOD LOAD_MAX
@@ -149,7 +150,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG OCC
+#define CC_ALG MAAT
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -440,7 +441,7 @@ enum PPSTxnType {
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
 #define DONE_TIMER 1 * 60 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 60 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false

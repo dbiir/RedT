@@ -6,7 +6,7 @@ PATH=os.getcwd()
 
 user="rhardin"
 machine = "schroedinger.csail.mit.edu"
-project_dir = "/home/rhardin/research/ddbms/distDBX/"
+project_dir = "/data1/rhardin/research/ddbms/distDBX/"
 
 cmd = "scp {}@{}:{}tests.tgz .".format(user,machine,project_dir)
 os.system(cmd)
