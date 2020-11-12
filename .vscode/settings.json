@@ -53,6 +53,8 @@
         "string": "cpp",
         "algorithm": "cpp",
         "*.trm": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
     }
 }

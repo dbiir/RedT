@@ -127,6 +127,21 @@ void WorkerThread::fakeprocess(Message * msg) {
   DEBUG("%ld EndProcessing %d %ld\n",get_thd_id(),msg->get_rtype(),msg->get_txn_id());
 }
 
+void WorkerThread::statqueue(uint64_t thd_id, Message * msg, uint64_t starttime) {
+  if (msg->rtype == CL_QRY || msg->rtype == RTXN_CONT ||
+      msg->rtype == RQRY_RSP || msg->rtype == RACK_PREP  ||
+      msg->rtype == RACK_FIN || msg->rtype == RTXN  ||
+      msg->rtype == CL_RSP) {
+    uint64_t queue_time = get_sys_clock() - starttime;
+		INC_STATS(thd_id,trans_local_process,queue_time);
+  } else if (msg->rtype == RQRY || msg->rtype == RQRY_CONT ||
+             msg->rtype == RFIN || msg->rtype == RPREPARE ||
+             msg->rtype == RFWD){
+    uint64_t queue_time = get_sys_clock() - starttime;
+		INC_STATS(thd_id,trans_remote_process,queue_time);
+  }
+}
+
 void WorkerThread::process(Message * msg) {
   RC rc __attribute__ ((unused));
 
@@ -187,6 +202,7 @@ void WorkerThread::process(Message * msg) {
 				assert(false);
 				break;
 		}
+  statqueue(get_thd_id(), msg, starttime);
   uint64_t timespan = get_sys_clock() - starttime;
   INC_STATS(get_thd_id(),worker_process_cnt,1);
   INC_STATS(get_thd_id(),worker_process_time,timespan);
@@ -354,32 +370,9 @@ RC WorkerThread::run() {
       fflush(stdout);
     }
   #endif
-  /* There is also annotated logic that jumps back to L1 below
-  L1:
-    #if WORKLOAD == DA
-      while (1) {
-        if (work_queue.top_element != NULL) {
-          if (is_mine(work_queue.top_element)) {
-            msg = work_queue.top_element;
-            work_queue.top_element = NULL;
-            break;
-          }
-        }
-        else
-        {
-          work_queue.top_element = work_queue.dequeue(get_thd_id());
-          if (!work_queue.top_element) {
-            continue;
-          }
-          if (is_mine(work_queue.top_element))
-            msg=work_queue.top_element;
-            work_queue.top_element=NULL;
-            break;
-        }
-      }
-    #else*/
-      msg = work_queue.dequeue(get_thd_id());
-    //#endif
+
+    msg = work_queue.dequeue(get_thd_id());
+
     if(!msg) {
       if (idle_starttime == 0) idle_starttime = get_sys_clock();
       //todo: add sleep 0.01ms

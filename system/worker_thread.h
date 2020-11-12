@@ -26,6 +26,7 @@ class WorkerThread : public Thread {
 public:
     RC run();
     void setup();
+    void statqueue(uint64_t thd_id, Message * msg, uint64_t starttime);
     void process(Message * msg);
     void fakeprocess(Message * msg);
     void check_if_done(RC rc);

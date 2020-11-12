@@ -423,6 +423,7 @@ void QWorkQueue::enqueue(uint64_t thd_id, Message * msg,bool busy) {
 	}
 	INC_STATS(thd_id,work_queue_enqueue_time,get_sys_clock() - starttime);
 	INC_STATS(thd_id,work_queue_enq_cnt,1);
+	INC_STATS(thd_id,trans_work_queue_item_total,txn_queue_size+work_queue_size);
 }
 
 void QWorkQueue::statqueue(uint64_t thd_id, work_queue_entry * entry) {
