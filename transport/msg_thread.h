@@ -39,14 +39,14 @@ struct mbuf {
 	  ((uint32_t*)buffer)[1] = g_node_id;
     ptr = sizeof(uint32_t) * 3 + sizeof(uint64_t);
   }
-  void set_send_time(uint64_t starttime) {
+  void set_send_time(uint64_t ts) {
     //buffer = (char*)nn_allocmsg(g_msg_size,0);
     //memset(buffer,0,g_msg_size);
-    starttime = 0;
-    cnt = 0;
-    wait = false;
-    uint64_t * start_time = (uint64_t*)(buffer + sizeof(uint32_t) * 3);
-	  *start_time = starttime;
+    // starttime = 0;
+    // cnt = 0;
+    // wait = false;
+    char * ts_ptr = buffer + sizeof(uint32_t) * 3;
+	  ((uint64_t*)ts_ptr)[0] = ts;
   }
   void copy(char * p, uint64_t s) {
     assert(ptr + s <= g_msg_size);
