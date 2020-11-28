@@ -54,6 +54,7 @@
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "http.h"
+#include "rdma_ctrl.hpp"
 
 void network_test();
 void network_test_recv();
@@ -70,12 +71,27 @@ CalvinLockThread * calvin_lock_thds;
 CalvinSequencerThread * calvin_seq_thds;
 #endif
 
+#if USE_RDMA
+	int server_node_id = 1;
+	int tcp_port       = 8888;
+	int client_port    = 8000;
+	using namespace rdmaio;
+#endif
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
 
 int main(int argc, char *argv[]) {
-	// 0. initialize global data structure
-	parser(argc, argv);
+	
+#if USE_RDMA
+	RdmaCtrl *c = new RdmaCtrl(server_node_id,tcp_port);
+    RdmaCtrl::DevIdx idx {.dev_id = 0,.port_id = 1 }; // using the first RNIC's first port
+    c->open_thread_local_device(idx);
+	if(c->get_device()) {
+		printf("----------------rdma get device success!!--------------------------\n");
+	}
+#endif
+    // 0. initialize global data structure
+    parser(argc, argv);
 #if SEED != 0
 	uint64_t seed = SEED + g_node_id;
 #else

@@ -26,6 +26,7 @@
 /***********************************************/
 //which creator to use
 #define CREATOR_USE_T false
+#define USE_RDMA true
 
 //TraversalActionSequenceCreator
 #define TRANS_CNT 2
@@ -56,7 +57,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
+#define NODE_CNT 1
 #define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
