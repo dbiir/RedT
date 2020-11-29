@@ -54,7 +54,7 @@
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "http.h"
-#include "rdma_ctrl.hpp"
+#include "lib.hh"
 
 void network_test();
 void network_test_recv();
@@ -72,10 +72,19 @@ CalvinSequencerThread * calvin_seq_thds;
 #endif
 
 #if USE_RDMA
-	int server_node_id = 1;
-	int tcp_port       = 8888;
-	int client_port    = 8000;
+	//DEFINE_int64(port, 8888, "Server listener (UDP) port.");
+	//DEFINE_int64(use_nic_idx, 1, "Which NIC to create QP");
+	//DEFINE_int64(reg_nic_name, 73, "The name to register an opened NIC at rctrl.");
+	//DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
+	//DEFINE_uint64(magic_num, 0xdeadbeaf, "The magic number read by the client");
+	int64_t port = 8888;
+	int64_t use_nic_idx = 1;
+	int64_t reg_nic_name = 0;
+	int64_t reg_mem_name = 0;
+	uint64_t magic_num = 0xdeadbeaf;
 	using namespace rdmaio;
+	using namespace rdmaio::rmem;
+
 #endif
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
@@ -83,11 +92,16 @@ void parser(int argc, char * argv[]);
 int main(int argc, char *argv[]) {
 	
 #if USE_RDMA
-	RdmaCtrl *c = new RdmaCtrl(server_node_id,tcp_port);
-    RdmaCtrl::DevIdx idx {.dev_id = 0,.port_id = 1 }; // using the first RNIC's first port
-    c->open_thread_local_device(idx);
-	if(c->get_device()) {
-		printf("----------------rdma get device success!!--------------------------\n");
+	//RCtrl ctrl(port);
+	//RDMA_LOG(4) << "Pingping server listenes at localhost:" << port;
+
+	// first we open the NIC
+	{
+		//auto nic =
+		//	RNic::create(RNicInfo::query_dev_names().at(use_nic_idx)).value();
+		//	printf("use rdma success!\n");
+		// register the nic with name 0 to the ctrl
+		//RDMA_ASSERT(ctrl.opened_nics.reg(reg_nic_name, nic));
 	}
 #endif
     // 0. initialize global data structure
