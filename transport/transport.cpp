@@ -25,6 +25,7 @@
 #include "nn.hpp"
 #include "query.h"
 #include "tpcc_query.h"
+/*
 #include <stdio.h>
 #include <iostream>
 #include "global.h"
@@ -34,7 +35,7 @@
 #include "tpcc_query.h"
 #include "query.h"
 #include "message.h"
-
+*/
 
 #define MAX_IFADDR_LEN 20 // max # of characters in name of address
 

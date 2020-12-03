@@ -26,7 +26,7 @@
 /***********************************************/
 //which creator to use
 #define CREATOR_USE_T false
-#define USE_RDMA true
+#define USE_RDMA false
 
 //TraversalActionSequenceCreator
 #define TRANS_CNT 2
@@ -44,10 +44,10 @@
 
 // ! Parameters used to locate distributed performance bottlenecks.
 #define SECOND 100 // Set the queue monitoring time.
-#define LESS_DIS // Reduce the number of yCSB remote data to 1
-#define LESS_DIS_NUM 9 // Reduce the number of yCSB remote data to 1
+// #define LESS_DIS // Reduce the number of yCSB remote data to 1
+// #define LESS_DIS_NUM 9 // Reduce the number of yCSB remote data to 1
 // #define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
-#define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
+// #define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
 // #define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
 // #define NO_REMOTE // remove all remote txn
 #define TXN_QUEUE_PERCENT 0.0 // The proportion of the transaction to take from txn_queue firstly.
@@ -57,7 +57,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 1
+#define NODE_CNT 2
 #define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -151,7 +151,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG MAAT
+#define CC_ALG NO_WAIT
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.

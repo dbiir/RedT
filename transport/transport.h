@@ -41,7 +41,7 @@ class Socket {
 		~Socket () { delete &sock;}
         char _pad1[CL_SIZE];
 		nn::socket sock;
-        char _pad[CL_SIZE - sizeof(nn::socket)];
+        char _pad[CL_SIZE - sizeof(nn::socket)];//?_pad的用处
 };
 
 class Transport {
