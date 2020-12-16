@@ -257,6 +257,10 @@ void WorkerThread::commit() {
   uint64_t timespan_short  = end_time - txn_man->txn_stats.restart_starttime;
   uint64_t two_pc_timespan  = end_time - txn_man->txn_stats.prepare_start_time;
   uint64_t finish_timespan  = end_time - txn_man->txn_stats.finish_start_time;
+  uint64_t prepare_timespan = txn_man->txn_stats.finish_start_time - txn_man->txn_stats.prepare_start_time;
+  INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+  INC_STATS(get_thd_id(), trans_prepare_count, 1);
+
   INC_STATS(get_thd_id(), trans_2pc_time, two_pc_timespan);
   INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_commit_time, finish_timespan);
@@ -288,6 +292,10 @@ void WorkerThread::abort() {
   uint64_t timespan_short  = end_time - txn_man->txn_stats.restart_starttime;
   uint64_t two_pc_timespan  = end_time - txn_man->txn_stats.prepare_start_time;
   uint64_t finish_timespan  = end_time - txn_man->txn_stats.finish_start_time;
+  uint64_t prepare_timespan = txn_man->txn_stats.finish_start_time - txn_man->txn_stats.prepare_start_time;
+  INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+  INC_STATS(get_thd_id(), trans_prepare_count, 1);
+
   INC_STATS(get_thd_id(), trans_2pc_time, two_pc_timespan);
   INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_abort_time, finish_timespan);
@@ -578,8 +586,9 @@ RC WorkerThread::process_rack_prep(Message * msg) {
   }
   uint64_t finish_start_time = get_sys_clock();
   txn_man->txn_stats.finish_start_time = finish_start_time;
-  uint64_t prepare_timespan  = finish_start_time - txn_man->txn_stats.prepare_start_time;
-  INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+  // uint64_t prepare_timespan  = finish_start_time - txn_man->txn_stats.prepare_start_time;
+  // INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+  // INC_STATS(get_thd_id(), trans_prepare_count, 1);
   if(rc == Abort || txn_man->get_rc() == Abort) {
     txn_man->txn->rc = Abort;
     rc = Abort;
@@ -847,7 +856,7 @@ RC WorkerThread::process_rtxn(Message * msg) {
   assert(time_table.get_lower(get_thd_id(),txn_man->get_txn_id()) == 0);
   assert(time_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
   assert(time_table.get_state(get_thd_id(),txn_man->get_txn_id()) == MAAT_RUNNING);
-#endif
+  #endif
 #endif
 #if CC_ALG == WOOKONG
   txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());

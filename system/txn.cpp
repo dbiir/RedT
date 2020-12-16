@@ -542,9 +542,9 @@ RC TxnManager::start_abort() {
 
 	uint64_t finish_start_time = get_sys_clock();
 	txn_stats.finish_start_time = finish_start_time;
-	uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-  INC_STATS(get_thd_id(), trans_prepare_count, 1);
+	// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
+	// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+  	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
 	if(query->partitions_touched.size() > 1) {
 		send_finish_messages();
 		abort();
@@ -580,7 +580,7 @@ RC TxnManager::start_commit() {
 	txn_stats.prepare_start_time = prepare_start_time;
 	uint64_t process_time_span  = prepare_start_time - txn_stats.restart_starttime;
 	INC_STATS(get_thd_id(), trans_process_time, process_time_span);
-  INC_STATS(get_thd_id(), trans_process_count, 1);
+  	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
 	if(is_multi_part()) {
@@ -598,9 +598,9 @@ RC TxnManager::start_commit() {
 		} else {
 			uint64_t finish_start_time = get_sys_clock();
 			txn_stats.finish_start_time = finish_start_time;
-			uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-			INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-      INC_STATS(get_thd_id(), trans_prepare_count, 1);
+			// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
+			// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+      		// INC_STATS(get_thd_id(), trans_prepare_count, 1);
 			if(CC_ALG == WSI) {
 				wsi_man.gene_finish_ts(this);
 			}
@@ -612,9 +612,9 @@ RC TxnManager::start_commit() {
 		rc = validate();
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
-		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-		INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    INC_STATS(get_thd_id(), trans_prepare_count, 1);
+		// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
+		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+    	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
 		if(CC_ALG == SSI) {
 			ssi_man.gene_finish_ts(this);
 		}
@@ -633,7 +633,6 @@ RC TxnManager::start_commit() {
 			}
 			rc = abort();
 		}
-			// start_abort();
 	}
 	return rc;
 }

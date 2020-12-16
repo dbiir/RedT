@@ -132,6 +132,8 @@ public:
   double dli_lock_time=0;
   double dli_check_conflict_time=0;
   double dli_final_validate=0;
+  double dli_get_rwset=0;
+  double dli_push_front_time=0;
   // trans queue
   double trans_local_process=0;
   double trans_remote_process=0;

@@ -19,7 +19,7 @@
 #include "global.h"
 #include "helper.h"
 #if MALLOC_TYPE != 0
-#include "jemalloc/jemalloc.h"
+#include <jemalloc/jemalloc.h>
 #endif
 
 #if MALLOC_TYPE == 0
