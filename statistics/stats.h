@@ -144,6 +144,9 @@ public:
   double trans_network_wait=0;
   double trans_network_recv=0;
   double trans_network_send=0;
+  double trans_return_client_wait=0;
+  double trans_get_client_wait=0;
+  double trans_process_client=0;
   // trans work queue count
   uint64_t trans_work_queue_item_total=0;
   uint64_t trans_msg_queue_item_total=0;

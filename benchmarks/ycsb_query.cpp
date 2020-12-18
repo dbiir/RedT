@@ -312,11 +312,11 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 		double r = (double)(mrand->next() % 10000) / 10000;
 		uint64_t partition_id;
 #ifdef LESS_DIS
-	if ( rid < LESS_DIS_NUM) {
-		partition_id = home_partition_id;;
-	} else {
-		partition_id = (home_partition_id + 1) % g_part_cnt;
-	}
+		if ( rid < LESS_DIS_NUM) {
+			partition_id = home_partition_id;
+		} else {
+			partition_id = (home_partition_id + 1) % g_part_cnt;
+		}
 #else
 	#ifdef NO_REMOTE
 		partition_id = home_partition_id;
@@ -379,7 +379,8 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 	for(auto it = partitions_accessed.begin(); it != partitions_accessed.end(); ++it) {
 		query->partitions.add(*it);
 	}
-
+	DEBUG("YCSB QUERY: homeid %ld and the first partion: %ld\n",
+				home_partition_id, query->partitions[0]);
 	//query->print();
 	return query;
 

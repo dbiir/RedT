@@ -150,6 +150,9 @@ void Stats_thd::clear() {
   trans_network_wait=0;
   trans_network_send=0;
   trans_network_recv=0;
+  trans_return_client_wait=0;
+  trans_get_client_wait=0;
+  trans_process_client=0;
   // trans work queue
   trans_work_queue_item_total=0;
   trans_msg_queue_item_total=0;
@@ -613,7 +616,10 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_msg_remote_wait=%f"
   ",trans_network_wait=%f"
   ",trans_network_send=%f"
-  ",trans_network_recv=%f",
+  ",trans_network_recv=%f"
+  ",trans_get_client_wait=%f"
+  ",trans_return_client_wait=%f"
+  ",trans_process_client=%f",
           trans_total_run_time / BILLION, trans_init_time / BILLION, trans_process_time / BILLION,
           trans_get_access_time / BILLION, trans_store_access_time / BILLION, trans_get_row_time /BILLION, trans_benchmark_compute_time /BILLION,
           trans_2pc_time / BILLION,
@@ -626,7 +632,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
           trans_local_process / BILLION, trans_remote_process / BILLION,
           trans_work_local_wait / BILLION, trans_work_remote_wait / BILLION,
           trans_msg_local_wait / BILLION, trans_msg_remote_wait / BILLION,
-          trans_network_wait / BILLION, trans_network_send /BILLION, trans_network_recv / BILLION);
+          trans_network_wait / BILLION, trans_network_send /BILLION, trans_network_recv / BILLION,
+          trans_get_client_wait / BILLION, trans_return_client_wait / BILLION, trans_process_client / BILLION);
 
   fprintf(outf,
   ",avg_trans_total_run_time=%f"
@@ -1361,6 +1368,9 @@ void Stats_thd::combine(Stats_thd * stats) {
   trans_network_wait+=stats->trans_network_wait;
   trans_network_recv+=stats->trans_network_recv;
   trans_network_send+=stats->trans_network_send;
+  trans_get_client_wait+=stats->trans_get_client_wait;
+  trans_return_client_wait+=stats->trans_return_client_wait;
+  trans_process_client+=stats->trans_process_client;
   // Transaction stats
   txn_total_process_time+=stats->txn_total_process_time;
   txn_process_time+=stats->txn_process_time;

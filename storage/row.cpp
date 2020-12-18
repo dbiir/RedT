@@ -651,7 +651,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	if (rc == Abort) {
 		manager->abort(type,txn);
 	} else {
-		manager->commit(type,txn,row);
+		manager->commit(type,txn);
 	}
 
 		row->free_row();

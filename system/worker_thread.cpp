@@ -128,7 +128,7 @@ void WorkerThread::fakeprocess(Message * msg) {
 }
 
 void WorkerThread::statqueue(uint64_t thd_id, Message * msg, uint64_t starttime) {
-  if (msg->rtype == CL_QRY || msg->rtype == RTXN_CONT ||
+  if (msg->rtype == RTXN_CONT ||
       msg->rtype == RQRY_RSP || msg->rtype == RACK_PREP  ||
       msg->rtype == RACK_FIN || msg->rtype == RTXN  ||
       msg->rtype == CL_RSP) {
@@ -139,6 +139,9 @@ void WorkerThread::statqueue(uint64_t thd_id, Message * msg, uint64_t starttime)
              msg->rtype == RFWD){
     uint64_t queue_time = get_sys_clock() - starttime;
 		INC_STATS(thd_id,trans_remote_process,queue_time);
+  } else if (msg->rtype == CL_QRY) {
+    uint64_t queue_time = get_sys_clock() - starttime;
+    INC_STATS(thd_id,trans_process_client,queue_time);
   }
 }
 

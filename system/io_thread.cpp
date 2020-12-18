@@ -113,7 +113,11 @@ RC InputThread::client_recv_loop() {
 		while(!msgs->empty()) {
 			Message * msg = msgs->front();
 			assert(msg->rtype == CL_RSP);
+		#if CC_ALG == BOCC || CC_ALG == FOCC || ONE_NODE_RECIEVE == 1
+			return_node_offset = msg->return_node_id;
+		#else
 			return_node_offset = msg->return_node_id - g_server_start_node;
+		#endif
 			assert(return_node_offset < g_servers_per_client);
 			rsp_cnts[return_node_offset]++;
 			INC_STATS(get_thd_id(),txn_cnt,1);
