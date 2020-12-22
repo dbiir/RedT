@@ -144,6 +144,8 @@ public:
   double trans_network_wait=0;
   double trans_network_recv=0;
   double trans_network_send=0;
+  double trans_msgsend_stage_one=0;
+  double trans_msgsend_stage_three=0;
   double trans_return_client_wait=0;
   double trans_get_client_wait=0;
   double trans_process_client=0;

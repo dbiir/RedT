@@ -50,8 +50,8 @@ struct CompareWQEntry {
   }
 #elif PRIORITY == PRIORITY_ACTIVE
   bool operator()(const work_queue_entry* lhs, const work_queue_entry* rhs) {
-    if (lhs->rtype == CL_QRY && rhs->rtype != CL_QRY) return true;
-    if (rhs->rtype == CL_QRY && lhs->rtype != CL_QRY) return false;
+    if ((lhs->rtype == CL_QRY || lhs->rtype == CL_QRY_O) && (rhs->rtype != CL_QRY && rhs->rtype != CL_QRY_O)) return true;
+    if ((rhs->rtype == CL_QRY || rhs->rtype == CL_QRY_O) && (lhs->rtype != CL_QRY && lhs->rtype != CL_QRY_O)) return false;
     return lhs->starttime < rhs->starttime;
   }
 #elif PRIORITY == PRIORITY_HOME

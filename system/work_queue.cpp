@@ -184,7 +184,7 @@ void QWorkQueue::enqueue(uint64_t thd_id, Message * msg,bool busy) {
 	DEBUG("Work Enqueue (%ld,%ld) %d\n",entry->txn_id,entry->batch_id,entry->rtype);
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
-	if(msg->rtype == CL_QRY) {
+	if(msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 		// boost::unique_lck<boost::mutex> lk(mt);
 		// cvt.wait(lk);
 		sem_wait(&mt);
@@ -276,7 +276,7 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 		uint64_t queue_time = get_sys_clock() - entry->starttime;
 		INC_STATS(thd_id,work_queue_wait_time,queue_time);
 		INC_STATS(thd_id,work_queue_cnt,1);
-		if(msg->rtype == CL_QRY) {
+		if(msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 			sem_wait(&_semaphore);
 			txn_queue_size --;
 			txn_dequeue_size ++;
@@ -354,7 +354,7 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 		uint64_t queue_time = get_sys_clock() - entry->starttime;
 		INC_STATS(thd_id,work_queue_wait_time,queue_time);
 		INC_STATS(thd_id,work_queue_cnt,1);
-		if(msg->rtype == CL_QRY) {
+		if(msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 			sem_wait(&_semaphore);
 			txn_queue_size --;
 			txn_dequeue_size ++;
@@ -401,7 +401,7 @@ void QWorkQueue::enqueue(uint64_t thd_id, Message * msg,bool busy) {
 	DEBUG("Work Enqueue (%ld,%ld) %d\n",entry->txn_id,entry->batch_id,entry->rtype);
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
-	if(msg->rtype == CL_QRY) {
+	if(msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 		while (!new_txn_queue->push(entry) && !simulation->is_done()) {
 		}
 		sem_wait(&_semaphore);
@@ -439,7 +439,7 @@ void QWorkQueue::statqueue(uint64_t thd_id, work_queue_entry * entry) {
 				msg->rtype == RFWD){
 		uint64_t queue_time = get_sys_clock() - entry->starttime;
 		INC_STATS(thd_id,trans_work_remote_wait,queue_time);
-	}else if (msg->rtype == CL_QRY) {
+	}else if (msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 		uint64_t queue_time = get_sys_clock() - entry->starttime;
 		INC_STATS(thd_id,trans_get_client_wait,queue_time);
 	}
@@ -453,6 +453,12 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	bool valid = false;
 
+#ifdef THD_ID_QUEUE
+	if (thd_id < THREAD_CNT / 2)
+		valid = work_queue->pop(entry);
+	else
+		valid = new_txn_queue->pop(entry);
+#else
 	double x = (double)(rand() % 10000) / 10000;
 	if (x > TXN_QUEUE_PERCENT)
 		valid = work_queue->pop(entry);
@@ -478,6 +484,7 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 		// 	valid = work_queue->pop(entry);
 #endif
 	}
+#endif
 	INC_STATS(thd_id,mtx[14],get_sys_clock() - mtx_wait_starttime);
 
 	if(valid) {
@@ -488,7 +495,7 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 		INC_STATS(thd_id,work_queue_wait_time,queue_time);
 		INC_STATS(thd_id,work_queue_cnt,1);
     	statqueue(thd_id, entry);
-		if(msg->rtype == CL_QRY) {
+		if(msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 			sem_wait(&_semaphore);
 			txn_queue_size --;
 			txn_dequeue_size ++;
@@ -553,7 +560,7 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 		uint64_t queue_time = get_sys_clock() - entry->starttime;
 		INC_STATS(thd_id,work_queue_wait_time,queue_time);
 		INC_STATS(thd_id,work_queue_cnt,1);
-		if(msg->rtype == CL_QRY) {
+		if(msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 			sem_wait(&_semaphore);
 			txn_queue_size --;
 			txn_dequeue_size ++;

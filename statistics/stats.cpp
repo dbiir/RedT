@@ -150,6 +150,8 @@ void Stats_thd::clear() {
   trans_network_wait=0;
   trans_network_send=0;
   trans_network_recv=0;
+  trans_msgsend_stage_one=0;
+  trans_msgsend_stage_three=0;
   trans_return_client_wait=0;
   trans_get_client_wait=0;
   trans_process_client=0;
@@ -617,6 +619,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_network_wait=%f"
   ",trans_network_send=%f"
   ",trans_network_recv=%f"
+  ",trans_msgsend_stage_one=%f"
+  ",trans_msgsend_stage_three=%f"
   ",trans_get_client_wait=%f"
   ",trans_return_client_wait=%f"
   ",trans_process_client=%f",
@@ -633,6 +637,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
           trans_work_local_wait / BILLION, trans_work_remote_wait / BILLION,
           trans_msg_local_wait / BILLION, trans_msg_remote_wait / BILLION,
           trans_network_wait / BILLION, trans_network_send /BILLION, trans_network_recv / BILLION,
+          trans_msgsend_stage_one / BILLION, trans_msgsend_stage_three / BILLION,
           trans_get_client_wait / BILLION, trans_return_client_wait / BILLION, trans_process_client / BILLION);
 
   fprintf(outf,
@@ -1368,6 +1373,8 @@ void Stats_thd::combine(Stats_thd * stats) {
   trans_network_wait+=stats->trans_network_wait;
   trans_network_recv+=stats->trans_network_recv;
   trans_network_send+=stats->trans_network_send;
+  trans_msgsend_stage_one+=stats->trans_msgsend_stage_one;
+  trans_msgsend_stage_three+=stats->trans_msgsend_stage_three;
   trans_get_client_wait+=stats->trans_get_client_wait;
   trans_return_client_wait+=stats->trans_return_client_wait;
   trans_process_client+=stats->trans_process_client;

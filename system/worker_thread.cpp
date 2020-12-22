@@ -52,7 +52,7 @@ void WorkerThread::fakeprocess(Message * msg) {
   RC rc __attribute__ ((unused));
 
   DEBUG("%ld Processing %ld %d\n",get_thd_id(),msg->get_txn_id(),msg->get_rtype());
-  assert(msg->get_rtype() == CL_QRY || msg->get_txn_id() != UINT64_MAX);
+  assert(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O || msg->get_txn_id() != UINT64_MAX);
   uint64_t starttime = get_sys_clock();
 		switch(msg->get_rtype()) {
 			case RPASS:
@@ -97,6 +97,7 @@ void WorkerThread::fakeprocess(Message * msg) {
         rc = process_rtxn_cont(msg);
 				break;
       case CL_QRY:
+      case CL_QRY_O:
 			case RTXN:
 #if CC_ALG == CALVIN
         rc = process_calvin_rtxn(msg);
@@ -139,7 +140,7 @@ void WorkerThread::statqueue(uint64_t thd_id, Message * msg, uint64_t starttime)
              msg->rtype == RFWD){
     uint64_t queue_time = get_sys_clock() - starttime;
 		INC_STATS(thd_id,trans_remote_process,queue_time);
-  } else if (msg->rtype == CL_QRY) {
+  } else if (msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
     uint64_t queue_time = get_sys_clock() - starttime;
     INC_STATS(thd_id,trans_process_client,queue_time);
   }
@@ -149,7 +150,7 @@ void WorkerThread::process(Message * msg) {
   RC rc __attribute__ ((unused));
 
   DEBUG("%ld Processing %ld %d\n",get_thd_id(),msg->get_txn_id(),msg->get_rtype());
-  assert(msg->get_rtype() == CL_QRY || msg->get_txn_id() != UINT64_MAX);
+  assert(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O || msg->get_txn_id() != UINT64_MAX);
   uint64_t starttime = get_sys_clock();
 		switch(msg->get_rtype()) {
 			case RPASS:
@@ -183,6 +184,7 @@ void WorkerThread::process(Message * msg) {
         rc = process_rtxn_cont(msg);
 				break;
       case CL_QRY:
+      case CL_QRY_O:
 			case RTXN:
 #if CC_ALG == CALVIN
         rc = process_calvin_rtxn(msg);
@@ -411,7 +413,7 @@ RC WorkerThread::run() {
     }
     //uint64_t starttime = get_sys_clock();
 
-    if(msg->rtype != CL_QRY || CC_ALG == CALVIN) {
+    if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O) || CC_ALG == CALVIN) {
       txn_man = get_transaction_manager(msg);
 
       if (CC_ALG != CALVIN && IS_LOCAL(txn_man->get_txn_id())) {
@@ -651,6 +653,7 @@ RC WorkerThread::process_rqry_rsp(Message * msg) {
   txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ?
                             txn_man->_min_commit_ts : qmsg->_min_commit_ts;
 #endif
+  txn_man->send_RQRY_RSP = false;
   RC rc = txn_man->run_txn();
   check_if_done(rc);
   return rc;
@@ -658,9 +661,12 @@ RC WorkerThread::process_rqry_rsp(Message * msg) {
 
 RC WorkerThread::process_rqry(Message * msg) {
   DEBUG("RQRY %ld\n",msg->get_txn_id());
+#if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
+#else
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()), "RQRY local: %ld %ld/%d\n", msg->get_txn_id(),
              msg->get_txn_id() % g_node_cnt, g_node_id);
   assert(!IS_LOCAL(msg->get_txn_id()));
+#endif
   RC rc = RCOK;
 
   msg->copy_to_txn(txn_man);
@@ -686,6 +692,7 @@ RC WorkerThread::process_rqry(Message * msg) {
   txn_table.update_min_ts(get_thd_id(), txn_man->get_txn_id(), 0, txn_man->get_start_timestamp());
   dta_time_table.init(get_thd_id(), txn_man->get_txn_id(), txn_man->get_start_timestamp());
 #endif
+  txn_man->send_RQRY_RSP = true;
   rc = txn_man->run_txn();
 
   // Send response
@@ -701,6 +708,7 @@ RC WorkerThread::process_rqry_cont(Message * msg) {
   RC rc = RCOK;
 
   txn_man->run_txn_post_wait();
+  txn_man->send_RQRY_RSP = false;
   rc = txn_man->run_txn();
 
   // Send response
@@ -718,6 +726,7 @@ RC WorkerThread::process_rtxn_cont(Message * msg) {
   txn_man->txn_stats.local_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
 
   txn_man->run_txn_post_wait();
+  txn_man->send_RQRY_RSP = false;
   RC rc = txn_man->run_txn();
   check_if_done(rc);
   return RCOK;
@@ -757,8 +766,8 @@ uint64_t WorkerThread::get_next_txn_id() {
 RC WorkerThread::process_rtxn(Message * msg) {
   RC rc = RCOK;
   uint64_t txn_id = UINT64_MAX;
-
-  if(msg->get_rtype() == CL_QRY) {
+  bool is_cl_o = msg->get_rtype() == CL_QRY_O;
+  if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
     // This is a new transaction
     // Only set new txn_id when txn first starts
     #if WORKLOAD == DA
@@ -887,7 +896,12 @@ RC WorkerThread::process_rtxn(Message * msg) {
   if (rc != RCOK) return rc;
 
   // Execute transaction
-  rc = txn_man->run_txn();
+  txn_man->send_RQRY_RSP = false;
+  if (is_cl_o) {
+    rc = txn_man->send_remote_request();
+  } else {
+    rc = txn_man->run_txn();
+  }
   check_if_done(rc);
   return rc;
 }

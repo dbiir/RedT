@@ -43,11 +43,16 @@ std::vector<Message*> * Message::create_messages(char * buf) {
   COPY_VAL(return_id,data,ptr);
   COPY_VAL(txn_cnt,data,ptr);
   COPY_VAL(starttime,data,ptr);
-  INC_STATS(0,trans_network_send,starttime);
-  INC_STATS(0,trans_network_recv,get_sys_clock());
-  INC_STATS(0,trans_network_wait,get_sys_clock()-starttime);
+  if (return_id < NODE_CNT) {
+    INC_STATS(0,trans_network_send,starttime);
+    INC_STATS(0,trans_network_recv,get_sys_clock());
+    INC_STATS(0,trans_network_wait,get_sys_clock()-starttime);
+  }
+#if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
+#else
   assert(dest_id == g_node_id);
   assert(return_id != g_node_id);
+#endif
   assert(ISCLIENTN(return_id) || ISSERVERN(return_id) || ISREPLICAN(return_id));
   while(txn_cnt > 0) {
     Message * msg = create_message(&data[ptr]);
@@ -97,7 +102,7 @@ Message * Message::create_message(LogRecord * record, RemReqType rtype) {
 
 
 Message * Message::create_message(BaseQuery * query, RemReqType rtype) {
- assert(rtype == RQRY || rtype == CL_QRY);
+ assert(rtype == RQRY || rtype == CL_QRY || rtype == CL_QRY_O);
  Message * msg = create_message(rtype);
 #if WORKLOAD == YCSB
  ((YCSBClientQueryMessage*)msg)->copy_from_query(query);
@@ -164,6 +169,7 @@ Message * Message::create_message(RemReqType rtype) {
       msg = new AckMessage;
       break;
     case CL_QRY:
+    case CL_QRY_O:
     case RTXN:
     case RTXN_CONT:
 #if WORKLOAD == YCSB
@@ -277,7 +283,7 @@ void Message::mcopy_to_buf(char * buf) {
   COPY_BUF(buf,lat_cc_block_time,ptr);
   COPY_BUF(buf,lat_cc_time,ptr);
   COPY_BUF(buf,lat_process_time,ptr);
-  if ((CC_ALG == CALVIN && rtype == CL_QRY && txn_id % g_node_cnt == g_node_id) ||
+  if ((CC_ALG == CALVIN && (rtype == CL_QRY||rtype == CL_QRY_O) && txn_id % g_node_cnt == g_node_id) ||
       (CC_ALG != CALVIN && IS_LOCAL(txn_id))) {
     lat_network_time = get_sys_clock();
   } else {
@@ -350,6 +356,7 @@ void Message::release_message(Message * msg) {
       break;
                    }
     case CL_QRY:
+    case CL_QRY_O:
     case RTXN:
     case RTXN_CONT: {
 #if WORKLOAD == YCSB
@@ -1469,8 +1476,11 @@ void YCSBQueryMessage::copy_to_txn(TxnManager * txn) {
   ((YCSBQuery*)(txn->query))->requests.clear();
 #endif
   //((YCSBQuery*)(txn->query))->requests.copy(requests);
+#if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
+#else
   ((YCSBQuery*)(txn->query))->requests.append(requests);
   ((YCSBQuery*)(txn->query))->orig_request = &requests;
+#endif
 }
 
 void YCSBQueryMessage::copy_from_buf(char * buf) {

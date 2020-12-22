@@ -123,13 +123,13 @@ RC YCSBTxnManager::run_txn() {
 
 RC YCSBTxnManager::run_txn_post_wait() {
   uint64_t starttime = get_sys_clock();
-    get_row_post_wait(row);
+  get_row_post_wait(row);
   uint64_t curr_time = get_sys_clock();
   txn_stats.process_time += curr_time - starttime;
   txn_stats.process_time_short += curr_time - starttime;
-    next_ycsb_state();
+  next_ycsb_state();
   INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - curr_time);
-    return RCOK;
+  return RCOK;
 }
 
 bool YCSBTxnManager::is_done() { return next_record_id >= ((YCSBQuery*)query)->requests.size(); }
@@ -141,7 +141,7 @@ void YCSBTxnManager::next_ycsb_state() {
       break;
     case YCSB_1:
       next_record_id++;
-      if(!IS_LOCAL(txn->txn_id) || !is_done()) {
+      if(send_RQRY_RSP || !IS_LOCAL(txn->txn_id) || !is_done()) {
         state = YCSB_0;
       } else {
         state = YCSB_FIN;
@@ -162,6 +162,7 @@ RC YCSBTxnManager::send_remote_request() {
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
   uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
   ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,dest_node_id));
+  DEBUG("ycsb send remote request %ld, %ld\n",txn->txn_id,txn->batch_id);
   msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),dest_node_id);
   return WAIT_REM;
 }
@@ -170,8 +171,12 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
   //msg->requests.init(ycsb_query->requests.size());
   uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
+#if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
+  while (next_record_id < ycsb_query->requests.size() && GET_NODE_ID(ycsb_query->requests[next_record_id]->key) == dest_node_id) {
+#else
   while (next_record_id < ycsb_query->requests.size() && !is_local_request(next_record_id) &&
          GET_NODE_ID(ycsb_query->requests[next_record_id]->key) == dest_node_id) {
+#endif
     YCSBQuery::copy_request_to_msg(ycsb_query,msg,next_record_id++);
   }
 }

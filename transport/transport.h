@@ -63,7 +63,7 @@ class Transport {
 
 	private:
     uint64_t rr;
-  std::map<std::pair<uint64_t, uint64_t>, Socket*> send_sockets;  // dest_node_id,send_thread_id :
+    std::map<std::pair<uint64_t, uint64_t>, Socket*> send_sockets;  // dest_node_id,send_thread_id :
                                                                   // socket
     std::vector<Socket*> recv_sockets;
 

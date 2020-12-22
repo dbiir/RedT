@@ -49,12 +49,13 @@ void InputThread::setup() {
 				assert(ISSERVER || ISREPLICA);
 				//printf("Received Msg %d from node %ld\n",msg->rtype,msg->return_node_id);
 #if CC_ALG == CALVIN
-			if(msg->rtype == CALVIN_ACK ||(msg->rtype == CL_QRY && ISCLIENTN(msg->get_return_id()))) {
+			if(msg->rtype == CALVIN_ACK ||(msg->rtype == CL_QRY && ISCLIENTN(msg->get_return_id())) ||
+				(msg->rtype == CL_QRY_O && ISCLIENTN(msg->get_return_id()))) {
 				work_queue.sequencer_enqueue(get_thd_id(),msg);
 				msgs->erase(msgs->begin());
 				continue;
 			}
-			if( msg->rtype == RDONE || msg->rtype == CL_QRY) {
+			if( msg->rtype == RDONE || msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 				assert(ISSERVERN(msg->get_return_id()));
 				work_queue.sched_enqueue(get_thd_id(),msg);
 				msgs->erase(msgs->begin());
@@ -231,12 +232,13 @@ RC InputThread::server_recv_loop() {
 				continue;
 			}
 #if CC_ALG == CALVIN
-			if(msg->rtype == CALVIN_ACK ||(msg->rtype == CL_QRY && ISCLIENTN(msg->get_return_id()))) {
+			if(msg->rtype == CALVIN_ACK ||(msg->rtype == CL_QRY && ISCLIENTN(msg->get_return_id())) ||
+			(msg->rtype == CL_QRY_O && ISCLIENTN(msg->get_return_id()))) {
 				work_queue.sequencer_enqueue(get_thd_id(),msg);
 				msgs->erase(msgs->begin());
 				continue;
 			}
-			if( msg->rtype == RDONE || msg->rtype == CL_QRY) {
+			if( msg->rtype == RDONE || msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 				assert(ISSERVERN(msg->get_return_id()));
 				work_queue.sched_enqueue(get_thd_id(),msg);
 				msgs->erase(msgs->begin());

@@ -45,7 +45,7 @@ void MessageQueue::init() {
 
 void MessageQueue::statqueue(uint64_t thd_id, msg_entry * entry) {
   Message *msg = entry->msg;
-  if (msg->rtype == CL_QRY || msg->rtype == RTXN_CONT ||
+  if (msg->rtype == CL_QRY || msg->rtype == CL_QRY_O || msg->rtype == RTXN_CONT ||
       msg->rtype == RQRY_RSP || msg->rtype == RACK_PREP  ||
       msg->rtype == RACK_FIN || msg->rtype == RTXN) {
     // these msg will send back to local node
@@ -66,7 +66,10 @@ void MessageQueue::statqueue(uint64_t thd_id, msg_entry * entry) {
 void MessageQueue::enqueue(uint64_t thd_id, Message * msg,uint64_t dest) {
   DEBUG("MQ Enqueue %ld\n",dest)
   assert(dest < g_total_node_cnt);
+#if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
+#else
   assert(dest != g_node_id);
+#endif
   DEBUG_M("MessageQueue::enqueue msg_entry alloc\n");
   msg_entry * entry = (msg_entry*) mem_allocator.alloc(sizeof(struct msg_entry));
   //msg_pool.get(entry);

@@ -59,7 +59,7 @@ class DATxnManager : public TxnManager {
 
   bool is_done();
   bool is_local_item(uint64_t idx);
-  RC send_remote_request();
+  RC send_remote_request() {return RCOK;}
   RC run_delivery(DAQuery* query);
 };
 #endif
