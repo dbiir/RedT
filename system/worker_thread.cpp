@@ -364,7 +364,7 @@ RC WorkerThread::run() {
 
   // DA takes msg logic
 
-  //#define TEST_MSG_order 1
+  // #define TEST_MSG_order
   #ifdef TEST_MSG_order
     while(1)
     {
@@ -392,21 +392,6 @@ RC WorkerThread::run() {
       continue;
     }
     simulation->last_da_query_time = get_sys_clock();
-    #if WORKLOAD == DA
-      printf("thd_id:%lu stxn_id:%lu batch_id:%lu seq_id:%lu type:%c rtype:%d trans_id:%lu item:%c laststate:%lu state:%lu next_state:%lu\n",
-        this->_thd_id,
-        ((DAClientQueryMessage*)msg)->txn_id,
-        ((DAClientQueryMessage*)msg)->batch_id,
-        ((DAClientQueryMessage*)msg)->seq_id,
-        type2char(((DAClientQueryMessage*)msg)->txn_type),
-        ((DAClientQueryMessage*)msg)->rtype,
-        ((DAClientQueryMessage*)msg)->trans_id,
-        static_cast<char>('x'+((DAClientQueryMessage*)msg)->item_id),
-        ((DAClientQueryMessage*)msg)->last_state,
-        ((DAClientQueryMessage*)msg)->state,
-        ((DAClientQueryMessage*)msg)->next_state);
-      fflush(stdout);
-    #endif
     if(idle_starttime > 0) {
       INC_STATS(_thd_id,worker_idle_time,get_sys_clock() - idle_starttime);
       idle_starttime = 0;
@@ -894,7 +879,21 @@ RC WorkerThread::process_rtxn(Message * msg) {
   INC_STATS(get_thd_id(),trans_init_time, txn_man->txn_stats.init_complete_time - txn_man->txn_stats.restart_starttime);
   INC_STATS(get_thd_id(),trans_init_count, 1);
   if (rc != RCOK) return rc;
-
+  #if WORKLOAD == DA
+    printf("thd_id:%lu stxn_id:%lu batch_id:%lu seq_id:%lu type:%c rtype:%d trans_id:%lu item:%c laststate:%lu state:%lu next_state:%lu\n",
+      this->_thd_id,
+      ((DAClientQueryMessage*)msg)->txn_id,
+      ((DAClientQueryMessage*)msg)->batch_id,
+      ((DAClientQueryMessage*)msg)->seq_id,
+      type2char(((DAClientQueryMessage*)msg)->txn_type),
+      ((DAClientQueryMessage*)msg)->rtype,
+      ((DAClientQueryMessage*)msg)->trans_id,
+      static_cast<char>('x'+((DAClientQueryMessage*)msg)->item_id),
+      ((DAClientQueryMessage*)msg)->last_state,
+      ((DAClientQueryMessage*)msg)->state,
+      ((DAClientQueryMessage*)msg)->next_state);
+    fflush(stdout);
+  #endif
   // Execute transaction
   txn_man->send_RQRY_RSP = false;
   if (is_cl_o) {

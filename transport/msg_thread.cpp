@@ -144,13 +144,17 @@ void MessageThread::run() {
     new_msg->return_node_id = g_node_id;
     DEBUG("%ld enqueue Msg into workqueue %d, (%ld,%ld) to %ld\n", _thd_id, new_msg->rtype, new_msg->txn_id, new_msg->batch_id,
         dest_node_id);
+    if (buffer[dest_node_id]->ready()) {
+      assert(sbuf->cnt > 0);
+      sbuf->reset(dest_node_id);   
+    }
     INC_STATS(0,trans_msgsend_stage_one,get_sys_clock()-starttime);
     work_queue.enqueue(get_thd_id(),new_msg,false);
 #elif SEND_STAGE == 2
     DEBUG("try to %ld enqueue Msg into workqueue %d, (%ld,%ld) to %ld\n", _thd_id, msg->rtype, msg->txn_id, msg->batch_id,
         dest_node_id);
     uint64_t starttime = get_sys_clock();
-    uint64_t stage3_span = 0;
+    uint64_t stage3_span1 = 0, stage3_span2 = 0;
     sbuf = buffer[dest_node_id];
 
     if(!sbuf->fits(msg->get_size())) {
@@ -160,7 +164,7 @@ void MessageThread::run() {
       ((uint32_t*)sbuf->buffer)[2] = sbuf->cnt;
       sbuf->set_send_time(get_sys_clock());
       Message::create_messages((char*)sbuf->buffer);
-      stage3_span = get_sys_clock() - stage3_starttime;
+      stage3_span1 = get_sys_clock() - stage3_starttime;
       // stage 3 parse msg
       sbuf->reset(dest_node_id);
     }
@@ -173,10 +177,21 @@ void MessageThread::run() {
     }
     Message *new_msg = Message::create_message(&sbuf->buffer[old_ptr]);
     new_msg->return_node_id = g_node_id;
+    if (buffer[dest_node_id]->ready()) {
+      assert(sbuf->cnt > 0);
+      // stage 3 parse msg
+      uint64_t stage3_starttime = get_sys_clock();
+      ((uint32_t*)sbuf->buffer)[2] = sbuf->cnt;
+      sbuf->set_send_time(get_sys_clock());
+      Message::create_messages((char*)sbuf->buffer);
+      stage3_span2 = get_sys_clock() - stage3_starttime;
+      // stage 3 parse msg
+      sbuf->reset(dest_node_id);      
+    }
     DEBUG("%ld enqueue Msg into workqueue %d, (%ld,%ld) to %ld\n", _thd_id, new_msg->rtype, new_msg->txn_id, new_msg->batch_id,
         dest_node_id);
-    INC_STATS(0,trans_msgsend_stage_one,get_sys_clock()-starttime);
-    INC_STATS(0,trans_msgsend_stage_three,stage3_span);
+    INC_STATS(0,trans_msgsend_stage_one,get_sys_clock()-starttime - stage3_span1 - stage3_span2);
+    INC_STATS(0,trans_msgsend_stage_three,stage3_span1 + stage3_span2);
     work_queue.enqueue(get_thd_id(),new_msg,false);
 #else
     DEBUG("try to %ld enqueue Msg into workqueue %d, (%ld,%ld) to %ld\n", _thd_id, msg->rtype, msg->txn_id, msg->batch_id,
@@ -199,14 +214,15 @@ void MessageThread::run() {
   }
 
   #if WORKLOAD == DA
-  if(!is_server&&false)
-  printf("cl seq_id:%lu type:%c trans_id:%lu item:%c state:%lu next_state:%lu\n",
+  if(!is_server&&true)
+  printf("cl seq_id:%lu type:%c trans_id:%lu item:%c state:%lu next_state:%lu write_version:%lu\n",
       ((DAClientQueryMessage*)msg)->seq_id,
       type2char1(((DAClientQueryMessage*)msg)->txn_type),
       ((DAClientQueryMessage*)msg)->trans_id,
       static_cast<char>('x'+((DAClientQueryMessage*)msg)->item_id),
       ((DAClientQueryMessage*)msg)->state,
-      (((DAClientQueryMessage*)msg)->next_state));
+      (((DAClientQueryMessage*)msg)->next_state),
+      ((DAClientQueryMessage*)msg)->write_version);
       fflush(stdout);
   #endif
 
