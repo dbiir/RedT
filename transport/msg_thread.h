@@ -19,7 +19,11 @@
 
 #include "global.h"
 #include "helper.h"
-#include "nn.hpp"
+#ifdef USE_RDMA
+  #include "nn_new.hpp"
+#else
+  #include "nn.hpp"
+#endif
 
 struct mbuf {
   char * buffer;

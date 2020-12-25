@@ -22,7 +22,12 @@
 #include "global.h"
 #include "manager.h"
 #include "message.h"
-#include "nn.hpp"
+#ifdef USE_RDMA
+  #include "nn_new.hpp"
+  #include "sig_sync.hpp"
+#else 
+  #include "nn.hpp"
+#endif
 #include "query.h"
 #include "tpcc_query.h"
 /*
@@ -157,7 +162,11 @@ Socket * Transport::bind(uint64_t port_id) {
 //#endif
 #endif
   printf("Sock Binding to %s %d\n",socket_name,g_node_id);
+#ifdef USE_RDMA
+  int rc = socket->sock.bind(ifaddr[g_node_id], port_id);
+#else
   int rc = socket->sock.bind(socket_name);
+#endif
   if(rc < 0) {
     printf("Bind Error: %d %s\n",errno,strerror(errno));
     assert(false);
@@ -178,7 +187,12 @@ Socket * Transport::connect(uint64_t dest_id,uint64_t port_id) {
 //#endif
 #endif
   printf("Sock Connecting to %s %d -> %ld\n",socket_name,g_node_id,dest_id);
+  
+#ifdef USE_RDMA
+  int rc = socket->sock.connect(ifaddr[g_node_id], port_id);
+#else
   int rc = socket->sock.connect(socket_name);
+#endif
   if(rc < 0) {
     printf("Connect Error: %d %s\n",errno,strerror(errno));
     assert(false);
@@ -186,6 +200,148 @@ Socket * Transport::connect(uint64_t dest_id,uint64_t port_id) {
   return socket;
 }
 
+#ifdef USE_RDMA
+void Transport::init() {
+  _sock_cnt = get_socket_count();
+
+  // m_nano_sleep(500000000);
+#define USE_IPC_SYNC
+
+#ifdef USE_IPC_SYNC
+  sig_sync::IPCLock ipc = sig_sync::IPCLock(g_total_node_cnt);
+
+  if (g_node_id == 0) {
+    ipc.clear();
+  }
+#endif
+
+  rr = 0;
+	printf("Tport Init %d: %ld\n",g_node_id,_sock_cnt);
+
+  vector<std::thread> th_bind;
+  vector<std::thread> th_connect;
+
+  string path = get_path();
+	read_ifconfig(path.c_str());
+
+  for(uint64_t node_id = 0; node_id < g_total_node_cnt; node_id++) {
+    if(node_id == g_node_id)
+      continue;
+    // Listening ports
+    if(ISCLIENTN(node_id)) {
+      for(uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt; client_thread_id < g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt; client_thread_id++) {
+
+        th_bind.push_back(std::thread([=](){
+          uint64_t port_id = get_port_id(node_id,g_node_id,client_thread_id % g_client_send_thread_cnt);
+          Socket * sock = bind(port_id);
+          recv_sockets.push_back(sock);
+          DEBUG("[C%ld]Socket insert: {%ld}: %ld\n",client_thread_id,node_id,(uint64_t)sock);
+          GREENLOG("[C%ld]Socket insert: {%ld}: %ld\n",client_thread_id,node_id,(uint64_t)port_id);
+
+        }));
+      }
+    } else {
+      for(uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt; server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt; server_thread_id++) {
+
+        th_bind.push_back(std::thread([=](){
+          uint64_t port_id = get_port_id(node_id,g_node_id,server_thread_id % g_send_thread_cnt);
+          Socket * sock = bind(port_id);
+          recv_sockets.push_back(sock);
+          DEBUG("[S%ld]Socket insert: {%ld}: %ld\n",server_thread_id,node_id,(uint64_t)sock);
+          GREENLOG("[S%ld]Socket insert: {%ld}: %ld\n",server_thread_id,node_id,(uint64_t)port_id);
+          
+        }));
+      }
+    }
+  }
+
+#ifdef USE_IPC_SYNC_
+  ipc.incre();
+  ipc.wait();
+  if (g_node_id == 0) {
+    ipc.clear();
+  }
+#endif
+
+  for(uint64_t node_id = 0; node_id < g_total_node_cnt; node_id++) {
+    if(node_id == g_node_id)
+      continue;
+    // Sending ports
+    if(ISCLIENTN(g_node_id)) {
+      for(uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt; client_thread_id < g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt; client_thread_id++) {
+
+        th_connect.push_back(std::thread([=](){
+          uint64_t port_id = get_port_id(g_node_id,node_id,client_thread_id % g_client_send_thread_cnt);
+          std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,client_thread_id);
+          Socket * sock = connect(node_id,port_id);
+          send_sockets.insert(std::make_pair(sender,sock));
+          DEBUG("[C%ld]Socket insert: {%ld}: %ld\n",client_thread_id,node_id,(uint64_t)sock);
+          REDLOG("[C%ld]Socket insert: {%ld}: %ld\n",client_thread_id,node_id,(uint64_t)port_id);
+        }));
+      }
+    } else {
+      for(uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt; server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt; server_thread_id++) {
+
+        th_connect.push_back(std::thread([=](){
+          uint64_t port_id = get_port_id(g_node_id,node_id,server_thread_id % g_send_thread_cnt);
+          std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,server_thread_id);
+          Socket * sock = connect(node_id,port_id); 
+          send_sockets.insert(std::make_pair(sender,sock));
+          DEBUG("[S%ld]Socket insert: {%ld}: %ld\n",server_thread_id,node_id,(uint64_t)sock);
+          REDLOG("[S%ld]Socket insert: {%ld}: %ld\n",server_thread_id,node_id,(uint64_t)port_id);
+        }));
+      }
+    }
+  }
+
+  for (std::thread &th: th_connect) {
+    th.join();
+  }
+
+  for (std::thread &th: th_bind) {
+    th.join();
+  }
+
+#ifdef USE_IPC_SYNC_
+  ipc.incre();
+  ipc.wait();
+#endif
+
+  REDLOG("/******** EVERYTHING IS OK ********/\n");
+
+  REDLOG("SEND: %d\n", send_sockets.size());
+  REDLOG("RECV: %d\n", recv_sockets.size());
+
+  REDLOG("/******** EVERYTHING IS OK ********/\n");
+
+  // for (auto &socket: send_sockets) {
+  //   REDLOG("[%d -> %d]\n", socket.first.first, socket.first.second);
+  //   socket.second->sock.print_pair_info_local();
+  //   socket.second->sock.print_pair_info_remote();
+  // }
+  // for (auto &socket: recv_sockets) {
+  //   // REDLOG("[%d -> %d]\n", socket.first.first, socket.first.second);
+  //   socket->sock.print_pair_info_local();
+  //   socket->sock.print_pair_info_remote();
+  // }
+  
+  // for (auto &socket: send_sockets) {
+  //   void * buf = socket.second->sock.get_send_buffer_addr();
+  //   socket.second->sock.write(buf, 32, 0);
+  // }
+
+  // for (auto &socket: send_sockets) {
+  //   printf("%s\n", (char *)(socket.second->sock.get_recv_buffer_addr()));
+  // }
+
+
+  // sleep(2);
+
+  // exit(-1);
+
+	fflush(stdout);
+}
+#else
 void Transport::init() {
   _sock_cnt = get_socket_count();
 
@@ -249,13 +405,18 @@ void Transport::init() {
 	fflush(stdout);
 }
 
+#endif
 // rename sid to send thread id
 void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * sbuf,int size) {
   uint64_t starttime = get_sys_clock();
 
   Socket * socket = send_sockets.find(std::make_pair(dest_node_id,send_thread_id))->second;
   // Copy messages to nanomsg buffer
+#ifdef USE_RDMA
+  void * buf = socket->sock.get_send_buffer_addr();
+#else
 	void * buf = nn_allocmsg(size,0);
+#endif
 	memcpy(buf,sbuf,size);
   DEBUG("%ld Sending batch of %d bytes to node %ld on socket %ld\n", send_thread_id, size,
         dest_node_id, (uint64_t)socket);
@@ -263,7 +424,14 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * 
   int rc = -1;
   while (rc < 0 && (!simulation->is_setup_done() ||
                     (simulation->is_setup_done() && !simulation->is_done()))) {
+    //printf("[send buf] %s", buf);
+    //exit(0);
+#ifdef USE_RDMA
+    
+    rc= socket->sock.send(buf,size, NN_DONTWAIT);
+#else
     rc= socket->sock.send(&buf,NN_MSG,NN_DONTWAIT);
+#endif
   }
   //nn_freemsg(sbuf);
   DEBUG("%ld Batch of %d bytes sent to node %ld\n",send_thread_id,size,dest_node_id);
@@ -297,16 +465,27 @@ std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
                         (simulation->is_setup_done() && !simulation->is_done()))) {
     Socket * socket = recv_sockets[ctr];
 		bytes = socket->sock.recv(&buf, NN_MSG, NN_DONTWAIT);
+    //printf("[recv buf] %s", buf);
+    //if (buf != NULL) {
+    //  exit(1);
+    //}
+#ifdef USE_RDMA
+     
+    printf("[Recv_Size]%d\n", bytes);
+#endif
     //++ctr;
     ctr = (ctr + g_this_rem_thread_cnt);
 
     if (ctr >= recv_sockets.size()) ctr = (thd_id % g_this_rem_thread_cnt) % recv_sockets.size();
     if (ctr == start_ctr) break;
-
+#ifdef USE_RDMA
+    // Do nothing
+#else
 		if(bytes <= 0 && errno != 11) {
 		  printf("Recv Error %d %s\n",errno,strerror(errno));
 			nn::freemsg(buf);
 		}
+#endif
 
     if (bytes > 0) break;
 	}
@@ -324,8 +503,11 @@ std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
   msgs = Message::create_messages((char*)buf);
   DEBUG("Batch of %d bytes recv from node %ld; Time: %f\n", bytes, msgs->front()->return_node_id,
         simulation->seconds_from_start(get_sys_clock()));
-
+#ifdef USE_RDMA
+  // Do nothing
+#else
 	nn::freemsg(buf);
+#endif
 
 	INC_STATS(thd_id,msg_unpack_time,get_sys_clock()-starttime);
   return msgs;

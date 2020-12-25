@@ -17,7 +17,12 @@
 #ifndef _TRANSPORT_H_
 #define _TRANSPORT_H_
 #include "global.h"
-#include "nn.hpp"
+//#include "nn.hpp"
+#ifdef USE_RDMA
+  #include "nn_new.hpp"
+#else
+  #include "nn.hpp"
+#endif
 #include <nanomsg/bus.h>
 #include <nanomsg/pair.h>
 #include "query.h"
@@ -37,11 +42,15 @@ Data:	MSG_SIZE - HDR_SIZE bytes
 
 class Socket {
 	public:
+#ifdef USE_RDMA
+    Socket () : sock() {}
+#else
 		Socket () : sock(AF_SP,NN_PAIR) {}
+#endif
 		~Socket () { delete &sock;}
         char _pad1[CL_SIZE];
 		nn::socket sock;
-        char _pad[CL_SIZE - sizeof(nn::socket)];//?_pad的用处
+        //char _pad[CL_SIZE - sizeof(nn::socket)];//?_pad的用处
 };
 
 class Transport {

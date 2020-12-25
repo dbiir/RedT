@@ -22,11 +22,19 @@
 */
 
 /***********************************************/
+// USE RDMA
+/**********************************************/
+//#define USE_RDMA
+#define RDMA_BUFFER_SIZE (1<<22)
+#define RDMA_CYC_QP_NUM (1<<10)
+#define RDMA_BUFFER_ITEM_SIZE (1<<10)
+//#define RDMA_COLOR_LOG
+/***********************************************/
 // DA Trans Creator
 /***********************************************/
 //which creator to use
 #define CREATOR_USE_T false
-#define USE_RDMA false
+//#define USE_RDMA false
 
 //TraversalActionSequenceCreator
 #define TRANS_CNT 2
@@ -57,7 +65,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
+#define NODE_CNT 1
 #define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -127,7 +135,7 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 7000
+#define TPORT_PORT 18000
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -226,7 +234,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 16777216
+#define SYNTH_TABLE_SIZE 8388608
 #define ZIPF_THETA 0.0
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5
@@ -403,7 +411,7 @@ enum PPSTxnType {
 #define LTS_CURL_CLOCK          5
 #define LTS_TCP_CLOCK          6
 
-#define LTS_TCP_IP  "10.77.110.147"
+#define LTS_TCP_IP  "10.77.110.148"
 #define LTS_TCP_PORT  62389
 // MODES
 // NORMAL < NOCC < QRY_ONLY < SETUP < SIMPLE
