@@ -1,0 +1,62 @@
+digraph graphname {
+  total [label="trans total time \n 573237.46\n 100 %",
+		shape=box]
+	process [label="trans process time \n 4507.45\n 0.79%",
+			shape=box]
+    txn_process [label="run benchmark read and write \n 36.68\n 0.01%",
+			shape=box]
+      init [label="trans init time \n 35.01\n 0.01%",
+        shape=box]
+      index [label="trans index time \n 0.65\n 0.00%",
+          shape=box]
+      txn_compute [label="run benchmark compute \n 2.32\n 0.00%",
+			            shape=box]
+      access_rwset [label="access data and store in rwset \n 28.24\n 0.00%",
+            shape=box]
+        get_access [label="get rwset struct \n 3.52\n 0.00%",
+            shape=box]
+        get_row [label="get row \n 23.15\n 0.00%",
+            shape=box]
+          init_row [label="init row \n 8.05\n 0.00%",
+              shape=box]
+          rw_row [label="read and write row \n 61.24\n 0.01%",
+              shape=box]
+          cur_row_copy [label="copy row \n 2.61\n 0.00%",
+              shape=box]
+        store_access [label="store row into rwset \n 0.88\n 0.00%",
+              shape=box]
+    block [label="trans block time \n 101.51\n 0.02%",
+        shape=box]
+	twopc [label="trans 2pc time \n 1838926292362.33\n 320796603.78%",
+		shape=box]
+		prepare [label="trans prepare time \n 0.00\n 0.00%",
+				shape=box]
+			validate [label="trans validate time \n 162.28\n 0.03%",
+					shape=box]
+		finish [label="trans finish time \n 2394.73\n 0.42%",
+				shape=box]
+			commit [label="trans commit time \n 0.10\n 0.00%",
+				shape=box]
+			abort [label="trans abort time \n 2394.63\n 0.42%",
+				shape=box]
+
+  total->process
+    process->txn_process
+      txn_process->init
+      txn_process->index
+      txn_process->txn_compute
+      txn_process->access_rwset
+        access_rwset->get_access
+        access_rwset->get_row
+          get_row->init_row
+          get_row->rw_row
+          get_row->cur_row_copy
+        access_rwset->store_access
+    process->block
+  total->twopc
+    twopc->prepare
+      prepare->validate
+    twopc->finish
+      finish->commit
+      finish->abort
+};

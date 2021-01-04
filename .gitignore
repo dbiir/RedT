@@ -1,0 +1,11 @@
+config.h
+*.o
+results*
+figs*
+*ifconfig.txt
+rundb
+runcl
+.vscode/*
+obj/*
+gnuplot-5.2.8/
+input.txt

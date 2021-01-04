@@ -1,0 +1,29 @@
+digraph graphname {
+  total [label="distributed total process time \n trans_total_run_time \n 100 %",
+		shape=box]
+  local_msg [label="1. local msg queue wait time \n trans_msg_local_wait \n trans_msg_local_wait_percent %",
+			shape=box]
+  network_A [label="2. msg send to remote \n trans_network_a \n trans_network_a_percent %",
+			shape=box]
+  remote_work [label="3. remote work queue wait time \n trans_work_remote_wait \n trans_work_remote_wait_percent %",
+			shape=box]
+  remote_process [label="4. remote process time \n trans_remote_process \n trans_remote_process_percent %",
+			shape=box]
+  remote_msg [label="5. remote msg queue wait time \n trans_msg_remote_wait \n trans_msg_remote_wait_percent %",
+			shape=box]
+  network_B [label="6. msg send back to local \n trans_network_b \n trans_network_b_percent %",
+			shape=box]
+  local_work [label="7. local work queue wait time \n trans_work_local_wait \n trans_work_local_wait_percent %",
+			shape=box]
+	local_process [label="8. local process time \n trans_local_process \n trans_local_process_percent %",
+			shape=box]
+
+  total->local_msg
+  total->network_A
+  total->remote_work
+  total->remote_process
+  total->remote_msg
+  total->network_B
+  total->local_work
+  total->local_process
+};
