@@ -218,6 +218,7 @@ static int m_memc_get_published(const char *key, void **value)
 }
 
 static void
+
 m_init_ds(struct m_ibv_res *ibv_res) {
 
 	ibv_res->send_cq = (struct ibv_cq **)malloc(sizeof(struct ibv_cq *) * ibv_res->qp_sum);

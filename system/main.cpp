@@ -71,7 +71,7 @@ CalvinLockThread * calvin_lock_thds;
 CalvinSequencerThread * calvin_seq_thds;
 #endif
 
-#if USE_RDMA
+#ifdef USE_RDMA
 	//DEFINE_int64(port, 8888, "Server listener (UDP) port.");
 	//DEFINE_int64(use_nic_idx, 1, "Which NIC to create QP");
 	//DEFINE_int64(reg_nic_name, 73, "The name to register an opened NIC at rctrl.");
@@ -91,7 +91,7 @@ void parser(int argc, char * argv[]);
 
 int main(int argc, char *argv[]) {
 	
-#if USE_RDMA
+#ifdef USE_RDMA
 	//RCtrl ctrl(port);
 	//RDMA_LOG(4) << "Pingping server listenes at localhost:" << port;
 

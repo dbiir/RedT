@@ -100,6 +100,44 @@ void init_client_globals() {
 // Global Clock!
 /****************************************************/
 
+void REDLOG(const char *format, ...)
+{ 
+#ifdef RDMA_COLOR_LOG
+  va_list args;
+
+  char buf1[1000], buf2[1000];
+  memset(buf1, 0, 1000);
+  memset(buf2, 0, 1000);
+
+    va_start(args, format);
+  vsnprintf(buf1, 1000, format, args);
+
+  snprintf(buf2, 1000, "\033[31m%s\033[0m", buf1);
+  printf("%s", buf2);
+  //write(2, buf2, 1000);
+    va_end( args );
+#endif
+}
+
+void GREENLOG(const char *format, ...)
+{ 
+#ifdef RDMA_COLOR_LOG
+  va_list args;
+
+  char buf1[1000], buf2[1000];
+  memset(buf1, 0, 1000);
+  memset(buf2, 0, 1000);
+
+    va_start(args, format);
+  vsnprintf(buf1, 1000, format, args);
+
+  snprintf(buf2, 1000, "\033[32m%s\033[0m", buf1);
+  printf("%s", buf2);
+  //write(2, buf2, 1000);
+    va_end( args );
+#endif
+}
+
 uint64_t get_wall_clock() {
 	timespec * tp = new timespec;
   clock_gettime(CLOCK_REALTIME, tp);
