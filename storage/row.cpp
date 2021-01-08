@@ -353,7 +353,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 
 	rc = this->manager->lock_get(lt, txn);
 
-  uint64_t copy_time = get_sys_clock();
+  	uint64_t copy_time = get_sys_clock();
 	if (rc == RCOK) {
 		access->data = this;
 	} else if (rc == Abort) {

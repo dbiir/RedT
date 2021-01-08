@@ -42,15 +42,18 @@
 #define INPUT_FILE_PATH "./input.txt"
 
 // ! Parameters used to locate distributed performance bottlenecks.
+
 #define SECOND 100 // Set the queue monitoring time.
 // #define THD_ID_QUEUE
 #define ONE_NODE_RECIEVE 0 // only node 0 will receive the txn query
+#if 0
 // #define LESS_DIS // Reduce the number of yCSB remote data to 1
 // #define LESS_DIS_NUM 10 // Reduce the number of yCSB remote data to 1
 // #define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
 // #define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
 // #define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
 // #define NO_REMOTE // remove all remote txn
+#endif 
 #define TXN_QUEUE_PERCENT 0.0 // The proportion of the transaction to take from txn_queue firstly.
 #define MALLOC_TYPE 0 // 0 represent normal malloc. 1 represent je-malloc
 // ! end of these parameters
