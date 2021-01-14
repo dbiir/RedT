@@ -42,7 +42,7 @@ namespace qp {
                                 .imm_data = 0}
   );
 */
-class RC : public Dummy, public std::enable_shared_from_this<RC> {
+class RDMARC : public Dummy, public std::enable_shared_from_this<RDMARC> {
 public:
   // default local MR used by this QP
   Option<RegAttr> local_mr;
@@ -65,7 +65,7 @@ public:
      }
   */
 private:
-  RC(Arc<RNic> nic, const QPConfig &config,ibv_cq *recv_cq = nullptr) : Dummy(nic), my_config(config) {
+  RDMARC(Arc<RNic> nic, const QPConfig &config,ibv_cq *recv_cq = nullptr) : Dummy(nic), my_config(config) {
     /*
       It takes 3 steps to create an RC QP during the initialization
       according to the RDMA programming mannal.
@@ -104,12 +104,12 @@ private:
   }
 
 public:
-  static Option<Arc<RC>> create(Arc<RNic> nic,
+  static Option<Arc<RDMARC>> create(Arc<RNic> nic,
                                 const QPConfig &config = QPConfig(),
                                 ibv_cq *recv_cq = nullptr) {
-    auto res = Arc<RC>(new RC(nic, config,recv_cq));
+    auto res = Arc<RDMARC>(new RDMARC(nic, config,recv_cq));
     if (res->valid()) {
-      return Option<Arc<RC>>(std::move(res));
+      return Option<Arc<RDMARC>>(std::move(res));
     }
     return {};
   }

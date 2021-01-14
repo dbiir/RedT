@@ -8,11 +8,11 @@ RALLOC = ./rlib/lib
 
 .SUFFIXES: .o .cpp .h .cc
 
-SRC_DIRS = ./ ./benchmarks/ ./client/ ./concurrency_control/ ./storage/ ./transport/ ./system/ ./statistics/ ./rlib/ ./rlibv2/#./unit_tests/
-DEPS = -I. -I./benchmarks -I./client/ -I./concurrency_control -I./storage -I./transport -I./system -I./statistics -I./rlib/ -I./rlibv2/#-I./unit_tests
+SRC_DIRS = ./ ./benchmarks/ ./client/ ./concurrency_control/ ./storage/ ./transport/ ./system/ ./statistics/ ./rlib/ ./rlibv2/ #./unit_tests/
+DEPS = -I. -I./benchmarks -I./client/ -I./concurrency_control -I./storage -I./transport -I./system -I./statistics -I./rlib/ -I./rlibv2/ #-I./unit_tests
 
 CFLAGS += $(DEPS) -D NOGRAPHITE=1 -Wno-sizeof-pointer-memaccess
-LDFLAGS = -Wall -L. -L$(NNMSG) -Wl,-rpath -pthread -lrt -lnanomsg -lanl -lcurl -lprotobuf -lpthread -libverbs -L$(RALLOC) -lssmalloc #-lc++experimental 
+LDFLAGS = -Wall -L. -L$(NNMSG) -Wl,-rpath -pthread -lrt -lnanomsg -lanl -lcurl -lprotobuf -lpthread -libverbs -L$(RALLOC) -lssmalloc #-ljemalloc#-lc++experimental 
 #LDFLAGS = -Wall -L. -L$(NNMSG) -L$(JEMALLOC)/lib -Wl,-rpath,$(JEMALLOC)/lib -pthread -gdwarf-3 -lrt -std=c++11
 LDFLAGS += $(CFLAGS)
 LIBS = -lrdmacm -lmemcached

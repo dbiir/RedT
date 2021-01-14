@@ -43,7 +43,7 @@ public:
         proto::CreateRCM,
         std::bind(&RecvManager::msg_rc_handler, this, std::placeholders::_1)));
   }
-
+  
   /*!
     The handler for creating a QP which is ready for recv.
     This handler should register with RCtrl (defined in ../rctrl.hh).
@@ -81,7 +81,7 @@ public:
         }
 
         // 1.1 try to create and register this QP
-        auto rc = qp::RC::create(nic.value(), rc_req.config, recv_cq).value();
+        auto rc = qp::RDMARC::create(nic.value(), rc_req.config, recv_cq).value();
         auto rc_status = rctrl_p->registered_qps.reg(rc_req.name, rc);
 
         if (!rc_status) {

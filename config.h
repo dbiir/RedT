@@ -27,7 +27,12 @@
 #define USE_RDMA
 #define RDMA_BUFFER_SIZE (1<<22)
 #define RDMA_CYC_QP_NUM (1<<10)
-#define RDMA_BUFFER_ITEM_SIZE (1<<10)
+#define RDMA_BUFFER_ITEM_SIZE (1<<11)
+#define RDMA_USE_NIC_IDX 0
+#define RDMA_REG_MEM_NAME 73
+#define RDMA_CQ_NAME "rdma_channel"
+#define RDMA_ENTRY_NUM 1U
+
 //#define RDMA_COLOR_LOG
 /***********************************************/
 // DA Trans Creator
@@ -136,6 +141,7 @@
 /***********************************************/
 #define TPORT_TYPE tcp
 #define TPORT_PORT 18000
+#define TPORT_TWOSIDE_PORT 13000
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128

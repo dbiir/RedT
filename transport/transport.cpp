@@ -5,7 +5,7 @@
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+	   http://www.apache.org/licenses/LICENSE-2.0
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,18 +16,27 @@
 #include "transport.h"
 
 #include <stdio.h>
-
+#include "pthread.h"
 #include <iostream>
 
 #include "global.h"
 #include "manager.h"
 #include "message.h"
+
 #ifdef USE_RDMA
-  #include "nn_new.hpp"
   #include "sig_sync.hpp"
+  #include "lib.hh"
+  #include "qps/rc_recv_manager.hh"
+  #include "qps/recv_iter.hh"
+  #include "qps/mod.hh"
+  #include "utils/timer.hh"
+  using namespace rdmaio;
+  using namespace rdmaio::rmem;
+  using namespace rdmaio::qp;
 #else 
-  #include "nn.hpp"
+  #include "nn.hpp"  
 #endif
+
 #include "query.h"
 #include "tpcc_query.h"
 /*
@@ -55,7 +64,7 @@ void Transport::read_ifconfig(const char * ifaddr_file) {
   while (getline(fin, line)) {
 		//memcpy(ifaddr[cnt],&line[0],12);
 		ifaddr[cnt] = new char[line.length()+1];
-    strcpy(ifaddr[cnt],&line[0]);
+	strcpy(ifaddr[cnt],&line[0]);
 		printf("%ld: %s\n",cnt,ifaddr[cnt]);
 		cnt++;
 	}
@@ -66,9 +75,9 @@ void Transport::read_ifconfig(const char * ifaddr_file) {
 uint64_t Transport::get_socket_count() {
   uint64_t sock_cnt = 0;
   if(ISCLIENT)
-    sock_cnt = (g_total_node_cnt)*2 + g_client_send_thread_cnt * g_servers_per_client;
+	sock_cnt = (g_total_node_cnt)*2 + g_client_send_thread_cnt * g_servers_per_client;
   else
-    sock_cnt = (g_total_node_cnt)*2 + g_client_send_thread_cnt;
+	sock_cnt = (g_total_node_cnt)*2 + g_client_send_thread_cnt;
   return sock_cnt;
 }
 
@@ -111,9 +120,44 @@ uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id) {
   return port_id;
 }
 
+uint64_t Transport::get_twoside_port_id(uint64_t src_node_id, uint64_t dest_node_id,
+								uint64_t send_thread_id) {
+  uint64_t port_id = 0;
+  DEBUG("Calc port id %ld %ld %ld\n",src_node_id,dest_node_id,send_thread_id);
+  port_id += g_total_node_cnt * dest_node_id;
+  DEBUG("%ld\n",port_id);
+  port_id += src_node_id;
+  DEBUG("%ld\n",port_id);
+  //  uint64_t max_send_thread_cnt = g_send_thread_cnt > g_client_send_thread_cnt ?
+  // g_send_thread_cnt : g_client_send_thread_cnt;
+//  port_id *= max_send_thread_cnt;
+  port_id += send_thread_id * g_total_node_cnt * g_total_node_cnt;
+  DEBUG("%ld\n",port_id);
+  port_id += TPORT_TWOSIDE_PORT;
+  DEBUG("%ld\n",port_id);
+  return port_id;
+}
+
+uint64_t Transport::get_twoside_id(uint64_t src_node_id, uint64_t dest_node_id,
+								uint64_t send_thread_id) {
+  uint64_t port_id = 0;
+  DEBUG("Calc port id %ld %ld %ld\n",src_node_id,dest_node_id,send_thread_id);
+  port_id += g_total_node_cnt * dest_node_id;
+  DEBUG("%ld\n",port_id);
+  port_id += src_node_id;
+  DEBUG("%ld\n",port_id);
+  //  uint64_t max_send_thread_cnt = g_send_thread_cnt > g_client_send_thread_cnt ?
+  // g_send_thread_cnt : g_client_send_thread_cnt;
+//  port_id *= max_send_thread_cnt;
+  port_id += send_thread_id * g_total_node_cnt * g_total_node_cnt;
+  DEBUG("%ld\n",port_id);
+  DEBUG("%ld\n",port_id);
+  return port_id;
+}
+
 #if NETWORK_DELAY_TEST || !ENVIRONMENT_EC2
 uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id,
-                                uint64_t send_thread_id) {
+								uint64_t send_thread_id) {
   uint64_t port_id = 0;
   DEBUG("Calc port id %ld %ld %ld\n",src_node_id,dest_node_id,send_thread_id);
   port_id += g_total_node_cnt * dest_node_id;
@@ -133,7 +177,7 @@ uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id,
 #else
 
 uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id,
-                                uint64_t send_thread_id) {
+								uint64_t send_thread_id) {
   uint64_t port_id = 0;
   DEBUG("Calc port id %ld %ld %ld\n",src_node_id,dest_node_id,send_thread_id);
   port_id += dest_node_id + src_node_id;
@@ -162,14 +206,10 @@ Socket * Transport::bind(uint64_t port_id) {
 //#endif
 #endif
   printf("Sock Binding to %s %d\n",socket_name,g_node_id);
-#ifdef USE_RDMA
-  int rc = socket->sock.bind(ifaddr[g_node_id], port_id);
-#else
   int rc = socket->sock.bind(socket_name);
-#endif
   if(rc < 0) {
-    printf("Bind Error: %d %s\n",errno,strerror(errno));
-    assert(false);
+	printf("Bind Error: %d %s\n",errno,strerror(errno));
+	assert(false);
   }
   return socket;
 }
@@ -188,157 +228,198 @@ Socket * Transport::connect(uint64_t dest_id,uint64_t port_id) {
 #endif
   printf("Sock Connecting to %s %d -> %ld\n",socket_name,g_node_id,dest_id);
   
-#ifdef USE_RDMA
-  int rc = socket->sock.connect(ifaddr[g_node_id], port_id);
-#else
+
   int rc = socket->sock.connect(socket_name);
-#endif
   if(rc < 0) {
-    printf("Connect Error: %d %s\n",errno,strerror(errno));
-    assert(false);
+	printf("Connect Error: %d %s\n",errno,strerror(errno));
+	assert(false);
   }
   return socket;
 }
 
 #ifdef USE_RDMA
+void Transport::create_server(uint64_t port, uint64_t dest_node_id) {
+	RCtrl ctrl(port);
+	RecvManager<RDMA_ENTRY_NUM, RDMA_BUFFER_ITEM_SIZE> manager(ctrl);
+	//auto tport_man.nic = RNic::create(RNicInfo::query_dev_names().at(RDMA_USE_NIC_IDX)).value();
+	RDMA_ASSERT(ctrl.opened_nics.reg(0, tport_man.nic));
+	RDMA_LOG(4) << g_node_id << " RDMA listens " << dest_node_id << " at " << port;
+	
+	//1、create receive cq
+	auto recv_cq_res = ::rdmaio::qp::Impl::create_cq(tport_man.nic, RDMA_ENTRY_NUM);
+	RDMA_ASSERT(recv_cq_res == IOCode::Ok);
+	auto recv_cq = std::get<0>(recv_cq_res.desc);
+	
+	//2、prepare the message buffer with allocator
+	auto mem = Arc<RMem>(new RMem(RDMA_BUFFER_SIZE)); // a memory with 4M bytes
+	auto handler = RegHandler::create(mem, tport_man.nic).value();
+	auto alloc = std::make_shared<SimpleAllocator>(mem, handler->get_reg_attr().value().key);
+
+	//3、register receive cq
+	manager.reg_recv_cqs.create_then_reg(RDMA_CQ_NAME+to_string(port), recv_cq, alloc);
+	RDMA_LOG(4) << "Register " << RDMA_CQ_NAME+to_string(port);
+	int64_t reg_mem_name = RDMA_REG_MEM_NAME + int64_t(port) - TPORT_TWOSIDE_PORT;
+	RDMA_LOG(4) << "Reg_mem_name is " << reg_mem_name;
+	ctrl.registered_mrs.reg(reg_mem_name, handler);
+	ctrl.start_daemon();
+	sleep(10);
+	RDMA_LOG(4) << "Recv qp: " << "rdma_qp"+to_string(port);
+	auto recv_qp = ctrl.registered_qps.query("rdma_qp"+to_string(port)).value();
+	auto recv_rs = manager.reg_recv_entries.query("rdma_qp"+to_string(port)).value();
+	pthread_mutex_lock( tport_man.latch );
+
+	tport_man.recv_handlers.push_back(handler);
+	tport_man.recv_qps.insert(pair<uint64_t, rdmaio::Arc<rdmaio::qp::Dummy>>(port-TPORT_TWOSIDE_PORT, recv_qp));
+	tport_man.recv_rss.insert(pair<uint64_t, rdmaio::Arc<rdmaio::qp::RecvEntries<1U>>>(port-TPORT_TWOSIDE_PORT, recv_rs));
+	pthread_mutex_unlock( tport_man.latch );
+	u64 recv_cnt = 0;
+
+	RDMA_LOG(2) << "a new recv";
+	pthread_mutex_lock( tport_man.latch );
+	auto recv_qpi = tport_man.recv_qps[port-TPORT_TWOSIDE_PORT];
+	auto recv_rsi = tport_man.recv_rss[port-TPORT_TWOSIDE_PORT];
+	pthread_mutex_unlock( tport_man.latch );
+	for (RecvIter<Dummy, RDMA_ENTRY_NUM> iter(recv_qpi, recv_rsi); iter.has_msgs();
+		iter.next()) {
+		auto imm_msg = iter.cur_msg().value();
+
+		auto buf = static_cast<char *>(std::get<1>(imm_msg));
+		const std::string msg(buf, 2048);  // wrap the received msg
+		
+		u64 seq = std::atoi(msg.c_str());
+		recv_cnt++;
+		RDMA_LOG(2) << "the message content is" << buf;
+	}
+}
+void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
+	//1、create the local QP to send
+	auto qp = RDMARC::create(tport_man.nic, QPConfig()).value();
+	string ifaddr_temp = ifaddr[dest_node_id];
+	string addr = ifaddr_temp + ":" + std::to_string(port);
+	cout << addr << endl;
+	
+	ConnectManager cm(addr);
+	
+	if (cm.wait_ready(1000000, 4) == IOCode::Timeout)
+	RDMA_LOG(4) << "connect to the " << ifaddr[dest_node_id] << " timeout!";
+	sleep(1);
+	//2、create the remote QP and connect
+	auto qp_res = cm.cc_rc_msg("rdma_qp"+to_string(port), 
+		RDMA_CQ_NAME+to_string(port), 4096, qp, RDMA_USE_NIC_IDX, QPConfig());
+	cout << "rdma_qp"+to_string(port) << "  " << RDMA_CQ_NAME+to_string(port);
+	RDMA_ASSERT(qp_res == IOCode::Ok) << std::get<0>(qp_res.desc);
+	auto fetch_res = cm.fetch_remote_mr(RDMA_REG_MEM_NAME + int64_t(port) - TPORT_TWOSIDE_PORT);
+	rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);
+
+	auto local_mr = RegHandler::create(Arc<RMem>(new RMem(1024 * 1024)), tport_man.nic).value();
+	char *buf = (char *)(local_mr->get_reg_attr().value().buf);
+	qp->bind_remote_mr(remote_attr);
+	qp->bind_local_mr(local_mr->get_reg_attr().value());
+	pthread_mutex_lock( tport_man.latch_send );
+	tport_man.cms.push_back(cm); 
+	tport_man.send_handlers.push_back(local_mr);
+	tport_man.send_qps.insert(pair<uint64_t, rdmaio::Arc<rdmaio::qp::RDMARC>>(port-TPORT_TWOSIDE_PORT, qp));
+	pthread_mutex_unlock( tport_man.latch_send );
+	RDMA_LOG(2) << "rc client ready to send message to the server!";
+	pthread_mutex_lock( tport_man.latch_send );
+	
+	auto send_qpi = tport_man.send_qps[port-TPORT_TWOSIDE_PORT];
+	char *buf2 = (char *)(send_qpi->local_mr->buf);
+	pthread_mutex_unlock( tport_man.latch_send );
+	Timer timer;
+	for (int i = 1; i <= 1; ++i) {
+		std::string msg = std::to_string(i);
+		memset(buf2, 0, msg.size() + 1);
+		memcpy(buf2, msg.data(), msg.size());
+		RDMA_LOG(2) << "the message content is" << buf2;
+		printf("qp buf ptr:%p\n", buf2);
+		auto res_s = send_qpi->send_normal(
+			{.op = IBV_WR_SEND_WITH_IMM,
+			.flags = IBV_SEND_SIGNALED,
+			.len = (u32) msg.size() + 1, 
+			.wr_id = 0},
+			{.local_addr = reinterpret_cast<RMem::raw_ptr_t>(buf2),
+			.remote_addr = 0,
+			.imm_data = 0});
+
+		RDMA_ASSERT(res_s == IOCode::Ok);
+		auto res_p = send_qpi->wait_one_comp(10000000);
+		RDMA_ASSERT(res_p == IOCode::Ok);
+	}
+}
 void Transport::init() {
   _sock_cnt = get_socket_count();
-
-  // m_nano_sleep(500000000);
-#define USE_IPC_SYNC
-
-#ifdef USE_IPC_SYNC
-  sig_sync::IPCLock ipc = sig_sync::IPCLock(g_total_node_cnt);
-
-  if (g_node_id == 0) {
-    ipc.clear();
-  }
-#endif
-
-  rr = 0;
-	printf("Tport Init %d: %ld\n",g_node_id,_sock_cnt);
-
-  vector<std::thread> th_bind;
-  vector<std::thread> th_connect;
-
+  rr = 0; 
+  printf("Tport Init %d: %ld\n",g_node_id,_sock_cnt);
   string path = get_path();
 	read_ifconfig(path.c_str());
-
+  
+	latch = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init( latch, NULL );
+  latch_send = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init( latch_send, NULL );
+  tport_man.nic = RNic::create(RNicInfo::query_dev_names().at(RDMA_USE_NIC_IDX)).value();
+  vector<std::thread> th_bind;
+  vector<std::thread> th_connect;
   for(uint64_t node_id = 0; node_id < g_total_node_cnt; node_id++) {
-    if(node_id == g_node_id)
-      continue;
-    // Listening ports
-    if(ISCLIENTN(node_id)) {
-      for(uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt; client_thread_id < g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt; client_thread_id++) {
-
-        th_bind.push_back(std::thread([=](){
-          uint64_t port_id = get_port_id(node_id,g_node_id,client_thread_id % g_client_send_thread_cnt);
-          Socket * sock = bind(port_id);
-          recv_sockets.push_back(sock);
-          DEBUG("[C%ld]Socket insert: {%ld}: %ld\n",client_thread_id,node_id,(uint64_t)sock);
-          GREENLOG("[C%ld]Socket insert: {%ld}: %ld\n",client_thread_id,node_id,(uint64_t)port_id);
-
-        }));
-      }
-    } else {
-      for(uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt; server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt; server_thread_id++) {
-
-        th_bind.push_back(std::thread([=](){
-          uint64_t port_id = get_port_id(node_id,g_node_id,server_thread_id % g_send_thread_cnt);
-          Socket * sock = bind(port_id);
-          recv_sockets.push_back(sock);
-          DEBUG("[S%ld]Socket insert: {%ld}: %ld\n",server_thread_id,node_id,(uint64_t)sock);
-          GREENLOG("[S%ld]Socket insert: {%ld}: %ld\n",server_thread_id,node_id,(uint64_t)port_id);
-          
-        }));
-      }
-    }
-  }
-
-#ifdef USE_IPC_SYNC_
-  ipc.incre();
-  ipc.wait();
-  if (g_node_id == 0) {
-    ipc.clear();
-  }
-#endif
-
-  for(uint64_t node_id = 0; node_id < g_total_node_cnt; node_id++) {
-    if(node_id == g_node_id)
-      continue;
-    // Sending ports
-    if(ISCLIENTN(g_node_id)) {
-      for(uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt; client_thread_id < g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt; client_thread_id++) {
-
-        th_connect.push_back(std::thread([=](){
-          uint64_t port_id = get_port_id(g_node_id,node_id,client_thread_id % g_client_send_thread_cnt);
-          std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,client_thread_id);
-          Socket * sock = connect(node_id,port_id);
-          send_sockets.insert(std::make_pair(sender,sock));
-          DEBUG("[C%ld]Socket insert: {%ld}: %ld\n",client_thread_id,node_id,(uint64_t)sock);
-          REDLOG("[C%ld]Socket insert: {%ld}: %ld\n",client_thread_id,node_id,(uint64_t)port_id);
-        }));
-      }
-    } else {
-      for(uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt; server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt; server_thread_id++) {
-
-        th_connect.push_back(std::thread([=](){
-          uint64_t port_id = get_port_id(g_node_id,node_id,server_thread_id % g_send_thread_cnt);
-          std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,server_thread_id);
-          Socket * sock = connect(node_id,port_id); 
-          send_sockets.insert(std::make_pair(sender,sock));
-          DEBUG("[S%ld]Socket insert: {%ld}: %ld\n",server_thread_id,node_id,(uint64_t)sock);
-          REDLOG("[S%ld]Socket insert: {%ld}: %ld\n",server_thread_id,node_id,(uint64_t)port_id);
-        }));
-      }
-    }
+	if (node_id == g_node_id) continue;
+	// Listening ports
+	if(ISCLIENTN(node_id)) {
+	  for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
+		   client_thread_id <
+			   g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
+		   client_thread_id++) {
+			th_bind.push_back(std::thread([=](){
+				uint64_t port_id =
+					get_twoside_port_id(node_id, g_node_id, client_thread_id % g_client_send_thread_cnt); 
+				create_server(port_id, node_id);
+			}));
+		}
+	} else {
+	  for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
+		   server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
+		   server_thread_id++) {
+			th_bind.push_back(std::thread([=](){
+				uint64_t port_id = get_twoside_port_id(node_id,g_node_id,server_thread_id % g_send_thread_cnt);
+				create_server(port_id, node_id);
+			}));
+		}
+	}
+	// Sending ports
+	if(ISCLIENTN(g_node_id)) {
+		for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
+			client_thread_id <
+				g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
+			client_thread_id++) {
+			th_connect.push_back(std::thread([=](){
+			sleep(1);
+			cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
+				uint64_t port_id =
+				get_twoside_port_id(g_node_id, node_id, client_thread_id % g_client_send_thread_cnt);
+				create_client(port_id, node_id);
+			}));
+		}
+	} else {
+		for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
+			server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
+			server_thread_id++) {
+			th_connect.push_back(std::thread([=](){
+				sleep(1);
+				cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
+				uint64_t port_id = get_twoside_port_id(g_node_id,node_id,server_thread_id % g_send_thread_cnt);
+				create_client(port_id, node_id);
+			}));
+		}
+	}
   }
 
   for (std::thread &th: th_connect) {
-    th.join();
+	th.join();
   }
 
   for (std::thread &th: th_bind) {
-    th.join();
+	th.join();
   }
-
-#ifdef USE_IPC_SYNC_
-  ipc.incre();
-  ipc.wait();
-#endif
-
-  REDLOG("/******** EVERYTHING IS OK ********/\n");
-
-  REDLOG("SEND: %d\n", send_sockets.size());
-  REDLOG("RECV: %d\n", recv_sockets.size());
-
-  REDLOG("/******** EVERYTHING IS OK ********/\n");
-
-  // for (auto &socket: send_sockets) {
-  //   REDLOG("[%d -> %d]\n", socket.first.first, socket.first.second);
-  //   socket.second->sock.print_pair_info_local();
-  //   socket.second->sock.print_pair_info_remote();
-  // }
-  // for (auto &socket: recv_sockets) {
-  //   // REDLOG("[%d -> %d]\n", socket.first.first, socket.first.second);
-  //   socket->sock.print_pair_info_local();
-  //   socket->sock.print_pair_info_remote();
-  // }
-  
-  // for (auto &socket: send_sockets) {
-  //   void * buf = socket.second->sock.get_send_buffer_addr();
-  //   socket.second->sock.write(buf, 32, 0);
-  // }
-
-  // for (auto &socket: send_sockets) {
-  //   printf("%s\n", (char *)(socket.second->sock.get_recv_buffer_addr()));
-  // }
-
-
-  // sleep(2);
-
-  // exit(-1);
-
 	fflush(stdout);
 }
 #else
@@ -352,53 +433,53 @@ void Transport::init() {
 	read_ifconfig(path.c_str());
 
   for(uint64_t node_id = 0; node_id < g_total_node_cnt; node_id++) {
-    if (node_id == g_node_id) continue;
-    // Listening ports
-    if(ISCLIENTN(node_id)) {
-      for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
-           client_thread_id <
-               g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
-           client_thread_id++) {
-        uint64_t port_id =
-            get_port_id(node_id, g_node_id, client_thread_id % g_client_send_thread_cnt);
-        Socket * sock = bind(port_id);
-        recv_sockets.push_back(sock);
-        DEBUG("Socket insert: {%ld}: %ld\n",node_id,(uint64_t)sock);
-      }
-    } else {
-      for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
-           server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
-           server_thread_id++) {
-        uint64_t port_id = get_port_id(node_id,g_node_id,server_thread_id % g_send_thread_cnt);
-        Socket * sock = bind(port_id);
-        recv_sockets.push_back(sock);
-        DEBUG("Socket insert: {%ld}: %ld\n",node_id,(uint64_t)sock);
-      }
-    }
-    // Sending ports
-    if(ISCLIENTN(g_node_id)) {
-      for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
-           client_thread_id <
-               g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
-           client_thread_id++) {
-        uint64_t port_id =
-            get_port_id(g_node_id, node_id, client_thread_id % g_client_send_thread_cnt);
-        std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,client_thread_id);
-        Socket * sock = connect(node_id,port_id);
-        send_sockets.insert(std::make_pair(sender,sock));
-        DEBUG("Socket insert: {%ld,%ld}: %ld\n",node_id,client_thread_id,(uint64_t)sock);
-      }
-    } else {
-      for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
-           server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
-           server_thread_id++) {
-        uint64_t port_id = get_port_id(g_node_id,node_id,server_thread_id % g_send_thread_cnt);
-        std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,server_thread_id);
-        Socket * sock = connect(node_id,port_id);
-        send_sockets.insert(std::make_pair(sender,sock));
-        DEBUG("Socket insert: {%ld,%ld}: %ld\n",node_id,server_thread_id,(uint64_t)sock);
-      }
-    }
+	if (node_id == g_node_id) continue;
+	// Listening ports
+	if(ISCLIENTN(node_id)) {
+	  for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
+		   client_thread_id <
+			   g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
+		   client_thread_id++) {
+		uint64_t port_id =
+			get_port_id(node_id, g_node_id, client_thread_id % g_client_send_thread_cnt);
+		Socket * sock = bind(port_id);
+		recv_sockets.push_back(sock);
+		DEBUG("Socket insert: {%ld}: %ld\n",node_id,(uint64_t)sock);
+	  }
+	} else {
+	  for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
+		   server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
+		   server_thread_id++) {
+		uint64_t port_id = get_port_id(node_id,g_node_id,server_thread_id % g_send_thread_cnt);
+		Socket * sock = bind(port_id);
+		recv_sockets.push_back(sock);
+		DEBUG("Socket insert: {%ld}: %ld\n",node_id,(uint64_t)sock);
+	  }
+	}
+	// Sending ports
+	if(ISCLIENTN(g_node_id)) {
+	  for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
+		   client_thread_id <
+			   g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
+		   client_thread_id++) {
+		uint64_t port_id =
+			get_port_id(g_node_id, node_id, client_thread_id % g_client_send_thread_cnt);
+		std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,client_thread_id);
+		Socket * sock = connect(node_id,port_id);
+		send_sockets.insert(std::make_pair(sender,sock));
+		DEBUG("Socket insert: {%ld,%ld}: %ld\n",node_id,client_thread_id,(uint64_t)sock);
+	  }
+	} else {
+	  for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
+		   server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
+		   server_thread_id++) {
+		uint64_t port_id = get_port_id(g_node_id,node_id,server_thread_id % g_send_thread_cnt);
+		std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,server_thread_id);
+		Socket * sock = connect(node_id,port_id);
+		send_sockets.insert(std::make_pair(sender,sock));
+		DEBUG("Socket insert: {%ld,%ld}: %ld\n",node_id,server_thread_id,(uint64_t)sock);
+	  }
+	}
   }
 
 
@@ -406,40 +487,142 @@ void Transport::init() {
 }
 
 #endif
+#ifdef USE_RDMA
+void Transport::rdma_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, char * sbuf, int size) {
+	uint64_t starttime = get_sys_clock();
+	//g_node_id: local node_id
+	//dest_node_id: remote node_id
+	uint64_t port_id;
+	if(ISCLIENTN(g_node_id)) {
+		port_id =
+				get_twoside_port_id(g_node_id, dest_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt); 
+	} else {
+		port_id = get_twoside_port_id(g_node_id, dest_node_id, (g_thread_cnt + g_rem_thread_cnt) % g_send_thread_cnt);
+	}
+
+	pthread_mutex_lock( tport_man.latch );
+	auto send_qpi = tport_man.send_qps[port_id-TPORT_TWOSIDE_PORT];
+	char *buf = (char *)(send_qpi->local_mr->buf);
+	pthread_mutex_unlock( tport_man.latch );
+
+	Timer timer;
+	memset(buf, 0, size + 1);
+	memcpy(buf, sbuf, size);
+	DEBUG("%ld Sending batch of %d bytes to node %ld on qp\n", send_thread_id, size,
+			dest_node_id, port_id);
+
+	auto res_s = send_qpi->send_normal(
+	  {.op = IBV_WR_SEND_WITH_IMM,
+	   .flags = IBV_SEND_SIGNALED,
+	   .len = (u32) size + 1,
+	   .wr_id = 0},
+	   {.local_addr = reinterpret_cast<RMem::raw_ptr_t>(buf),
+		.remote_addr = 0,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == IOCode::Ok);
+	auto res_p = send_qpi->wait_one_comp();
+	RDMA_ASSERT(res_p == IOCode::Ok);
+
+	DEBUG("%ld Batch of %d bytes sent to node %ld\n",send_thread_id,size,dest_node_id);
+
+	INC_STATS(send_thread_id,msg_send_time,get_sys_clock() - starttime);
+	INC_STATS(send_thread_id,msg_send_cnt,1);
+}
+#else
 // rename sid to send thread id
 void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * sbuf,int size) {
-  uint64_t starttime = get_sys_clock();
+	uint64_t starttime = get_sys_clock();
 
-  Socket * socket = send_sockets.find(std::make_pair(dest_node_id,send_thread_id))->second;
-  // Copy messages to nanomsg buffer
-#ifdef USE_RDMA
-  void * buf = socket->sock.get_send_buffer_addr();
-#else
+	Socket * socket = send_sockets.find(std::make_pair(dest_node_id,send_thread_id))->second;
+
 	void * buf = nn_allocmsg(size,0);
-#endif
 	memcpy(buf,sbuf,size);
-  DEBUG("%ld Sending batch of %d bytes to node %ld on socket %ld\n", send_thread_id, size,
-        dest_node_id, (uint64_t)socket);
+	DEBUG("%ld Sending batch of %d bytes to node %ld on socket %ld\n", send_thread_id, size,
+			dest_node_id, (uint64_t)socket);
 
-  int rc = -1;
-  while (rc < 0 && (!simulation->is_setup_done() ||
-                    (simulation->is_setup_done() && !simulation->is_done()))) {
-    //printf("[send buf] %s", buf);
-    //exit(0);
-#ifdef USE_RDMA
-    
-    rc= socket->sock.send(buf,size, NN_DONTWAIT);
-#else
-    rc= socket->sock.send(&buf,NN_MSG,NN_DONTWAIT);
-#endif
-  }
-  //nn_freemsg(sbuf);
-  DEBUG("%ld Batch of %d bytes sent to node %ld\n",send_thread_id,size,dest_node_id);
+  	int rc = -1;
+	while (rc < 0 && (!simulation->is_setup_done() ||
+						(simulation->is_setup_done() && !simulation->is_done()))) {
 
-  INC_STATS(send_thread_id,msg_send_time,get_sys_clock() - starttime);
-  INC_STATS(send_thread_id,msg_send_cnt,1);
+		rc= socket->sock.send(&buf,NN_MSG,NN_DONTWAIT);
+	}
+
+  	DEBUG("%ld Batch of %d bytes sent to node %ld\n",send_thread_id,size,dest_node_id);
+
+	INC_STATS(send_thread_id,msg_send_time,get_sys_clock() - starttime);
+	INC_STATS(send_thread_id,msg_send_cnt,1);
 }
+#endif
+#ifdef USE_RDMA
+std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
+  	int bytes = 0;
+	void * buf;
+	uint64_t starttime = get_sys_clock();
+	
+	uint64_t ctr;
+	ctr = starttime % (g_node_cnt + g_client_node_cnt);
+	while(ctr == g_node_id) {
+		starttime = get_sys_clock();
+		ctr = starttime % (g_node_cnt + g_client_node_cnt);
+	}
+	std::vector<Message*> * msgs = NULL;
+    //cout << "dest_node_id" << ctr << endl;
+	uint64_t port_id;
+	if(ISCLIENTN(g_node_id)) {
+		port_id =
+				get_twoside_port_id(ctr, g_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt); 
+	} else {
+		port_id = get_twoside_port_id(ctr, g_node_id, (g_thread_cnt + g_rem_thread_cnt) % g_send_thread_cnt);
+	}
 
+	while (bytes <= 0 && (!simulation->is_setup_done() ||
+							(simulation->is_setup_done() && !simulation->is_done()))) {
+		starttime = get_sys_clock();
+		ctr = starttime % (g_node_cnt + g_client_node_cnt);
+		while(ctr == g_node_id) {
+			starttime = get_sys_clock();
+			ctr = starttime % (g_node_cnt + g_client_node_cnt);
+		}
+		//cout << "dest_node_id" << ctr << endl;
+		if(ISCLIENTN(g_node_id)) {
+			port_id =
+					get_twoside_port_id(ctr, g_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt); 
+		} else {
+			port_id = get_twoside_port_id(ctr, g_node_id, (g_thread_cnt + g_rem_thread_cnt) % g_send_thread_cnt);
+		}
+		pthread_mutex_lock( tport_man.latch );
+		auto recv_qpi = tport_man.recv_qps[port_id-TPORT_TWOSIDE_PORT];
+		auto recv_rsi = tport_man.recv_rss[port_id-TPORT_TWOSIDE_PORT];
+		pthread_mutex_unlock( tport_man.latch );
+
+		for (RecvIter<Dummy, RDMA_ENTRY_NUM> iter(recv_qpi, recv_rsi); iter.has_msgs();
+			iter.next()) {
+			auto imm_msg = iter.cur_msg().value();
+
+			buf = static_cast<char *>(std::get<1>(imm_msg));
+			bytes++;
+		}
+		if (bytes > 0) break;
+	}
+
+	if(bytes <= 0 ) {
+		INC_STATS(thd_id,msg_recv_idle_time, get_sys_clock() - starttime);
+		return msgs;
+	}
+
+  	INC_STATS(thd_id,msg_recv_time, get_sys_clock() - starttime);
+	INC_STATS(thd_id,msg_recv_cnt,1);
+
+	starttime = get_sys_clock();
+
+	msgs = Message::create_messages((char*)buf);
+	DEBUG("Batch of %d bytes recv from node %ld; Time: %f\n", bytes, msgs->front()->return_node_id,
+			simulation->seconds_from_start(get_sys_clock()));
+
+	INC_STATS(thd_id,msg_unpack_time,get_sys_clock()-starttime);
+	return msgs;
+}
+#else
 // Listens to sockets for messages from other nodes
 std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
 	int bytes = 0;
@@ -453,46 +636,39 @@ std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
   uint64_t ctr = thd_id % g_this_rem_thread_cnt;
   if (ctr >= recv_sockets.size()) return msgs;
   if(g_this_rem_thread_cnt < g_total_node_cnt) {
-    ctr += rand * g_this_rem_thread_cnt;
-    while(ctr >= recv_sockets.size()) {
-      ctr -= g_this_rem_thread_cnt;
-    }
+	ctr += rand * g_this_rem_thread_cnt;
+	while(ctr >= recv_sockets.size()) {
+	  ctr -= g_this_rem_thread_cnt;
+	}
   }
   assert(ctr < recv_sockets.size());
   uint64_t start_ctr = ctr;
 
   while (bytes <= 0 && (!simulation->is_setup_done() ||
-                        (simulation->is_setup_done() && !simulation->is_done()))) {
-    Socket * socket = recv_sockets[ctr];
+						(simulation->is_setup_done() && !simulation->is_done()))) {
+	Socket * socket = recv_sockets[ctr];
 		bytes = socket->sock.recv(&buf, NN_MSG, NN_DONTWAIT);
-    //printf("[recv buf] %s", buf);
-    //if (buf != NULL) {
-    //  exit(1);
-    //}
-#ifdef USE_RDMA
-     
-    printf("[Recv_Size]%d\n", bytes);
-#endif
-    //++ctr;
-    ctr = (ctr + g_this_rem_thread_cnt);
+	//printf("[recv buf] %s", buf);
+	//sleep(1);
+	//if (buf != NULL) {
+	//  exit(1);
+	//}
+	//++ctr;
+	ctr = (ctr + g_this_rem_thread_cnt);
 
-    if (ctr >= recv_sockets.size()) ctr = (thd_id % g_this_rem_thread_cnt) % recv_sockets.size();
-    if (ctr == start_ctr) break;
-#ifdef USE_RDMA
-    // Do nothing
-#else
+	if (ctr >= recv_sockets.size()) ctr = (thd_id % g_this_rem_thread_cnt) % recv_sockets.size();
+	if (ctr == start_ctr) break;
 		if(bytes <= 0 && errno != 11) {
 		  printf("Recv Error %d %s\n",errno,strerror(errno));
 			nn::freemsg(buf);
 		}
-#endif
 
-    if (bytes > 0) break;
+	if (bytes > 0) break;
 	}
 
 	if(bytes <= 0 ) {
-    INC_STATS(thd_id,msg_recv_idle_time, get_sys_clock() - starttime);
-    return msgs;
+	INC_STATS(thd_id,msg_recv_idle_time, get_sys_clock() - starttime);
+	return msgs;
 	}
 
   INC_STATS(thd_id,msg_recv_time, get_sys_clock() - starttime);
@@ -502,17 +678,15 @@ std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
 
   msgs = Message::create_messages((char*)buf);
   DEBUG("Batch of %d bytes recv from node %ld; Time: %f\n", bytes, msgs->front()->return_node_id,
-        simulation->seconds_from_start(get_sys_clock()));
-#ifdef USE_RDMA
-  // Do nothing
-#else
+		simulation->seconds_from_start(get_sys_clock()));
+
 	nn::freemsg(buf);
-#endif
+
 
 	INC_STATS(thd_id,msg_unpack_time,get_sys_clock()-starttime);
   return msgs;
 }
-
+#endif
 /*
 void Transport::simple_send_msg(int size) {
 	void * sbuf = nn_allocmsg(size,0);
@@ -523,9 +697,9 @@ void Transport::simple_send_msg(int size) {
   int rc = -1;
   while(rc < 0 ) {
   if(g_node_id == 0)
-    rc = socket->sock.send(&sbuf,NN_MSG,0);
+	rc = socket->sock.send(&sbuf,NN_MSG,0);
   else
-    rc = socket->sock.send(&sbuf,NN_MSG,0);
+	rc = socket->sock.send(&sbuf,NN_MSG,0);
 	}
 }
 
@@ -537,11 +711,11 @@ uint64_t Transport::simple_recv_msg() {
 		bytes = socket->sock.recv(&buf, NN_MSG, NN_DONTWAIT);
   else
 		bytes = socket->sock.recv(&buf, NN_MSG, NN_DONTWAIT);
-    if(bytes <= 0 ) {
-      if(errno != 11)
-        nn::freemsg(buf);
-      return 0;
-    }
+	if(bytes <= 0 ) {
+	  if(errno != 11)
+		nn::freemsg(buf);
+	  return 0;
+	}
 
 	ts_t time;
 	memcpy(&time,&((char*)buf)[0],sizeof(ts_t));

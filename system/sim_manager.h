@@ -40,6 +40,10 @@ public:
   void init();
   bool is_setup_done();
   bool is_done();
+#ifdef USE_RDMA
+  bool client_timeout();
+  bool is_client_done();
+#endif
   bool is_warmup_done();
   void set_setup_done();
   void set_done();

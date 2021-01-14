@@ -37,7 +37,11 @@ void InputThread::setup() {
 
 	std::vector<Message*> * msgs;
 	while(!simulation->is_setup_done()) {
+#ifdef USE_RDMA
+        msgs = tport_man.rdma_recv_msg(get_thd_id());
+#else
 		msgs = tport_man.recv_msg(get_thd_id());
+#endif
 		if (msgs == NULL) continue;
 		while(!msgs->empty()) {
 			Message * msg = msgs->front();
@@ -104,7 +108,11 @@ RC InputThread::client_recv_loop() {
 	while (!simulation->is_done()) {
 		heartbeat();
 		uint64_t starttime = get_sys_clock();
+#ifdef USE_RDMA
+        msgs = tport_man.rdma_recv_msg(get_thd_id());
+#else
 		msgs = tport_man.recv_msg(get_thd_id());
+#endif
 		INC_STATS(_thd_id,mtx[28], get_sys_clock() - starttime);
 		starttime = get_sys_clock();
 		//while((m_query = work_queue.get_next_query(get_thd_id())) != NULL) {
@@ -214,8 +222,11 @@ RC InputThread::server_recv_loop() {
 		heartbeat();
 		starttime = get_sys_clock();
 
+#ifdef USE_RDMA
+        msgs = tport_man.rdma_recv_msg(get_thd_id());
+#else
 		msgs = tport_man.recv_msg(get_thd_id());
-
+#endif
 		INC_STATS(_thd_id,mtx[28], get_sys_clock() - starttime);
 		starttime = get_sys_clock();
 

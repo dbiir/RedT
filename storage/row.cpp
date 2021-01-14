@@ -206,7 +206,7 @@ void row_t::free_row() {
 RC row_t::get_lock(access_t type, TxnManager * txn) {
 	RC rc = RCOK;
 #if CC_ALG == CALVIN
-	lock_t lt = (type == RD || type == SCAN)? LOCK_SH : LOCK_EX;
+	lock_t lt = (type == RD || type == SCAN)? DLOCK_SH : DLOCK_EX;
 	rc = this->manager->lock_get(lt, txn);
 #endif
 	return rc;
@@ -348,7 +348,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT
   uint64_t init_time = get_sys_clock();
 	//uint64_t thd_id = txn->get_thd_id();
-	lock_t lt = (type == RD || type == SCAN) ? LOCK_SH : LOCK_EX; // ! this wrong !!
+	lock_t lt = (type == RD || type == SCAN) ? DLOCK_SH : DLOCK_EX; // ! this wrong !!
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
 	rc = this->manager->lock_get(lt, txn);

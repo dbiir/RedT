@@ -132,7 +132,7 @@ public:
    */
   using cc_rc_ret_t = std::pair<std::string, u64>;
   Result<cc_rc_ret_t> cc_rc(const std::string &name,
-                            const Arc<::rdmaio::qp::RC> rc,
+                            const Arc<::rdmaio::qp::RDMARC> rc,
                             const ::rdmaio::nic_id_t &nic_id,
                             const ::rdmaio::qp::QPConfig &config,
                             const double &timeout_usec = 1000000) {
@@ -200,7 +200,7 @@ public:
   Result<cc_rc_ret_t> cc_rc_msg(const std::string &qp_name,
                                 const std::string &channel_name,
                                 const usize &msg_sz,
-                                const Arc<::rdmaio::qp::RC> rc,
+                                const Arc<::rdmaio::qp::RDMARC> rc,
                                 const ::rdmaio::nic_id_t &nic_id,
                                 const ::rdmaio::qp::QPConfig &config,
                                 const double &timeout_usec = 1000000) {

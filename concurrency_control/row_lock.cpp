@@ -188,7 +188,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
         STACK_PUSH(owners[hash(txn->get_txn_id())], entry);
 #endif
         if(owner_cnt > 0) {
-          assert(type == LOCK_SH);
+          assert(type == DLOCK_SH);
           INC_STATS(txn->get_thd_id(),twopl_sh_bypass_cnt,1);
         }
         if(txn->get_timestamp() > max_owner_ts) {
@@ -251,7 +251,7 @@ RC Row_lock::lock_release(TxnManager * txn) {
         INC_STATS(txn->get_thd_id(),twopl_owned_cnt,1);
         uint64_t endtime = get_sys_clock();
         INC_STATS(txn->get_thd_id(),twopl_owned_time,endtime - own_starttime);
-        if(lock_type == LOCK_SH) {
+        if(lock_type == DLOCK_SH) {
           INC_STATS(txn->get_thd_id(),twopl_sh_owned_time,endtime - own_starttime);
           INC_STATS(txn->get_thd_id(),twopl_sh_owned_cnt,1);
     } else {
@@ -283,7 +283,7 @@ RC Row_lock::lock_release(TxnManager * txn) {
         INC_STATS(txn->get_thd_id(),twopl_owned_cnt,1);
         uint64_t endtime = get_sys_clock();
         INC_STATS(txn->get_thd_id(),twopl_owned_time,endtime - own_starttime);
-        if(lock_type == LOCK_SH) {
+        if(lock_type == DLOCK_SH) {
           INC_STATS(txn->get_thd_id(),twopl_sh_owned_time,endtime - own_starttime);
           INC_STATS(txn->get_thd_id(),twopl_sh_owned_cnt,1);
       } else {
@@ -357,7 +357,7 @@ RC Row_lock::lock_release(TxnManager * txn) {
               own_starttime = get_sys_clock();
           }
           lock_type = entry->type;
-#if CC_AlG == NO_WAIT
+#if CC_ALG == NO_WAIT
           return_entry(entry);
 #endif
       }
@@ -380,7 +380,7 @@ RC Row_lock::lock_release(TxnManager * txn) {
 bool Row_lock::conflict_lock(lock_t l1, lock_t l2) {
     if (l1 == LOCK_NONE || l2 == LOCK_NONE)
         return false;
-    else if (l1 == LOCK_EX || l2 == LOCK_EX)
+    else if (l1 == DLOCK_EX || l2 == DLOCK_EX)
         return true;
     else
         return false;

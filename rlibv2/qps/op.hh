@@ -146,11 +146,11 @@ public:
     return true;
   }
 
-  inline auto execute_batch(const Arc<RC> &qp) -> Result<std::string> {
+  inline auto execute_batch(const Arc<RDMARC> &qp) -> Result<std::string> {
     // to avoid performance overhead of Arc, we first extract QP's raw pointer
     // out
-    RC *qp_ptr = ({  // unsafe code
-      RC *temp = qp.get();
+    RDMARC *qp_ptr = ({  // unsafe code
+      RDMARC *temp = qp.get();
       temp;
     });
 
@@ -166,11 +166,11 @@ public:
     return ::rdmaio::Err(std::string(strerror(errno)));
   }
 
-  inline auto execute(const Arc<RC> &qp, const int &flags = 0, u64 wr_id = 0)
+  inline auto execute(const Arc<RDMARC> &qp, const int &flags = 0, u64 wr_id = 0)
       -> Result<std::string> {
 
-    RC *qp_ptr = ({  // unsafe code
-      RC *temp = qp.get();
+    RDMARC *qp_ptr = ({  // unsafe code
+      RDMARC *temp = qp.get();
       temp;
     });
 

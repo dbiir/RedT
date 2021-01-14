@@ -13,7 +13,7 @@ const u32 kDefaultPSN = 3185;
 const u32 kRcMaxSendSz = 128;
 const u32 kRcMaxRecvSz = 2048;
 
-class RC;
+class RDMARC;
 class UD;
 class Impl;
 
@@ -111,7 +111,7 @@ private:
 
   int qkey = kDefaultQKey;
 
-  friend class RC;
+  friend class RDMARC;
   friend class UD;
   friend class Impl;
 }; // class QPConfig

@@ -52,7 +52,11 @@ RC ClientThread::run() {
 	for (uint32_t i = 0; i < g_servers_per_client; ++i) txns_sent[i] = 0;
 
 	run_starttime = get_sys_clock();
+#ifdef USE_RDMA
+    while(!simulation->is_client_done()) {
+#else
 	while(!simulation->is_done()) {
+#endif
 		heartbeat();
 #if SERVER_GENERATE_QUERIES
 		break;

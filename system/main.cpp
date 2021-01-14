@@ -55,7 +55,10 @@
 #include "rts_cache.h"
 #include "http.h"
 #include "lib.hh"
-
+//#include "rdma_ctrl.hpp"
+#include "qps/rc_recv_manager.hh"
+#include "qps/recv_iter.hh"
+//#include "src/allocator_master.hh"
 void network_test();
 void network_test_recv();
 void * run_thread(void *);
@@ -72,19 +75,41 @@ CalvinSequencerThread * calvin_seq_thds;
 #endif
 
 #ifdef USE_RDMA
-	//DEFINE_int64(port, 8888, "Server listener (UDP) port.");
-	//DEFINE_int64(use_nic_idx, 1, "Which NIC to create QP");
-	//DEFINE_int64(reg_nic_name, 73, "The name to register an opened NIC at rctrl.");
-	//DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
-	//DEFINE_uint64(magic_num, 0xdeadbeaf, "The magic number read by the client");
-	int64_t port = 8888;
-	int64_t use_nic_idx = 1;
-	int64_t reg_nic_name = 0;
-	int64_t reg_mem_name = 0;
-	uint64_t magic_num = 0xdeadbeaf;
+	/*using namespace std;
 	using namespace rdmaio;
 	using namespace rdmaio::rmem;
+	using namespace rdmaio::qp;
 
+	int64_t port = 8888;
+	int64_t use_nic_idx = 0;
+	int64_t reg_mem_name = 73;
+	string cq_name = "test_channel";
+	int64_t msg_cnt = 10000;
+	class SimpleAllocator : public AbsRecvAllocator {
+  RMem::raw_ptr_t buf = nullptr;
+  usize total_mem = 0;
+  mr_key_t key;
+
+ public:
+  SimpleAllocator(Arc<RMem> mem, mr_key_t key)
+      : buf(mem->raw_ptr), total_mem(mem->sz), key(key) {
+    // RDMA_LOG(4) << "simple allocator use key: " << key;
+  }
+
+  Option<std::pair<rmem::RMem::raw_ptr_t, rmem::mr_key_t>> alloc_one(
+      const usize &sz) override {
+    if (total_mem < sz) return {};
+    auto ret = buf;
+    buf = static_cast<char *>(buf) + sz;
+    total_mem -= sz;
+    return std::make_pair(ret, key);
+  }
+
+  Option<std::pair<rmem::RMem::raw_ptr_t, rmem::RegAttr>> alloc_one_for_remote(
+      const usize &sz) override {
+    return {};
+  }
+};*/
 #endif
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
@@ -92,17 +117,26 @@ void parser(int argc, char * argv[]);
 int main(int argc, char *argv[]) {
 	
 #ifdef USE_RDMA
-	//RCtrl ctrl(port);
-	//RDMA_LOG(4) << "Pingping server listenes at localhost:" << port;
+/*	const usize entry_num = 128;
 
-	// first we open the NIC
-	{
-		//auto nic =
-		//	RNic::create(RNicInfo::query_dev_names().at(use_nic_idx)).value();
-		//	printf("use rdma success!\n");
-		// register the nic with name 0 to the ctrl
-		//RDMA_ASSERT(ctrl.opened_nics.reg(reg_nic_name, nic));
-	}
+  RCtrl ctrl(port);
+  RecvManager<entry_num, 2048> manager(ctrl);
+  auto nic =
+      RNic::create(RNicInfo::query_dev_names().at(use_nic_idx)).value();
+  RDMA_ASSERT(ctrl.opened_nics.reg(0, nic));
+  RDMA_LOG(4) << "(RC) Pingping server listenes at localhost:" << port;
+
+  // 1. create receive cq
+  auto recv_cq_res = ::rdmaio::qp::Impl::create_cq(nic, entry_num);
+  RDMA_ASSERT(recv_cq_res == IOCode::Ok);
+  auto recv_cq = std::get<0>(recv_cq_res.desc);
+
+  // 2. prepare the message buffer with allocator
+  auto mem =
+      Arc<RMem>(new RMem(16 * 1024 * 1024));  // allocate a memory with 4M bytes
+  auto handler = RegHandler::create(mem, nic).value();
+  auto alloc = std::make_shared<SimpleAllocator>(
+      mem, handler->get_reg_attr().value().key);*/
 #endif
     // 0. initialize global data structure
     parser(argc, argv);

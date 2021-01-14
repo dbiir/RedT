@@ -199,7 +199,7 @@ private:
 #endif
 
         // 1.1 try to create and register this QP
-        auto rc = qp::RC::create(nic.value(), rc_req.config, recv_cq).value();
+        auto rc = qp::RDMARC::create(nic.value(), rc_req.config, recv_cq).value();
         auto rc_status = registered_qps.reg(rc_req.name, rc);
 
         if (!rc_status) {

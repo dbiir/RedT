@@ -52,7 +52,17 @@
 #include "da_block_queue.h"
 //#include "maat.h"
 
-using namespace std;
+#ifdef USE_RDMA
+  #include "lib.hh"
+  #include "qps/rc_recv_manager.hh"
+  #include "qps/recv_iter.hh"
+  #include "qps/mod.hh"
+  using namespace rdmaio;
+  using namespace rdmaio::rmem;
+  using namespace rdmaio::qp;
+#endif
+  using namespace std;
+//#endif
 
 class mem_alloc;
 class Stats;
@@ -287,6 +297,7 @@ extern uint32_t g_max_num_waits;
 extern UInt32 g_repl_type;
 extern UInt32 g_repl_cnt;
 
+
 enum RC { RCOK=0, Commit, Abort, WAIT, WAIT_REM, ERROR, FINISH, NONE};
 enum RemReqType {
   INIT_DONE = 0,
@@ -349,7 +360,7 @@ typedef uint64_t (*func_ptr)(idx_key_t);	// part_id func_ptr(index_key);
 /* general concurrency control */
 enum access_t {RD, WR, XP, SCAN};
 /* LOCK */
-enum lock_t {LOCK_EX = 0, LOCK_SH, LOCK_NONE };
+enum lock_t {DLOCK_EX = 0, DLOCK_SH, LOCK_NONE };
 /* TIMESTAMP */
 enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 

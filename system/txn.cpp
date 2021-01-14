@@ -788,7 +788,7 @@ uint64_t TxnManager::incr_rsp(int i) {
 	sem_post(&rsp_mutex);
 	return result;
 }
-
+ 
 uint64_t TxnManager::decr_rsp(int i) {
 	//ATOM_SUB(this->rsp_cnt,i);
 	uint64_t result;

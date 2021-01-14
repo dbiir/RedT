@@ -190,7 +190,6 @@ RC YCSBTxnManager::run_txn_state() {
         rc = run_ycsb_0(req,row);
       } else {
         rc = send_remote_request();
-
       }
 
       break;

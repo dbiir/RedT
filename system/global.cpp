@@ -59,7 +59,16 @@
 
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
-
+#ifdef USE_RDMA
+  #include "lib.hh"
+  #include "qps/rc_recv_manager.hh"
+  #include "qps/recv_iter.hh"
+  #include "qps/mod.hh"
+  using namespace rdmaio;
+  using namespace rdmaio::rmem;
+  using namespace rdmaio::qp;
+  using namespace std;
+#endif
 
 mem_alloc mem_allocator;
 Stats stats;
@@ -256,3 +265,4 @@ UInt32 g_repl_type = REPL_TYPE;
 UInt32 g_repl_cnt = REPLICA_CNT;
 
 map<string, string> g_params;
+
