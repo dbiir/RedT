@@ -50,6 +50,9 @@
 
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
+#include "src/allocator_master.hh"
+#include "lib.hh"
+//#include "rdma_ctrl.hpp"
 //#include "maat.h"
 
 using namespace std;
@@ -153,6 +156,27 @@ extern TcpTimestamp tcp_ts;
 
 extern map<string, string> g_params;
 
+extern char *rdma_global_buffer;
+//extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
+extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
+extern rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
+extern rdmaio::Arc<rdmaio::rmem::RegHandler> rm_handler;
+extern rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
+
+extern std::vector<rdmaio::ConnectManager> cm;
+extern rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
+extern rdmaio::Arc<rdmaio::RNic> nic;
+extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT];
+
+extern string rdma_server_add[NODE_CNT];
+extern string qp_name[NODE_CNT][THREAD_CNT];
+
+//extern rdmaio::ConnectManager cm[NODE_CNT];
+//extern r2::Allocator *r2_allocator;
+
+extern int rdma_server_port[NODE_CNT];
+
+
 extern bool volatile warmup_done;
 extern bool volatile enable_thread_mem_pool;
 extern pthread_barrier_t warmup_bar;
@@ -204,7 +228,8 @@ extern int32_t g_inflight_max;
 extern uint64_t g_msg_size;
 extern uint64_t g_log_buf_max;
 extern uint64_t g_log_flush_timeout;
-
+extern uint64_t rdma_buffer_size;
+extern uint64_t rdma_index_size;
 extern UInt32 g_max_txn_per_part;
 extern int32_t g_load_per_server;
 
@@ -351,7 +376,7 @@ typedef uint64_t (*func_ptr)(idx_key_t);	// part_id func_ptr(index_key);
 /* general concurrency control */
 enum access_t {RD, WR, XP, SCAN};
 /* LOCK */
-enum lock_t {LOCK_EX = 0, LOCK_SH, LOCK_NONE };
+enum lock_t {DLOCK_EX = 0, DLOCK_SH, LOCK_NONE };
 /* TIMESTAMP */
 enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 
@@ -392,8 +417,10 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 // index structure for specific purposes. (e.g. non-primary key access should use hash)
 #if (INDEX_STRUCT == IDX_BTREE)
 #define INDEX		index_btree
+#elif (INDEX_STRUCT == IDX_HASH)
+#define  INDEX		IndexHash
 #else  // IDX_HASH
-#define INDEX		IndexHash
+#define INDEX		IndexRdma
 #endif
 
 /************************************************/

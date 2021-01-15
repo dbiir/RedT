@@ -45,16 +45,17 @@ RC YCSBWorkload::init() {
 		path += "YCSB_schema.txt";
 		//path += "/tests/apps/dbms/YCSB_schema.txt";
 	}
-  printf("Initializing schema... ");
-  fflush(stdout);
+	printf("Initializing schema... ");
+	fflush(stdout);
 	init_schema( path.c_str() );
-  printf("Done\n");
+	printf("Done\n");
 
-  printf("Initializing table... ");
-  fflush(stdout);
-	init_table_parallel();
-  printf("Done\n");
-  fflush(stdout);
+	printf("Initializing table... ");
+	fflush(stdout);
+
+   init_table_parallel();
+   printf("Done\n");
+   fflush(stdout);
 //	init_table();
 	return RCOK;
 }
@@ -88,6 +89,7 @@ RC YCSBWorkload::init_table() {
             row_t * new_row = NULL;
 			uint64_t row_id;
             rc = the_table->get_new_row(new_row, part_id, row_id);
+			//new_row中保存新创建的地址
             // insertion of last row may fail after the table_size
             // is updated. So never access the last record in a table
 			assert(rc == RCOK);
@@ -128,8 +130,8 @@ void YCSBWorkload::init_table_parallel() {
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
 		pthread_create(&p_thds[i], NULL, threadInitTable, this);
 	}
-	threadInitTable(this);
 
+	threadInitTable(this);
 	for (uint32_t i = 0; i < g_init_parallelism - 1; i++) {
 		int rc = pthread_join(p_thds[i], NULL);
 		//printf("thread %d complete\n", i);
@@ -142,11 +144,11 @@ void YCSBWorkload::init_table_parallel() {
 }
 
 void * YCSBWorkload::init_table_slice() {
-	UInt32 tid = ATOM_FETCH_ADD(next_tid, 1);
+	UInt32 tid = ATOM_FETCH_ADD(next_tid, 1);//返回next_id，next_id+1
 	RC rc;
 	assert(g_synth_table_size % g_init_parallelism == 0);
 	assert(tid < g_init_parallelism);
-  uint64_t key_cnt = 0;
+    uint64_t key_cnt = 0;
 	while ((UInt32)ATOM_FETCH_ADD(next_tid, 0) < g_init_parallelism) {}
 	assert((UInt32)ATOM_FETCH_ADD(next_tid, 0) == g_init_parallelism);
 	uint64_t slice_size = g_synth_table_size / g_init_parallelism;
@@ -196,9 +198,9 @@ void * YCSBWorkload::init_table_slice() {
 
 		rc = the_index->index_insert(idx_key, m_item, part_id);
 		assert(rc == RCOK);
-    key += g_part_cnt;
+        key += g_part_cnt;
 	}
-  printf("Thd %d inserted %ld keys\n",tid,key_cnt);
+    printf("Thd %d inserted %ld keys\n",tid,key_cnt);
 	return NULL;
 }
 

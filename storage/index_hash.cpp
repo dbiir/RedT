@@ -25,14 +25,14 @@ RC IndexHash::init(uint64_t bucket_cnt) {
 	//_bucket_cnt_per_part = bucket_cnt / g_part_cnt;
 	//_buckets = new BucketHeader * [g_part_cnt];
 	_buckets = new BucketHeader * [1];
-  _buckets[0] = (BucketHeader *) mem_allocator.alloc(sizeof(BucketHeader) * _bucket_cnt_per_part);
-  uint64_t buckets_init_cnt = 0;
-  for (UInt32 n = 0; n < _bucket_cnt_per_part; n ++) {
-			_buckets[0][n].init();
-      ++buckets_init_cnt;
-  }
-  printf("Index init with %ld buckets\n",buckets_init_cnt);
-	return RCOK;
+	_buckets[0] = (BucketHeader *) mem_allocator.alloc(sizeof(BucketHeader) * _bucket_cnt_per_part);
+	uint64_t buckets_init_cnt = 0;
+	for (UInt32 n = 0; n < _bucket_cnt_per_part; n ++) {
+				_buckets[0][n].init();
+		++buckets_init_cnt;
+	}
+	printf("Index init with %ld buckets\n",buckets_init_cnt);
+		return RCOK;
 }
 
 RC IndexHash::init(int part_cnt, table_t *table, uint64_t bucket_cnt) {

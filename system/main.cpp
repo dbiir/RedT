@@ -105,6 +105,7 @@ int main(int argc, char *argv[]) {
 		//RDMA_ASSERT(ctrl.opened_nics.reg(reg_nic_name, nic));
 	//}
 //#endif
+
 #ifdef USE_RDMA
   if(g_node_id == 0) {
     printf("[Memcached Begin Listen]\n");
@@ -144,6 +145,17 @@ int main(int argc, char *argv[]) {
 	simulation->init();
 	printf("Done\n");
 	fflush(stdout);
+
+   
+    
+	//register memeory
+	//prepare QP connection with rdma_global_buffer(as registry memory)
+    //#ifdef USE_RDMA
+        rdma_man.init();
+    //#endif
+
+
+   //prepare workload
 	Workload * m_wl;
 	switch (WORKLOAD) {
 		case YCSB :
@@ -393,9 +405,7 @@ int main(int argc, char *argv[]) {
 	warmup_done = true;
 	pthread_barrier_init( &warmup_bar, NULL, all_thd_cnt);
 
-//#if USE_RDMA == true
-    rdma_man.init();
-//#endif
+
 
 #if SET_AFFINITY
 	uint64_t cpu_cnt = 0;

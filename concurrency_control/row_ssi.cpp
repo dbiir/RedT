@@ -178,14 +178,14 @@ void Row_ssi::get_lock(lock_t type, TxnManager * txn) {
 	entry->type = type;
 	entry->start_ts = get_sys_clock();
 	entry->txn = txn->get_txn_id();
-	if (type == LOCK_SH)
+	if (type == DLOCK_SH)
 		STACK_PUSH(si_read_lock, entry);
-	if (type == LOCK_EX)
+	if (type == DLOCK_EX)
 		STACK_PUSH(write_lock, entry);
 }
 
 void Row_ssi::release_lock(lock_t type, TxnManager * txn) {
-	if (type == LOCK_SH) {
+	if (type == DLOCK_SH) {
 		SSILockEntry * read = si_read_lock;
 		SSILockEntry * pre_read = NULL;
 		while (read != NULL) {
@@ -203,7 +203,7 @@ void Row_ssi::release_lock(lock_t type, TxnManager * txn) {
 			read = read->next;
 		}
 	}
-	if (type == LOCK_EX) {
+	if (type == DLOCK_EX) {
 		SSILockEntry * write = write_lock;
 		SSILockEntry * pre_write = NULL;
 		while (write != NULL) {
@@ -236,7 +236,7 @@ RC Row_ssi::access(TxnManager * txn, TsType type, row_t * row) {
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - starttime);
   	if (type == R_REQ) {
 		// Add the si-read lock
-		get_lock(LOCK_SH, txn);
+		get_lock(DLOCK_SH, txn);
 		// Traverse the whole write lock
 		SSILockEntry * write = write_lock;
 		while (write != NULL) {
@@ -288,7 +288,7 @@ RC Row_ssi::access(TxnManager * txn, TsType type, row_t * row) {
 		// }
 	} else if (type == P_REQ) {
 		// Add the write lock
-		get_lock(LOCK_EX, txn);
+		get_lock(DLOCK_EX, txn);
 		// Traverse the whole read his
 		SSILockEntry * si_read = si_read_lock;
 		while (si_read != NULL) {
@@ -355,9 +355,9 @@ RC Row_ssi::access(TxnManager * txn, TsType type, row_t * row) {
 		}
 	} else if (type == W_REQ) {
 		rc = RCOK;
-		release_lock(LOCK_EX, txn);
+		release_lock(DLOCK_EX, txn);
 		//TODO: here need to consider whether need to release the si-read lock.
-		// release_lock(LOCK_SH, txn);
+		// release_lock(DLOCK_SH, txn);
 
 		// the corresponding prewrite request is debuffered.
 		insert_history(ts, txn, row);
@@ -366,9 +366,9 @@ RC Row_ssi::access(TxnManager * txn, TsType type, row_t * row) {
 		assert(req != NULL);
 		return_req_entry(req);
 	} else if (type == XP_REQ) {
-		release_lock(LOCK_EX, txn);
+		release_lock(DLOCK_EX, txn);
 		//TODO: here need to consider whether need to release the si-read lock.
-		release_lock(LOCK_SH, txn);
+		release_lock(DLOCK_SH, txn);
 
         DEBUG("debuf %ld %ld\n",txn->get_txn_id(),_row->get_primary_key());
 		SSIReqEntry * req = debuffer_req(P_REQ, txn);

@@ -121,9 +121,9 @@ public:
   }
 
   /*!
-    *C*reate and *C*onnect an RC QP at remote end.
-    This function first creates an RC QP at local,
-    and then create an RC QP at remote host to connect with the local
+    *C*reate and *C*onnect an RDMARC QP at remote end.
+    This function first creates an RDMARC QP at local,
+    and then create an RDMARC QP at remote host to connect with the local
     created QP.
 
     \param:
@@ -132,7 +132,7 @@ public:
    */
   using cc_rc_ret_t = std::pair<std::string, u64>;
   Result<cc_rc_ret_t> cc_rc(const std::string &name,
-                            const Arc<::rdmaio::qp::RC> rc,
+                            const Arc<::rdmaio::qp::RDMARC> rc,
                             const ::rdmaio::nic_id_t &nic_id,
                             const ::rdmaio::qp::QPConfig &config,
                             const double &timeout_usec = 1000000) {
@@ -200,7 +200,7 @@ public:
   Result<cc_rc_ret_t> cc_rc_msg(const std::string &qp_name,
                                 const std::string &channel_name,
                                 const usize &msg_sz,
-                                const Arc<::rdmaio::qp::RC> rc,
+                                const Arc<::rdmaio::qp::RDMARC> rc,
                                 const ::rdmaio::nic_id_t &nic_id,
                                 const ::rdmaio::qp::QPConfig &config,
                                 const double &timeout_usec = 1000000) {
@@ -305,7 +305,7 @@ public:
   }
 
   /*!
-    Fetch remote QP attr, this qp can be either UD PQ or RC QP.
+    Fetch remote QP attr, this qp can be either UD PQ or RDMARC QP.
    */
   using qp_attr_ret_t = std::pair<std::string, ::rdmaio::qp::QPAttr>;
   Result<qp_attr_ret_t> fetch_qp_attr(const std::string &name,

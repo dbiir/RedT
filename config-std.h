@@ -187,6 +187,7 @@ extern TestCases                                        g_test_case;
 // INDEX_STRUCT
 #define IDX_HASH                                        1
 #define IDX_BTREE                                       2
+#define IDX_RDMA                                        3
 // WORKLOAD
 #define YCSB                                            1
 #define TPCC                                            2

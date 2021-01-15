@@ -184,11 +184,11 @@ public:
 namespace rdmaio {
 namespace qp {
 
-class RC;
+class RDMARC;
 
 // shall we use a string to identify QPs?
 using register_id_t = u64;
-using RCFactory = Factory<register_id_t, RC>;
+using RCFactory = Factory<register_id_t, RDMARC>;
 
 using QPFactory = Factory<std::string, Dummy>;
 

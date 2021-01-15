@@ -56,8 +56,9 @@
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "http.h"
-
-
+#include "src/allocator_master.hh"
+//#include "rdma_ctrl.hpp"
+#include "lib.hh"
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
 
@@ -208,6 +209,8 @@ UInt64 g_msg_time_limit = MSG_TIME_LIMIT;
 UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
+UInt64 rdma_buffer_size = 1024*1024*1024;
+UInt64 rdma_index_size = 300*1024*1024;
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;
 UInt64 g_max_pre_req = MAX_PRE_REQ;
@@ -258,3 +261,28 @@ UInt32 g_repl_type = REPL_TYPE;
 UInt32 g_repl_cnt = REPLICA_CNT;
 
 map<string, string> g_params;
+
+char *rdma_global_buffer;
+//rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
+rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
+rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
+rdmaio::Arc<rdmaio::rmem::RegHandler> rm_handler;
+rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
+
+std::vector<rdmaio::ConnectManager> cm;
+rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
+rdmaio::Arc<rdmaio::RNic> nic;
+rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT];
+
+string rdma_server_add[NODE_CNT];
+string qp_name[NODE_CNT][THREAD_CNT];
+//rdmaio::ConnectManager cm[NODE_CNT];
+
+int rdma_server_port[NODE_CNT];
+
+//rdmaio::Arc<rdmaio::rmem::RegHandler> local_mr[NODE_CNT][THREAD_CNT];
+
+
+
+//r2::Allocator *r2_allocator;
+//rdmaio::RCQP *qp[NODE_CNT][THREAD_CNT];

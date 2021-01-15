@@ -28,6 +28,7 @@ class row_t;
 class table_t
 {
 public:
+    void test_read();
 	void init(Catalog * schema);
 	// row lookup should be done with index. But index does not have
 	// records for new rows. get_new_row returns the pointer to a

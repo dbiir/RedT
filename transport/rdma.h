@@ -1,7 +1,13 @@
+#include "global.h"
 #include "nn.hpp"
 #include <string>
-#include<string.h>
+#include "lib.hh"
+//#include "rdma_ctrl.hpp"
 
+//using namespace rdmaio;
+using namespace rdmaio;
+using namespace rdmaio::rmem;
+using namespace rdmaio::qp;
 using namespace std;
 
 class Rdma{
@@ -10,11 +16,12 @@ class Rdma{
     string get_path();
     void read_ifconfig(const char * ifaddr_file);
     static uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id);
-    static void * create_qp(void *);
-    static void * connect_qp(void *);
+    static uint64_t get_port(uint64_t node_id);
+    static void * client_qp(void *);
+    static void * server_qp(void *);
     void * create();
     void * connect();
-    void init();
+    void init(); 
    private:
     uint64_t _sock_cnt;
     uint64_t rr;
@@ -22,4 +29,10 @@ class Rdma{
     static char ** ifaddr;
     char *buffer;
     char ** addr;
+    
 };
+
+typedef struct{
+    uint64_t node_id;
+    uint64_t thread_num;
+} rdmaParameter;

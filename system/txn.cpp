@@ -580,10 +580,10 @@ RC TxnManager::start_commit() {
 	txn_stats.prepare_start_time = prepare_start_time;
 	uint64_t process_time_span  = prepare_start_time - txn_stats.restart_starttime;
 	INC_STATS(get_thd_id(), trans_process_time, process_time_span);
-  INC_STATS(get_thd_id(), trans_process_count, 1);
+  	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
-	if(is_multi_part()) {
+	if(is_multi_part() && CC_ALG != RDMA_SILO) {
 		if(CC_ALG == TICTOC) {
 			rc = validate();
 			if (rc != Abort) {
@@ -600,7 +600,7 @@ RC TxnManager::start_commit() {
 			txn_stats.finish_start_time = finish_start_time;
 			uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
 			INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-      INC_STATS(get_thd_id(), trans_prepare_count, 1);
+      		INC_STATS(get_thd_id(), trans_prepare_count, 1);
 			if(CC_ALG == WSI) {
 				wsi_man.gene_finish_ts(this);
 			}
@@ -614,7 +614,7 @@ RC TxnManager::start_commit() {
 		txn_stats.finish_start_time = finish_start_time;
 		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
 		INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    INC_STATS(get_thd_id(), trans_prepare_count, 1);
+    	INC_STATS(get_thd_id(), trans_prepare_count, 1);
 		if(CC_ALG == SSI) {
 			ssi_man.gene_finish_ts(this);
 		}
@@ -919,6 +919,39 @@ RC TxnManager::get_lock(row_t * row, access_t type) {
 	return rc;
 }
 
+#if RDMA_SILO_OPEN
+RC TxnManager::one_side_read(row_t * row, access_t type, row_t *& row_rtn) {
+	RC rc = RCOK;
+	DEBUG_M("TxnManager::get_row access alloc\n");
+	Access * access = NULL;
+	this->last_row = row;
+	this->last_type = type;
+
+	access_pool.get(get_thd_id(),access);
+	rc = row->get_row(type, this, access);
+
+	if (rc == Abort || rc == WAIT) {
+		row_rtn = NULL;
+		DEBUG_M("TxnManager::get_row(abort) access free\n");
+		access_pool.put(get_thd_id(),access);
+		return rc;
+	}
+	access->type = type;
+	access->orig_row = row;
+#if CC_ALG == SILO
+	access->tid = last_tid;
+#endif
+	++txn->row_cnt;
+	if (type == WR) ++txn->write_cnt;
+	txn->accesses.add(access);
+	row_rtn  = access->data;
+
+	if (CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN) assert(rc == RCOK);
+	assert(rc == RCOK);
+	return rc;
+}
+
+#endif
 RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	uint64_t starttime = get_sys_clock();
 	uint64_t timespan;
@@ -973,17 +1006,17 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	}
 #else
 	access_pool.get(get_thd_id(),access);
-  get_access_end_time = get_sys_clock();
-  INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
-  INC_STATS(get_thd_id(), trans_get_access_count, 1);
+	get_access_end_time = get_sys_clock();
+	INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
+	INC_STATS(get_thd_id(), trans_get_access_count, 1);
 #endif
 	//uint64_t row_cnt = txn->row_cnt;
 	//assert(txn->accesses.get_count() - 1 == row_cnt);
 #if CC_ALG != TICTOC
   // uint64_t start_time = get_sys_clock();
 	rc = row->get_row(type, this, access);
-  INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
-  INC_STATS(get_thd_id(), trans_get_row_count, 1);
+	INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
+	INC_STATS(get_thd_id(), trans_get_row_count, 1);
 #endif
 #if CC_ALG == FOCC
 	focc_man.active_storage(type, this, access);
@@ -1137,7 +1170,8 @@ RC TxnManager::validate() {
 			CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != WSI &&
 			CC_ALG != SSI && CC_ALG != DLI_BASE && CC_ALG != DLI_OCC &&
 			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
-			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO) {
+			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO &&
+			CC_ALG != RDMA_SILO) {
 		return RCOK;
 	}
 	RC rc = RCOK;
@@ -1156,10 +1190,6 @@ RC TxnManager::validate() {
 	}
 	if(CC_ALG == TICTOC  && rc == RCOK) {
 		rc = tictoc_man.validate(this);
-		// Note: home node must be last to validate
-		// if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
-		//   rc = tictoc_man.find_bound(this);
-		// }
 	}
 	if ((CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 ||
 			 CC_ALG == DLI_MVCC) &&
@@ -1189,6 +1219,16 @@ RC TxnManager::validate() {
 	}
 #if CC_ALG == SILO
   if(CC_ALG == SILO && rc == RCOK) {
+    rc = validate_silo();
+    if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
+      _cur_tid ++;
+      commit_timestamp = _cur_tid;
+      DEBUG("Validate success: %ld, cts: %ld \n", get_txn_id(), commit_timestamp);
+    }
+  }
+#endif
+#if CC_ALG == RDMA_SILO
+  if(CC_ALG == RDMA_SILO && rc == RCOK) {
     rc = validate_silo();
     if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
       _cur_tid ++;

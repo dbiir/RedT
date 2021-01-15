@@ -165,7 +165,7 @@
 #define ENABLE_LATCH        false
 #define CENTRAL_INDEX       false
 #define CENTRAL_MANAGER       false
-#define INDEX_STRUCT        IDX_HASH
+#define INDEX_STRUCT        IDX_RDMA
 #define BTREE_ORDER         16
 
 // [TIMESTAMP]
@@ -358,6 +358,7 @@ enum PPSTxnType {
 // INDEX_STRUCT
 #define IDX_HASH          1
 #define IDX_BTREE         2
+#define IDX_RDMA          3
 // WORKLOAD
 #define YCSB            1
 #define TPCC            2

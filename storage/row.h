@@ -120,7 +120,7 @@ public:
 	#elif CC_ALG == MVCC
 		Row_mvcc * manager;
 	#elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
-			Row_occ * manager;
+		Row_occ * manager;
 	#elif CC_ALG == DLI_BASE || CC_ALG == DLI_OCC
 		Row_dli_base *manager;
 	#elif CC_ALG == MAAT

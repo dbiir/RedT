@@ -1,14 +1,14 @@
-#include "rdma.h"
-
-#include <stdio.h>
 #include "global.h"
-#include "rdma_ctrl.hpp"
+#include "config.h"
+#include "rdma.h"
+#include <stdio.h>
+//#include "rdma_ctrl.hpp"
+#include "lib.hh"
 #include <assert.h>
-#include <string.h>
+#include <string>
+#include "src/allocator_master.hh"
 
-using namespace rdmaio;
-
-char *Rdma::rdma_buffer = new char[RDMA_BUFFER_SIZE];
+char *Rdma::rdma_buffer; //= new char[RDMA_BUFFER_SIZE];
 char ** Rdma::ifaddr = new char *[g_total_node_cnt];
 
 uint64_t Rdma::get_socket_count() {
@@ -65,11 +65,9 @@ uint64_t Rdma::get_port_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t
   DEBUG("%ld\n",port_id);
   port_id += src_node_id;
   DEBUG("%ld\n",port_id);
-//  uint64_t max_send_thread_cnt = g_send_thread_cnt > g_client_send_thread_cnt ? g_send_thread_cnt : g_client_send_thread_cnt;
-//  port_id *= max_send_thread_cnt;
   port_id += send_thread_id * g_total_node_cnt * g_total_node_cnt;
   DEBUG("%ld\n",port_id);
-  port_id += 10000;
+  port_id += 30000;
   port_id = port_id + 1;
   DEBUG("%ld\n",port_id);
 
@@ -83,142 +81,159 @@ uint64_t get_rm_id(uint64_t node_id,uint64_t thread_id){
   return rm_id;
 }
 
-void * Rdma::create_qp(void *){
+uint64_t Rdma::get_port(uint64_t node_id){
+  uint64_t port_id = 0;
+  port_id = 7344 + node_id;
+  return port_id ;  
+}
 
-  printf("\n====create====");
-  for(uint64_t node_id = g_node_id; node_id < g_total_node_cnt; node_id++) {
-    if(node_id == g_node_id || ISCLIENTN(node_id))
-     //如果是自身或客户节点
-      continue;
-    //对每个线程
-     for(uint64_t thread_id = 0;thread_id < THREAD_CNT;thread_id++){
-          //计算本机用到的端口
-          uint64_t port_id = get_port_id(g_node_id,node_id,thread_id);
-                                    //uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id
-       
-//这里是建立了一个QP等待其他server连接过来
-         //创建
-          RdmaCtrl *c = new RdmaCtrl(g_node_id,port_id);
-         //分配网卡
-          RdmaCtrl::DevIdx idx {.dev_id = 0,.port_id = 1 }; 
-          c->open_thread_local_device(idx);
+void * Rdma::client_qp(void *arg){
 
-         //注册内存
-         Rdma::rdma_buffer = (char *)malloc(RDMA_BUFFER_SIZE);
-         rdma_buffer = new char[RDMA_BUFFER_SIZE];
-         memset(rdma_buffer, 0, RDMA_BUFFER_SIZE);
-         
-         //注册内存
-         uint64_t rm_id = get_rm_id(node_id,thread_id);
-         RDMA_ASSERT(c->register_memory(rm_id,rdma_buffer,4096,c->get_device()) == true);
-         //����ע���ڴ���Ϣ����QP
-         MemoryAttr local_mr = c->get_local_mr(rm_id);
-         RCQP *qp = c->create_rc_qp(create_rc_idx(1,0),c->get_device(), &local_mr);
-         //连接
-         uint64_t client_port = get_port_id(node_id,g_node_id,thread_id);//计算连接端的端口
-         while(qp->connect(ifaddr[node_id],port_id, create_rc_idx(1,0)) != SUCC){
-            usleep(2000);
-         }
-        printf("server %d QP wait for server %d\n",g_node_id,node_id);
-     }
+  printf("\n====client====");
+
+  rdmaParameter *arg_tmp;
+  arg_tmp = (rdmaParameter*)arg;
+  uint64_t node_id = arg_tmp->node_id;
+  uint64_t thread_num = arg_tmp->thread_num; 
+
+  printf("\n node_id = %d \n",node_id);
+
+  ConnectManager cm_(std::string(rdma_server_add[node_id]));
+
+  printf("address = %s\n",rdma_server_add[node_id].c_str());
+  
+  if (cm_.wait_ready(1000000, 8) == IOCode::Timeout) RDMA_ASSERT(false) << "cm connect to server timeout";
+
+  uint64_t reg_nic_name = node_id;
+  uint64_t reg_mem_name = node_id;
+
+  auto fetch_res = cm_.fetch_remote_mr(reg_mem_name);
+  RDMA_ASSERT(fetch_res == IOCode::Ok) << std::get<0>(fetch_res.desc);
+  rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);
+
+  for(int thread_id = 0;thread_id < THREAD_CNT ; thread_id ++){
+    rc_qp[node_id][thread_id] = RDMARC::create(nic, QPConfig()).value();
+   // auto rcqp = RDMARC::create(nic, QPConfig()).value();
+    ///auto qp_res = cm_.cc_rc("client-qp", rc_qp[node_id][thread_id], reg_nic_name, QPConfig());
+
+    qp_name[node_id][thread_id] = "client-qp" + std::to_string(thread_id);
+    //auto qp_res = cm_.cc_rc("client-qp", rcqp, reg_nic_name, QPConfig());
+    auto qp_res = cm_.cc_rc(qp_name[node_id][thread_id], rc_qp[node_id][thread_id], reg_nic_name, QPConfig());
+    RDMA_ASSERT(qp_res == IOCode::Ok) << std::get<0>(qp_res.desc);
+    auto key = std::get<1>(qp_res.desc);
+    RDMA_LOG(4) << "client fetch QP authentical key: " << key;
+
+
+    //local_mr.push_back(local_mr_);
+
+    rc_qp[node_id][thread_id]->bind_remote_mr(remote_attr);
+    rc_qp[node_id][thread_id]->bind_local_mr(client_rm_handler->get_reg_attr().value());
+
   }
+  cm.push_back(cm_);
+
+  printf("server %d QP connect to server %d\n",g_node_id,node_id);
   
   return NULL;
 }
 
-void * Rdma::connect_qp(void *){
-    printf("\n====connect====\n");
-    uint64_t node_id = g_node_id;
- // for(uint64_t node_id = g_node_id; node_id > 0; node_id--) {
-   while(node_id >= 0){
-   //   printf("\nnode id = %d\n",node_id);
-      
-      if(node_id == -1){
-        break;
-      }
-      if(node_id == g_node_id || ISCLIENTN(node_id)){
-          node_id--;
-          continue;
-      }
-     
-     for(uint64_t thread_id = 0;thread_id < THREAD_CNT;thread_id++){
-        printf("\nget port\n");
-        uint64_t port_id = get_port_id(g_node_id,node_id,thread_id);
-                                        //uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id
+void * Rdma::server_qp(void *){
+  printf("\n====server====\n");
+ // printf("port = %d\n",port);
+  printf("rdma_server_port[g_node_id] = %d\n",rdma_server_port[g_node_id]);
+  rm_ctrl = Arc<RCtrl>(new rdmaio::RCtrl(rdma_server_port[g_node_id]));
+  //rm_ctrl = Arc<RCtrl>(new rdmaio::RCtrl(port));
+  //  rm_ctrl(rdma_server_port);
 
-          RdmaCtrl *c = new RdmaCtrl(node_id,port_id);
-          RdmaCtrl::DevIdx idx {.dev_id = 0,.port_id = 1 }; 
-          c->open_thread_local_device(idx);
+  uint64_t reg_nic_name = g_node_id;
+  uint64_t reg_mem_name = g_node_id;
 
-        
-          //rdma_buffer = (char *)malloc(RDMA_BUFFER_SIZE);
-          //rdma_buffer = new char[RDMA_BUFFER_SIZE];
-          memset(rdma_buffer, 0, RDMA_BUFFER_SIZE);
-         
-          uint64_t rm_id = get_rm_id(node_id,thread_id);
-          RDMA_ASSERT(c->register_memory(rm_id,rdma_buffer,4096,c->get_device()) == true);
+  RDMA_ASSERT(rm_ctrl->opened_nics.reg(reg_nic_name, nic));
 
-          MemoryAttr remote_mr;
-          uint64_t remote_rm_id = get_rm_id(g_node_id,thread_id);
-          //计算另一端使用的端口
-          int server_port = get_port_id(node_id,g_node_id,thread_id);
+  RDMA_ASSERT(rm_ctrl->registered_mrs.create_then_reg(
+        reg_mem_name, rdma_rm,
+        rm_ctrl->opened_nics.query(reg_nic_name).value()));
 
-          while(QP::get_remote_mr(ifaddr[node_id],server_port,remote_rm_id,&remote_mr) != SUCC) {
-            usleep(2000);
-          }
+  rdma_global_buffer = (char*)(rm_ctrl->registered_mrs.query(reg_mem_name)
+                             .value()
+                             ->get_reg_attr()
+                             .value()
+                             .buf);
+  
+  rm_ctrl->start_daemon();   
 
-        MemoryAttr local_mr = c->get_local_mr(node_id);
-        RCQP *qp = c->create_rc_qp(create_rc_idx(1,0),c->get_device(), &local_mr);
-        qp->bind_remote_mr(remote_mr); // bind to the previous allocated mr
-
-        while(qp->connect(ifaddr[node_id],server_port) != SUCC)  {
-            usleep(2000);
-        }
-      
-        printf("server %d connect to server %d QP\n",g_node_id,node_id);
-     }
-
-     node_id--;
-
-  }
+  //printf("server %d connect to server %d QP\n",g_node_id,node_id);
   
   return NULL;
 }
 
 
 void Rdma::init(){
+
   _sock_cnt = get_socket_count();
 
-  rr = 0;
   printf("rdma Init %d: %ld\n",g_node_id,_sock_cnt);
-
-  vector<std::thread> th_bind;
-  vector<std::thread> th_connect;
 
   string path = get_path();
   read_ifconfig(path.c_str());
-  //将IP地址存到ifaddr数组中
+	
+  nic =  RNic::create(RNicInfo::query_dev_names().at(0)).value();
 
-  pthread_t create_qp_thread,connect_qp_thread;
-  pthread_create(&create_qp_thread,NULL,create_qp,NULL);
-  pthread_create(&connect_qp_thread,NULL,connect_qp,NULL);
+  // rdma_global_buffer = (char *)malloc(rdma_buffer_size);
+  // memset(rdma_global_buffer,0,rdma_buffer_size);
+  // rdma_buffer = rdma_global_buffer;
 
-  pthread_join(create_qp_thread, NULL);
-  pthread_join(connect_qp_thread, NULL);  
+ //as server
+  rdma_rm = Arc<RMem>(new RMem(rdma_buffer_size));
+  rm_handler = RegHandler::create(rdma_rm, nic).value();
 
-/*创建线程一*/
-   // ret=pthread_create(&id_1,NULL,(void  *) thread_1,NULL);
+  //as client
+  client_rdma_rm = Arc<RMem>(new RMem(1024));
+  client_rm_handler = RegHandler::create(client_rdma_rm, nic).value();
 
-  //建两个线程分别用来创建QP等待连接和连接QP
-  // pthread_t *p_thds = (pthread_t *)malloc(sizeof(pthread_t) * 2);
-  // worker_num_thds[0].init(0,g_node_id,m_wl);
-  // pthread_create(&p_thds[id++], &attr, run_thread, (void *)&worker_num_thds[0]);
+  uint64_t thread_num = 0;
+  uint64_t node_id = 0;
+  pthread_t *client_thread = new pthread_t[g_total_node_cnt * g_thread_cnt];
+ // pthread_t *server_thread = new pthread_t[g_total_node_cnt * g_thread_cnt];
+  pthread_t server_thread;
+  printf("g_total_node_cnt = %d",g_total_node_cnt);
 
-  // pthread_create(&id_1,NULL,(void  *) thread_1,NULL);
-  // for (uint64_t i = 0; i < all_thd_cnt; i++) pthread_join(p_thds[i], NULL);
+  //pthread_create(&server_thread,NULL,server_qp,NULL);
+  // if(g_node_id == 0){port = 7344;server_port = 7345;}
+  //  else{port = 7345;server_port = 7344;} 
+  for(int i = 0;i < NODE_CNT ; i++){
+    rdma_server_port[i] = get_port(i);
+  }
 
- 
+  server_qp(NULL);
+  printf("start wait\n");
+  sleep(5);
 
-   
+  for(node_id = 0; node_id < g_total_node_cnt; node_id++) {
+      
+      if(node_id == g_node_id || ISCLIENTN(node_id))continue;                        //对自身节点之外的每个节点
+       
+        rdma_server_add[node_id] = ifaddr[node_id] + std::string(":") + std::to_string(rdma_server_port[node_id]);
+        //rdma_server_add[node_id] = ifaddr[node_id] + std::string(":") + std::to_string(server_port);
+
+        rdmaParameter *arg = (rdmaParameter*)malloc(sizeof(rdmaParameter));
+        arg->node_id = node_id;
+        arg->thread_num = thread_num;
+       
+        pthread_create(&client_thread[thread_num],NULL,client_qp,(void *)arg);
+       
+       thread_num ++;
+  }
+
+  
+ // pthread_join(server_thread,NULL);
+
+  for(int i = 0;i<thread_num;i++){
+    pthread_join(client_thread[i],NULL);
+  }
+
+  //char* rheader = (char *)rdma_rm->raw_ptr + rdma_index_size;
+  char* rheader = rdma_global_buffer + rdma_index_size;
+  r2::AllocatorMaster<>::init(rheader,rdma_buffer_size-rdma_index_size);
 
 }

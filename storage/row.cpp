@@ -206,7 +206,7 @@ void row_t::free_row() {
 RC row_t::get_lock(access_t type, TxnManager * txn) {
 	RC rc = RCOK;
 #if CC_ALG == CALVIN
-	lock_t lt = (type == RD || type == SCAN)? LOCK_SH : LOCK_EX;
+	lock_t lt = (type == RD || type == SCAN)? DLOCK_SH : DLOCK_EX;
 	rc = this->manager->lock_get(lt, txn);
 #endif
 	return rc;
@@ -348,7 +348,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT
   uint64_t init_time = get_sys_clock();
 	//uint64_t thd_id = txn->get_thd_id();
-	lock_t lt = (type == RD || type == SCAN) ? LOCK_SH : LOCK_EX; // ! this wrong !!
+	lock_t lt = (type == RD || type == SCAN) ? DLOCK_SH : DLOCK_EX; // ! this wrong !!
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
 	rc = this->manager->lock_get(lt, txn);
@@ -371,13 +371,13 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	// row_t * newr = NULL;*/
   uint64_t init_time = get_sys_clock();
 #if CC_ALG == TIMESTAMP
-		DEBUG_M("row_t::get_row TIMESTAMP alloc \n");
+	DEBUG_M("row_t::get_row TIMESTAMP alloc \n");
 	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
 	txn->cur_row->init(get_table(), this->get_part_id());
 #endif
-  INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-  uint64_t copy_time = get_sys_clock();
-  // row_t * row;
+	INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
+	uint64_t copy_time = get_sys_clock();
+	// row_t * row;
 	if (type == WR) {
 		rc = this->manager->access(txn, P_REQ, NULL);
 		if (rc != RCOK) goto end;

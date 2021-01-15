@@ -60,7 +60,7 @@ class QPImpl {
   }
 
   static ConnStatus get_remote_helper(ConnArg *arg, ConnReply *reply,std::string ip,int port) {
-
+    
     ConnStatus ret = SUCC;
 
     auto socket = PreConnector::get_send_socket(ip,port);
