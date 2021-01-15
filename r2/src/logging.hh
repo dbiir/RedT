@@ -63,11 +63,11 @@ enum loglevel {
 #define LOG_IF(n,condition)                                     \
   if(n >= ROCC_LOG_LEVEL && (condition))                        \
     ::r2::MessageLogger((char*)__FILE__, __LINE__, n).stream()
-
+/*
 #define ASSERT(condition)                                               \
   if(unlikely(!(condition)))                                            \
     ::r2::MessageLogger((char*)__FILE__, __LINE__, ::r2::LOG_FATAL + 1).stream() << "Assertion! "
-
+*/
 #define VERIFY(n,condition) LOG_IF(n,(!(condition)))
 
 #define FILE_LOG(f)                             \

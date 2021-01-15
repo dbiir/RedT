@@ -18,7 +18,7 @@ public:
 
   inline ptr_t alloc(u32 size, int flag = 0)
   {
-    auto ptr = jemallocx(size, id | flag);
+    auto ptr = mallocx(size, id | flag);
     return ptr;
   }
 
@@ -32,7 +32,7 @@ public:
       But according to my test, if using id has better scalability.d
      */
     //jedallocx(ptr,0);
-    jedallocx(ptr, id);
+    dallocx(ptr, id);
   }
 
 private:

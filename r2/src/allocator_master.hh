@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <functional>
+#include "jemalloc/jemalloc.h"
 
 #include "allocator.hh"
 #include "logging.hh"
@@ -40,14 +41,14 @@ class AllocatorMaster {
   static  void init(char *mem,u64 mem_size) {
     std::lock_guard<std::mutex> guard(lock);
     if(total_managed_mem() != 0) {
-      LOG(2) << "AllocatorMaster<" << NAME << "> inited multiple times";
+      // LOG(2) << "AllocatorMaster<" << NAME << "> inited multiple times";
       return;
     }
 
     start_addr = mem;
     end_addr   = start_addr + mem_size;
     heap_top   = start_addr;
-    LOG(4) << "allocator master register memory: " << total_managed_mem();
+    // LOG(4) << "allocator master register memory: " << total_managed_mem();
   }
 
   static Allocator *get_thread_allocator() {
@@ -71,9 +72,9 @@ class AllocatorMaster {
     size_t sz = sizeof(unsigned);
 
     extent_hooks_t *new_hooks = &hooks;
-    jemallctl("arenas.create", (void *)(&arena_id), &sz,
+    mallctl("arenas.create", (void *)(&arena_id), &sz,
               (void *)(&new_hooks), sizeof(extent_hooks_t *));
-    jemallctl("tcache.create", (void *)(&cache_id), &sz, nullptr, 0);
+    mallctl("tcache.create", (void *)(&cache_id), &sz, nullptr, 0);
     return new Allocator(MALLOCX_ARENA(arena_id) | MALLOCX_TCACHE(cache_id));
     //return new Allocator(MALLOCX_ARENA(arena_id));
   }
