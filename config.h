@@ -31,7 +31,7 @@
 #define RDMA_USE_NIC_IDX 0
 #define RDMA_REG_MEM_NAME 73
 #define RDMA_CQ_NAME "rdma_channel"
-#define RDMA_ENTRY_NUM 1U
+#define RDMA_ENTRY_NUM 128U
 
 //#define RDMA_COLOR_LOG
 /***********************************************/
@@ -70,7 +70,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 1
+#define NODE_CNT 2
 #define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -165,7 +165,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG NO_WAIT
+#define CC_ALG MVCC
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -248,7 +248,7 @@
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR
-#define REQ_PER_QUERY 10
+#define REQ_PER_QUERY 20
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 0

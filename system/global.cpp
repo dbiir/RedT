@@ -266,3 +266,5 @@ UInt32 g_repl_cnt = REPLICA_CNT;
 
 map<string, string> g_params;
 
+bool g_init_done[50] = {false};
+int g_init_cnt = 0;

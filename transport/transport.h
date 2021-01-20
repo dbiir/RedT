@@ -116,10 +116,12 @@ class Transport {
     std::vector<rdmaio::ConnectManager> cms;
     std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> send_handlers;
     std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> recv_handlers;
-
-    std::map<uint64_t, rdmaio::Arc<rdmaio::qp::Dummy>> recv_qps;
-    std::map<uint64_t, rdmaio::Arc<rdmaio::qp::RecvEntries<1U>>> recv_rss;
-    std::map<uint64_t, rdmaio::Arc<rdmaio::qp::RDMARC>> send_qps;
+    rdmaio::Arc<rdmaio::qp::Dummy> recv_qps[50];
+    rdmaio::Arc<rdmaio::qp::RecvEntries<128U>> recv_rss[50];
+    rdmaio::Arc<rdmaio::qp::RDMARC> send_qps[50];
+    //std::map<uint64_t, rdmaio::Arc<rdmaio::qp::Dummy>> recv_qps;
+    //std::map<uint64_t, rdmaio::Arc<rdmaio::qp::RecvEntries<128U>>> recv_rss;
+    //std::map<uint64_t, rdmaio::Arc<rdmaio::qp::RDMARC>> send_qps;
     pthread_mutex_t * latch;
     pthread_mutex_t * latch_send;
 #endif

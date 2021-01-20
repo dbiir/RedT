@@ -46,6 +46,8 @@ void InputThread::setup() {
 		while(!msgs->empty()) {
 			Message * msg = msgs->front();
 			if(msg->rtype == INIT_DONE) {
+				//g_init_done[g_node_id] = 1;
+				g_init_done[msg->return_node_id] = true;
 				printf("Received INIT_DONE from node %ld\n",msg->return_node_id);
 				fflush(stdout);
 				simulation->process_setup_msg();

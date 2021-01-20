@@ -175,7 +175,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
             //txn->wait_starttime = get_sys_clock();
         }
     } else {
-    DEBUG("1lock (%ld,%ld): owners %d, own type %d, req type %d, key %ld %lx\n", txn->get_txn_id(),
+        DEBUG("1lock (%ld,%ld): owners %d, own type %d, req type %d, key %ld %lx\n", txn->get_txn_id(),
           txn->get_batch_id(), owner_cnt, lock_type, type, _row->get_primary_key(), (uint64_t)_row);
 #if DEBUG_TIMELINE
         printf("LOCK %ld %ld\n",entry->txn->get_txn_id(),entry->start_ts);
