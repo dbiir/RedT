@@ -53,7 +53,7 @@
 #include "tictoc.h"
 #include "key_xid.h"
 #include "rts_cache.h"
-#include "http.h"
+// #include "http.h"
 #include "lib.hh"
 //#include "rdma_ctrl.hpp"
 #include "qps/rc_recv_manager.hh"
@@ -294,7 +294,7 @@ int main(int argc, char *argv[]) {
 	if (g_ts_alloc == LTS_TCP_CLOCK) {
 		printf("Initializing tcp queue... ");
 		fflush(stdout);
-		tcp_ts.init(all_thd_cnt);
+		// tcp_ts.init(all_thd_cnt);
 		printf("Done\n");
 	}
 
@@ -448,11 +448,11 @@ int main(int argc, char *argv[]) {
 	msg_pool.free_all();
 	qry_pool.free_all();
 	*/
-	if (g_ts_alloc == LTS_TCP_CLOCK) {
-		for (uint32_t i = 0; i < all_thd_cnt; i++) {
-			tcp_ts.CloseToLts(i);
-		}
-	}
+	// if (g_ts_alloc == LTS_TCP_CLOCK) {
+	// 	for (uint32_t i = 0; i < all_thd_cnt; i++) {
+	// 		tcp_ts.CloseToLts(i);
+	// 	}
+	// }
 	return 0;
 }
 

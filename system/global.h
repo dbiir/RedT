@@ -157,7 +157,7 @@ extern WkdbTimeTable wkdb_time_table;
 extern KeyXidCache wkdb_key_xid_cache;
 extern RtsCache wkdb_rts_cache;
 // extern QTcpQueue tcp_queue;
-extern TcpTimestamp tcp_ts;
+// extern TcpTimestamp tcp_ts;
 
 extern map<string, string> g_params;
 

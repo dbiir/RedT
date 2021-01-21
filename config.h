@@ -24,22 +24,23 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-#define USE_RDMA
-#define RDMA_BUFFER_SIZE (1<<22)
+//#define USE_RDMA
+#define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
-#define RDMA_BUFFER_ITEM_SIZE (1<<11)
+#define RDMA_BUFFER_ITEM_SIZE (1<<12)
 #define RDMA_USE_NIC_IDX 0
 #define RDMA_REG_MEM_NAME 73
 #define RDMA_CQ_NAME "rdma_channel"
-#define RDMA_ENTRY_NUM 128U
-
+#define RDMA_ENTRY_NUM 512U
+#define RDMA_SEND_COUNT (128)
+// #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
 //#define RDMA_COLOR_LOG
+
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
 //which creator to use
 #define CREATOR_USE_T false
-//#define USE_RDMA false
 
 //TraversalActionSequenceCreator
 #define TRANS_CNT 2
@@ -56,7 +57,7 @@
 #define INPUT_FILE_PATH "./input.txt"
 
 // ! Parameters used to locate distributed performance bottlenecks.
-#define SECOND 100 // Set the queue monitoring time.
+#define SECOND 200 // Set the queue monitoring time.
 // #define LESS_DIS // Reduce the number of yCSB remote data to 1
 // #define LESS_DIS_NUM 9 // Reduce the number of yCSB remote data to 1
 // #define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
@@ -70,7 +71,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
+#define NODE_CNT 1
 #define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -140,7 +141,7 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 18000
+#define TPORT_PORT 7000
 #define TPORT_TWOSIDE_PORT 13000
 #define SET_AFFINITY true
 
@@ -248,7 +249,7 @@
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR
-#define REQ_PER_QUERY 20
+#define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 0
@@ -351,7 +352,7 @@ enum PPSTxnType {
 #define DEBUG_TIMESTAMP       false
 #define DEBUG_SYNTH         false
 #define DEBUG_ASSERT        false
-#define DEBUG_DISTR false
+#define DEBUG_DISTR true
 #define DEBUG_ALLOC false
 #define DEBUG_RACE false
 #define DEBUG_TIMELINE        false

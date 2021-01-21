@@ -87,7 +87,30 @@ class Socket {
 		nn::socket sock;
         //char _pad[CL_SIZE - sizeof(nn::socket)];//?_pad的用处
 };
-
+#ifdef USE_RDMA
+class rdma_send_qps{
+  public:
+    rdmaio::Arc<rdmaio::qp::RDMARC> send_qps;
+    uint64_t buffer_idx;
+    uint64_t buffer_size;
+    uint64_t count;
+    uint64_t max_count;
+    rdma_send_qps() {
+      send_qps = NULL;
+      count = 0;
+      buffer_idx = 0;
+      buffer_size = (RDMA_BUFFER_SIZE / MSG_SIZE_MAX);
+      max_count = RDMA_SEND_COUNT;
+    }
+    rdma_send_qps(rdmaio::Arc<rdmaio::qp::RDMARC> qp) {
+      send_qps = qp;
+      count = 0;
+      buffer_idx = 0;
+      buffer_size = (RDMA_BUFFER_SIZE / MSG_SIZE_MAX);
+      max_count = RDMA_SEND_COUNT;
+    }
+};
+#endif
 class Transport {
 	public:
 		void read_ifconfig(const char * ifaddr_file);
@@ -117,13 +140,15 @@ class Transport {
     std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> send_handlers;
     std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> recv_handlers;
     rdmaio::Arc<rdmaio::qp::Dummy> recv_qps[50];
-    rdmaio::Arc<rdmaio::qp::RecvEntries<128U>> recv_rss[50];
-    rdmaio::Arc<rdmaio::qp::RDMARC> send_qps[50];
-    //std::map<uint64_t, rdmaio::Arc<rdmaio::qp::Dummy>> recv_qps;
-    //std::map<uint64_t, rdmaio::Arc<rdmaio::qp::RecvEntries<128U>>> recv_rss;
-    //std::map<uint64_t, rdmaio::Arc<rdmaio::qp::RDMARC>> send_qps;
+    rdmaio::Arc<rdmaio::qp::RecvEntries<RDMA_ENTRY_NUM>> recv_rss[50];
+
+    // rdmaio::Arc<rdmaio::qp::RDMARC> send_qps[50];
+    rdma_send_qps send_qps[50];
+
     pthread_mutex_t * latch;
     pthread_mutex_t * latch_send;
+
+    char* get_next_buf(rdma_send_qps* send_qpi);
 #endif
 
 	private:

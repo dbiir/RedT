@@ -311,29 +311,30 @@ void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
 	auto fetch_res = cm.fetch_remote_mr(RDMA_REG_MEM_NAME + int64_t(port) - TPORT_TWOSIDE_PORT);
 	rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);
 
-	auto local_mr = RegHandler::create(Arc<RMem>(new RMem(1024 * 1024)), tport_man.nic).value();
+	auto local_mr = RegHandler::create(Arc<RMem>(new RMem(RDMA_BUFFER_SIZE/*1024 * 1024*/)), tport_man.nic).value();
 	char *buf = (char *)(local_mr->get_reg_attr().value().buf);
 	qp->bind_remote_mr(remote_attr);
 	qp->bind_local_mr(local_mr->get_reg_attr().value());
 	pthread_mutex_lock( tport_man.latch_send );
 	tport_man.cms.push_back(cm);
 	tport_man.send_handlers.push_back(local_mr);
-	tport_man.send_qps[port-TPORT_TWOSIDE_PORT] = qp;
+  rdma_send_qps sqp(qp);
+	tport_man.send_qps[port-TPORT_TWOSIDE_PORT] = sqp;
 	pthread_mutex_unlock( tport_man.latch_send );
 	RDMA_LOG(2) << "rc client ready to send message to the server!";
 	pthread_mutex_lock( tport_man.latch_send );
 
-	auto send_qpi = tport_man.send_qps[port-TPORT_TWOSIDE_PORT];
-	char *buf2 = (char *)(send_qpi->local_mr->buf);
+	auto send_qpi = &tport_man.send_qps[port-TPORT_TWOSIDE_PORT];
+	char *buf2 = (char *)(send_qpi->send_qps->local_mr->buf);
 	pthread_mutex_unlock( tport_man.latch_send );
-	Timer timer;
+	// Timer timer;
 	for (int i = 1; i <= 1; ++i) {
 		std::string msg = std::to_string(i);
 		memset(buf2, 0, msg.size() + 1);
 		memcpy(buf2, msg.data(), msg.size());
 		RDMA_LOG(2) << "the message content is" << buf2;
 		printf("qp buf ptr:%p\n", buf2);
-		auto res_s = send_qpi->send_normal(
+		auto res_s = send_qpi->send_qps->send_normal(
 			{.op = IBV_WR_SEND_WITH_IMM,
 			.flags = IBV_SEND_SIGNALED,
 			.len = (u32) msg.size() + 1,
@@ -343,7 +344,7 @@ void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
 			.imm_data = 0});
 
 		RDMA_ASSERT(res_s == IOCode::Ok);
-		auto res_p = send_qpi->wait_one_comp();
+		auto res_p = send_qpi->send_qps->wait_one_comp();
 		RDMA_ASSERT(res_p == IOCode::Ok);
 	}
 }
@@ -488,6 +489,26 @@ void Transport::init() {
 
 #endif
 #ifdef USE_RDMA
+#if 0
+char* Transport::get_next_buf(rdma_send_qps* send_qpi) {
+  char *buf = (char *)(send_qpi->send_qps->local_mr->buf);
+  if (send_qpi->buffer_idx > send_qpi->buffer_size) send_qpi->buffer_idx = 0;
+  buf = buf + MSG_SIZE_MAX * send_qpi->buffer_idx;
+  send_qpi->buffer_idx ++;
+  return buf;
+
+}
+#else
+char* Transport::get_next_buf(rdma_send_qps* send_qpi) {
+  char *buf = (char *)(send_qpi->send_qps->local_mr->buf);
+  if (send_qpi->count > send_qpi->max_count) return NULL;
+  else {
+    buf = buf + MSG_SIZE_MAX * send_qpi->count;
+    // send_qpi->count ++;
+    return buf;
+  }
+}
+#endif
 void Transport::rdma_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, char * sbuf, int size) {
 	uint64_t starttime = get_sys_clock();
 	//g_node_id: local node_id
@@ -500,28 +521,40 @@ void Transport::rdma_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, ch
 	}
 
 	pthread_mutex_lock( tport_man.latch );
-	auto send_qpi = tport_man.send_qps[port_id-TPORT_TWOSIDE_PORT];
-	char *buf = (char *)(send_qpi->local_mr->buf);
+	auto send_qpi = &tport_man.send_qps[port_id-TPORT_TWOSIDE_PORT];
+	char* buf = get_next_buf(send_qpi);
 	pthread_mutex_unlock( tport_man.latch );
-
-	Timer timer;
-	memset(buf, 0, size + 1);
+	assert (buf != NULL);
+	memset(buf, 0, size + sizeof(size) + 1);
 	memcpy(buf, &size, 4);
 	memcpy((buf+4), sbuf, size);
-	DEBUG("%ld Sending batch of %d bytes to node %ld on qp\n", send_thread_id, size,
-			dest_node_id, port_id);
 
-	auto res_s = send_qpi->send_normal(
+	DEBUG("%ld Sending batch of %d bytes to node %ld on qp\n", send_thread_id, size,
+		dest_node_id, port_id);
+
+	unsigned int send_flags = send_qpi->count + 1 > send_qpi->max_count ? IBV_SEND_SIGNALED : 0;
+	// unsigned int send_flags = send_qpi->count == 0 ? IBV_SEND_SIGNALED : 0;
+	auto res_s = send_qpi->send_qps->send_normal(
 		{.op = IBV_WR_SEND_WITH_IMM,
-		.flags = IBV_SEND_SIGNALED,
+		.flags = send_flags,
 		.len = (u32) size + sizeof(size) + 1,
 		.wr_id = 0},
 	    {.local_addr = reinterpret_cast<RMem::raw_ptr_t>(buf),
-		.remote_addr = 0,
+    .remote_addr = 0,
 		.imm_data = 0});
 	RDMA_ASSERT(res_s == IOCode::Ok);
-	auto res_p = send_qpi->wait_one_comp();
-	RDMA_ASSERT(res_p == IOCode::Ok);
+	// void* pVoid = buf;
+	// RDMA_LOG(4) << port_id-TPORT_TWOSIDE_PORT << " RDMA send " << (send_qpi->count) << " buf size "<< (u32) size + sizeof(size) + 1 << " buf ptr " << pVoid << " flags " << send_flags;
+	if (send_qpi->count >= send_qpi->max_count) {
+		auto res_p = send_qpi->send_qps->wait_one_comp(10000000);
+		// RDMA_LOG(4) << port_id-TPORT_TWOSIDE_PORT << " RDMA send wait ";
+		// RDMA_ASSERT(res_p == IOCode::Ok);
+		pthread_mutex_lock( tport_man.latch );
+		send_qpi->count = 0;
+		pthread_mutex_unlock( tport_man.latch );
+	} else {
+		send_qpi->count ++;
+	}
 
 	DEBUG("%ld Batch of %d bytes sent to node %ld\n",send_thread_id,size + sizeof(size) + 1,dest_node_id);
 
@@ -558,7 +591,7 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
   	int bytes = 0;
 	char * buf;
 	uint64_t starttime = get_sys_clock();
-	int ptr = 0;
+
 	uint64_t ctr;
 	ctr = starttime % (g_node_cnt + g_client_node_cnt);
 	while(ctr == g_node_id) {
@@ -585,8 +618,7 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 			ctr = starttime % (g_node_cnt + g_client_node_cnt);
 		}
 		if(ISCLIENTN(g_node_id)) {
-			port_id =
-					get_twoside_port_id(ctr, g_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt);
+			port_id = get_twoside_port_id(ctr, g_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt);
 		} else {
 			port_id = get_twoside_port_id(ctr, g_node_id, (g_thread_cnt + g_rem_thread_cnt) % g_send_thread_cnt);
 		}
@@ -594,38 +626,29 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 		auto recv_qpi = tport_man.recv_qps[port_id-TPORT_TWOSIDE_PORT];
 		auto recv_rsi = tport_man.recv_rss[port_id-TPORT_TWOSIDE_PORT];
 		pthread_mutex_unlock( tport_man.latch );
-
 		for (RecvIter<Dummy, RDMA_ENTRY_NUM> iter(recv_qpi, recv_rsi); iter.has_msgs();
 			iter.next()) {
 			auto imm_msg = iter.cur_msg().value();
 			char *tmp = static_cast<char *>(std::get<1>(imm_msg));
 			bytes = *(int*)tmp;
-			//ptr += bytes;
+
 			buf = (char*)malloc(bytes);
-		    memcpy(buf, tmp + 4, bytes);
-			std::vector<Message*> * new_msgs = Message::create_messages((char*)buf);//new std::vector<Message*>;
-			//assert(new_msgs.size() != 1);
-
+			memcpy(buf, tmp + 4, bytes);
+			std::vector<Message*> * new_msgs = Message::create_messages((char*)buf);//new
 			msgs->push_back(new_msgs->front());
-			//cout << "[Rtype]:  " << msgs->front()->rtype << new_msgs->size() << endl;
-
-			//msgs->push_back(Message::create_messages((char*)buf)->front());
 			free(buf);
-			//if(msgs->front()->rtype == INIT_DONE) {
-				//cout << "[Rtype]:  " << msgs->front()->rtype << endl;
-			//	break;
 		}
-
-		if (bytes > 0) break;
+		
+		if (msgs->size() > 0) break;
 
 	}
-
+  // if (msgs->size() > 0) RDMA_LOG(4) << " RDMA recv node id "<< msgs->front()->return_node_id;
 	if(bytes <= 0 ) {
 		INC_STATS(thd_id,msg_recv_idle_time, get_sys_clock() - starttime);
 		return msgs;
 	}
 
-  	INC_STATS(thd_id,msg_recv_time, get_sys_clock() - starttime);
+    INC_STATS(thd_id,msg_recv_time, get_sys_clock() - starttime);
 	INC_STATS(thd_id,msg_recv_cnt,1);
 
 	starttime = get_sys_clock();

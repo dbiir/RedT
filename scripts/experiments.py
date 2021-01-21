@@ -71,11 +71,11 @@ def ycsb_scaling():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
-    nnodes = [2]
-	# algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    nnodes = [1]
+	  # algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     # algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    algos=['MAAT']
+    algos=['MVCC']
     base_table_size=1048576*8
     #base_table_size=2097152*8
     txn_write_perc = [0.5]

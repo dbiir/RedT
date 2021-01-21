@@ -1,7 +1,7 @@
 CC=/usr/bin/g++
 
 #CFLAGS=-Wall -Werror -std=c++11 -g3 -ggdb -O0 -fno-strict-aliasing -fno-omit-frame-pointer -D_GLIBCXX_USE_CXX11_ABI=0
-CFLAGS=-Wall -std=c++1y -g3 -ggdb -O0 -fno-strict-aliasing -fno-omit-frame-pointer -D_GLIBCXX_USE_CXX11_ABI=0 
+CFLAGS=-Wall -std=c++1y -g3 -ggdb -O0 -fno-strict-aliasing -fno-omit-frame-pointer -D_GLIBCXX_USE_CXX11_ABI=0
 # -fsanitize=address
 #CFLAGS += -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer
 NNMSG=./nanomsg-0.5-beta
@@ -13,10 +13,10 @@ SRC_DIRS = ./ ./benchmarks/ ./client/ ./concurrency_control/ ./storage/ ./transp
 DEPS = -I. -I./benchmarks -I./client/ -I./concurrency_control -I./storage -I./transport -I./system -I./statistics -I./rlib/ -I./rlibv2/ #-I./unit_tests
 
 CFLAGS += $(DEPS) -D NOGRAPHITE=1 -Wno-sizeof-pointer-memaccess
-LDFLAGS = -Wall -L. -L$(NNMSG) -Wl,-rpath -pthread -lrt -lnanomsg -lanl -lcurl -lprotobuf -lpthread -libverbs -L$(RALLOC) -lssmalloc #-ljemalloc#-lc++experimental 
+LDFLAGS = -Wall -L. -L$(NNMSG) -Wl,-rpath -pthread -lrt -lnanomsg -lanl -lcurl -lpthread -libverbs -L$(RALLOC) -lssmalloc #-ljemalloc#-lc++experimental -lprotobuf
 #LDFLAGS = -Wall -L. -L$(NNMSG) -L$(JEMALLOC)/lib -Wl,-rpath,$(JEMALLOC)/lib -pthread -gdwarf-3 -lrt -std=c++11
 LDFLAGS += $(CFLAGS)
-LIBS = -lrdmacm -lmemcached
+#LIBS = -lrdmacm -lmemcached
 
 DB_MAINS = ./client/client_main.cpp ./system/sequencer_main.cpp ./unit_tests/unit_main.cpp
 CL_MAINS = ./system/main.cpp ./system/sequencer_main.cpp ./unit_tests/unit_main.cpp
