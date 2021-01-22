@@ -22,6 +22,7 @@
 #include "math.h"
 #include "message.h"
 #include "msg_queue.h"
+#include "transport.h"
 #include "query.h"
 #include "txn.h"
 #include "wl.h"
@@ -45,8 +46,12 @@ void Thread::send_init_done_to_all_nodes() {
 		for(uint64_t i = 0; i < g_total_node_cnt; i++) {
 			if(i != g_node_id) {
         printf("Send INIT_DONE to %ld\n",i);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), i, Message::create_message(INIT_DONE));
+#else
         msg_queue.enqueue(get_thd_id(),Message::create_message(INIT_DONE),i);
-			}
+#endif        
+      }
 		}
 }
 

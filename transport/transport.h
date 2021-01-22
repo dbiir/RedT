@@ -25,7 +25,7 @@
   #include "qps/recv_iter.hh"
   #include "qps/mod.hh"
   #include "utils/timer.hh"
-
+  #include "msg_thread.h"
   using namespace std;
   using namespace rdmaio;
   using namespace rdmaio::rmem;
@@ -123,10 +123,12 @@ class Transport {
     uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id);
     uint64_t get_twoside_port_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id);
     uint64_t get_twoside_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id);
+    uint64_t get_thd_port_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id);
     Socket * bind(uint64_t port_id);
     Socket * connect(uint64_t dest_id,uint64_t port_id);
     void send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * sbuf,int size);
     void rdma_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, char * sbuf,int size);
+    void rdma_thd_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, Message * msg);
     std::vector<Message*> * recv_msg(uint64_t thd_id);
     std::vector<Message*> * rdma_recv_msg(uint64_t thd_id);
 		void simple_send_msg(int size);
@@ -136,14 +138,21 @@ class Transport {
 #ifdef USE_RDMA
     //client need
     rdmaio::Arc<rdmaio::RNic> nic;
+    //-----------------send------------------//
     std::vector<rdmaio::ConnectManager> cms;
     std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> send_handlers;
-    std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> recv_handlers;
-    rdmaio::Arc<rdmaio::qp::Dummy> recv_qps[50];
-    rdmaio::Arc<rdmaio::qp::RecvEntries<RDMA_ENTRY_NUM>> recv_rss[50];
-
+    std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> send_thread_handlers;
     // rdmaio::Arc<rdmaio::qp::RDMARC> send_qps[50];
-    rdma_send_qps send_qps[50];
+    rdma_send_qps send_qps[200];
+    rdma_send_qps sned_thread_qps[200];
+    //-----------------recv------------------//
+    std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> recv_handlers;
+    rdmaio::Arc<rdmaio::qp::Dummy> recv_qps[200];
+    rdmaio::Arc<rdmaio::qp::RecvEntries<RDMA_ENTRY_NUM>> recv_rss[200];
+
+    std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> recv_thread_handlers;
+    rdmaio::Arc<rdmaio::qp::Dummy> recv_thread_qps[200];
+    rdmaio::Arc<rdmaio::qp::RecvEntries<RDMA_ENTRY_NUM>> recv_thread_rss[200];
 
     pthread_mutex_t * latch;
     pthread_mutex_t * latch_send;

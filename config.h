@@ -24,7 +24,7 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-//#define USE_RDMA
+#define USE_RDMA CHANGE_MSG_QUEUE
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
 #define RDMA_BUFFER_ITEM_SIZE (1<<12)
@@ -35,6 +35,10 @@
 #define RDMA_SEND_COUNT (128)
 // #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
 //#define RDMA_COLOR_LOG
+
+/************RDMA TYPE**************/
+#define CHANGE_TCP_ONLY 0
+#define CHANGE_MSG_QUEUE 1
 
 /***********************************************/
 // DA Trans Creator
@@ -352,7 +356,7 @@ enum PPSTxnType {
 #define DEBUG_TIMESTAMP       false
 #define DEBUG_SYNTH         false
 #define DEBUG_ASSERT        false
-#define DEBUG_DISTR true
+#define DEBUG_DISTR false
 #define DEBUG_ALLOC false
 #define DEBUG_RACE false
 #define DEBUG_TIMELINE        false

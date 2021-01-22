@@ -74,6 +74,7 @@ public:
   void copy_to_buffer(mbuf * sbuf, RemReqType type, BaseQuery * qry);
   uint64_t get_msg_size(RemReqType type, BaseQuery * qry);
   void rack( mbuf * sbuf,BaseQuery * qry);
+  
   void rprepare( mbuf * sbuf,BaseQuery * qry);
   void rfin( mbuf * sbuf,BaseQuery * qry);
   void cl_rsp(mbuf * sbuf, BaseQuery *qry);

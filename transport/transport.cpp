@@ -155,6 +155,16 @@ uint64_t Transport::get_twoside_id(uint64_t src_node_id, uint64_t dest_node_id,
   return port_id;
 }
 
+uint64_t Transport::get_thd_port_id(uint64_t src_node_id, uint64_t dest_node_id,
+								uint64_t send_thread_id) {
+  uint64_t port_id = TPORT_TWOSIDE_PORT+100;
+  port_id += src_node_id * g_thread_cnt * g_thread_cnt;
+  port_id += dest_node_id * g_thread_cnt;
+  port_id += send_thread_id;
+  //DEBUG("%ld\n",port_id);
+  //DEBUG("%ld\n",port_id);
+  return port_id;
+}
 #if NETWORK_DELAY_TEST || !ENVIRONMENT_EC2
 uint64_t Transport::get_port_id(uint64_t src_node_id, uint64_t dest_node_id,
 								uint64_t send_thread_id) {
@@ -348,6 +358,7 @@ void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
 		RDMA_ASSERT(res_p == IOCode::Ok);
 	}
 }
+#if USE_RDMA == CHANGE_TCP_ONLY
 void Transport::init() {
 	_sock_cnt = get_socket_count();
 	rr = 0;
@@ -423,6 +434,72 @@ void Transport::init() {
 	}
 		fflush(stdout);
 }
+#elif USE_RDMA == CHANGE_MSG_QUEUE
+void Transport::init() {
+	_sock_cnt = get_socket_count();
+	rr = 0;
+	printf("Tport Init %d: %ld\n",g_node_id,_sock_cnt);
+	string path = get_path();
+	read_ifconfig(path.c_str());
+
+	latch = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init( latch, NULL );
+	latch_send = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init( latch_send, NULL );
+	tport_man.nic = RNic::create(RNicInfo::query_dev_names().at(RDMA_USE_NIC_IDX)).value();
+	vector<std::thread> th_bind;
+	vector<std::thread> th_connect;
+	for(uint64_t node_id = 0; node_id < g_total_node_cnt; node_id++) {
+		if (node_id == g_node_id) continue;
+		// Listening ports
+		if(ISCLIENTN(node_id)) {
+		for (uint64_t client_thread_id = 0; client_thread_id < g_client_thread_cnt; client_thread_id++) {
+				th_bind.push_back(std::thread([=](){
+					uint64_t port_id = get_thd_port_id(node_id, g_node_id, client_thread_id);
+					create_server(port_id, node_id);
+				}));
+			}
+		} else {
+		for (uint64_t server_thread_id = 0; server_thread_id < g_thread_cnt; server_thread_id++) {
+				th_bind.push_back(std::thread([=](){
+					uint64_t port_id = get_thd_port_id(node_id,g_node_id,server_thread_id);
+					create_server(port_id, node_id);
+				}));
+			}
+		}
+		// Sending ports
+		if(ISCLIENTN(g_node_id)) {
+			for (uint64_t client_thread_id = 0; client_thread_id < g_client_thread_cnt; client_thread_id++) {
+				th_connect.push_back(std::thread([=](){
+				sleep(1);
+				cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
+					uint64_t port_id =
+					get_thd_port_id(g_node_id, node_id, client_thread_id);
+					create_client(port_id, node_id);
+				}));
+			}
+		} else {
+			for (uint64_t server_thread_id = 0; server_thread_id < g_thread_cnt; server_thread_id++) {
+				th_connect.push_back(std::thread([=](){
+					sleep(1);
+					cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
+					uint64_t port_id = get_thd_port_id(g_node_id,node_id,server_thread_id);
+					create_client(port_id, node_id);
+				}));
+			}
+		}
+	}
+
+	for (std::thread &th: th_connect) {
+		th.join();
+	}
+
+	for (std::thread &th: th_bind) {
+		th.join();
+	}
+		fflush(stdout);
+}
+#endif
 #else
 void Transport::init() {
 	_sock_cnt = get_socket_count();
@@ -509,16 +586,62 @@ char* Transport::get_next_buf(rdma_send_qps* send_qpi) {
   }
 }
 #endif
+void Transport::rdma_thd_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, Message * msg) {
+	mbuf * sbuf;
+	mbuf * buffer;
+	buffer = (mbuf *)mem_allocator.align_alloc(sizeof(mbuf));
+	buffer->init(dest_node_id);
+	buffer->reset(dest_node_id);
+	assert(msg);
+	assert(dest_node_id < g_total_node_cnt);
+	assert(dest_node_id != g_node_id);
+	sbuf = buffer;
+	uint64_t copy_starttime = get_sys_clock();
+	msg->copy_to_buf(&(sbuf->buffer[sbuf->ptr]));
+	INC_STATS(send_thread_id, msg_copy_output_time,get_sys_clock() - copy_starttime);
+	DEBUG("%ld Buffered Msg %d, (%ld,%ld) to %ld\n", send_thread_id, msg->rtype, msg->txn_id, msg->batch_id, dest_node_id);
+	sbuf->cnt += 1;
+    sbuf->ptr += msg->get_size();
+	if(CC_ALG != CALVIN) {
+        Message::release_message(msg);
+    }
+	if (sbuf->starttime == 0) sbuf->starttime = get_sys_clock();
+	uint64_t starttime = get_sys_clock();
+	
+	((uint32_t*)sbuf->buffer)[2] = sbuf->cnt;
+	INC_STATS(send_thread_id,mbuf_send_intv_time,get_sys_clock() - sbuf->starttime);
+	DEBUG("Send batch of %ld msgs to %ld\n",sbuf->cnt,dest_node_id);
+    fflush(stdout);
+    sbuf->set_send_time(get_sys_clock());
+	// TODO: 发送 
+
+    rdma_send_msg(send_thread_id, dest_node_id, sbuf->buffer, sbuf->ptr);
+
+	INC_STATS(send_thread_id,msg_batch_size_msgs,sbuf->cnt);
+    INC_STATS(send_thread_id,msg_batch_size_bytes,sbuf->ptr);
+    if(ISSERVERN(dest_node_id)) {
+      INC_STATS(send_thread_id,msg_batch_size_bytes_to_server,sbuf->ptr);
+    } else if (ISCLIENTN(dest_node_id)){
+      INC_STATS(send_thread_id,msg_batch_size_bytes_to_client,sbuf->ptr);
+    }
+    INC_STATS(send_thread_id,msg_batch_cnt,1);
+    sbuf->reset(dest_node_id);
+	INC_STATS(send_thread_id,mtx[12],get_sys_clock() - starttime);
+}
 void Transport::rdma_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, char * sbuf, int size) {
 	uint64_t starttime = get_sys_clock();
 	//g_node_id: local node_id
 	//dest_node_id: remote node_id
 	uint64_t port_id;
+#if USE_RDMA == CHANGE_TCP_ONLY
 	if(ISCLIENTN(g_node_id)) {
 		port_id = get_twoside_port_id(g_node_id, dest_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt);
 	} else {
 		port_id = get_twoside_port_id(g_node_id, dest_node_id, (g_thread_cnt + g_rem_thread_cnt) % g_send_thread_cnt);
 	}
+#elif USE_RDMA == CHANGE_MSG_QUEUE
+		port_id = get_thd_port_id(g_node_id, dest_node_id, send_thread_id);
+#endif	
 
 	pthread_mutex_lock( tport_man.latch );
 	auto send_qpi = &tport_man.send_qps[port_id-TPORT_TWOSIDE_PORT];
@@ -600,16 +723,23 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 	}
 	std::vector<Message*> * msgs =new std::vector<Message*>;
 	uint64_t port_id;
+#if USE_RDMA == CHANGE_TCP_ONLY
 	if(ISCLIENTN(g_node_id)) {
 		port_id =
 				get_twoside_port_id(ctr, g_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt);
 	} else {
 		port_id = get_twoside_port_id(ctr, g_node_id, (g_thread_cnt + g_rem_thread_cnt) % g_send_thread_cnt);
 	}
+#elif USE_RDMA == CHANGE_MSG_QUEUE
+    uint64_t send_thd_id;
+	starttime = get_sys_clock();
+	send_thd_id = starttime % (g_thread_cnt);
+	port_id = get_thd_port_id(ctr, g_node_id, send_thd_id);
+#endif
 	//uint64_t start_ctr = ctr;
 	while (bytes <= 0 && (!simulation->is_setup_done() ||
 							(simulation->is_setup_done() && !simulation->is_done()))) {
-		//cout << "recv message from :" << ctr << endl;
+		
 		//sleep(1);
 		starttime = get_sys_clock();
 		ctr = starttime % (g_node_cnt + g_client_node_cnt);
@@ -617,11 +747,19 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 			starttime = get_sys_clock();
 			ctr = starttime % (g_node_cnt + g_client_node_cnt);
 		}
+		
+#if USE_RDMA == CHANGE_TCP_ONLY
 		if(ISCLIENTN(g_node_id)) {
 			port_id = get_twoside_port_id(ctr, g_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt);
 		} else {
 			port_id = get_twoside_port_id(ctr, g_node_id, (g_thread_cnt + g_rem_thread_cnt) % g_send_thread_cnt);
 		}
+#elif USE_RDMA == CHANGE_MSG_QUEUE
+		starttime = get_sys_clock();
+		send_thd_id = starttime % (g_thread_cnt);
+		port_id = get_thd_port_id(ctr, g_node_id, send_thd_id);
+#endif
+        //cout << "recv message from :" << ctr << " send_thd " << send_thd_id << endl;
 		pthread_mutex_lock( tport_man.latch );
 		auto recv_qpi = tport_man.recv_qps[port_id-TPORT_TWOSIDE_PORT];
 		auto recv_rsi = tport_man.recv_rss[port_id-TPORT_TWOSIDE_PORT];
