@@ -33,6 +33,7 @@
 #include "query.h"
 #include "msg_queue.h"
 #include "message.h"
+#include "transport.h"
 
 void YCSBTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	TxnManager::init(thd_id, h_wl);
@@ -162,7 +163,11 @@ RC YCSBTxnManager::send_remote_request() {
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
   uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
   ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,dest_node_id));
+#if USE_RDMA == CHANGE_MSG_QUEUE
+  tport_man.rdma_thd_send_msg(get_thd_id(), dest_node_id, Message::create_message(this,RQRY));
+#else
   msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),dest_node_id);
+#endif
   return WAIT_REM;
 }
 

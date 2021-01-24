@@ -161,7 +161,11 @@ void Sequencer::process_ack(Message * msg, uint64_t thd_id) {
 			ClientResponseMessage *rsp_msg =
 					(ClientResponseMessage *)Message::create_message(msg->get_txn_id(), CL_RSP);
 					rsp_msg->client_startts = wait_list[id].client_startts;
-					msg_queue.enqueue(thd_id,rsp_msg,wait_list[id].client_id);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+                	tport_man.rdma_thd_send_msg(thd_id, wait_list[id].client_id, rsp_msg);
+#else
+					msg_queue.enqueue(thd_id, rsp_msg, wait_list[id].client_id);
+#endif
 #if WORKLOAD == PPS
 			}
 #endif
@@ -298,7 +302,11 @@ void Sequencer::send_next_batch(uint64_t thd_id) {
 			if(j == g_node_id) {
 					work_queue.sched_enqueue(thd_id,msg);
 			} else {
-				msg_queue.enqueue(thd_id,msg,j);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+                tport_man.rdma_thd_send_msg(thd_id, j, msg);
+#else
+				msg_queue.enqueue(thd_id, msg, j);
+#endif
 			}
 		}
 		if(!empty) {
@@ -309,7 +317,11 @@ void Sequencer::send_next_batch(uint64_t thd_id) {
 		if(j == g_node_id) {
 			work_queue.sched_enqueue(thd_id,msg);
 		} else {
-			msg_queue.enqueue(thd_id,msg,j);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+            tport_man.rdma_thd_send_msg(thd_id, j, msg);
+#else
+			msg_queue.enqueue(thd_id, msg, j);
+#endif
 		}
 	}
 

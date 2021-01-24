@@ -40,6 +40,8 @@
 #include "ssi.h"
 #include "focc.h"
 #include "bocc.h"
+#include "transport.h"
+
 
 void WorkerThread::setup() {
 	if( get_thd_id() == 0) {
@@ -237,8 +239,12 @@ void WorkerThread::calvin_wrapup() {
   if(txn_man->return_id == g_node_id) {
     work_queue.sequencer_enqueue(_thd_id,Message::create_message(txn_man,CALVIN_ACK));
   } else {
+#if USE_RDMA == CHANGE_MSG_QUEUE
+    tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->return_id, Message::create_message(txn_man, CALVIN_ACK));
+#else
     msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, CALVIN_ACK),
                       txn_man->return_id);
+#endif
   }
   release_txn_man();
 }
@@ -269,7 +275,11 @@ void WorkerThread::commit() {
 
   // Send result back to client
 #if !SERVER_GENERATE_QUERIES
-  msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,CL_RSP),txn_man->client_id);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+    tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->client_id, Message::create_message(txn_man,CL_RSP));
+#else
+    msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,CL_RSP),txn_man->client_id);
+#endif
 #endif
   // remove txn from pool
   release_txn_man();
@@ -489,8 +499,12 @@ RC WorkerThread::process_rfin(Message * msg) {
     txn_man->abort();
     txn_man->reset();
     txn_man->reset_query();
+#if USE_RDMA == CHANGE_MSG_QUEUE
+    tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->get_txn_id()), Message::create_message(txn_man, RACK_FIN));
+#else
     msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN),
                       GET_NODE_ID(msg->get_txn_id()));
+#endif
     return Abort;
   }
   txn_man->commit();
@@ -498,8 +512,12 @@ RC WorkerThread::process_rfin(Message * msg) {
   if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC ||
        CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == DLI_BASE ||
        CC_ALG == DLI_OCC || CC_ALG == SILO)
+#if USE_RDMA == CHANGE_MSG_QUEUE
+    tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->get_txn_id()), Message::create_message(txn_man, RACK_FIN));
+#else
     msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN),
                       GET_NODE_ID(msg->get_txn_id()));
+#endif
   release_txn_man();
 
   return RCOK;
@@ -678,7 +696,11 @@ RC WorkerThread::process_rqry(Message * msg) {
 
   // Send response
   if(rc != WAIT) {
+#if USE_RDMA == CHANGE_MSG_QUEUE
+    tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->return_id, Message::create_message(txn_man,RQRY_RSP));
+#else
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),txn_man->return_id);
+#endif
   }
   return rc;
 }
@@ -693,7 +715,11 @@ RC WorkerThread::process_rqry_cont(Message * msg) {
 
   // Send response
   if(rc != WAIT) {
+#if USE_RDMA == CHANGE_MSG_QUEUE
+    tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->return_id, Message::create_message(txn_man,RQRY_RSP));
+#else
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),txn_man->return_id);
+#endif
   }
   return rc;
 }
@@ -726,7 +752,11 @@ RC WorkerThread::process_rprepare(Message * msg) {
     // Validate transaction
     rc  = txn_man->validate();
     txn_man->set_rc(rc);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+    tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RACK_PREP));
+#else
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+#endif
     // Clean up as soon as abort is possible
     if(rc == Abort) {
       txn_man->abort();
@@ -905,8 +935,12 @@ RC WorkerThread::process_log_msg_rsp(Message * msg) {
 RC WorkerThread::process_log_flushed(Message * msg) {
   DEBUG("LOG FLUSHED %ld\n",msg->get_txn_id());
   if(ISREPLICA) {
+#if USE_RDMA == CHANGE_MSG_QUEUE
+    tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->txn_id), Message::create_message(msg->txn_id, LOG_MSG_RSP));
+#else
     msg_queue.enqueue(get_thd_id(), Message::create_message(msg->txn_id, LOG_MSG_RSP),
                       GET_NODE_ID(msg->txn_id));
+#endif
     return RCOK;
   }
 

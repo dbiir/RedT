@@ -156,8 +156,8 @@ class Transport {
 
     pthread_mutex_t * latch;
     pthread_mutex_t * latch_send;
-
-    char* get_next_buf(rdma_send_qps* send_qpi);
+    mbuf ** buffer; 
+    char * get_next_buf(rdma_send_qps* send_qpi);
 #endif
 
 	private:

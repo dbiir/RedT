@@ -49,6 +49,7 @@
 #include "ssi.h"
 #include "wsi.h"
 #include "manager.h"
+#include "transport.h"
 
 void TxnStats::init() {
 	starttime=0;
@@ -469,8 +470,12 @@ RC TxnManager::commit() {
 #if LOGGING
 	LogRecord * record = logger.createRecord(get_txn_id(),L_NOTIFY,0,0);
 	if(g_repl_cnt > 0) {
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), g_node_id + g_node_cnt + g_client_node_cnt, Message::create_message(record, LOG_MSG));
+#else
 		msg_queue.enqueue(get_thd_id(), Message::create_message(record, LOG_MSG),
 											g_node_id + g_node_cnt + g_client_node_cnt);
+#endif
 	}
 	logger.enqueueRecord(record);
 	return WAIT;
@@ -645,8 +650,12 @@ void TxnManager::send_prepare_messages() {
 	if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) {
 		continue;
 	}
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(query->partitions_touched[i]), Message::create_message(this, RPREPARE));
+#else
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),
 											GET_NODE_ID(query->partitions_touched[i]));
+#endif
 	}
 }
 
@@ -658,8 +667,12 @@ void TxnManager::send_finish_messages() {
 		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) {
 			continue;
     }
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(query->partitions_touched[i]), Message::create_message(this, RFIN));
+#else
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN),
 											GET_NODE_ID(query->partitions_touched[i]));
+#endif
 	}
 }
 
@@ -1028,8 +1041,12 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 		LogRecord *record = logger.createRecord(
 				get_txn_id(), L_UPDATE, row->get_table()->get_table_id(), row->get_primary_key());
 	if(g_repl_cnt > 0) {
+#if USE_RDMA == CHANGE_MSG_QUEUE
+            tport_man.rdma_thd_send_msg(get_thd_id(), g_node_id + g_node_cnt + g_client_node_cnt, Message::create_message(record, LOG_MSG));
+#else
 			msg_queue.enqueue(get_thd_id(), Message::create_message(record, LOG_MSG),
 												g_node_id + g_node_cnt + g_client_node_cnt);
+#endif
 	}
 	logger.enqueueRecord(record);
 #endif
@@ -1213,7 +1230,11 @@ RC TxnManager::send_remote_reads() {
 		if (i == g_node_id) continue;
 	if(query->active_nodes[i] == 1) {
 		DEBUG("(%ld,%ld) send_remote_read to %ld\n",get_txn_id(),get_batch_id(),i);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), i, Message::create_message(this,RFWD));
+#else
 		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RFWD),i);
+#endif
 	}
 	}
 	return RCOK;

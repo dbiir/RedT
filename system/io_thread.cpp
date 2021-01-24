@@ -178,24 +178,40 @@ bool InputThread::fakeprocess(Message * msg) {
 			case RPREPARE:
 				rc = RCOK;
 				txn_man->set_rc(rc);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+                tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RACK_PREP));
+#else
 				msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+#endif
 				break;
 			case RQRY:
 				rc = RCOK;
 				txn_man->set_rc(rc);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+                tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RQRY_RSP));
+#else
 				msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),msg->return_node_id);
+#endif
 				break;
 			case RQRY_CONT:
 				rc = RCOK;
 				txn_man->set_rc(rc);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+                tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RQRY_RSP));
+#else
 				msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),msg->return_node_id);
+#endif
 				break;
 			case RFIN:
 				rc = RCOK;
 				txn_man->set_rc(rc);
 				if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC || CC_ALG == BOCC || CC_ALG == SSI)
 				// if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC)
+#if USE_RDMA == CHANGE_MSG_QUEUE
+                	tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->get_txn_id()), Message::create_message(txn_man,RACK_FIN));
+#else
 					msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_FIN),GET_NODE_ID(msg->get_txn_id()));
+#endif
 				// rc = process_rfin(msg);
 				break;
 			default:

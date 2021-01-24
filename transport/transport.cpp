@@ -442,6 +442,13 @@ void Transport::init() {
 	string path = get_path();
 	read_ifconfig(path.c_str());
 
+	buffer = (mbuf **) mem_allocator.align_alloc(sizeof(mbuf*) * g_total_node_cnt * g_thread_cnt);
+	for(uint64_t n = 0; n < g_total_node_cnt * g_thread_cnt; n++) {
+		DEBUG_M("MessageThread::init mbuf alloc\n");
+		buffer[n] = (mbuf *)mem_allocator.align_alloc(sizeof(mbuf));
+		buffer[n]->init(n / g_thread_cnt);
+		buffer[n]->reset(n / g_thread_cnt);
+	}
 	latch = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init( latch, NULL );
 	latch_send = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
@@ -588,14 +595,17 @@ char* Transport::get_next_buf(rdma_send_qps* send_qpi) {
 #endif
 void Transport::rdma_thd_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, Message * msg) {
 	mbuf * sbuf;
-	mbuf * buffer;
-	buffer = (mbuf *)mem_allocator.align_alloc(sizeof(mbuf));
-	buffer->init(dest_node_id);
-	buffer->reset(dest_node_id);
+	//mbuf * buffer;
+	// sbuf = (mbuf *)mem_allocator.align_alloc(sizeof(mbuf));
+
+	// sbuf->init(dest_node_id);
+	// sbuf->reset(dest_node_id);
+
 	assert(msg);
 	assert(dest_node_id < g_total_node_cnt);
 	assert(dest_node_id != g_node_id);
-	sbuf = buffer;
+	sbuf = buffer[dest_node_id * g_thread_cnt + send_thread_id];
+	//sbuf = buffer;
 	uint64_t copy_starttime = get_sys_clock();
 	msg->copy_to_buf(&(sbuf->buffer[sbuf->ptr]));
 	INC_STATS(send_thread_id, msg_copy_output_time,get_sys_clock() - copy_starttime);
@@ -607,15 +617,19 @@ void Transport::rdma_thd_send_msg(uint64_t send_thread_id, uint64_t dest_node_id
     }
 	if (sbuf->starttime == 0) sbuf->starttime = get_sys_clock();
 	uint64_t starttime = get_sys_clock();
-	
+
 	((uint32_t*)sbuf->buffer)[2] = sbuf->cnt;
 	INC_STATS(send_thread_id,mbuf_send_intv_time,get_sys_clock() - sbuf->starttime);
 	DEBUG("Send batch of %ld msgs to %ld\n",sbuf->cnt,dest_node_id);
     fflush(stdout);
     sbuf->set_send_time(get_sys_clock());
-	// TODO: 发送 
-
+	// TODO: 发送
+	//sleep(1);
+	// printf("node %ld thread %ld send to remote node %ld\n", g_node_id, send_thread_id, dest_node_id);
     rdma_send_msg(send_thread_id, dest_node_id, sbuf->buffer, sbuf->ptr);
+	sbuf->reset(dest_node_id);
+	//free(sbuf->buffer);
+
 
 	INC_STATS(send_thread_id,msg_batch_size_msgs,sbuf->cnt);
     INC_STATS(send_thread_id,msg_batch_size_bytes,sbuf->ptr);
@@ -624,8 +638,9 @@ void Transport::rdma_thd_send_msg(uint64_t send_thread_id, uint64_t dest_node_id
     } else if (ISCLIENTN(dest_node_id)){
       INC_STATS(send_thread_id,msg_batch_size_bytes_to_client,sbuf->ptr);
     }
+	//mem_allocator.free(sbuf,sizeof(mbuf));
     INC_STATS(send_thread_id,msg_batch_cnt,1);
-    sbuf->reset(dest_node_id);
+
 	INC_STATS(send_thread_id,mtx[12],get_sys_clock() - starttime);
 }
 void Transport::rdma_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, char * sbuf, int size) {
@@ -641,7 +656,7 @@ void Transport::rdma_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, ch
 	}
 #elif USE_RDMA == CHANGE_MSG_QUEUE
 		port_id = get_thd_port_id(g_node_id, dest_node_id, send_thread_id);
-#endif	
+#endif
 
 	pthread_mutex_lock( tport_man.latch );
 	auto send_qpi = &tport_man.send_qps[port_id-TPORT_TWOSIDE_PORT];
@@ -739,7 +754,7 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 	//uint64_t start_ctr = ctr;
 	while (bytes <= 0 && (!simulation->is_setup_done() ||
 							(simulation->is_setup_done() && !simulation->is_done()))) {
-		
+
 		//sleep(1);
 		starttime = get_sys_clock();
 		ctr = starttime % (g_node_cnt + g_client_node_cnt);
@@ -747,7 +762,7 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 			starttime = get_sys_clock();
 			ctr = starttime % (g_node_cnt + g_client_node_cnt);
 		}
-		
+
 #if USE_RDMA == CHANGE_TCP_ONLY
 		if(ISCLIENTN(g_node_id)) {
 			port_id = get_twoside_port_id(ctr, g_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt);
@@ -769,14 +784,14 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 			auto imm_msg = iter.cur_msg().value();
 			char *tmp = static_cast<char *>(std::get<1>(imm_msg));
 			bytes = *(int*)tmp;
-
+			// printf("recv msg form remote %ld and thread %ld\n", ctr, send_thd_id);
 			buf = (char*)malloc(bytes);
 			memcpy(buf, tmp + 4, bytes);
 			std::vector<Message*> * new_msgs = Message::create_messages((char*)buf);//new
 			msgs->push_back(new_msgs->front());
 			free(buf);
 		}
-		
+
 		if (msgs->size() > 0) break;
 
 	}

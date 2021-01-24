@@ -1,7 +1,7 @@
 MVCC 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
-175.270768
-0.006466
-0.341522
-0.212593
-2.3e-05
+92246.636763
+188.68214
+15038.912685
+14587.921657
+10981.782137
