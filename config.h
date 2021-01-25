@@ -31,7 +31,7 @@
 #define RDMA_USE_NIC_IDX 0
 #define RDMA_REG_MEM_NAME 73
 #define RDMA_CQ_NAME "rdma_channel"
-#define RDMA_ENTRY_NUM 512U
+#define RDMA_ENTRY_NUM 1024U
 #define RDMA_SEND_COUNT (128)
 // #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
 //#define RDMA_COLOR_LOG
