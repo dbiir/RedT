@@ -58,6 +58,18 @@ public:
   uint64_t total_txn_commit_cnt;
   uint64_t local_txn_commit_cnt;
   uint64_t remote_txn_commit_cnt;
+  //count abort
+  uint64_t  valid_abort_cnt;
+  double  local_lock_fail_abort;
+  double  remote_lock_fail_abort;
+  double  local_readset_validate_fail_abort;
+  double  remote_readset_validate_fail_abort;
+  double  local_writeset_validate_fail_abort;
+  double  remote_writeset_validate_fail_abort;
+  double  validate_lock_abort;
+  double  local_try_lock_fail_abort;
+  double  remote_try_lock_fail_abort;
+  //
   uint64_t total_txn_abort_cnt;
   uint64_t positive_txn_abort_cnt;
   uint64_t unique_txn_abort_cnt;
@@ -98,6 +110,8 @@ public:
   uint64_t trans_process_count=0;
   uint64_t trans_2pc_count=0;
   uint64_t trans_prepare_count=0;
+  uint64_t rdma_read_cnt = 0;
+  uint64_t rdma_write_cnt = 0;
   uint64_t trans_validate_count=0;
   uint64_t trans_finish_count=0;
   uint64_t trans_commit_count=0;
@@ -110,6 +124,8 @@ public:
   double trans_process_time=0;
   double trans_2pc_time=0;
   double trans_prepare_time=0;
+  double rdma_read_time = 0;
+  double rdma_write_time = 0;
   double trans_validate_time=0;
   double trans_finish_time=0;
   double trans_commit_time=0;
@@ -117,6 +133,8 @@ public:
   double trans_get_access_time=0;
   double trans_store_access_time=0;
   double trans_get_row_time=0;
+
+
 
   double trans_benchmark_compute_time=0;
 

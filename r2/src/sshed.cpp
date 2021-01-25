@@ -70,8 +70,8 @@ void SScheduler::poll_all_futures() {
 
     // if res == Ok, NearOk, we need to decrease the pending futures
     if (res == IOCode::Ok || res == IOCode::NearOk) {
-      ASSERT(pending_futures[cid] >= num)
-          << " reduce num: " << num << " for cid: " << cid;
+      // ASSERT(pending_futures[cid] >= num)
+          // << " reduce num: " << num << " for cid: " << cid;
       pending_futures.at(cid) -= num;
       if (pending_futures[cid] == 0) {
         need_add = true;

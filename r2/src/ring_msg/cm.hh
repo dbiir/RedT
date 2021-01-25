@@ -20,7 +20,7 @@ public:
   Result<RingReply> connect_for_ring(const std::string &qp_name,
                                      const std::string &channel_name,
                                      const usize &ring_sz,
-                                     const Arc<::rdmaio::qp::RC> rc,
+                                     const Arc<::rdmaio::qp::RDMARC> rc,
                                      const ::rdmaio::nic_id_t &nic_id,
                                      const ::rdmaio::qp::QPConfig &config,
                                      const double &timeout_usec = 1000000) {

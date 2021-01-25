@@ -23,6 +23,7 @@
 #include "row.h"
 #include "index_hash.h"
 #include "index_btree.h"
+#include "index_rdma.h"
 #include "catalog.h"
 #include "manager.h"
 #include "row_lock.h"
@@ -53,9 +54,9 @@ RC YCSBWorkload::init() {
 	printf("Initializing table... ");
 	fflush(stdout);
 
-   init_table_parallel();
-   printf("Done\n");
-   fflush(stdout);
+	init_table_parallel();
+	printf("Done\n");
+	fflush(stdout);
 //	init_table();
 	return RCOK;
 }
@@ -156,15 +157,14 @@ void * YCSBWorkload::init_table_slice() {
 			key < slice_size * (tid + 1);
 			//key ++
 	) {
-    if(GET_NODE_ID(key_to_part(key)) != g_node_id) {
-      ++key;
-      continue;
-    }
-
-    ++key_cnt;
-    if(key_cnt % 500000 == 0) {
-      printf("Thd %d inserted %ld keys %f\n",tid,key_cnt,simulation->seconds_from_start(get_sys_clock()));
-    }
+		if(GET_NODE_ID(key_to_part(key)) != g_node_id) {
+			++key;
+			continue;
+		}
+		++key_cnt;
+		if(key_cnt % 500000 == 0) {
+			printf("Thd %d inserted %ld keys %f\n",tid,key_cnt,simulation->seconds_from_start(get_sys_clock()));
+		}
 //		printf("tid=%d. key=%ld\n", tid, key);
 		row_t * new_row = NULL;
 		uint64_t row_id;
@@ -197,6 +197,9 @@ void * YCSBWorkload::init_table_slice() {
 		uint64_t idx_key = primary_key;
 
 		rc = the_index->index_insert(idx_key, m_item, part_id);
+    if (INDEX_STRUCT == IDX_RDMA) {
+      mem_allocator.free(m_item, sizeof(itemid_t));
+    }
 		assert(rc == RCOK);
         key += g_part_cnt;
 	}

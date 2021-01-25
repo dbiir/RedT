@@ -22,21 +22,23 @@
 #include "index_base.h"
 #include "index_hash.h"
 
-
-
 class IndexInfo {
 public:
-    void init(){
+	void init(){
 		key = 0;
 		length = sizeof(row_t*);
+		offset = 0;
+    table_offset = 0;
 		valid = true;
 		type = DT_row;
 	};
 	uint64_t key;
 	row_t* address;
+	uint64_t offset;
+  uint64_t table_offset;
 	uint64_t length;
 	bool valid;
-    Data_type type;
+	Data_type type;
 };
 
 // TODO Hash index does not support partition yet.
@@ -70,12 +72,11 @@ private:
 		return key % _bucket_cnt_per_part;
 #endif
 	}
-	
-    BucketHeader ** 	_buckets;
+
+	BucketHeader ** 	_buckets;
 	uint64_t	 		_bucket_cnt;
 	uint64_t 			_bucket_cnt_per_part;
 	IndexInfo          *index_info;
- 
 };
 
 #endif

@@ -72,41 +72,13 @@ CalvinLockThread * calvin_lock_thds;
 CalvinSequencerThread * calvin_seq_thds;
 #endif
 
-/*#if USE_RDMA
-	//DEFINE_int64(port, 8888, "Server listener (UDP) port.");
-	//DEFINE_int64(use_nic_idx, 1, "Which NIC to create QP");
-	//DEFINE_int64(reg_nic_name, 73, "The name to register an opened NIC at rctrl.");
-	//DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
-	//DEFINE_uint64(magic_num, 0xdeadbeaf, "The magic number read by the client");
-	int64_t port = 8888;
-	int64_t use_nic_idx = 1;
-	int64_t reg_nic_name = 0;
-	int64_t reg_mem_name = 0;
-	uint64_t magic_num = 0xdeadbeaf;
-	using namespace rdmaio;
-	using namespace rdmaio::rmem;
-
-#endif*/
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
 
 int main(int argc, char *argv[]) {
 	
-//#if USE_RDMA
-	//RCtrl ctrl(port);
-	//RDMA_LOG(4) << "Pingping server listenes at localhost:" << port;
 
-	// first we open the NIC
-	//{
-		//auto nic =
-		//	RNic::create(RNicInfo::query_dev_names().at(use_nic_idx)).value();
-		//	printf("use rdma success!\n");
-		// register the nic with name 0 to the ctrl
-		//RDMA_ASSERT(ctrl.opened_nics.reg(reg_nic_name, nic));
-	//}
-//#endif
-
-#ifdef USE_RDMA
+#if USE_RDMA
   if(g_node_id == 0) {
     printf("[Memcached Begin Listen]\n");
     system("memcached -l 0.0.0.0 -p 10086 &");  
@@ -150,9 +122,10 @@ int main(int argc, char *argv[]) {
     
 	//register memeory
 	//prepare QP connection with rdma_global_buffer(as registry memory)
-    //#ifdef USE_RDMA
+	#if USE_RDMA
+    //#if CC_ALG == RDMA_SILO
         rdma_man.init();
-    //#endif
+    #endif
 
 
    //prepare workload
@@ -485,10 +458,10 @@ int main(int argc, char *argv[]) {
 	// Free things
 	//tport_man.shutdown();
 	m_wl->index_delete_all();
-#ifdef USE_RDMA
-  if(g_node_id == 0) {
-    system("killall memcached");  
-  }
+#if USE_RDMA
+	if(g_node_id == 0) {
+		system("killall memcached");  
+	}
 #endif
 	/*
 	txn_table.delete_all();

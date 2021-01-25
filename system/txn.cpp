@@ -31,6 +31,7 @@
 #include "dta.h"
 #include "index_btree.h"
 #include "index_hash.h"
+#include "index_rdma.h"
 #include "maat.h"
 #include "manager.h"
 #include "mem_alloc.h"
@@ -49,6 +50,7 @@
 #include "ssi.h"
 #include "wsi.h"
 #include "manager.h"
+#include "rdma_silo.h"
 
 void TxnStats::init() {
 	starttime=0;
@@ -496,6 +498,7 @@ RC TxnManager::abort() {
 	}
 
 	aborted = true;
+	//RDMA_SILO - ADD remote release lock by rdma
 	release_locks(Abort);
 #if CC_ALG == MAAT
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
@@ -507,6 +510,10 @@ RC TxnManager::abort() {
 #if CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
 	dta_time_table.release(get_thd_id(), get_txn_id());
+#endif
+#if CC_ALG == RDMA_SILO
+    //TODO
+	//rdam_rlease(get_thd_id(), get_txn_id());
 #endif
 
 	uint64_t timespan = get_sys_clock() - txn_stats.restart_starttime;
@@ -536,7 +543,7 @@ RC TxnManager::start_abort() {
 	txn_stats.prepare_start_time = prepare_start_time;
 	uint64_t process_time_span  = prepare_start_time - txn_stats.restart_starttime;
 	INC_STATS(get_thd_id(), trans_process_time, process_time_span);
-  INC_STATS(get_thd_id(), trans_process_count, 1);
+    INC_STATS(get_thd_id(), trans_process_count, 1);
 	txn->rc = Abort;
 	DEBUG("%ld start_abort\n",get_txn_id());
 
@@ -544,8 +551,9 @@ RC TxnManager::start_abort() {
 	txn_stats.finish_start_time = finish_start_time;
 	uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
 	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-  INC_STATS(get_thd_id(), trans_prepare_count, 1);
-	if(query->partitions_touched.size() > 1) {
+    INC_STATS(get_thd_id(), trans_prepare_count, 1);
+	//RDMA_SILO:keep message or not
+	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO) {
 		send_finish_messages();
 		abort();
 		return Abort;
@@ -626,7 +634,7 @@ RC TxnManager::start_commit() {
 		else {
 			txn->rc = Abort;
 			DEBUG("%ld start_abort\n",get_txn_id());
-			if(query->partitions_touched.size() > 1) {
+			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO) {
 				send_finish_messages();
 				abort();
 				rc = Abort;
@@ -803,7 +811,6 @@ void TxnManager::release_last_row_lock() {
 	row_t * orig_r = txn->accesses[txn->row_cnt-1]->orig_row;
 	access_t type = txn->accesses[txn->row_cnt-1]->type;
 	orig_r->return_row(RCOK, type, this, NULL);
-	//txn->accesses[txn->row_cnt-1]->orig_row = NULL;
 }
 
 void TxnManager::cleanup_row(RC rc, uint64_t rid) {
@@ -818,19 +825,37 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 #if CC_ALG != CALVIN
 #if ISOLATION_LEVEL != READ_UNCOMMITTED
 	row_t * orig_r = txn->accesses[rid]->orig_row;
-	if (ROLL_BACK && type == XP &&
-			(CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
-			 CC_ALG == HSTORE_SPEC)) {
-		orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data);
-	} else {
-#if ISOLATION_LEVEL == READ_COMMITTED
-		if(type == WR) {
-			version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
-		}
+#if CC_ALG == RDMA_SILO
+  if (txn->accesses[rid]->location == g_node_id) {
+    if (ROLL_BACK && type == XP &&
+        (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
+        CC_ALG == HSTORE_SPEC)) {
+      orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data);
+    } else {
+  #if ISOLATION_LEVEL == READ_COMMITTED
+      if(type == WR) {
+        version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
+      }
+  #else
+      version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
+  #endif
+    }
+  }
 #else
-		version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
+  if (ROLL_BACK && type == XP &&
+      (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
+      CC_ALG == HSTORE_SPEC)) {
+    orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data);
+  } else {
+#if ISOLATION_LEVEL == READ_COMMITTED
+    if(type == WR) {
+      version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
+    }
+#else
+    version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
 #endif
-	}
+  }
+#endif
 #endif
 
 #if ROLL_BACK && \
@@ -860,7 +885,7 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 
 void TxnManager::cleanup(RC rc) {
 #if CC_ALG == SILO
-  finish(rc);
+    finish(rc);
 #endif
 #if CC_ALG == OCC && MODE == NORMAL_MODE
 	occ_man.finish(rc,this);
@@ -873,6 +898,10 @@ void TxnManager::cleanup(RC rc) {
 #endif
 #if (CC_ALG == WSI) && MODE == NORMAL_MODE
 	wsi_man.finish(rc,this);
+#endif
+//TODO-relase lock
+#if CC_ALG == RDMA_SILO
+    rsilo_man.finish(rc,this);
 #endif
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
@@ -919,39 +948,6 @@ RC TxnManager::get_lock(row_t * row, access_t type) {
 	return rc;
 }
 
-#if RDMA_SILO_OPEN
-RC TxnManager::one_side_read(row_t * row, access_t type, row_t *& row_rtn) {
-	RC rc = RCOK;
-	DEBUG_M("TxnManager::get_row access alloc\n");
-	Access * access = NULL;
-	this->last_row = row;
-	this->last_type = type;
-
-	access_pool.get(get_thd_id(),access);
-	rc = row->get_row(type, this, access);
-
-	if (rc == Abort || rc == WAIT) {
-		row_rtn = NULL;
-		DEBUG_M("TxnManager::get_row(abort) access free\n");
-		access_pool.put(get_thd_id(),access);
-		return rc;
-	}
-	access->type = type;
-	access->orig_row = row;
-#if CC_ALG == SILO
-	access->tid = last_tid;
-#endif
-	++txn->row_cnt;
-	if (type == WR) ++txn->write_cnt;
-	txn->accesses.add(access);
-	row_rtn  = access->data;
-
-	if (CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN) assert(rc == RCOK);
-	assert(rc == RCOK);
-	return rc;
-}
-
-#endif
 RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	uint64_t starttime = get_sys_clock();
 	uint64_t timespan;
@@ -1083,8 +1079,8 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 #endif
 
 	timespan = get_sys_clock() - starttime;
-  INC_STATS(get_thd_id(), trans_store_access_time, timespan + starttime - middle_time);
-  INC_STATS(get_thd_id(), trans_store_access_count, 1);
+    INC_STATS(get_thd_id(), trans_store_access_time, timespan + starttime - middle_time);
+  	INC_STATS(get_thd_id(), trans_store_access_count, 1);
 	INC_STATS(get_thd_id(), txn_manager_time, timespan);
 	row_rtn  = access->data;
 
@@ -1229,7 +1225,8 @@ RC TxnManager::validate() {
 #endif
 #if CC_ALG == RDMA_SILO
   if(CC_ALG == RDMA_SILO && rc == RCOK) {
-    rc = validate_silo();
+    rc = rsilo_man.validate_rdma_silo(this);
+	//rc = RCOK;
     if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
       _cur_tid ++;
       commit_timestamp = _cur_tid;
@@ -1239,7 +1236,7 @@ RC TxnManager::validate() {
 #endif
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);
-  INC_STATS(get_thd_id(),trans_validate_count, 1);
+    INC_STATS(get_thd_id(),trans_validate_count, 1);
 	return rc;
 }
 

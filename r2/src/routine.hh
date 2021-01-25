@@ -6,7 +6,8 @@
 #include <functional>
 #include <memory>
 
-#include "rlib/core/result.hh"
+//#include "rlib/core/result.hh"
+#include "result.hh"
 
 #include "./common.hh"
 #include "./linked_list.hh"

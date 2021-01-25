@@ -53,6 +53,7 @@
 #include "maat.h"
 #include "wkdb.h"
 #include "tictoc.h"
+#include "rdma_silo.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "http.h"
@@ -81,6 +82,9 @@ wsi wsi_man;
 Tictoc tictoc_man;
 Transport tport_man;
 Rdma rdma_man;
+#if CC_ALG == RDMA_SILO
+RDMA_silo rsilo_man;
+#endif
 TxnManPool txn_man_pool;
 TxnPool txn_pool;
 AccessPool access_pool;
@@ -265,6 +269,17 @@ map<string, string> g_params;
 char *rdma_global_buffer;
 //rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
 rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
+// 每个线程只用自己的那一块客户端内存地址
+/* client_rdma_rm 内存地址使用,假设有4个执行线程
+ * size:IndexInfo //0号线程读index
+ * size:IndexInfo //1号线程读index
+ * size:IndexInfo //2号线程读index
+ * size:IndexInfo //3号线程读index
+ * size:Row //0号线程读row
+ * size:Row //1号线程读row
+ * size:Row //2号线程读row
+ * size:Row //3号线程读row
+ */
 rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
 rdmaio::Arc<rdmaio::rmem::RegHandler> rm_handler;
 rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
@@ -273,6 +288,8 @@ std::vector<rdmaio::ConnectManager> cm;
 rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
 rdmaio::Arc<rdmaio::RNic> nic;
 rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT];
+
+rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
 
 string rdma_server_add[NODE_CNT];
 string qp_name[NODE_CNT][THREAD_CNT];

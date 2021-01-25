@@ -52,6 +52,7 @@
 #include "da_block_queue.h"
 #include "src/allocator_master.hh"
 #include "lib.hh"
+
 //#include "rdma_ctrl.hpp"
 //#include "maat.h"
 
@@ -74,6 +75,9 @@ class Wkdb;
 class Tictoc;
 class Transport;
 class Rdma;
+#if CC_ALG == RDMA_SILO
+class RDMA_silo;
+#endif
 class Remote_query;
 class TxnManPool;
 class TxnPool;
@@ -129,6 +133,9 @@ extern Wkdb wkdb_man;
 extern Tictoc tictoc_man;
 extern Transport tport_man;
 extern Rdma rdma_man;
+#if CC_ALG == RDMA_SILO
+extern RDMA_silo rsilo_man;
+#endif
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;
 extern AccessPool access_pool;
@@ -167,6 +174,8 @@ extern std::vector<rdmaio::ConnectManager> cm;
 extern rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
 extern rdmaio::Arc<rdmaio::RNic> nic;
 extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT];
+
+extern rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
 
 extern string rdma_server_add[NODE_CNT];
 extern string qp_name[NODE_CNT][THREAD_CNT];
@@ -419,7 +428,7 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 #define INDEX		index_btree
 #elif (INDEX_STRUCT == IDX_HASH)
 #define  INDEX		IndexHash
-#else  // IDX_HASH
+#else
 #define INDEX		IndexRdma
 #endif
 

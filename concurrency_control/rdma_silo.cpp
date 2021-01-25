@@ -16,98 +16,131 @@
 
 #include "global.h"
 #include "config.h"
-#if RMDA_SILO_OPEN
 
+//#if RMDA_SILO_OPEN
+#include "manager.h"
 #include "helper.h"
 #include "txn.h"
 #include "row.h"
 #include "rdma_silo.h"
 #include "manager.h"
 #include "mem_alloc.h"
+#include "lib.hh"
+#include "qps/op.hh"
+#include "transport/rdma.h"
+#include "row_rdma_silo.h"
+#include "src/rdma/sop.hh"
 
-RC RDMA_silo::get_and_sort_rw_set(Transaction * txn, int * &read_set, int *& write_set) {
-
-	RC rc = RCOK;
-	// lock write tuples in the primary key order.
-	uint64_t wr_cnt = txn->->write_cnt;
-	write_set = (int *) mem_allocator.alloc(sizeof(int) * wr_cnt);
-	read_set = (int *) mem_allocator.alloc(sizeof(int) * wr_cnt);
-
-	int cur_wr_idx = 0;
-
-	int read_set[txn->row_cnt - txn->write_cnt];
-	int cur_rd_idx = 0;
-	for (uint64_t rid = 0; rid < txn->row_cnt; rid ++) {
-		if (txn->accesses[rid]->type == WR)
-			write_set[cur_wr_idx ++] = rid;
-		else 
-			read_set[cur_rd_idx ++] = rid;
-	}
-
-	// bubble sort the write_set, in primary key order 
-	if (wr_cnt > 1)
-	{
-		for (uint64_t i = wr_cnt - 1; i >= 1; i--) {
-			for (uint64_t j = 0; j < i; j++) {
-				if (txn->accesses[ write_set[j] ]->orig_row->get_primary_key() > 
-					txn->accesses[ write_set[j + 1] ]->orig_row->get_primary_key())
-				{
-					int tmp = write_set[j];
-					write_set[j] = write_set[j+1];
-					write_set[j+1] = tmp;
-				}
-			}
-		}
-	}
-
-	return RCOK;
+#if CC_ALG == RDMA_SILO
+RC RDMA_silo::validate_key(TxnManager * txn , uint64_t num) {
+  row_t * row = txn->txn->accesses[num]->orig_row;
+  assert(row->get_primary_key() == txn->txn->accesses[num]->key);
 }
 
-RDMA_silo::validate(TxnManager * txn)
+row_t * RDMA_silo::read_remote_row(TxnManager * txn , uint64_t num){
+	row_t * row = txn->txn->accesses[num]->orig_row;
+	// row_t * row = txn->txn->accesses[num]->test_row;
+
+	uint64_t off = txn->txn->accesses[num]->offset;
+ 	uint64_t loc = txn->txn->accesses[num]->location;
+	uint64_t thd_id = txn->get_thd_id();
+
+	uint64_t operate_size = sizeof(row_t);
+
+	char *test_buf = Rdma::get_row_client_memory(thd_id);
+    memset(test_buf, 0, operate_size);
+
+	// r2::rdma::SROp op;
+  //   op.set_payload(test_buf,operate_size).set_remote_addr(off).set_read();
+
+	// bool runned = false;
+  //   r2::SScheduler ssched;
+
+	// ssched.spawn([&op, &runned,&loc,&thd_id](R2_ASYNC) {
+	// 	auto ret = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED, R2_ASYNC_WAIT);
+	// 	R2_YIELD;
+	// 	ASSERT(ret == IOCode::Ok);
+	// 	runned = true;
+	// 	R2_STOP();
+	// 	R2_RET;
+	// });
+	// ssched.run();
+	// ASSERT(runned == true);
+	uint64_t starttime;
+	uint64_t endtime;
+	starttime = get_sys_clock();
+
+	auto res_s = rc_qp[loc][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_READ,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+		.remote_addr = off,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+  	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+	endtime = get_sys_clock();
+
+	INC_STATS(txn->get_thd_id(), rdma_read_time, endtime-starttime);
+	INC_STATS(txn->get_thd_id(), rdma_read_cnt, 1);
+
+	row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	memcpy(temp_row, test_buf, operate_size);
+	assert(temp_row->get_primary_key() == row->get_primary_key());
+
+	return temp_row;
+}
+#if 1
+RC
+RDMA_silo::validate_rdma_silo(TxnManager * txnMng)
 {
+	Transaction *txn = txnMng->txn;
 	RC rc = RCOK;
-	silo_set_ent * wset;
-	silo_set_ent * rset;
 	// lock write tuples in the primary key order.
 	uint64_t wr_cnt = txn->write_cnt;
 
 	int cur_wr_idx = 0;
-	int read_set[txn->row_cnt - txn->write_cnt];
+  	int read_set[10];
+	// int read_set[txn->row_cnt - txn->write_cnt];
 	int cur_rd_idx = 0;
 	for (uint64_t rid = 0; rid < txn->row_cnt; rid ++) {
 		if (txn->accesses[rid]->type == WR)
-			write_set[cur_wr_idx ++] = rid;
-		else 
+			txnMng->write_set[cur_wr_idx ++] = rid;
+		else
 			read_set[cur_rd_idx ++] = rid;
 	}
 
-	// bubble sort the write_set, in primary key order 
+	// bubble sort the write_set, in primary key order
 	if (wr_cnt > 1)
 	{
 		for (uint64_t i = wr_cnt - 1; i >= 1; i--) {
 			for (uint64_t j = 0; j < i; j++) {
-				if (txn->accesses[ write_set[j] ]->orig_row->get_primary_key() > 
-					txn->accesses[ write_set[j + 1] ]->orig_row->get_primary_key())
+				if (txn->accesses[ txnMng->write_set[j] ]->orig_row->get_primary_key() >
+					txn->accesses[ txnMng->write_set[j + 1] ]->orig_row->get_primary_key())
+				//if(write_set_key[txnMng->write_set[j]]>write_set_key[txnMng->write_set[j + 1]])
 				{
-					int tmp = write_set[j];
-					write_set[j] = write_set[j+1];
-					write_set[j+1] = tmp;
+					int tmp = txnMng->write_set[j];
+					txnMng->write_set[j] = txnMng->write_set[j+1];
+					txnMng->write_set[j+1] = tmp;
 				}
 			}
 		}
 	}
 
-	num_locks = 0;
+	txnMng->num_locks = 0;
 	ts_t max_tid = 0;
 	bool done = false;
-	if (_pre_abort) {
+	if (txnMng->_pre_abort) {
 		for (uint64_t i = 0; i < wr_cnt; i++) {
-			row_t * row = txn->accesses[ write_set[i] ]->orig_row;
-			if (row->manager->get_tid() != txn->accesses[write_set[i]]->tid) {
+			row_t * row = txn->accesses[ txnMng->write_set[i] ]->orig_row;
+			if (row->manager->get_tid() != txn->accesses[txnMng->write_set[i]]->tid) {
 				rc = Abort;
 				return rc;
-			}	
-		}	
+			}
+		}
 		for (uint64_t i = 0; i < txn->row_cnt - wr_cnt; i ++) {
 			Access * access = txn->accesses[ read_set[i] ];
 			if (access->orig_row->manager->get_tid() != txn->accesses[read_set[i]]->tid) {
@@ -117,78 +150,82 @@ RDMA_silo::validate(TxnManager * txn)
 		}
 	}
 
-	// lock all rows in the write set.
-	if (_validation_no_wait) {
 		while (!done) {
-			num_locks = 0;
+			txnMng->num_locks = 0;
 			for (uint64_t i = 0; i < wr_cnt; i++) {
-				row_t * row = txn->accesses[ write_set[i] ]->orig_row;
-				if (!row->manager->try_lock())
-				{
-					// rc = Abort;
-					// return rc;
-					break;
+				if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){//lock in local
+					row_t * row = txn->accesses[ txnMng->write_set[i] ]->orig_row;
+					if (!row->manager->try_lock(txn->txn_id))
+					{
+						INC_STATS(txnMng->get_thd_id(), local_try_lock_fail_abort, 1);
+						INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
+						break;
+					}
+					DEBUG("silo %ld write lock row %ld \n", txnMng->get_txn_id(), row->get_primary_key());
+					if (!row->manager->assert_lock(txn->txn_id)) {
+                       //  RDMA_LOG(4) << "txn " << txn->txn_id << " lock "<<row->get_primary_key() <<" failed and abort";
+					    INC_STATS(txnMng->get_thd_id(), local_lock_fail_abort, 1);
+						INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
+						rc = Abort;
+						return rc;
+                    } else 
+					txnMng->num_locks ++;
 				}
-				DEBUG("silo %ld write lock row %ld \n", this->get_txn_id(), row->get_primary_key());
-				row->manager->assert_lock();
-				num_locks ++;
-				if (row->manager->get_tid() != txn->accesses[write_set[i]]->tid)
-				{
-					rc = Abort;
-					return rc;
+				else{//lock remote
+         		   row_t * row = txn->accesses[ txnMng->write_set[i] ]->orig_row;
+				   if(!remote_try_lock(txnMng,txnMng->write_set[i])){//remote lock fail
+				   	    INC_STATS(txnMng->get_thd_id(), remote_try_lock_fail_abort, 1);
+						INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
+						break;
+				   }
+				   DEBUG("silo %ld write lock row %ld \n", txnMng->get_txn_id(), row->get_primary_key());
+
+				   if(assert_remote_lock(txnMng,txnMng->write_set[i])){//check whether the row was locked by current txn
+					   	txnMng->num_locks ++;
+				   }else{
+                        // RDMA_LOG(4) << "txn " << txn->txn_id << " lock "<<row->get_primary_key() <<" failed and abort";
+						INC_STATS(txnMng->get_thd_id(), remote_lock_fail_abort, 1);
+						INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
+					    rc = Abort;
+						return rc;
+				   }
+
 				}
 			}
-			if (num_locks == wr_cnt) {
-				DEBUG("TRY LOCK true %ld\n", get_txn_id());
+			if (txnMng->num_locks == wr_cnt) {
+				DEBUG("TRY LOCK true %ld\n", txnMng->get_txn_id());
 				done = true;
 			} else {
 				rc = Abort;
 				return rc;
+			}
+		}
 
-				// for (uint64_t i = 0; i < num_locks; i++)
-				// {
-				// 	txn->accesses[ write_set[i] ]->orig_row->manager->release();
-				// }
-				// if (_pre_abort) {
-				// 	num_locks = 0;
-				// 	for (uint64_t i = 0; i < wr_cnt; i++) {
-				// 		row_t * row = txn->accesses[ write_set[i] ]->orig_row;
-				// 		if (row->manager->get_tid() != txn->accesses[write_set[i]]->tid) {
-				// 			rc = Abort;
-				// 			return rc;
-				// 		}	
-				// 	}	
-				// 	for (uint64_t i = 0; i < txn->row_cnt - wr_cnt; i ++) {
-				// 		Access * access = txn->accesses[ read_set[i] ];
-				// 		if (access->orig_row->manager->get_tid() != txn->accesses[read_set[i]]->tid) {
-				// 			rc = Abort;
-				// 			return rc;
-				// 		}
-				// 	}
-				// }
-                // PAUSE_SILO
-			}
-		}
-	} else {
-		for (uint64_t i = 0; i < wr_cnt; i++) {
-			row_t * row = txn->accesses[ write_set[i] ]->orig_row;
-			row->manager->lock();
-			DEBUG("silo %ld write lock row %ld \n", this->get_txn_id(), row->get_primary_key());
-			num_locks++;
-			if (row->manager->get_tid() != txn->accesses[write_set[i]]->tid) {
-				rc = Abort;
-				return rc;
-			}
-		}
-	}
 
 	COMPILER_BARRIER
 
 	// validate rows in the read set
 	// for repeatable_read, no need to validate the read set.
 	for (uint64_t i = 0; i < txn->row_cnt - wr_cnt; i ++) {
+		bool success = false;
 		Access * access = txn->accesses[ read_set[i] ];
-		bool success = access->orig_row->manager->validate(access->tid, false);
+		if(txn->accesses[read_set[i]]->location == g_node_id){//local
+		    // success = access->orig_row->manager->validate(access->tid, false);
+			success = access->orig_row->manager->validate(txnMng->get_txn_id(), false);
+			// success = true;
+			if(!success){
+				 INC_STATS(txnMng->get_thd_id(), local_readset_validate_fail_abort, 1);
+				 INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
+			}
+       }else{//remote
+        	success = validate_rw_remote(txnMng,read_set[i]);
+			// success = true;
+			if(!success){
+				 INC_STATS(txnMng->get_thd_id(), remote_readset_validate_fail_abort, 1);
+				 INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
+			}
+		}
+
 		if (!success) {
 			rc = Abort;
 			return rc;
@@ -198,8 +235,26 @@ RDMA_silo::validate(TxnManager * txn)
 	}
 	// validate rows in the write set
 	for (uint64_t i = 0; i < wr_cnt; i++) {
-		Access * access = txn->accesses[ write_set[i] ];
-		bool success = access->orig_row->manager->validate(access->tid, true);
+		bool success = false;
+		Access * access = txn->accesses[ txnMng->write_set[i] ];
+		if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){//local
+			// success = access->orig_row->manager->validate(access->tid, true);
+			success = access->orig_row->manager->validate(txnMng->get_txn_id(), true);
+			// success = true;
+      		if (!success){
+				  INC_STATS(txnMng->get_thd_id(), local_writeset_validate_fail_abort, 1);
+				  INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
+			  }
+		}else{//remote
+      		success = validate_rw_remote(txnMng,txnMng->write_set[i]);
+			// success = true;
+			if(!success){
+				 INC_STATS(txnMng->get_thd_id(), remote_writeset_validate_fail_abort, 1);
+				 INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
+			}
+      		// if (!success) RDMA_LOG(4) << "txn " << txn->txn_id << " validate "<<access->orig_row->get_primary_key() <<" failed and abort";
+		}
+
 		if (!success) {
 			rc = Abort;
 			return rc;
@@ -208,44 +263,238 @@ RDMA_silo::validate(TxnManager * txn)
 			max_tid = access->tid;
 	}
 
-	this->max_tid = max_tid;
+	txnMng->max_tid = max_tid;
 
 	return rc;
 }
 
+#else
 RC
-TxnManager::finish(RC rc)
+RDMA_silo::validate_rdma_silo(TxnManager * txnMng)
 {
+	RC rc = RCOK;
+	// validate rows in the read set
+	// for repeatable_read, no need to validate the read set.
+	for (uint64_t i = 0; i < txnMng->txn->row_cnt; i ++) {
+		Access * access = txnMng->txn->accesses[i];
+		if(access->location == g_node_id){//local
+		}else{//remote
+          validate_key(txnMng,i);
+		}
+  }
+	return rc;
+}
+
+#endif
+bool RDMA_silo::validate_rw_remote(TxnManager * txn , uint64_t num){
+	bool succ = true;
+
+	row_t * row = txn->txn->accesses[num]->orig_row;
+	// row_t * row = txn->txn->accesses[num]->test_row;
+	uint64_t lock = txn->get_txn_id();
+
+//read the row again
+	row_t *temp_row = read_remote_row(txn , num);
+
+//check whether it was changed by other transaction
+	if(temp_row->_tid_word != lock && temp_row->_tid_word != 0){
+		succ = false;
+		INC_STATS(txn->get_thd_id(), validate_lock_abort, 1);
+    // RDMA_LOG(4) << "txn " << txn->txn->txn_id << " validate "<<row->get_primary_key() <<" failed and abort";
+	}
+	if(strcmp(row->data,temp_row->data)){
+		succ = false;
+    // RDMA_LOG(4) << "txn " << txn->txn->txn_id << " validate "<<row->get_primary_key() <<" failed and abort";
+	}
+
+	mem_allocator.free(temp_row,sizeof(row_t));
+
+	return succ;
+}
+
+bool RDMA_silo::remote_try_lock(TxnManager * txnMng , uint64_t num){
+    bool result = false;
+	Transaction *txn = txnMng->txn;
+
+    uint64_t off = txn->accesses[num]->offset;
+    uint64_t loc = txn->accesses[num]->location;
+	uint64_t thd_id = txnMng->get_thd_id();
+	uint64_t lock = txnMng->get_txn_id();
+
+	uint64_t *test_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+	auto mr = client_rm_handler->get_reg_attr().value();
+
+	rdmaio::qp::Op<> op;
+    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
+  	assert(op.set_payload(test_loc, sizeof(uint64_t), mr.key) == true);
+  	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+
+	RDMA_ASSERT(res_s2 == IOCode::Ok);
+	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p2 == IOCode::Ok);
+
+	result = true;
+	return result;
+}
+
+bool RDMA_silo::assert_remote_lock(TxnManager * txn , uint64_t num){
+	bool succ = true;
+
+	uint64_t lock = txn->get_txn_id();
+
+//read the row again
+	row_t *temp_row = read_remote_row(txn , num);
+
+//check whether it was locked by current txn
+    if(temp_row->_tid_word != lock){
+	//	RDMA_LOG(4) <<"check _tid_word = "<<temp_row->_tid_word;
+		succ = false;
+	}
+
+	mem_allocator.free(temp_row,sizeof(row_t));
+	return succ;
+
+}
+
+bool RDMA_silo::remote_commit_write(TxnManager * txnMng , uint64_t num , row_t * data, uint64_t tid){
+	bool result = false;
+	Transaction *txn = txnMng->txn;
+
+    uint64_t off = txn->accesses[num]->offset;
+    uint64_t loc = txn->accesses[num]->location;
+	uint64_t thd_id = txnMng->get_thd_id();
+	uint64_t lock = txnMng->get_txn_id();
+//RDMA_SILO:usage of tid?
+	data->_tid_word = tid;
+    uint64_t operate_size = sizeof(row_t);
+
+    char *test_buf = Rdma::get_row_client_memory(thd_id);
+    memcpy(test_buf, data, operate_size);
+
+//async
+	// r2::rdma::SROp op;
+    // op.set_payload(test_buf,operate_size).set_remote_addr(off).set_write();
+
+	// bool runned = false;
+  //   r2::SScheduler ssched;
+
+	// ssched.spawn([&op, &runned,&loc,&thd_id](R2_ASYNC) {
+	// 	auto ret = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED, R2_ASYNC_WAIT);
+	// 	R2_YIELD;
+	// 	ASSERT(ret == IOCode::Ok);
+	// 	runned = true;
+	// 	R2_STOP();
+	// 	R2_RET;
+	// });
+	// ssched.run();
+	// ASSERT(runned == true);
+//
+
+	uint64_t starttime;
+	uint64_t endtime;
+	starttime = get_sys_clock();
+
+	auto res_s = rc_qp[loc][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_WRITE,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+		.remote_addr = off,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+  	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+	endtime = get_sys_clock();
+
+	INC_STATS(txnMng->get_thd_id(), rdma_write_time, endtime-starttime);
+	INC_STATS(txnMng->get_thd_id(), rdma_write_cnt, 1);
+
+	result = true;
+	return result;
+}
+
+void
+RDMA_silo::release_remote_lock(TxnManager * txnMng , uint64_t num){
+
+    Transaction *txn = txnMng->txn;
+
+    uint64_t off = txn->accesses[num]->offset;
+    uint64_t loc = txn->accesses[num]->location;
+	uint64_t thd_id = txnMng->get_thd_id();
+	uint64_t lock = txnMng->get_txn_id();
+
+	uint64_t *test_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+	auto mr = client_rm_handler->get_reg_attr().value();
+
+	rdmaio::qp::Op<> op;
+    op.set_atomic_rbuf((uint64_t*)remote_mr_attr[loc].buf, remote_mr_attr[loc].key).set_cas(lock, 0);//0-locked,1-unlock
+  	assert(op.set_payload(test_loc, sizeof(uint64_t), mr.key) == true);
+  	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+
+	RDMA_ASSERT(res_s2 == IOCode::Ok);
+	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p2 == IOCode::Ok);
+}
+
+RC
+RDMA_silo::finish(RC rc , TxnManager * txnMng)
+{
+	Transaction *txn = txnMng->txn;
+	//abort
 	if (rc == Abort) {
-		if (this->num_locks > get_access_cnt()) 
+		if (txnMng->num_locks > txnMng->get_access_cnt())
 			return rc;
-		// DEBUG("silo abort finish %ld", txn->get_txn_id());
-		for (uint64_t i = 0; i < this->num_locks; i++) {
-			txn->accesses[ write_set[i] ]->orig_row->manager->release();
-			DEBUG("silo %ld abort release row %ld \n", this->get_txn_id(), txn->accesses[ write_set[i] ]->orig_row->get_primary_key());
+		for (uint64_t i = 0; i < txnMng->num_locks; i++) {
+			//local
+			if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
+				txn->accesses[ txnMng->write_set[i] ]->orig_row->manager->release(txn->txn_id);
+			} else{
+			//remote
+        		release_remote_lock(txnMng,txnMng->write_set[i] );
+			}
+			// DEBUG("silo %ld abort release row %ld \n", txnMng->get_txn_id(), txn->accesses[ txnMng->write_set[i] ]->orig_row->get_primary_key());
 		}
 	} else {
-		
+	//commit
 		for (uint64_t i = 0; i < txn->write_cnt; i++) {
-			Access * access = txn->accesses[ write_set[i] ];
-			access->orig_row->manager->write( 
-				access->data, this->commit_timestamp );
-			txn->accesses[ write_set[i] ]->orig_row->manager->release();
-			DEBUG("silo %ld commit release row %ld \n", this->get_txn_id(), txn->accesses[ write_set[i] ]->orig_row->get_primary_key());
+			//local
+			if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
+				Access * access = txn->accesses[ txnMng->write_set[i] ];
+				access->orig_row->manager->write( access->data, txnMng->commit_timestamp );
+				txn->accesses[ txnMng->write_set[i] ]->orig_row->manager->release(txn->txn_id);
+			}else{
+			//remote
+				Access * access = txn->accesses[ txnMng->write_set[i] ];
+				remote_commit_write(txnMng,txnMng->write_set[i],access->data,txnMng->commit_timestamp);
+				release_remote_lock(txnMng,txnMng->write_set[i] );//unlock
+			}
+			// DEBUG("silo %ld abort release row %ld \n", txnMng->get_txn_id(), txn->accesses[ txnMng->write_set[i] ]->orig_row->get_primary_key());
 		}
 	}
-	num_locks = 0;
-	memset(write_set, 0, 100);
+  for (uint64_t i = 0; i < txn->row_cnt; i++) {
+    //local
+    if(txn->accesses[i]->location != g_node_id){
+    //remote
+      mem_allocator.free(txn->accesses[i]->data,0);
+      mem_allocator.free(txn->accesses[i]->orig_row,0);
+      // mem_allocator.free(txn->accesses[i]->test_row,0);
+      txn->accesses[i]->data = NULL;
+      txn->accesses[i]->orig_row = NULL;
+      txn->accesses[i]->orig_data = NULL;
+      txn->accesses[i]->version = 0;
+
+      txn->accesses[i]->key = 0;
+      txn->accesses[i]->tid = 0;
+      txn->accesses[i]->test_row = NULL;
+      txn->accesses[i]->offset = 0;
+    }
+  }
+	txnMng->num_locks = 0;
+	memset(txnMng->write_set, 0, 100);
 	// mem_allocator.free(write_set, sizeof(int) * txn->write_cnt);
 	return rc;
-}
-
-RC
-TxnManager::find_tid_silo(ts_t max_tid)
-{
-	if (max_tid > _cur_tid)
-		_cur_tid = max_tid;
-	return RCOK;
 }
 
 #endif

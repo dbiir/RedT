@@ -48,6 +48,17 @@ void table_t::test_read(){
 	}
 }
 
+
+#if USE_RDMA
+void table_t::init(Catalog schema) {
+	//this->table_name = schema->table_name;
+	strcpy(this->table_name,schema.table_name);
+	this->table_id = schema.table_id;
+	this->schema = schema;
+
+	test_read();
+}
+#else
 void table_t::init(Catalog * schema) {
 	this->table_name = schema->table_name;
 	this->table_id = schema->table_id;
@@ -61,6 +72,7 @@ void table_t::init(Catalog * schema) {
 
 	test_read();
 }
+#endif
 
 RC table_t::get_new_row(row_t *& row) {
 	// this function is obsolete.
@@ -70,30 +82,27 @@ RC table_t::get_new_row(row_t *& row) {
 
 // the row is not stored locally. the pointer must be maintained by index structure.
 RC table_t::get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
-	
+#if USE_RDMA
 	RC rc = RCOK;
   	DEBUG_M("table_t::get_new_row alloc\n");
-	  
-	//char* head = rdma_global_buffer;
-	// r2::AllocatorMaster<>::init(head,rdma_buffer_size);
-	// auto allocator = r2::AllocatorMaster<>::get_allocator();
 
     row_t *ptr = (row_t*)r2::AllocatorMaster<>::get_thread_allocator()->alloc(sizeof(row_t));
 	
-	// auto allocator = r2::AllocatorMaster<RDMA_ONE_SIDE_MEMORY_ID_1>::get_allocator();
-	// char *ptr = (char*)allocator->alloc(sizeof(row_t));
 	assert (ptr != NULL);
-
-	// srand(time(NULL));
-	// if (rand()%10 == 0) {
-	// 	char* rhead = rdma_global_buffer+rdma_index_size;
-	// 	double size = ((char*)ptr-rhead) / (1024 * 1024);
-	// 	printf("rdma row ptr:%p head_ptr:%p size:%f", ptr, rhead, size);
-	// }
 
 	row = (row_t *) ptr;
 	rc = row->init(this, part_id, row_id);
 	row->init_manager(row);
 
 	return rc;
+#else
+	RC rc = RCOK;
+  	DEBUG_M("table_t::get_new_row alloc\n");
+	void * ptr = mem_allocator.alloc(sizeof(row_t));
+	assert (ptr != NULL);
+
+	row = (row_t *) ptr;
+	rc = row->init(this, part_id, row_id);
+	row->init_manager(row);
+#endif
 }

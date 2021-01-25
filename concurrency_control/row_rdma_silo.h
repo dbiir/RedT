@@ -5,10 +5,10 @@ class Catalog;
 class txn_man;
 struct TsReqEntry;
 
-#if CC_ALG==SILO
+#if CC_ALG==RDMA_SILO
 #define LOCK_BIT (1UL << 63)
 
-class Row_silo {
+class Row_rdma_silo {
 public:
 	void 				init(row_t * row);
 	RC 					access(TxnManager * txn, TsType type, row_t * local_row);
@@ -17,23 +17,18 @@ public:
 	void				write(row_t * data, uint64_t tid);
 
 	void 				lock();
-	void 				release();
-	bool				try_lock();
+	void 				release(uint64_t txn_id);
+	bool				try_lock(uint64_t txn_id);
 	uint64_t 			get_tid();
-#if ATOMIC_WORD
-	void 				assert_lock() {assert(_tid_word & LOCK_BIT); }
-#else
-	void 				assert_lock() { }
-#endif
+	bool 				assert_lock(uint64_t txn_id){ return _row->_tid_word == txn_id; }
 
 private:
-#if ATOMIC_WORD
+
 	volatile uint64_t	_tid_word;
-#else
+
  	pthread_mutex_t * 	_latch;
 	ts_t 				_tid;
-#endif
-	row_t * 			_row;
+	row_t * 			_row; 
 };
 
 #endif

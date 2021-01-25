@@ -1,6 +1,7 @@
 #pragma once
 
 #include "./sshed.hh"
+//#include <boost/coroutine/all.hpp>
 
 /*!
     Several macros to easily manage coroutines like the ones in many modern

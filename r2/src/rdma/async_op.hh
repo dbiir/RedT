@@ -22,7 +22,7 @@ struct AsyncOp : Op<NSGE> {
     return *this;
   }
 
-  inline auto execute_async(const Arc<RC> &qp, int flags, R2_ASYNC)
+  inline auto execute_async(const Arc<RDMARC> &qp, int flags, R2_ASYNC)
       -> Result<ibv_wc> {
     ibv_wc wc;
     auto ret_s = this->execute(qp, flags, R2_COR_ID());
@@ -34,11 +34,11 @@ struct AsyncOp : Op<NSGE> {
     return ::rdmaio::Ok(wc);
   }
 
-  inline auto wait_one(const Arc<RC> &qp, R2_ASYNC) -> Result<ibv_wc> {
+  inline auto wait_one(const Arc<RDMARC> &qp, R2_ASYNC) -> Result<ibv_wc> {
     // to avoid performance overhead of Arc, we first extract QP's raw pointer
     // out
-    RC *qp_ptr = ({  // unsafe code
-      RC *temp = qp.get();
+    RDMARC *qp_ptr = ({  // unsafe code
+      RDMARC *temp = qp.get();
       temp;
     });
 

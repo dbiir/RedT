@@ -96,7 +96,7 @@ RC Row_wkdb::read_and_write(TsType type, TxnManager * txn, row_t * row) {
 			txn->ts_ready = false;
 		} else if (_row->get_table() && !strcmp(_row->get_table_name(),"WAREHOUSE")) {
 			DEBUG("set write tran of row: %lu with txn: %lu \n", _row->get_primary_key(), txn->get_txn_id());
-			DEBUG("current row: table: %s, %lu \n", _row->get_table_name(), _row->get_table()->get_table_size())
+		//	DEBUG("current row: table: %s, %lu \n", _row->get_table_name(), _row->get_table()->get_table_size())
 			write_trans = txn->get_txn_id();
 		}
 	}

@@ -20,6 +20,7 @@
 #include <cassert>
 #include "global.h"
 
+#define ROW_DEFAULT_SIZE 1100
 
 #define DECL_SET_VALUE(type) void set_value(int col_id, type value);
 
@@ -59,6 +60,7 @@ class Row_tictoc;
 class Row_si;
 class Row_null;
 class Row_silo;
+class Row_rdma_silo;
 
 class row_t {
 public:
@@ -66,7 +68,7 @@ public:
 	RC switch_schema(table_t * host_table);
 	// not every row has a manager
 	void init_manager(row_t * row);
-
+  RC remote_get_row(row_t* remote_row, TxnManager * txn, Access *access);
 	table_t * get_table();
 	Catalog * get_schema();
 	const char * get_table_name();
@@ -113,7 +115,10 @@ public:
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
-	#if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
+  #if CC_ALG == RDMA_SILO
+    volatile uint64_t	_tid_word;
+	Row_rdma_silo * manager;
+	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
 	Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP
 	 	Row_ts * manager;
@@ -146,7 +151,11 @@ public:
   #elif CC_ALG == SILO
   	Row_silo * manager;
 	#endif
+#if USE_RDMA
+	char data[ROW_DEFAULT_SIZE];
+#else
 	char * data;
+#endif
 	int tuple_size;
 	table_t * table;
 private:

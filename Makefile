@@ -8,11 +8,11 @@ RALLOC = ./rlib/lib
 
 .SUFFIXES: .o .cpp .h .cc
 
-SRC_DIRS = ./ ./benchmarks/ ./client/ ./concurrency_control/ ./storage/ ./transport/ ./system/ ./statistics/ ./rlibv2/ ./r2/ #./unit_tests/ ./rlibv2/ 
-DEPS = -I. -I./benchmarks -I./client/ -I./concurrency_control -I./storage -I./transport -I./system -I./statistics -I./rlibv2/ -I./r2/  #-I./unit_tests -I./rlibv2/ 
+SRC_DIRS = ./ ./benchmarks/ ./client/ ./concurrency_control/ ./storage/ ./transport/ ./system/ ./statistics/ ./rlibv2/ ./r2/ ./r2/src/#./unit_tests/ ./rlibv2/
+DEPS = -I. -I./benchmarks -I./client/ -I./concurrency_control -I./storage -I./transport -I./system -I./statistics -I./rlibv2/ -I./r2/ -I./r2/src/#-I./unit_tests -I./rlibv2/
 
 CFLAGS += $(DEPS) -D NOGRAPHITE=1 -Wno-sizeof-pointer-memaccess -ljemalloc
-LDFLAGS = -Wall -L. -L$(NNMSG) -Wl,-rpath -pthread -lrt -lnanomsg -lanl -lcurl -ldl -lprotobuf -lpthread -libverbs -ljemalloc -L$(RALLOC) -lssmalloc #-lc++experimental 
+LDFLAGS = -Wall -L. -L$(NNMSG) -Wl,-rpath -pthread -lrt -lnanomsg -lanl -lcurl -ldl -lprotobuf -lpthread -libverbs -ljemalloc -L$(RALLOC) -lssmalloc -lboost_system -lboost_coroutine#-lc++experimental
 #LDFLAGS = -Wall -L. -L$(NNMSG) -L$(JEMALLOC)/lib -Wl,-rpath,$(JEMALLOC)/lib -pthread -gdwarf-3 -lrt -std=c++11
 LDFLAGS += $(CFLAGS)
 LIBS = -lrdmacm -lmemcached
@@ -60,6 +60,8 @@ unit_test : $(OBJS_UNIT)
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 ./obj/%.o: client/%.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
+./obj/%.o: r2/src/%.cpp
+	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 ./obj/%.o: %.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 
@@ -84,6 +86,8 @@ rundb : $(OBJS_DB)
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 ./obj/%.o: client/%.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
+./obj/%.o: r2/src/%.cpp
+	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 ./obj/%.o: %.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 
@@ -107,6 +111,8 @@ runcl : $(OBJS_CL)
 ./obj/%.o: concurrency_control/%.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 ./obj/%.o: client/%.cpp
+	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
+./obj/%.o: r2/src/%.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 ./obj/%.o: %.cpp
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<

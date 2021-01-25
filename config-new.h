@@ -146,9 +146,9 @@
 // Concurrency Control
 /***********************************************/
 
-// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
+// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI,RDMA_SILO
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG SILO
+#define CC_ALG NO_WAIT
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.

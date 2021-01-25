@@ -5,7 +5,7 @@
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+	   http://www.apache.org/licenses/LICENSE-2.0
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,20 +23,14 @@
 RC IndexRdma::init(uint64_t bucket_cnt) {
 	uint64_t index_size = (g_synth_table_size/g_node_cnt)*(sizeof(IndexInfo)+1);
 
-	// r2::AllocatorMaster<>::init(rdma_global_buffer,rdma_buffer_size);
-	// auto allocator = r2::AllocatorMaster<>::get_allocator();
-	// index_info = (IndexInfo*)r2_allocator->alloc(index_size);
 	index_info = (IndexInfo*)rdma_global_buffer;
-    // index_info = (IndexInfo*)r2::AllocatorMaster<>::get_thread_allocator()->alloc(index_size);
 
-	// auto allocator = r2::AllocatorMaster<>::get_allocator();
-    // index_info = (IndexInfo*)(allocator->alloc(index_size));//为数组申请空间
-    printf("%d",index_info[0].key);
+	printf("%d",index_info[0].key);
 
-    uint64_t i = 0;
+	uint64_t i = 0;
 	for (i = 0; i < g_synth_table_size/g_node_cnt; i ++) {
-				index_info[i].init();
-	}	
+		index_info[i].init();
+	}
 
  	printf("init %ld index\n",i);
 	return RCOK;
@@ -81,13 +75,16 @@ IndexRdma::release_latch(BucketHeader * bucket) {
 RC IndexRdma::index_insert(idx_key_t key, itemid_t * item, int part_id) {
 	RC rc = RCOK;
 
-    uint64_t index_key = key/g_node_cnt;
+	uint64_t index_key = key/g_node_cnt;
 	index_info[index_key].key = key;
 	index_info[index_key].address = (row_t*)(item->location);
+	index_info[index_key].table_offset = (char*)table - rdma_global_buffer;
+	index_info[index_key].offset = (char*)item->location - rdma_global_buffer;
 
 	return rc;
 }
 
+// todo:之后可能要改
 RC IndexRdma::index_insert_nonunique(idx_key_t key, itemid_t * item, int part_id) {
 	RC rc = RCOK;
 	uint64_t bkt_idx = hash(key);
@@ -106,12 +103,12 @@ RC IndexRdma::index_insert_nonunique(idx_key_t key, itemid_t * item, int part_id
 }
 
 RC IndexRdma::index_read(idx_key_t key, itemid_t * &item, int part_id) {
-	
 	RC rc = RCOK;
 
 	uint64_t index_key = key/g_node_cnt;
 
-    assert(index_info[index_key].key == key);
+	assert(index_info[index_key].key == key);
+	item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
 	item->location = index_info[index_key].address;
 	item->type = index_info[index_key].type;
 	item->valid = index_info[index_key].valid;
@@ -119,7 +116,7 @@ RC IndexRdma::index_read(idx_key_t key, itemid_t * &item, int part_id) {
 	return rc;
 
 }
-
+// todo:之后可能要改
 RC IndexRdma::index_read(idx_key_t key, int count, itemid_t * &item, int part_id) {
 	uint64_t bkt_idx = hash(key);
 	assert(bkt_idx < _bucket_cnt_per_part);
@@ -137,21 +134,16 @@ RC IndexRdma::index_read(idx_key_t key, int count, itemid_t * &item, int part_id
 
 }
 
-
-RC IndexRdma::index_read(idx_key_t key, itemid_t * &item,
-						int part_id, int thd_id) {
-	uint64_t bkt_idx = hash(key);
-	assert(bkt_idx < _bucket_cnt_per_part);
-	//BucketHeader * cur_bkt = &_buckets[part_id][bkt_idx];
-	BucketHeader * cur_bkt = &_buckets[0][bkt_idx];
+// todo:之后可能要改
+RC IndexRdma::index_read(idx_key_t key, itemid_t * &item,int part_id, int thd_id) {
 	RC rc = RCOK;
-	// 1. get the sh latch
-//	get_latch(cur_bkt);
 
+	uint64_t index_key = key/g_node_cnt;
+	item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
+	assert(index_info[index_key].key == key);
+	item->location = index_info[index_key].address;
+	item->type = index_info[index_key].type;
+	item->valid = index_info[index_key].valid;
 
-	cur_bkt->read_item(key, item);
-
-	// 3. release the latch
-//	release_latch(cur_bkt);
 	return rc;
 }
