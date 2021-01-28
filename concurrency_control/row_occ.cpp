@@ -52,6 +52,9 @@ RC Row_occ::access(TxnManager *txn, TsType type) {
 #else
   sem_post(&_semaphore);
 #endif
+  uint64_t timespan = get_sys_clock() - starttime;
+  txn->txn_stats.cc_time += timespan;
+  txn->txn_stats.cc_time_short += timespan;
 	return rc;
 }
 

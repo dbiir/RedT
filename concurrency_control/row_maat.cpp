@@ -36,7 +36,7 @@ void Row_maat::init(row_t * row) {
 }
 
 RC Row_maat::access(access_t type, TxnManager * txn) {
-    uint64_t starttime = get_sys_clock();
+  uint64_t starttime = get_sys_clock();
 #if WORKLOAD == TPCC
   read_and_prewrite(txn);
 #else

@@ -138,6 +138,8 @@ void Stats_thd::clear() {
   dli_lock_time=0;
   dli_check_conflict_time=0;
   dli_final_validate=0;
+  dli_get_rwset=0;
+  dli_push_front_time=0;
   // trans queue
   trans_local_process=0;
   trans_remote_process=0;
@@ -148,6 +150,11 @@ void Stats_thd::clear() {
   trans_network_wait=0;
   trans_network_send=0;
   trans_network_recv=0;
+  trans_msgsend_stage_one=0;
+  trans_msgsend_stage_three=0;
+  trans_return_client_wait=0;
+  trans_get_client_wait=0;
+  trans_process_client=0;
   // trans work queue
   trans_work_queue_item_total=0;
   trans_msg_queue_item_total=0;
@@ -600,6 +607,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",dli_lock_time=%f"
   ",dli_check_conflict_time=%f"
   ",dli_final_validate=%f"
+  ",dli_get_rwset=%f"
+  ",dli_push_front_time=%f"
   // trans queue
   ",trans_local_process=%f"
   ",trans_remote_process=%f"
@@ -609,7 +618,12 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_msg_remote_wait=%f"
   ",trans_network_wait=%f"
   ",trans_network_send=%f"
-  ",trans_network_recv=%f",
+  ",trans_network_recv=%f"
+  ",trans_msgsend_stage_one=%f"
+  ",trans_msgsend_stage_three=%f"
+  ",trans_get_client_wait=%f"
+  ",trans_return_client_wait=%f"
+  ",trans_process_client=%f",
           trans_total_run_time / BILLION, trans_init_time / BILLION, trans_process_time / BILLION,
           trans_get_access_time / BILLION, trans_store_access_time / BILLION, trans_get_row_time /BILLION, trans_benchmark_compute_time /BILLION,
           trans_2pc_time / BILLION,
@@ -618,10 +632,13 @@ void Stats_thd::print(FILE * outf, bool prog) {
           trans_mvcc_clear_history / BILLION, trans_mvcc_access / BILLION,
           trans_cur_row_copy_time / BILLION, trans_cur_row_init_time / BILLION,
           dli_init_time / BILLION, dli_lock_time / BILLION, dli_check_conflict_time / BILLION, dli_final_validate / BILLION,
+          dli_get_rwset / BILLION, dli_push_front_time / BILLION,
           trans_local_process / BILLION, trans_remote_process / BILLION,
           trans_work_local_wait / BILLION, trans_work_remote_wait / BILLION,
           trans_msg_local_wait / BILLION, trans_msg_remote_wait / BILLION,
-          trans_network_wait / BILLION, trans_network_send /BILLION, trans_network_recv / BILLION);
+          trans_network_wait / BILLION, trans_network_send /BILLION, trans_network_recv / BILLION,
+          trans_msgsend_stage_one / BILLION, trans_msgsend_stage_three / BILLION,
+          trans_get_client_wait / BILLION, trans_return_client_wait / BILLION, trans_process_client / BILLION);
 
   fprintf(outf,
   ",avg_trans_total_run_time=%f"
@@ -1342,6 +1359,8 @@ void Stats_thd::combine(Stats_thd * stats) {
   dli_lock_time+=stats->dli_lock_time;
   dli_check_conflict_time+=stats->dli_check_conflict_time;
   dli_final_validate+=stats->dli_final_validate;
+  dli_get_rwset+=stats->dli_get_rwset;
+  dli_push_front_time+=stats->dli_push_front_time;
   trans_work_queue_item_total+=stats->trans_work_queue_item_total;
   trans_msg_queue_item_total+=stats->trans_msg_queue_item_total;
   // trans queue
@@ -1354,6 +1373,11 @@ void Stats_thd::combine(Stats_thd * stats) {
   trans_network_wait+=stats->trans_network_wait;
   trans_network_recv+=stats->trans_network_recv;
   trans_network_send+=stats->trans_network_send;
+  trans_msgsend_stage_one+=stats->trans_msgsend_stage_one;
+  trans_msgsend_stage_three+=stats->trans_msgsend_stage_three;
+  trans_get_client_wait+=stats->trans_get_client_wait;
+  trans_return_client_wait+=stats->trans_return_client_wait;
+  trans_process_client+=stats->trans_process_client;
   // Transaction stats
   txn_total_process_time+=stats->txn_total_process_time;
   txn_process_time+=stats->txn_process_time;

@@ -59,7 +59,7 @@ RC CalvinLockThread::run() {
 		}
 
 		prof_starttime = get_sys_clock();
-		assert(msg->get_rtype() == CL_QRY);
+		assert(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O);
 		assert(msg->get_txn_id() != UINT64_MAX);
 
 		txn_man =
@@ -141,6 +141,7 @@ RC CalvinSequencerThread::run() {
 
 		switch (msg->get_rtype()) {
 			case CL_QRY:
+			case CL_QRY_O:
 				// Query from client
 				DEBUG("SEQ process_txn\n");
 				seq_man.process_txn(msg,get_thd_id(),0,0,0,0);

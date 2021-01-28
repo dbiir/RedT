@@ -132,6 +132,8 @@ public:
   double dli_lock_time=0;
   double dli_check_conflict_time=0;
   double dli_final_validate=0;
+  double dli_get_rwset=0;
+  double dli_push_front_time=0;
   // trans queue
   double trans_local_process=0;
   double trans_remote_process=0;
@@ -142,6 +144,11 @@ public:
   double trans_network_wait=0;
   double trans_network_recv=0;
   double trans_network_send=0;
+  double trans_msgsend_stage_one=0;
+  double trans_msgsend_stage_three=0;
+  double trans_return_client_wait=0;
+  double trans_get_client_wait=0;
+  double trans_process_client=0;
   // trans work queue count
   uint64_t trans_work_queue_item_total=0;
   uint64_t trans_msg_queue_item_total=0;

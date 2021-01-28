@@ -353,7 +353,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 
 	rc = this->manager->lock_get(lt, txn);
 
-  uint64_t copy_time = get_sys_clock();
+  	uint64_t copy_time = get_sys_clock();
 	if (rc == RCOK) {
 		access->data = this;
 	} else if (rc == Abort) {
@@ -364,7 +364,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	goto end;
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI
 	//uint64_t thd_id = txn->get_thd_id();
-// For TIMESTAMP RD, a new copy of the access->data will be returned.
+	// For TIMESTAMP RD, a new copy of the access->data will be returned.
 
 	// for MVCC RD, the version will be returned instead of a copy
 	// So for MVCC RD-WR, the version should be explicitly copied.

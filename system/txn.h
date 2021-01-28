@@ -149,6 +149,7 @@ public:
 	virtual RC      run_txn_post_wait() = 0;
 	virtual RC      run_calvin_txn() = 0;
 	virtual RC      acquire_locks() = 0;
+	virtual RC 		send_remote_request() = 0;
 	void            register_thread(Thread * h_thd);
 	uint64_t        get_thd_id();
 	Workload *      get_wl();
@@ -201,7 +202,7 @@ public:
     RC              find_tid_silo(ts_t max_tid);
     RC              finish(RC rc);
 #endif
-
+	bool send_RQRY_RSP;
 	bool aborted;
 	uint64_t return_id;
 	RC        validate();
