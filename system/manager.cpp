@@ -18,7 +18,7 @@
 #include "row.h"
 #include "txn.h"
 #include "pthread.h"
-#include "http.h"
+// #include "http.h"
 //#include <jemallloc.h>
 __thread uint64_t Manager::_max_cts = 1;
 void Manager::init() {
@@ -58,13 +58,12 @@ uint64_t Manager::get_ts(uint64_t thread_id) {
 	case TS_CLOCK :
 		time = get_wall_clock() * (g_node_cnt + g_thread_cnt) + (g_node_id * g_thread_cnt + thread_id);
 		break;
-	case LTS_CURL_CLOCK:
-		time = CurlGetTimeStamp();
-		break;
-	case LTS_TCP_CLOCK:
-		time = tcp_ts.TcpGetTimeStamp(thread_id);
-
-		break;
+	// case LTS_CURL_CLOCK:
+	// 	time = CurlGetTimeStamp();
+	// 	break;
+	// case LTS_TCP_CLOCK:
+	// 	time = tcp_ts.TcpGetTimeStamp(thread_id);
+	// 	break;
 	default :
 		assert(false);
 	}

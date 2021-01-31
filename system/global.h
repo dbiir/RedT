@@ -52,11 +52,17 @@
 #include "da_block_queue.h"
 #include "src/allocator_master.hh"
 #include "lib.hh"
-
-//#include "rdma_ctrl.hpp"
-//#include "maat.h"
-
 using namespace std;
+
+#ifdef USE_RDMA
+  #include "qps/rc_recv_manager.hh"
+  #include "qps/recv_iter.hh"
+  #include "qps/mod.hh"
+  using namespace rdmaio;
+  using namespace rdmaio::rmem;
+  using namespace rdmaio::qp;
+#endif
+//#endif
 
 class mem_alloc;
 class Stats;
@@ -103,7 +109,7 @@ class DtaTimeTable;
 class KeyXidCache;
 class RtsCache;
 // class QTcpQueue;
-class TcpTimestamp;
+// class TcpTimestamp;
 
 typedef uint32_t UInt32;
 typedef int32_t SInt32;
@@ -159,7 +165,7 @@ extern WkdbTimeTable wkdb_time_table;
 extern KeyXidCache wkdb_key_xid_cache;
 extern RtsCache wkdb_rts_cache;
 // extern QTcpQueue tcp_queue;
-extern TcpTimestamp tcp_ts;
+// extern TcpTimestamp tcp_ts;
 
 extern map<string, string> g_params;
 
@@ -200,6 +206,11 @@ extern UInt32 g_client_node_cnt;
 extern UInt32 g_servers_per_client;
 extern UInt32 g_clients_per_server;
 extern UInt32 g_server_start_node;
+/******************************************/
+// INIT Global Params
+/******************************************/
+extern bool g_init_done[50];
+extern int g_init_cnt;
 
 /******************************************/
 // Global Parameter

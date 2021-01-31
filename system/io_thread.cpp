@@ -37,11 +37,17 @@ void InputThread::setup() {
 
 	std::vector<Message*> * msgs;
 	while(!simulation->is_setup_done()) {
+#ifdef USE_RDMA
+        msgs = tport_man.rdma_recv_msg(get_thd_id());
+#else
 		msgs = tport_man.recv_msg(get_thd_id());
+#endif
 		if (msgs == NULL) continue;
 		while(!msgs->empty()) {
 			Message * msg = msgs->front();
 			if(msg->rtype == INIT_DONE) {
+				//g_init_done[g_node_id] = 1;
+				g_init_done[msg->return_node_id] = true;
 				printf("Received INIT_DONE from node %ld\n",msg->return_node_id);
 				fflush(stdout);
 				simulation->process_setup_msg();
@@ -104,7 +110,11 @@ RC InputThread::client_recv_loop() {
 	while (!simulation->is_done()) {
 		heartbeat();
 		uint64_t starttime = get_sys_clock();
+#ifdef USE_RDMA
+        msgs = tport_man.rdma_recv_msg(get_thd_id());
+#else
 		msgs = tport_man.recv_msg(get_thd_id());
+#endif
 		INC_STATS(_thd_id,mtx[28], get_sys_clock() - starttime);
 		starttime = get_sys_clock();
 		//while((m_query = work_queue.get_next_query(get_thd_id())) != NULL) {
@@ -168,24 +178,40 @@ bool InputThread::fakeprocess(Message * msg) {
 			case RPREPARE:
 				rc = RCOK;
 				txn_man->set_rc(rc);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+                tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RACK_PREP));
+#else
 				msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+#endif
 				break;
 			case RQRY:
 				rc = RCOK;
 				txn_man->set_rc(rc);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+                tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RQRY_RSP));
+#else
 				msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),msg->return_node_id);
+#endif
 				break;
 			case RQRY_CONT:
 				rc = RCOK;
 				txn_man->set_rc(rc);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+                tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RQRY_RSP));
+#else
 				msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),msg->return_node_id);
+#endif
 				break;
 			case RFIN:
 				rc = RCOK;
 				txn_man->set_rc(rc);
 				if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC || CC_ALG == BOCC || CC_ALG == SSI)
 				// if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC)
+#if USE_RDMA == CHANGE_MSG_QUEUE
+                	tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->get_txn_id()), Message::create_message(txn_man,RACK_FIN));
+#else
 					msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_FIN),GET_NODE_ID(msg->get_txn_id()));
+#endif
 				// rc = process_rfin(msg);
 				break;
 			default:
@@ -214,8 +240,11 @@ RC InputThread::server_recv_loop() {
 		heartbeat();
 		starttime = get_sys_clock();
 
+#ifdef USE_RDMA
+        msgs = tport_man.rdma_recv_msg(get_thd_id());
+#else
 		msgs = tport_man.recv_msg(get_thd_id());
-
+#endif
 		INC_STATS(_thd_id,mtx[28], get_sys_clock() - starttime);
 		starttime = get_sys_clock();
 

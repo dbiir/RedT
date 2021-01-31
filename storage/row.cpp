@@ -52,16 +52,18 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 
 	Catalog * schema = host_table->get_schema();
 	tuple_size = schema->get_tuple_size();
-#if USE_RDMA == false
-#if SIM_FULL_ROW
-	data = (char *) mem_allocator.alloc(sizeof(char) * tuple_size);
-#else
-	data = (char *) mem_allocator.alloc(sizeof(uint64_t) * 1);
-#endif
+
+#ifndef USE_RDMA// == false
+	#if SIM_FULL_ROW
+		data = (char *) mem_allocator.alloc(sizeof(char) * tuple_size);
+	#else
+		data = (char *) mem_allocator.alloc(sizeof(uint64_t) * 1);
+	#endif
 #endif
 #if CC_ALG == RDMA_SILO
   _tid_word = 0;
 #endif
+
 	return RCOK;
 }
 
@@ -105,6 +107,7 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_silo *) mem_allocator.align_alloc(sizeof(Row_silo));
 #elif CC_ALG == RDMA_SILO
   manager = (Row_rdma_silo *) mem_allocator.align_alloc(sizeof(Row_rdma_silo));
+
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -113,11 +116,13 @@ void row_t::init_manager(row_t * row) {
 }
 
 table_t *row_t::get_table() { return table; }
-#if USE_RDMA
+
+#ifdef USE_RDMA
 Catalog *row_t::get_schema() { return &table->schema; }
 #else
 Catalog *row_t::get_schema() { return get_table()->get_schema(); }
 #endif
+
 const char *row_t::get_table_name() { return get_table()->get_table_name(); };
 uint64_t row_t::get_tuple_size() { return get_schema()->get_tuple_size(); }
 
@@ -207,13 +212,17 @@ void row_t::copy(row_t * src) {
 
 void row_t::free_row() {
 	DEBUG_M("row_t::free_row free\n");
-#if USE_RDMA == false
+
+#ifndef USE_RDMA // == false
+
 #if SIM_FULL
 	mem_allocator.free(data, sizeof(char) * get_tuple_size());
 #else
 	mem_allocator.free(data, sizeof(uint64_t) * 1);
 #endif
+
 #endif
+
 }
 
 RC row_t::get_lock(access_t type, TxnManager * txn) {
@@ -224,6 +233,7 @@ RC row_t::get_lock(access_t type, TxnManager * txn) {
 #endif
 	return rc;
 }
+
 
 RC row_t::remote_get_row(row_t* remote_row, TxnManager * txn, Access *access) {
   RC rc = RCOK;
@@ -405,13 +415,16 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 	uint64_t copy_time = get_sys_clock();
 	// row_t * row;
+
 	if (type == WR) {
 		rc = this->manager->access(txn, P_REQ, NULL);
 		if (rc != RCOK) goto end;
 	}
 	if ((type == WR && rc == RCOK) || type == RD || type == SCAN) {
 		rc = this->manager->access(txn, R_REQ, NULL);
+
     	copy_time = get_sys_clock();
+
 		if (rc == RCOK ) {
 			access->data = txn->cur_row;
 		} else if (rc == WAIT) {
@@ -487,6 +500,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 #endif
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
+
 #elif CC_ALG == SILO || CC_ALG == RDMA_SILO
 	// like OCC, tictoc also makes a local copy for each read/write
  	uint64_t init_time = get_sys_clock();
@@ -678,7 +692,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	if (rc == Abort) {
 		manager->abort(type,txn);
 	} else {
-		manager->commit(type,txn,row);
+		manager->commit(type,txn);
 	}
 
 		row->free_row();

@@ -22,6 +22,7 @@
 
 #define ROW_DEFAULT_SIZE 1100
 
+
 #define DECL_SET_VALUE(type) void set_value(int col_id, type value);
 
 #define SET_VALUE(type) \
@@ -62,6 +63,7 @@ class Row_null;
 class Row_silo;
 class Row_rdma_silo;
 
+
 class row_t {
 public:
 	RC init(table_t * host_table, uint64_t part_id, uint64_t row_id = 0);
@@ -69,6 +71,7 @@ public:
 	// not every row has a manager
 	void init_manager(row_t * row);
   RC remote_get_row(row_t* remote_row, TxnManager * txn, Access *access);
+
 	table_t * get_table();
 	Catalog * get_schema();
 	const char * get_table_name();
@@ -126,6 +129,7 @@ public:
 		Row_mvcc * manager;
 	#elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
 		Row_occ * manager;
+
 	#elif CC_ALG == DLI_BASE || CC_ALG == DLI_OCC
 		Row_dli_base *manager;
 	#elif CC_ALG == MAAT
@@ -151,11 +155,12 @@ public:
   #elif CC_ALG == SILO
   	Row_silo * manager;
 	#endif
-#if USE_RDMA
+#ifdef USE_RDMA// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
 	char data[ROW_DEFAULT_SIZE];
 #else
 	char * data;
 #endif
+
 	int tuple_size;
 	table_t * table;
 private:

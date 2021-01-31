@@ -56,13 +56,20 @@
 #include "rdma_silo.h"
 #include "key_xid.h"
 #include "rts_cache.h"
-#include "http.h"
 #include "src/allocator_master.hh"
 //#include "rdma_ctrl.hpp"
 #include "lib.hh"
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
-
+#ifdef USE_RDMA
+  #include "qps/rc_recv_manager.hh"
+  #include "qps/recv_iter.hh"
+  #include "qps/mod.hh"
+  using namespace rdmaio;
+  using namespace rdmaio::rmem;
+  using namespace rdmaio::qp;
+  using namespace std;
+#endif
 
 mem_alloc mem_allocator;
 Stats stats;
@@ -108,7 +115,7 @@ WkdbTimeTable wkdb_time_table;
 KeyXidCache wkdb_key_xid_cache;
 RtsCache wkdb_rts_cache;
 // QTcpQueue tcp_queue;
-TcpTimestamp tcp_ts;
+// TcpTimestamp tcp_ts;
 
 boost::lockfree::queue<DAQuery*, boost::lockfree::fixed_sized<true>> da_query_queue{100};
 DABlockQueue da_gen_qry_queue(50);
@@ -213,7 +220,7 @@ UInt64 g_msg_time_limit = MSG_TIME_LIMIT;
 UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
-UInt64 rdma_buffer_size = 1024*1024*1024;
+UInt64 rdma_buffer_size = 2*(1024*1024*1024L);
 UInt64 rdma_index_size = 300*1024*1024;
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;
@@ -303,3 +310,5 @@ int rdma_server_port[NODE_CNT];
 
 //r2::Allocator *r2_allocator;
 //rdmaio::RCQP *qp[NODE_CNT][THREAD_CNT];
+bool g_init_done[50] = {false};
+int g_init_cnt = 0;

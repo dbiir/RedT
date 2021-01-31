@@ -1320,7 +1320,7 @@ inline ::PROTOBUF_NAMESPACE_ID::uint32 Cluster::cluster_id() const {
   return cluster_id_;
 }
 inline void Cluster::set_cluster_id(::PROTOBUF_NAMESPACE_ID::uint32 value) {
-  
+
   cluster_id_ = value;
   // @@protoc_insertion_point(field_set:ltsrpc.Cluster.cluster_id)
 }
@@ -1338,7 +1338,7 @@ inline ::ltsrpc::StatusCode Status::code() const {
   return static_cast< ::ltsrpc::StatusCode >(code_);
 }
 inline void Status::set_code(::ltsrpc::StatusCode value) {
-  
+
   code_ = value;
   // @@protoc_insertion_point(field_set:ltsrpc.Status.code)
 }
@@ -1352,43 +1352,43 @@ inline const std::string& Status::msg() const {
   return msg_.GetNoArena();
 }
 inline void Status::set_msg(const std::string& value) {
-  
+
   msg_.SetNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), value);
   // @@protoc_insertion_point(field_set:ltsrpc.Status.msg)
 }
 inline void Status::set_msg(std::string&& value) {
-  
+
   msg_.SetNoArena(
     &::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
   // @@protoc_insertion_point(field_set_rvalue:ltsrpc.Status.msg)
 }
 inline void Status::set_msg(const char* value) {
   GOOGLE_DCHECK(value != nullptr);
-  
+
   msg_.SetNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:ltsrpc.Status.msg)
 }
 inline void Status::set_msg(const char* value, size_t size) {
-  
+
   msg_.SetNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(),
       ::std::string(reinterpret_cast<const char*>(value), size));
   // @@protoc_insertion_point(field_set_pointer:ltsrpc.Status.msg)
 }
 inline std::string* Status::mutable_msg() {
-  
+
   // @@protoc_insertion_point(field_mutable:ltsrpc.Status.msg)
   return msg_.MutableNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
 }
 inline std::string* Status::release_msg() {
   // @@protoc_insertion_point(field_release:ltsrpc.Status.msg)
-  
+
   return msg_.ReleaseNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
 }
 inline void Status::set_allocated_msg(std::string* msg) {
   if (msg != nullptr) {
-    
+
   } else {
-    
+
   }
   msg_.SetAllocatedNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), msg);
   // @@protoc_insertion_point(field_set_allocated:ltsrpc.Status.msg)
@@ -1407,7 +1407,7 @@ inline ::PROTOBUF_NAMESPACE_ID::uint64 Member::member_id() const {
   return member_id_;
 }
 inline void Member::set_member_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
-  
+
   member_id_ = value;
   // @@protoc_insertion_point(field_set:ltsrpc.Member.member_id)
 }
@@ -1421,43 +1421,43 @@ inline const std::string& Member::name() const {
   return name_.GetNoArena();
 }
 inline void Member::set_name(const std::string& value) {
-  
+
   name_.SetNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), value);
   // @@protoc_insertion_point(field_set:ltsrpc.Member.name)
 }
 inline void Member::set_name(std::string&& value) {
-  
+
   name_.SetNoArena(
     &::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
   // @@protoc_insertion_point(field_set_rvalue:ltsrpc.Member.name)
 }
 inline void Member::set_name(const char* value) {
   GOOGLE_DCHECK(value != nullptr);
-  
+
   name_.SetNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:ltsrpc.Member.name)
 }
 inline void Member::set_name(const char* value, size_t size) {
-  
+
   name_.SetNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(),
       ::std::string(reinterpret_cast<const char*>(value), size));
   // @@protoc_insertion_point(field_set_pointer:ltsrpc.Member.name)
 }
 inline std::string* Member::mutable_name() {
-  
+
   // @@protoc_insertion_point(field_mutable:ltsrpc.Member.name)
   return name_.MutableNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
 }
 inline std::string* Member::release_name() {
   // @@protoc_insertion_point(field_release:ltsrpc.Member.name)
-  
+
   return name_.ReleaseNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
 }
 inline void Member::set_allocated_name(std::string* name) {
   if (name != nullptr) {
-    
+
   } else {
-    
+
   }
   name_.SetAllocatedNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), name);
   // @@protoc_insertion_point(field_set_allocated:ltsrpc.Member.name)
@@ -1602,7 +1602,7 @@ inline ::PROTOBUF_NAMESPACE_ID::int32 Member::leader_priority() const {
   return leader_priority_;
 }
 inline void Member::set_leader_priority(::PROTOBUF_NAMESPACE_ID::int32 value) {
-  
+
   leader_priority_ = value;
   // @@protoc_insertion_point(field_set:ltsrpc.Member.leader_priority)
 }
@@ -1620,7 +1620,7 @@ inline ::PROTOBUF_NAMESPACE_ID::uint32 RequestHeader::cluster_id() const {
   return cluster_id_;
 }
 inline void RequestHeader::set_cluster_id(::PROTOBUF_NAMESPACE_ID::uint32 value) {
-  
+
   cluster_id_ = value;
   // @@protoc_insertion_point(field_set:ltsrpc.RequestHeader.cluster_id)
 }
@@ -1638,7 +1638,7 @@ inline ::PROTOBUF_NAMESPACE_ID::uint32 ResponseHeader::cluster_id() const {
   return cluster_id_;
 }
 inline void ResponseHeader::set_cluster_id(::PROTOBUF_NAMESPACE_ID::uint32 value) {
-  
+
   cluster_id_ = value;
   // @@protoc_insertion_point(field_set:ltsrpc.ResponseHeader.cluster_id)
 }
@@ -1661,13 +1661,13 @@ inline const ::ltsrpc::Status& ResponseHeader::status() const {
 }
 inline ::ltsrpc::Status* ResponseHeader::release_status() {
   // @@protoc_insertion_point(field_release:ltsrpc.ResponseHeader.status)
-  
+
   ::ltsrpc::Status* temp = status_;
   status_ = nullptr;
   return temp;
 }
 inline ::ltsrpc::Status* ResponseHeader::mutable_status() {
-  
+
   if (status_ == nullptr) {
     auto* p = CreateMaybeMessage<::ltsrpc::Status>(GetArenaNoVirtual());
     status_ = p;
@@ -1686,9 +1686,9 @@ inline void ResponseHeader::set_allocated_status(::ltsrpc::Status* status) {
       status = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
           message_arena, status, submessage_arena);
     }
-    
+
   } else {
-    
+
   }
   status_ = status;
   // @@protoc_insertion_point(field_set_allocated:ltsrpc.ResponseHeader.status)
@@ -1716,13 +1716,13 @@ inline const ::ltsrpc::RequestHeader& GetMembersRequest::header() const {
 }
 inline ::ltsrpc::RequestHeader* GetMembersRequest::release_header() {
   // @@protoc_insertion_point(field_release:ltsrpc.GetMembersRequest.header)
-  
+
   ::ltsrpc::RequestHeader* temp = header_;
   header_ = nullptr;
   return temp;
 }
 inline ::ltsrpc::RequestHeader* GetMembersRequest::mutable_header() {
-  
+
   if (header_ == nullptr) {
     auto* p = CreateMaybeMessage<::ltsrpc::RequestHeader>(GetArenaNoVirtual());
     header_ = p;
@@ -1741,9 +1741,9 @@ inline void GetMembersRequest::set_allocated_header(::ltsrpc::RequestHeader* hea
       header = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
           message_arena, header, submessage_arena);
     }
-    
+
   } else {
-    
+
   }
   header_ = header;
   // @@protoc_insertion_point(field_set_allocated:ltsrpc.GetMembersRequest.header)
@@ -1771,13 +1771,13 @@ inline const ::ltsrpc::ResponseHeader& GetMembersResponse::header() const {
 }
 inline ::ltsrpc::ResponseHeader* GetMembersResponse::release_header() {
   // @@protoc_insertion_point(field_release:ltsrpc.GetMembersResponse.header)
-  
+
   ::ltsrpc::ResponseHeader* temp = header_;
   header_ = nullptr;
   return temp;
 }
 inline ::ltsrpc::ResponseHeader* GetMembersResponse::mutable_header() {
-  
+
   if (header_ == nullptr) {
     auto* p = CreateMaybeMessage<::ltsrpc::ResponseHeader>(GetArenaNoVirtual());
     header_ = p;
@@ -1796,9 +1796,9 @@ inline void GetMembersResponse::set_allocated_header(::ltsrpc::ResponseHeader* h
       header = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
           message_arena, header, submessage_arena);
     }
-    
+
   } else {
-    
+
   }
   header_ = header;
   // @@protoc_insertion_point(field_set_allocated:ltsrpc.GetMembersResponse.header)
@@ -1852,13 +1852,13 @@ inline const ::ltsrpc::Member& GetMembersResponse::leader() const {
 }
 inline ::ltsrpc::Member* GetMembersResponse::release_leader() {
   // @@protoc_insertion_point(field_release:ltsrpc.GetMembersResponse.leader)
-  
+
   ::ltsrpc::Member* temp = leader_;
   leader_ = nullptr;
   return temp;
 }
 inline ::ltsrpc::Member* GetMembersResponse::mutable_leader() {
-  
+
   if (leader_ == nullptr) {
     auto* p = CreateMaybeMessage<::ltsrpc::Member>(GetArenaNoVirtual());
     leader_ = p;
@@ -1877,9 +1877,9 @@ inline void GetMembersResponse::set_allocated_leader(::ltsrpc::Member* leader) {
       leader = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
           message_arena, leader, submessage_arena);
     }
-    
+
   } else {
-    
+
   }
   leader_ = leader;
   // @@protoc_insertion_point(field_set_allocated:ltsrpc.GetMembersResponse.leader)
@@ -1903,13 +1903,13 @@ inline const ::ltsrpc::Member& GetMembersResponse::etcd_leader() const {
 }
 inline ::ltsrpc::Member* GetMembersResponse::release_etcd_leader() {
   // @@protoc_insertion_point(field_release:ltsrpc.GetMembersResponse.etcd_leader)
-  
+
   ::ltsrpc::Member* temp = etcd_leader_;
   etcd_leader_ = nullptr;
   return temp;
 }
 inline ::ltsrpc::Member* GetMembersResponse::mutable_etcd_leader() {
-  
+
   if (etcd_leader_ == nullptr) {
     auto* p = CreateMaybeMessage<::ltsrpc::Member>(GetArenaNoVirtual());
     etcd_leader_ = p;
@@ -1928,9 +1928,9 @@ inline void GetMembersResponse::set_allocated_etcd_leader(::ltsrpc::Member* etcd
       etcd_leader = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
           message_arena, etcd_leader, submessage_arena);
     }
-    
+
   } else {
-    
+
   }
   etcd_leader_ = etcd_leader;
   // @@protoc_insertion_point(field_set_allocated:ltsrpc.GetMembersResponse.etcd_leader)
@@ -1949,7 +1949,7 @@ inline ::PROTOBUF_NAMESPACE_ID::uint64 GetTxnTimestampCtx::txn_id() const {
   return txn_id_;
 }
 inline void GetTxnTimestampCtx::set_txn_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
-  
+
   txn_id_ = value;
   // @@protoc_insertion_point(field_set:ltsrpc.GetTxnTimestampCtx.txn_id)
 }
@@ -1963,7 +1963,7 @@ inline ::PROTOBUF_NAMESPACE_ID::uint64 GetTxnTimestampCtx::txn_ts() const {
   return txn_ts_;
 }
 inline void GetTxnTimestampCtx::set_txn_ts(::PROTOBUF_NAMESPACE_ID::uint64 value) {
-  
+
   txn_ts_ = value;
   // @@protoc_insertion_point(field_set:ltsrpc.GetTxnTimestampCtx.txn_ts)
 }

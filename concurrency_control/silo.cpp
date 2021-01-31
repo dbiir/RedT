@@ -22,8 +22,8 @@ TxnManager::validate_silo()
 		else
 			read_set[cur_rd_idx ++] = rid;
 	}
-
 	// bubble sort the write_set, in primary key order
+
 	if (wr_cnt > 1)
 	{
 		for (uint64_t i = wr_cnt - 1; i >= 1; i--) {
@@ -76,6 +76,8 @@ TxnManager::validate_silo()
 				num_locks ++;
 				if (row->manager->get_tid() != txn->accesses[write_set[i]]->tid)
 				{
+					INC_STATS(get_thd_id(), local_lock_fail_abort, 1);
+					INC_STATS(get_thd_id(), valid_abort_cnt, 1);
 					rc = Abort;
 					return rc;
 				}
@@ -100,6 +102,7 @@ TxnManager::validate_silo()
 				// 			return rc;
 				// 		}
 				// 	}
+
 				// 	for (uint64_t i = 0; i < txn->row_cnt - wr_cnt; i ++) {
 				// 		Access * access = txn->accesses[ read_set[i] ];
 				// 		if (access->orig_row->manager->get_tid() != txn->accesses[read_set[i]]->tid) {
@@ -132,6 +135,8 @@ TxnManager::validate_silo()
 		Access * access = txn->accesses[ read_set[i] ];
 		bool success = access->orig_row->manager->validate(access->tid, false);
 		if (!success) {
+			INC_STATS(get_thd_id(), local_readset_validate_fail_abort, 1);
+			INC_STATS(get_thd_id(), valid_abort_cnt, 1);
 			rc = Abort;
 			return rc;
 		}

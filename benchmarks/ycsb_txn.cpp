@@ -7,6 +7,7 @@
 
 	   http://www.apache.org/licenses/LICENSE-2.0
 
+
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,6 +40,7 @@
 #include "message.h"
 #include "src/rdma/sop.hh"
 #include "src/sshed.hh"
+#include "transport.h"
 
 void YCSBTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	TxnManager::init(thd_id, h_wl);
@@ -94,6 +96,7 @@ RC YCSBTxnManager::acquire_locks() {
 
 
 RC YCSBTxnManager::run_txn() {
+
 	RC rc = RCOK;
 	assert(CC_ALG != CALVIN);
 
@@ -333,55 +336,11 @@ RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
 	ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,dest_node_id));
-
-	//index
-	// itemid_t * m_item;
-	// m_item = read_remote_index(ycsb_query->requests[next_record_id]);
-	
-	//row
-    // uint64_t loc = dest_node_id;
-	// assert(loc != g_node_id);
-    // uint64_t thd_id = get_thd_id();
-
-	// uint64_t operate_size = sizeof(row_t);
-
-	// char *test_buf = Rdma::get_row_client_memory(thd_id);
-    // memset(test_buf, 0, operate_size);
-
-	// auto res_s = rc_qp[loc][thd_id]->send_normal(
-	// 		{.op = IBV_WR_RDMA_READ,
-	// 		.flags = IBV_SEND_SIGNALED,
-	// 		.len = operate_size,
-	// 		.wr_id = 0},
-	// 	   {.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
-	// 		.remote_addr = 0,
-	// 		.imm_data = 0});
-	// RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
-	// auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
-	// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-
-	
-	// row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
-	// memcpy(temp_row, test_buf, operate_size);
-
-	// row_t *test_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
-    // memcpy(test_row, test_buf, operate_size);
-
-	// Access * access = NULL;
-	// access_pool.get(get_thd_id(),access);
-
-	// this->last_row = test_row;
-
-	// RC rc = RCOK;
-	// rc = row->remote_get_row(test_row, this, access);
-
-	// access->orig_row = test_row;
-
-    // row_t * row_local = access->data;
-
-  //  mem_allocator.free(m_item,0);
- //end test
+#if USE_RDMA == CHANGE_MSG_QUEUE
+	tport_man.rdma_thd_send_msg(get_thd_id(), dest_node_id, Message::create_message(this,RQRY));
+#else
 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),dest_node_id);
+#endif
 
 	return WAIT_REM;
 }
@@ -413,9 +372,7 @@ RC YCSBTxnManager::run_txn_state() {
 		if(loc) {
 			rc = run_ycsb_0(req,row);
 		} else if (rdma_one_side()) {
-
 			rc = send_remote_one_side_request(req,row);
-
 		} else {
 			rc = send_remote_request();
 		}
@@ -429,6 +386,7 @@ RC YCSBTxnManager::run_txn_state() {
 		break;
 	default:
 		assert(false);
+
   }
 
   if (rc == RCOK) next_ycsb_state();
@@ -459,8 +417,8 @@ RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {
   uint64_t starttime = get_sys_clock();
   if (acctype == RD || acctype == SCAN) {
 	int fid = 0;
-		char * data = row_local->get_data();
-		uint64_t fval __attribute__ ((unused));
+	char * data = row_local->get_data();
+	uint64_t fval __attribute__ ((unused));
 	fval = *(uint64_t *)(&data[fid * 100]);
 #if ISOLATION_LEVEL == READ_COMMITTED || ISOLATION_LEVEL == READ_UNCOMMITTED
 	// Release lock after read
@@ -550,6 +508,7 @@ RC YCSBTxnManager::run_calvin_txn() {
 	  default:
 		assert(false);
 	}
+
   }
   uint64_t curr_time = get_sys_clock();
   txn_stats.process_time += curr_time - starttime;

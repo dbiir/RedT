@@ -177,7 +177,6 @@ public:
 	uint64_t        incr_lr();
 	uint64_t        decr_lr();
 
-
 	RC commit();
 	RC start_commit();
 	RC start_abort();
@@ -330,7 +329,6 @@ protected:
 
 	sem_t rsp_mutex;
 	bool registed_;
-
 };
 
 #endif

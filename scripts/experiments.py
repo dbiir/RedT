@@ -75,13 +75,15 @@ def ycsb_scaling():
 	# algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     # algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    algos=['MAAT']
-    base_table_size=1048576*8
+    algos=['RDMA_SILO']
+
+    base_table_size=350000
+    # base_table_size=1048576*8
     #base_table_size=2097152*8
-    txn_write_perc = [0.5]
-    tup_write_perc = [0.5]
+    txn_write_perc = [0.1]
+    tup_write_perc = [0.1]
     load = [10000]
-    tcnt = [4]
+    tcnt = [1]
     ctcnt = [4]
     skew = [0.0]
     #skew = [0.0,0.5,0.9]
@@ -843,8 +845,8 @@ configs = {
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '0UL',
     "NETWORK_DELAY_TEST": 'false',
-    "DONE_TIMER": "1 * 60 * BILLION // ~1 minutes",
-    "WARMUP_TIMER": "1 * 60 * BILLION // ~1 minutes",
+    "DONE_TIMER": "1 * 20 * BILLION // ~1 minutes",
+    "WARMUP_TIMER": "1 * 20 * BILLION // ~1 minutes",
     "SEQ_BATCH_TIMER": "5 * 1 * MILLION // ~5ms -- same as CALVIN paper",
     "BATCH_TIMER" : "0",
     "PROG_TIMER" : "10 * BILLION // in s",
@@ -867,7 +869,7 @@ configs = {
 #TPCC
     "NUM_WH": 'PART_CNT',
     "PERC_PAYMENT":0.0,
-    "DEBUG_DISTR":"false",
+    "DEBUG_DISTR":"true",
     "DEBUG_ALLOC":"false",
     "DEBUG_RACE":"false",
     "MODE":"NORMAL_MODE",

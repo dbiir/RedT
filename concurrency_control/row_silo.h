@@ -6,7 +6,7 @@ class txn_man;
 struct TsReqEntry;
 
 #if CC_ALG==SILO
-#define LOCK_BIT (1UL << 63)
+#define LOCK_BIT (1UL << 63)//unsigned long int, put position 63 as 1
 
 class Row_silo {
 public:

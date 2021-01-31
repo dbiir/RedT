@@ -7,6 +7,7 @@
 #include <string>
 #include <cstdarg>
 #include <fstream>
+//#include "logging.hpp"
 
 namespace r2 {
 

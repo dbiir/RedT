@@ -86,10 +86,12 @@ void Stats_thd::clear() {
   remote_readset_validate_fail_abort = 0;
   local_writeset_validate_fail_abort = 0;
   remote_writeset_validate_fail_abort = 0;
-  validate_lock_abort;
+  validate_lock_abort = 0;;
   local_try_lock_fail_abort = 0;
   remote_try_lock_fail_abort = 0;
+  cnt_unequal_abort = 0;
   //
+
   total_txn_abort_cnt=0;
   unique_txn_abort_cnt=0;
   local_txn_abort_cnt=0;
@@ -116,8 +118,10 @@ void Stats_thd::clear() {
   trans_process_count=0;
   trans_2pc_count=0;
   trans_prepare_count=0;
+
   rdma_read_cnt = 0;
   rdma_write_cnt = 0;
+
   trans_validate_count=0;
   trans_finish_count=0;
   trans_commit_count=0;
@@ -130,8 +134,10 @@ void Stats_thd::clear() {
   trans_process_time=0;
   trans_2pc_time=0;
   trans_prepare_time=0;
+
   rdma_read_time = 0;
   rdma_write_time = 0;
+
   trans_validate_time=0;
   trans_finish_time=0;
   trans_commit_time=0;
@@ -139,7 +145,6 @@ void Stats_thd::clear() {
   trans_get_access_time=0;
   trans_store_access_time=0;
   trans_get_row_time=0;
-
 
   trans_benchmark_compute_time=0;
 
@@ -566,7 +571,9 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",validate_lock_abort = %f"
   ",local_try_lock_fail_abort = %f"
   ",remote_try_lock_fail_abort = %f"
-  ",total_txn_abort_cnt=%f"
+  ",cnt_unequal_abort = %f"
+  ",total_txn_abort_cnt=%ld"
+
           ",positive_txn_abort_cnt=%ld"
   ",unique_txn_abort_cnt=%ld"
   ",local_txn_abort_cnt=%ld"
@@ -595,8 +602,10 @@ void Stats_thd::print(FILE * outf, bool prog) {
           validate_lock_abort/valid_abort_cnt,
           local_try_lock_fail_abort/valid_abort_cnt,
           remote_try_lock_fail_abort/valid_abort_cnt,
+          cnt_unequal_abort/valid_abort_cnt,
 
           total_txn_abort_cnt,positive_txn_abort_cnt, unique_txn_abort_cnt,
+
           local_txn_abort_cnt, remote_txn_abort_cnt, txn_run_time / BILLION,
           txn_run_avg_time / BILLION, multi_part_txn_cnt, multi_part_txn_run_time / BILLION,
           multi_part_txn_avg_time / BILLION, single_part_txn_cnt,
@@ -626,6 +635,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_prepare_time=%f"
   ",rdma_read_time = %f"
   ",rdma_write_time = %f"
+
   ",trans_validate_time=%f"
   ",trans_finish_time=%f"
   ",trans_commit_time=%f"
@@ -654,10 +664,11 @@ void Stats_thd::print(FILE * outf, bool prog) {
           trans_total_run_time / BILLION, trans_init_time / BILLION, trans_process_time / BILLION,
           trans_get_access_time / BILLION, trans_store_access_time / BILLION, trans_get_row_time /BILLION, trans_benchmark_compute_time /BILLION,
           trans_2pc_time / BILLION,
-          trans_prepare_time / BILLION, 
+          trans_prepare_time / BILLION,
           rdma_read_time/BILLION,
           rdma_write_time/BILLION,
           trans_validate_time / BILLION, trans_finish_time / BILLION,
+
           trans_commit_time / BILLION, trans_abort_time / BILLION, trans_access_lock_wait_time / BILLION,
           trans_mvcc_clear_history / BILLION, trans_mvcc_access / BILLION,
           trans_cur_row_copy_time / BILLION, trans_cur_row_init_time / BILLION,
@@ -678,6 +689,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",avg_trans_prepare_time=%f"
   ",avg_rdma_read_time = %f"
   ",avg_rdma_write_time = %f"
+
   ",avg_trans_validate_time=%f"
   ",avg_trans_finish_time=%f"
   ",avg_trans_commit_time=%f"
@@ -685,7 +697,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
           trans_total_run_time / (trans_total_count * BILLION), trans_init_time / (trans_init_count * BILLION), trans_process_time / (trans_process_count * BILLION),
           trans_get_access_time / (trans_get_access_count * BILLION), trans_store_access_time / (trans_store_access_count * BILLION), trans_get_row_time / (trans_get_row_count * BILLION),
           trans_2pc_time / (trans_2pc_count * BILLION),
-          trans_prepare_time / (trans_prepare_count * BILLION), 
+          trans_prepare_time / (trans_prepare_count * BILLION),
           rdma_read_time / (rdma_read_cnt * BILLION),
           rdma_write_time / (rdma_write_cnt * BILLION),
           trans_validate_time / (trans_validate_count * BILLION), trans_finish_time / (trans_finish_count * BILLION),
@@ -712,7 +724,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
           trans_total_count, trans_init_count, trans_process_count,
           trans_get_access_count, trans_store_access_count, trans_get_row_count,
           trans_2pc_count,
-          trans_prepare_count, 
+          trans_prepare_count,
           rdma_read_cnt,
           rdma_write_cnt,
           trans_validate_count, trans_finish_count,
@@ -1214,6 +1226,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
           ano_3_trans_write_skew_2, ano_2_trans_read_skew, ano_3_trans_read_skew_1,
           ano_3_trans_read_skew_2, ano_4_trans_read_skew, ano_unknown);
 
+
   // if (!prog) {
   //     last_start_commit_latency.quicksort(0,last_start_commit_latency.cnt-1);
   // first_start_commit_latency.quicksort(0,first_start_commit_latency.cnt-1);
@@ -1345,6 +1358,8 @@ void Stats_thd::combine(Stats_thd * stats) {
   validate_lock_abort+=stats->validate_lock_abort;
   local_try_lock_fail_abort+=stats->local_try_lock_fail_abort;
   remote_try_lock_fail_abort+=stats->remote_try_lock_fail_abort;
+  cnt_unequal_abort+=stats->cnt_unequal_abort;
+
   total_txn_abort_cnt+=stats->total_txn_abort_cnt;
   positive_txn_abort_cnt += stats->positive_txn_abort_cnt;
   unique_txn_abort_cnt+=stats->unique_txn_abort_cnt;
@@ -1374,6 +1389,7 @@ void Stats_thd::combine(Stats_thd * stats) {
   trans_prepare_count+=stats->trans_prepare_count;
   rdma_read_cnt+=stats->rdma_read_cnt;
   rdma_write_cnt+=stats->rdma_write_cnt;
+
   trans_validate_count+=stats->trans_validate_count;
   trans_finish_count+=stats->trans_finish_count;
   trans_commit_count+=stats->trans_commit_count;
@@ -1389,6 +1405,7 @@ void Stats_thd::combine(Stats_thd * stats) {
   trans_prepare_time+=stats->trans_prepare_time;
   rdma_read_time +=stats->rdma_read_time;
   rdma_write_time +=stats->rdma_write_time;
+
   trans_validate_time+=stats->trans_validate_time;
   trans_finish_time+=stats->trans_finish_time;
   trans_commit_time+=stats->trans_commit_time;

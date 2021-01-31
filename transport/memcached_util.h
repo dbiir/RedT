@@ -1,11 +1,11 @@
 #ifndef MEMCACHED_UTIL_H
 #define MEMCACHED_UTIL_H
 
-#include </memcached.h>
+#include <libmemcached/memcached.h>
 #include <stdio.h>
 #include <assert.h>
 
-static char REG_IP[] = "192.168.1.61";
+static char REG_IP[] = "10.77.110.148";
 
 __thread memcached_st *memc = NULL;
 

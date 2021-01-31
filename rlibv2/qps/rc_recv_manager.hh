@@ -43,7 +43,6 @@ public:
         proto::CreateRCM,
         std::bind(&RecvManager::msg_rc_handler, this, std::placeholders::_1)));
   }
-
   /*!
     The handler for creating a QP which is ready for recv.
     This handler should register with RCtrl (defined in ../rctrl.hh).

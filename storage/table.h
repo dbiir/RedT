@@ -22,10 +22,9 @@
 // TODO sequential scan is not supported yet.
 // only index access is supported for table.
 
-
 class row_t;
 
-#if USE_RDMA
+#ifdef USE_RDMA
 #include "catalog.h"
 class table_t
 {
@@ -56,6 +55,7 @@ class table_t
 {
 public:
     void test_read();
+
 	void init(Catalog * schema);
 	// row lookup should be done with index. But index does not have
 	// records for new rows. get_new_row returns the pointer to a
@@ -73,11 +73,11 @@ public:
 	Catalog * 		schema;
 private:
 	const char * 	table_name;
+
   	uint32_t        table_id;
 	uint64_t * 		cur_tab_size;
 	char 			pad[CL_SIZE - sizeof(void *)*3 - sizeof(uint32_t)];
 };
 #endif
-
 
 #endif

@@ -109,6 +109,9 @@ void * Rdma::client_qp(void *arg){
   uint64_t reg_nic_name = node_id;
   uint64_t reg_mem_name = node_id;
 
+//   uint64_t reg_nic_name = 0;
+//   uint64_t reg_mem_name = 0;
+
   auto fetch_res = cm_.fetch_remote_mr(reg_mem_name);
   RDMA_ASSERT(fetch_res == IOCode::Ok) << std::get<0>(fetch_res.desc);
   rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);
@@ -144,6 +147,9 @@ void * Rdma::server_qp(void *){
 	uint64_t reg_nic_name = g_node_id;
 	uint64_t reg_mem_name = g_node_id;
 
+	// uint64_t reg_nic_name = 0;
+	// uint64_t reg_mem_name = 0;
+
 	RDMA_ASSERT(rm_ctrl->opened_nics.reg(reg_nic_name, nic));
 
 	RDMA_ASSERT(rm_ctrl->registered_mrs.create_then_reg(
@@ -178,7 +184,39 @@ char* Rdma::get_table_client_memory(uint64_t thd_id) {
   	temp += sizeof(table_t) * thd_id;
   	return temp;
 }
+#if 0
+void *malloc_huge_pages(size_t size,uint64_t huge_page_sz,bool flag)
+{
+  char *ptr; // the return value
+#define ALIGN_TO_PAGE_SIZE(x)  (((x) + huge_page_sz - 1) / huge_page_sz * huge_page_sz)
+  size_t real_size = ALIGN_TO_PAGE_SIZE(size + huge_page_sz);
 
+  if(flag) {
+    // Use 1 extra page to store allocation metadata
+    // (libhugetlbfs is more efficient in this regard)
+    char *ptr = (char *)mmap(NULL, real_size, PROT_READ | PROT_WRITE,
+                             MAP_PRIVATE | MAP_ANONYMOUS |
+                             MAP_POPULATE | MAP_HUGETLB, -1, 0);
+    if (ptr == MAP_FAILED) {
+      // The mmap() call failed. Try to malloc instead
+      LOG(4) << "huge page alloc failed!";
+      goto ALLOC_FAILED;
+    } else {
+      LOG(2) << "huge page real size " << (double)(get_memory_size_g(real_size)) << "G";
+      // Save real_size since mmunmap() requires a size parameter
+      *((size_t *)ptr) = real_size;
+      // Skip the page with metadata
+      return ptr + huge_page_sz;
+    }
+  }
+ALLOC_FAILED:
+  ptr = (char *)malloc(real_size);
+  if (ptr == NULL) return NULL;
+  real_size = 0;
+  return ptr + huge_page_sz;
+}
+
+#endif
 void Rdma::init(){
 	_sock_cnt = get_socket_count();
 	printf("rdma Init %d: %ld\n",g_node_id,_sock_cnt);
@@ -212,7 +250,7 @@ void Rdma::init(){
 
 	for(node_id = 0; node_id < g_total_node_cnt; node_id++) {
 
-		if(node_id == g_node_id || ISCLIENTN(node_id)) continue;  //对自身节点之外的每个节点
+		if(ISCLIENTN(node_id)) continue;  //对每个client
 
 		rdma_server_add[node_id] = ifaddr[node_id] + std::string(":") + std::to_string(rdma_server_port[node_id]);
 		//rdma_server_add[node_id] = ifaddr[node_id] + std::string(":") + std::to_string(server_port);

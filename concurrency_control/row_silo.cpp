@@ -5,6 +5,7 @@
 
 #if CC_ALG==SILO
 
+
 void
 Row_silo::init(row_t * row)
 {
@@ -41,11 +42,10 @@ Row_silo::access(TxnManager * txn, TsType type, row_t * local_row) {
 		local_row->copy(_row);
 		COMPILER_BARRIER
 		v2 = _tid_word;
+
 	}
 	txn->last_tid = v & (~LOCK_BIT);
 
-
-#else
 	if (!try_lock())
 	{
 		return Abort;
@@ -75,6 +75,7 @@ Row_silo::validate(ts_t tid, bool in_write_set) {
 		return true;
 #else
 	if (in_write_set)
+
 		return tid == _tid;
 	if (!try_lock())
 		return false;
@@ -134,7 +135,6 @@ Row_silo::try_lock()
 	return __sync_bool_compare_and_swap(&_tid_word, v, (v | LOCK_BIT));
 #else
 	return pthread_mutex_trylock( _latch ) != EBUSY;
-
 #endif
 }
 

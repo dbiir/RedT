@@ -24,9 +24,10 @@ class TxnManager;
 class Row_null {
  public:
   void init(row_t* row);
-  RC access(TsType type, TxnManager* txn, row_t* row, uint64_t& version);
+
+  RC access(access_t type, TxnManager* txn);
   RC abort(access_t type, TxnManager* txn);
-  RC commit(access_t type, TxnManager* txn, row_t* data, uint64_t& version);
+  RC commit(access_t type, TxnManager* txn);
 
  private:
   row_t* _row;

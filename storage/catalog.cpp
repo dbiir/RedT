@@ -17,7 +17,8 @@
 #include "catalog.h"
 #include "global.h"
 #include "helper.h"
-#if USE_RDMA
+
+#ifdef USE_RDMA
 void Catalog::init(const char* table_name, uint32_t table_id, int field_cnt) {
 	strcpy(this->table_name,table_name);
 	// this->table_name = table_name;
@@ -25,7 +26,6 @@ void Catalog::init(const char* table_name, uint32_t table_id, int field_cnt) {
 	this->field_cnt = 0;
 	this->tuple_size = 0;
 }
-
 #else
 void Catalog::init(const char* table_name, uint32_t table_id, int field_cnt) {
 	this->table_name = table_name;
@@ -35,6 +35,8 @@ void Catalog::init(const char* table_name, uint32_t table_id, int field_cnt) {
 	this->tuple_size = 0;
 }
 #endif
+
+
 
 void Catalog::add_col(char * col_name, uint64_t size, char * type) {
 	_columns[field_cnt].size = size;

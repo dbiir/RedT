@@ -43,6 +43,7 @@ std::vector<Message*> * Message::create_messages(char * buf) {
   COPY_VAL(return_id,data,ptr);
   COPY_VAL(txn_cnt,data,ptr);
   COPY_VAL(starttime,data,ptr);
+  //cout << "txn_cnt: " << txn_cnt << endl;
   INC_STATS(0,trans_network_send,starttime);
   INC_STATS(0,trans_network_recv,get_sys_clock());
   INC_STATS(0,trans_network_wait,get_sys_clock()-starttime);

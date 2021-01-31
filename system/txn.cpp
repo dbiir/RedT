@@ -51,6 +51,7 @@
 #include "wsi.h"
 #include "manager.h"
 #include "rdma_silo.h"
+#include "transport.h"
 
 void TxnStats::init() {
 	starttime=0;
@@ -471,8 +472,12 @@ RC TxnManager::commit() {
 #if LOGGING
 	LogRecord * record = logger.createRecord(get_txn_id(),L_NOTIFY,0,0);
 	if(g_repl_cnt > 0) {
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), g_node_id + g_node_cnt + g_client_node_cnt, Message::create_message(record, LOG_MSG));
+#else
 		msg_queue.enqueue(get_thd_id(), Message::create_message(record, LOG_MSG),
 											g_node_id + g_node_cnt + g_client_node_cnt);
+#endif
 	}
 	logger.enqueueRecord(record);
 	return WAIT;
@@ -653,8 +658,12 @@ void TxnManager::send_prepare_messages() {
 	if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) {
 		continue;
 	}
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(query->partitions_touched[i]), Message::create_message(this, RPREPARE));
+#else
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),
 											GET_NODE_ID(query->partitions_touched[i]));
+#endif
 	}
 }
 
@@ -666,8 +675,12 @@ void TxnManager::send_finish_messages() {
 		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) {
 			continue;
     }
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(query->partitions_touched[i]), Message::create_message(this, RFIN));
+#else
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN),
 											GET_NODE_ID(query->partitions_touched[i]));
+#endif
 	}
 }
 
@@ -796,7 +809,6 @@ uint64_t TxnManager::incr_rsp(int i) {
 	sem_post(&rsp_mutex);
 	return result;
 }
-
 uint64_t TxnManager::decr_rsp(int i) {
 	//ATOM_SUB(this->rsp_cnt,i);
 	uint64_t result;
@@ -811,6 +823,7 @@ void TxnManager::release_last_row_lock() {
 	row_t * orig_r = txn->accesses[txn->row_cnt-1]->orig_row;
 	access_t type = txn->accesses[txn->row_cnt-1]->type;
 	orig_r->return_row(RCOK, type, this, NULL);
+	//txn->accesses[txn->row_cnt-1]->orig_row = NULL;
 }
 
 void TxnManager::cleanup_row(RC rc, uint64_t rid) {
@@ -1039,6 +1052,10 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	access->tid = last_tid;
 #endif
 
+#if CC_ALG == RDMA_SILO
+	access->offset = (char*)row - rdma_global_buffer;
+#endif
+
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
 									CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
 	if (type == WR) {
@@ -1057,8 +1074,12 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 		LogRecord *record = logger.createRecord(
 				get_txn_id(), L_UPDATE, row->get_table()->get_table_id(), row->get_primary_key());
 	if(g_repl_cnt > 0) {
+#if USE_RDMA == CHANGE_MSG_QUEUE
+            tport_man.rdma_thd_send_msg(get_thd_id(), g_node_id + g_node_cnt + g_client_node_cnt, Message::create_message(record, LOG_MSG));
+#else
 			msg_queue.enqueue(get_thd_id(), Message::create_message(record, LOG_MSG),
 												g_node_id + g_node_cnt + g_client_node_cnt);
+#endif
 	}
 	logger.enqueueRecord(record);
 #endif
@@ -1117,6 +1138,9 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 
 	++txn->row_cnt;
 	if (type == WR) ++txn->write_cnt;
+#if CC_ALG == RDMA_SILO
+	access->offset = (char*)row - rdma_global_buffer;
+#endif
 	txn->accesses.add(access);
 	uint64_t timespan = get_sys_clock() - starttime;
 	INC_STATS(get_thd_id(), txn_manager_time, timespan);
@@ -1186,6 +1210,10 @@ RC TxnManager::validate() {
 	}
 	if(CC_ALG == TICTOC  && rc == RCOK) {
 		rc = tictoc_man.validate(this);
+		// Note: home node must be last to validate
+		// if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
+		//   rc = tictoc_man.find_bound(this);
+		// }
 	}
 	if ((CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 ||
 			 CC_ALG == DLI_MVCC) &&
@@ -1216,6 +1244,7 @@ RC TxnManager::validate() {
 #if CC_ALG == SILO
   if(CC_ALG == SILO && rc == RCOK) {
     rc = validate_silo();
+	//rc = RCOK;
     if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
       _cur_tid ++;
       commit_timestamp = _cur_tid;
@@ -1250,7 +1279,11 @@ RC TxnManager::send_remote_reads() {
 		if (i == g_node_id) continue;
 	if(query->active_nodes[i] == 1) {
 		DEBUG("(%ld,%ld) send_remote_read to %ld\n",get_txn_id(),get_batch_id(),i);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), i, Message::create_message(this,RFWD));
+#else
 		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RFWD),i);
+#endif
 	}
 	}
 	return RCOK;

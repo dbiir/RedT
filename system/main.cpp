@@ -53,10 +53,13 @@
 #include "tictoc.h"
 #include "key_xid.h"
 #include "rts_cache.h"
-#include "http.h"
 #include "lib.hh"
 #include "rdma.h"
-
+// #include "http.h"
+//#include "rdma_ctrl.hpp"
+#include "qps/rc_recv_manager.hh"
+#include "qps/recv_iter.hh"
+//#include "src/allocator_master.hh"
 void network_test();
 void network_test_recv();
 void * run_thread(void *);
@@ -78,10 +81,10 @@ void parser(int argc, char * argv[]);
 int main(int argc, char *argv[]) {
 	
 
-#if USE_RDMA
+#ifdef USE_RDMA
   if(g_node_id == 0) {
-    printf("[Memcached Begin Listen]\n");
-    system("memcached -l 0.0.0.0 -p 10086 &");  
+    // printf("[Memcached Begin Listen]\n");
+    // system("memcached -l 0.0.0.0 -p 10086 &");  
   }
 #endif
     // 0. initialize global data structure
@@ -122,7 +125,7 @@ int main(int argc, char *argv[]) {
     
 	//register memeory
 	//prepare QP connection with rdma_global_buffer(as registry memory)
-	#if USE_RDMA
+	#ifdef USE_RDMA //== CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
     //#if CC_ALG == RDMA_SILO
         rdma_man.init();
     #endif
@@ -311,7 +314,7 @@ int main(int argc, char *argv[]) {
 	if (g_ts_alloc == LTS_TCP_CLOCK) {
 		printf("Initializing tcp queue... ");
 		fflush(stdout);
-		tcp_ts.init(all_thd_cnt);
+		// tcp_ts.init(all_thd_cnt);
 		printf("Done\n");
 	}
 
@@ -458,11 +461,13 @@ int main(int argc, char *argv[]) {
 	// Free things
 	//tport_man.shutdown();
 	m_wl->index_delete_all();
-#if USE_RDMA
-	if(g_node_id == 0) {
-		system("killall memcached");  
-	}
-#endif
+
+// #if USE_RDMA
+// 	if(g_node_id == 0) {
+// 		system("killall memcached");  
+// 	}
+// #endif
+
 	/*
 	txn_table.delete_all();
 	txn_pool.free_all();
@@ -471,11 +476,11 @@ int main(int argc, char *argv[]) {
 	msg_pool.free_all();
 	qry_pool.free_all();
 	*/
-	if (g_ts_alloc == LTS_TCP_CLOCK) {
-		for (uint32_t i = 0; i < all_thd_cnt; i++) {
-			tcp_ts.CloseToLts(i);
-		}
-	}
+	// if (g_ts_alloc == LTS_TCP_CLOCK) {
+	// 	for (uint32_t i = 0; i < all_thd_cnt; i++) {
+	// 		tcp_ts.CloseToLts(i);
+	// 	}
+	// }
 	return 0;
 }
 

@@ -131,8 +131,8 @@ void YCSBWorkload::init_table_parallel() {
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
 		pthread_create(&p_thds[i], NULL, threadInitTable, this);
 	}
-
 	threadInitTable(this);
+
 	for (uint32_t i = 0; i < g_init_parallelism - 1; i++) {
 		int rc = pthread_join(p_thds[i], NULL);
 		//printf("thread %d complete\n", i);
@@ -145,11 +145,12 @@ void YCSBWorkload::init_table_parallel() {
 }
 
 void * YCSBWorkload::init_table_slice() {
-	UInt32 tid = ATOM_FETCH_ADD(next_tid, 1);//返回next_id，next_id+1
+	UInt32 tid = ATOM_FETCH_ADD(next_tid, 1);
 	RC rc;
 	assert(g_synth_table_size % g_init_parallelism == 0);
 	assert(tid < g_init_parallelism);
-    uint64_t key_cnt = 0;
+  uint64_t key_cnt = 0;
+
 	while ((UInt32)ATOM_FETCH_ADD(next_tid, 0) < g_init_parallelism) {}
 	assert((UInt32)ATOM_FETCH_ADD(next_tid, 0) == g_init_parallelism);
 	uint64_t slice_size = g_synth_table_size / g_init_parallelism;
@@ -157,6 +158,7 @@ void * YCSBWorkload::init_table_slice() {
 			key < slice_size * (tid + 1);
 			//key ++
 	) {
+
 		if(GET_NODE_ID(key_to_part(key)) != g_node_id) {
 			++key;
 			continue;
@@ -165,6 +167,7 @@ void * YCSBWorkload::init_table_slice() {
 		if(key_cnt % 500000 == 0) {
 			printf("Thd %d inserted %ld keys %f\n",tid,key_cnt,simulation->seconds_from_start(get_sys_clock()));
 		}
+
 //		printf("tid=%d. key=%ld\n", tid, key);
 		row_t * new_row = NULL;
 		uint64_t row_id;
@@ -204,6 +207,7 @@ void * YCSBWorkload::init_table_slice() {
         key += g_part_cnt;
 	}
     printf("Thd %d inserted %ld keys\n",tid,key_cnt);
+
 	return NULL;
 }
 

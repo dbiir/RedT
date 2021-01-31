@@ -21,7 +21,8 @@
 #include <vector>
 #include "global.h"
 #include "helper.h"
-#if USE_RDMA
+
+#ifdef USE_RDMA
 class Column {
 public:
 	Column() {	}
@@ -84,6 +85,7 @@ private:
 };
 
 #else
+
 class Column {
 public:
 	Column() {
@@ -145,4 +147,5 @@ private:
 	char pad[CL_SIZE - sizeof(uint64_t)*2 - sizeof(int) - sizeof(char *)*2 - sizeof(uint32_t)];
 };
 #endif
+
 #endif

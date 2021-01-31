@@ -1,6 +1,7 @@
 CC=/usr/bin/g++
 
 #CFLAGS=-Wall -Werror -std=c++11 -g3 -ggdb -O0 -fno-strict-aliasing -fno-omit-frame-pointer -D_GLIBCXX_USE_CXX11_ABI=0
+
 CFLAGS=-Wall -std=c++1y -g3 -ggdb -O0 -fno-strict-aliasing -fno-omit-frame-pointer -I/usr/local/include -L/usr/local/lib -D_GLIBCXX_USE_CXX11_ABI=0
 #CFLAGS += -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer
 NNMSG=./nanomsg-0.5-beta
@@ -12,10 +13,11 @@ SRC_DIRS = ./ ./benchmarks/ ./client/ ./concurrency_control/ ./storage/ ./transp
 DEPS = -I. -I./benchmarks -I./client/ -I./concurrency_control -I./storage -I./transport -I./system -I./statistics -I./rlibv2/ -I./r2/ -I./r2/src/#-I./unit_tests -I./rlibv2/
 
 CFLAGS += $(DEPS) -D NOGRAPHITE=1 -Wno-sizeof-pointer-memaccess -ljemalloc
-LDFLAGS = -Wall -L. -L$(NNMSG) -Wl,-rpath -pthread -lrt -lnanomsg -lanl -lcurl -ldl -lprotobuf -lpthread -libverbs -ljemalloc -L$(RALLOC) -lssmalloc -lboost_system -lboost_coroutine#-lc++experimental
-#LDFLAGS = -Wall -L. -L$(NNMSG) -L$(JEMALLOC)/lib -Wl,-rpath,$(JEMALLOC)/lib -pthread -gdwarf-3 -lrt -std=c++11
+LDFLAGS = -Wall -L. -L$(NNMSG) -Wl,-rpath -pthread -lrt -lnanomsg -lanl -lcurl -ldl -lpthread -libverbs -ljemalloc -L$(RALLOC) -lssmalloc -lboost_system -lboost_coroutine#-lc++experimental
+#LDFLAGS = -Wall -L. -L$(NNMSG) -L$(JEMALLOC)/lib -Wl,-rpath,$(JEMALLOC)/lib -pthread -gdwarf-3 -lrt -std=c++11  -lprotobuf
 LDFLAGS += $(CFLAGS)
 LIBS = -lrdmacm -lmemcached
+
 
 DB_MAINS = ./client/client_main.cpp ./system/sequencer_main.cpp ./unit_tests/unit_main.cpp
 CL_MAINS = ./system/main.cpp ./system/sequencer_main.cpp ./unit_tests/unit_main.cpp

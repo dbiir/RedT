@@ -33,6 +33,7 @@ RC IndexHash::init(uint64_t bucket_cnt) {
 	}
 	printf("Index init with %ld buckets\n",buckets_init_cnt);
 		return RCOK;
+
 }
 
 RC IndexHash::init(int part_cnt, table_t *table, uint64_t bucket_cnt) {
