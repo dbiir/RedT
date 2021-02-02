@@ -13,6 +13,7 @@ Row_rdma_silo::init(row_t * row)
 {
 	_row = row;
 	_tid_word = 0;
+	timestamp = 0;
 }
 
 RC
@@ -31,18 +32,20 @@ Row_rdma_silo::access(TxnManager * txn, TsType type, row_t * local_row) {
 }
 
 bool
-Row_rdma_silo::validate(ts_t tid, bool in_write_set) {
+Row_rdma_silo::validate(ts_t tid, ts_t ts , bool in_write_set) {
   uint64_t v = _row->_tid_word;
   DEBUG("silo try to validate lock %ld row %ld \n", v, _row->get_primary_key());
   if (v != tid && v != 0) return false;
-  else return true;
+  if(_row->timestamp != ts)return false;//the row has been rewrote
+  return true;
 }
 
 void
-Row_rdma_silo::write(row_t * data, uint64_t tid) {
+Row_rdma_silo::write(row_t * data, uint64_t tid , ts_t time) {
   //todo : lock currenct row
 	_row->copy(data);
-  _row->_tid_word = 0;
+	_row->timestamp = time;
+  //_row->_tid_word = 0;
 }
 
 void

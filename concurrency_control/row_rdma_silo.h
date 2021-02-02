@@ -13,8 +13,8 @@ public:
 	void 				init(row_t * row);
 	RC 					access(TxnManager * txn, TsType type, row_t * local_row);
 
-	bool				validate(ts_t tid, bool in_write_set);
-	void				write(row_t * data, uint64_t tid);
+	bool				validate(ts_t tid,ts_t ts, bool in_write_set);
+	void				write(row_t * data, uint64_t tid , ts_t time);
 
 	void 				lock();
 	void 				release(TxnManager * txnMng , uint64_t num);
@@ -25,6 +25,7 @@ public:
 private:
 
 	volatile uint64_t	_tid_word;
+	ts_t                timestamp;
 
  	pthread_mutex_t * 	_latch;
 	ts_t 				_tid;

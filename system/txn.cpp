@@ -1053,6 +1053,7 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 #endif
 
 #if CC_ALG == RDMA_SILO
+	access->timestamp = row->timestamp;
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
 

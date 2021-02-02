@@ -54,8 +54,9 @@ public:
 	// ts_t 		epoch;
 #endif
 #if CC_ALG == RDMA_SILO
-    uint64_t key;
+    uint64_t 	key;
 	ts_t 		tid;
+	ts_t		timestamp;
     row_t * 	test_row;
 	uint64_t    location;
 	uint64_t    offset;

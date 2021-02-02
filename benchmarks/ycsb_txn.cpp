@@ -316,6 +316,7 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
 #if CC_ALG == RDMA_SILO
 		access->key = req->key;
 		access->tid = last_tid;
+		access->timestamp = test_row->timestamp;
 
 		access->location = loc;
 		access->offset = m_item->offset;

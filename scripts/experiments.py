@@ -75,15 +75,15 @@ def ycsb_scaling():
 	# algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     # algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    algos=['RDMA_SILO']
+    algos=['OCC']
 
-    base_table_size=350000
+    base_table_size=1048576
     # base_table_size=1048576*8
     #base_table_size=2097152*8
-    txn_write_perc = [0.1]
-    tup_write_perc = [0.1]
+    txn_write_perc = [0.5]
+    tup_write_perc = [0.5]
     load = [10000]
-    tcnt = [1]
+    tcnt = [4]
     ctcnt = [4]
     skew = [0.0]
     #skew = [0.0,0.5,0.9]
@@ -869,7 +869,7 @@ configs = {
 #TPCC
     "NUM_WH": 'PART_CNT',
     "PERC_PAYMENT":0.0,
-    "DEBUG_DISTR":"true",
+    "DEBUG_DISTR":"false",
     "DEBUG_ALLOC":"false",
     "DEBUG_RACE":"false",
     "MODE":"NORMAL_MODE",

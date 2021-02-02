@@ -70,7 +70,7 @@ public:
 	RC switch_schema(table_t * host_table);
 	// not every row has a manager
 	void init_manager(row_t * row);
-  RC remote_get_row(row_t* remote_row, TxnManager * txn, Access *access);
+  	RC remote_get_row(row_t* remote_row, TxnManager * txn, Access *access);
 
 	table_t * get_table();
 	Catalog * get_schema();
@@ -120,6 +120,7 @@ public:
 
   #if CC_ALG == RDMA_SILO
     volatile uint64_t	_tid_word;
+	ts_t 			timestamp;
 	Row_rdma_silo * manager;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
 	Row_lock * manager;

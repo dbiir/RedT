@@ -46,7 +46,7 @@ public:
 private:
   bool remote_try_lock(TxnManager * txnMng , uint64_t num);
   bool assert_remote_lock(TxnManager * txnMng , uint64_t num);
-  bool remote_commit_write(TxnManager * txnMng , uint64_t num , row_t * data, uint64_t tid);
+  bool remote_commit_write(TxnManager * txnMng , uint64_t num , row_t * data , ts_t time);
   void release_remote_lock(TxnManager * txn , uint64_t num);
   bool validate_rw_remote(TxnManager * txnMng , uint64_t num);
   row_t *read_remote_row(TxnManager * txn , uint64_t num);
