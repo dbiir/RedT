@@ -1,7 +1,7 @@
-MVCC 
+OCC 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
-441672.300117
-2243.639999
-83660.640226
-83664.844422
-12837.006122
+96233.952401
+0.0
+42342.724617
+6297.287307
+36125.889385

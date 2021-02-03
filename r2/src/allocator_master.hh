@@ -41,14 +41,14 @@ class AllocatorMaster {
   static  void init(char *mem,u64 mem_size) {
     std::lock_guard<std::mutex> guard(lock);
     if(total_managed_mem() != 0) {
-      LOG(2) << "AllocatorMaster<" << NAME << "> inited multiple times";
+      // LOG(2) << "AllocatorMaster<" << NAME << "> inited multiple times";
       return;
     }
 
     start_addr = mem;
     end_addr   = start_addr + mem_size;
     heap_top   = start_addr;
-    LOG(4) << "allocator master register memory: " << total_managed_mem();
+    // LOG(4) << "allocator master register memory: " << total_managed_mem();
   }
 
   static Allocator *get_thread_allocator() {

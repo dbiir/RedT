@@ -43,7 +43,7 @@ public:
 	row_t * 	orig_row;
 	row_t * 	data;
 	row_t * 	orig_data;
-	uint64_t version;
+	uint64_t    version;
 #if CC_ALG == TICTOC
 	uint64_t    orig_wts;
 	uint64_t    orig_rts;
@@ -52,6 +52,14 @@ public:
 #if CC_ALG == SILO
 	ts_t 		tid;
 	// ts_t 		epoch;
+#endif
+#if CC_ALG == RDMA_SILO
+    uint64_t 	key;
+	ts_t 		tid;
+	ts_t		timestamp;
+    row_t * 	test_row;
+	uint64_t    location;
+	uint64_t    offset;
 #endif
 	void cleanup();
 };
@@ -203,6 +211,21 @@ public:
     RC              finish(RC rc);
 #endif
 	bool send_RQRY_RSP;
+
+
+#if CC_ALG == RDMA_SILO
+	ts_t 			last_tid;
+    ts_t            max_tid;
+	uint64_t        num_locks;
+    int             write_set[100];
+    int*            read_set;
+#endif
+#if CC_ALG == SILO || CC_ALG == RDMA_SILO
+	bool 			_pre_abort;
+	bool 			_validation_no_wait;
+	ts_t 			_cur_tid;
+	RC				validate_silo();
+#endif
 	bool aborted;
 	uint64_t return_id;
 	RC        validate();
@@ -310,12 +333,6 @@ protected:
 
 	sem_t rsp_mutex;
 	bool registed_;
-#if CC_ALG == SILO
-	bool 			_pre_abort;
-	bool 			_validation_no_wait;
-	ts_t 			_cur_tid;
-	RC				validate_silo();
-#endif
 };
 
 #endif

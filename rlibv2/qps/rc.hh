@@ -13,11 +13,11 @@ namespace qp {
 
 /*!
   To use:
-  Arc<RC> rc = RC::create(...).value();
+  Arc<RDMARC> rc = RDMARC::create(...).value();
   class Class_use_rc {
-  Arc<RC> rc;
+  Arc<RDMARC> rc;
 
-  Class_use_rc(Arc<RC> rr) : rc(std::move(rr) {
+  Class_use_rc(Arc<RDMARC> rr) : rc(std::move(rr) {
   // std::move here is to avoid copy from shared_ptr
   }
   };
@@ -26,8 +26,8 @@ namespace qp {
   // to use cur
   }
 
-  // example to send an RC request to remote QP
-  RC &qp = *rc; // some QP
+  // example to send an RDMARC request to remote QP
+  RDMARC &qp = *rc; // some QP
 
   // note that send_normal is deprecated; plase check ./op.hh for other usage
   // read sizeof(u64) to (local_addr) at remote address (remote addr)
@@ -59,7 +59,7 @@ public:
   /* the only constructor
      make it private because it may failed to create
      use the factory method to create it:
-     Option<Arc<RC>> qp = RC::create(nic,config);
+     Option<Arc<RDMARC>> qp = RDMARC::create(nic,config);
      if(qp) {
      ...
      }
@@ -67,7 +67,7 @@ public:
 private:
   RDMARC(Arc<RNic> nic, const QPConfig &config,ibv_cq *recv_cq = nullptr) : Dummy(nic), my_config(config) {
     /*
-      It takes 3 steps to create an RC QP during the initialization
+      It takes 3 steps to create an RDMARC QP during the initialization
       according to the RDMA programming mannal.
       First, we create the cq for completions of send request.
       Then, we create the qp.
@@ -115,7 +115,7 @@ public:
   }
 
   /*!
-    Get the attribute of this RC QP, so that others can connect to it.
+    Get the attribute of this RDMARC QP, so that others can connect to it.
     \note: this function would panic if the created context (nic) is not valid
    */
   QPAttr my_attr() const override {

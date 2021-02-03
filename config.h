@@ -25,6 +25,7 @@
 // USE RDMA
 /**********************************************/
 #define USE_RDMA CHANGE_MSG_QUEUE
+// #define USE_RDMA CHANGE_TCP_ONLY
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
 #define RDMA_BUFFER_ITEM_SIZE (1<<12)
@@ -155,7 +156,7 @@
 /***********************************************/
 #define TPORT_TYPE tcp
 #define TPORT_PORT 7000
-#define TPORT_TWOSIDE_PORT 13000
+#define TPORT_TWOSIDE_PORT 15000
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -254,7 +255,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 16777216
+#define SYNTH_TABLE_SIZE 2097152
 #define ZIPF_THETA 0.0
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5
@@ -389,6 +390,7 @@ enum PPSTxnType {
 // INDEX_STRUCT
 #define IDX_HASH          1
 #define IDX_BTREE         2
+#define IDX_RDMA          3
 // WORKLOAD
 #define YCSB            1
 #define TPCC            2
@@ -424,6 +426,7 @@ enum PPSTxnType {
 #define DLI_DTA3 26
 #define SILO 27
 #define CNULL 28
+#define RDMA_SILO 29
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
@@ -470,8 +473,8 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 60 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 60 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false

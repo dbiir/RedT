@@ -50,10 +50,11 @@
 
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
-//#include "maat.h"
+#include "src/allocator_master.hh"
+#include "lib.hh"
+using namespace std;
 
 #ifdef USE_RDMA
-  #include "lib.hh"
   #include "qps/rc_recv_manager.hh"
   #include "qps/recv_iter.hh"
   #include "qps/mod.hh"
@@ -61,7 +62,6 @@
   using namespace rdmaio::rmem;
   using namespace rdmaio::qp;
 #endif
-  using namespace std;
 //#endif
 
 class mem_alloc;
@@ -80,6 +80,10 @@ class Dta;
 class Wkdb;
 class Tictoc;
 class Transport;
+class Rdma;
+#if CC_ALG == RDMA_SILO
+class RDMA_silo;
+#endif
 class Remote_query;
 class TxnManPool;
 class TxnPool;
@@ -105,7 +109,7 @@ class DtaTimeTable;
 class KeyXidCache;
 class RtsCache;
 // class QTcpQueue;
-class TcpTimestamp;
+// class TcpTimestamp;
 
 typedef uint32_t UInt32;
 typedef int32_t SInt32;
@@ -134,6 +138,10 @@ extern Dta dta_man;
 extern Wkdb wkdb_man;
 extern Tictoc tictoc_man;
 extern Transport tport_man;
+extern Rdma rdma_man;
+#if CC_ALG == RDMA_SILO
+extern RDMA_silo rsilo_man;
+#endif
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;
 extern AccessPool access_pool;
@@ -160,6 +168,29 @@ extern RtsCache wkdb_rts_cache;
 // extern TcpTimestamp tcp_ts;
 
 extern map<string, string> g_params;
+
+extern char *rdma_global_buffer;
+//extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
+extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
+extern rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
+extern rdmaio::Arc<rdmaio::rmem::RegHandler> rm_handler;
+extern rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
+
+extern std::vector<rdmaio::ConnectManager> cm;
+extern rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
+extern rdmaio::Arc<rdmaio::RNic> nic;
+extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT];
+
+extern rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
+
+extern string rdma_server_add[NODE_CNT];
+extern string qp_name[NODE_CNT][THREAD_CNT];
+
+//extern rdmaio::ConnectManager cm[NODE_CNT];
+//extern r2::Allocator *r2_allocator;
+
+extern int rdma_server_port[NODE_CNT];
+
 
 extern bool volatile warmup_done;
 extern bool volatile enable_thread_mem_pool;
@@ -217,7 +248,8 @@ extern int32_t g_inflight_max;
 extern uint64_t g_msg_size;
 extern uint64_t g_log_buf_max;
 extern uint64_t g_log_flush_timeout;
-
+extern uint64_t rdma_buffer_size;
+extern uint64_t rdma_index_size;
 extern UInt32 g_max_txn_per_part;
 extern int32_t g_load_per_server;
 
@@ -301,7 +333,6 @@ extern uint32_t g_max_num_waits;
 // Replication
 extern UInt32 g_repl_type;
 extern UInt32 g_repl_cnt;
-
 
 enum RC { RCOK=0, Commit, Abort, WAIT, WAIT_REM, ERROR, FINISH, NONE};
 enum RemReqType {
@@ -407,8 +438,10 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 // index structure for specific purposes. (e.g. non-primary key access should use hash)
 #if (INDEX_STRUCT == IDX_BTREE)
 #define INDEX		index_btree
-#else  // IDX_HASH
-#define INDEX		IndexHash
+#elif (INDEX_STRUCT == IDX_HASH)
+#define  INDEX		IndexHash
+#else
+#define INDEX		IndexRdma
 #endif
 
 /************************************************/

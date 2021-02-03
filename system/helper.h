@@ -258,6 +258,8 @@ public:
     };
 	Data_type type;
 	void * location; // points to the table | page | row
+  uint64_t offset;
+  uint64_t table_offset;
 	itemid_t * next;
 	bool valid;
 	void init();

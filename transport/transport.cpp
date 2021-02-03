@@ -5,7 +5,7 @@
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
 
-	   http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +22,9 @@
 #include "global.h"
 #include "manager.h"
 #include "message.h"
+#include "nn.hpp"
+#include "query.h"
+#include "tpcc_query.h"
 
 #ifdef USE_RDMA
 	#include "sig_sync.hpp"
@@ -33,12 +36,8 @@
 	using namespace rdmaio;
 	using namespace rdmaio::rmem;
 	using namespace rdmaio::qp;
-#else
-	#include "nn.hpp"
 #endif
 
-#include "query.h"
-#include "tpcc_query.h"
 /*
 #include <stdio.h>
 #include <iostream>
@@ -328,7 +327,7 @@ void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
 	pthread_mutex_lock( tport_man.latch_send );
 	tport_man.cms.push_back(cm);
 	tport_man.send_handlers.push_back(local_mr);
-  rdma_send_qps sqp(qp);
+    rdma_send_qps sqp(qp);
 	tport_man.send_qps[port-TPORT_TWOSIDE_PORT] = sqp;
 	pthread_mutex_unlock( tport_man.latch_send );
 	RDMA_LOG(2) << "rc client ready to send message to the server!";

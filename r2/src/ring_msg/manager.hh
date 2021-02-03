@@ -65,11 +65,11 @@ public:
     return {};
   }
 
-  Option<Arc<RC>> query_ring_qp(const std::string &name){
+  Option<Arc<RDMARC>> query_ring_qp(const std::string &name){
     auto res = rctrl_p->registered_qps.query(name);
     if (!res)
       return {};
-    return std::dynamic_pointer_cast<RC>(res.value());
+    return std::dynamic_pointer_cast<RDMARC>(res.value());
   }
 
   /*!
@@ -112,7 +112,7 @@ public:
         recv_cq = recv_c_res.value()->recv_common.cq;
 
       // 1.1 try to create and register this QP
-      auto rc = qp::RC::create(nic.value(), rc_req.config, recv_cq).value();
+      auto rc = qp::RDMARC::create(nic.value(), rc_req.config, recv_cq).value();
       auto rc_status = rctrl_p->registered_qps.reg(rc_req.name, rc);
       LOG(0) << "try to createqp";
       if (!rc_status) {

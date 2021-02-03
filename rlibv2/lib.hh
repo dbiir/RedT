@@ -121,9 +121,9 @@ public:
   }
 
   /*!
-    *C*reate and *C*onnect an RC QP at remote end.
-    This function first creates an RC QP at local,
-    and then create an RC QP at remote host to connect with the local
+    *C*reate and *C*onnect an RDMARC QP at remote end.
+    This function first creates an RDMARC QP at local,
+    and then create an RDMARC QP at remote host to connect with the local
     created QP.
 
     \param:
@@ -305,7 +305,7 @@ public:
   }
 
   /*!
-    Fetch remote QP attr, this qp can be either UD PQ or RC QP.
+    Fetch remote QP attr, this qp can be either UD PQ or RDMARC QP.
    */
   using qp_attr_ret_t = std::pair<std::string, ::rdmaio::qp::QPAttr>;
   Result<qp_attr_ret_t> fetch_qp_attr(const std::string &name,

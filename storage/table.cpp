@@ -15,11 +15,51 @@
 */
 
 #include "global.h"
+#include "config.h"
+
 #include "helper.h"
 #include "table.h"
 #include "catalog.h"
 #include "row.h"
 #include "mem_alloc.h"
+
+#include "src/allocator_master.hh"
+#include <time.h>
+#include "lib.hh"
+
+void table_t::test_read(){
+	// if(g_node_id == 1){
+	// 	char *test_buf = (char *)(client_rdma_rm->raw_ptr);
+	// 	//char *test_buf = (char *)client_rm_handler->get_reg_attr().value().buf;
+	// 	*((char *)test_buf) = 'x';
+	// 	//*test_buf = 'x';
+
+	// 	auto res_s = rc_qp[0][2]->send_normal(
+	// 		{.op = IBV_WR_RDMA_WRITE,
+	// 		.flags = IBV_SEND_SIGNALED,
+	// 		.len = 1, // only write one byte
+	// 		.wr_id = 0},
+	// 		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+	// 		.remote_addr = 3,
+	// 		.imm_data = 0});
+	// 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+	// 	auto res_p = rc_qp[0][2]->wait_one_comp();
+	// 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+	// 	RDMA_LOG(4) << "client write done";
+	// }
+}
+
+
+#ifdef USE_RDMA
+void table_t::init(Catalog schema) {
+	//this->table_name = schema->table_name;
+	strcpy(this->table_name,schema.table_name);
+	this->table_id = schema.table_id;
+	this->schema = schema;
+	//test_read();
+}
+#else
 
 void table_t::init(Catalog * schema) {
 	this->table_name = schema->table_name;
@@ -32,6 +72,8 @@ void table_t::init(Catalog * schema) {
 	char * ptr = new char[CL_SIZE*2 + sizeof(uint64_t)];
 	cur_tab_size = (uint64_t *) &ptr[CL_SIZE];
 }
+#endif
+
 
 RC table_t::get_new_row(row_t *& row) {
 	// this function is obsolete.
@@ -41,9 +83,12 @@ RC table_t::get_new_row(row_t *& row) {
 
 // the row is not stored locally. the pointer must be maintained by index structure.
 RC table_t::get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
+
+#ifdef USE_RDMA
 	RC rc = RCOK;
-  DEBUG_M("table_t::get_new_row alloc\n");
-	void * ptr = mem_allocator.alloc(sizeof(row_t));
+  	DEBUG_M("table_t::get_new_row alloc\n");
+
+    row_t *ptr = (row_t*)r2::AllocatorMaster<>::get_thread_allocator()->alloc(sizeof(row_t));
 	assert (ptr != NULL);
 
 	row = (row_t *) ptr;
@@ -51,4 +96,18 @@ RC table_t::get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
 	row->init_manager(row);
 
 	return rc;
+
+#else
+	RC rc = RCOK;
+    DEBUG_M("table_t::get_new_row alloc\n");
+	void * ptr = mem_allocator.alloc(sizeof(row_t));
+	assert (ptr != NULL);
+
+	row = (row_t *) ptr;
+	rc = row->init(this, part_id, row_id);
+	row->init_manager(row);
+
+  return rc;
+#endif
+
 }

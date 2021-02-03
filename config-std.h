@@ -49,8 +49,8 @@
 /***********************************************/
 // Concurrency Control
 /***********************************************/
-// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL
-#define CC_ALG                                          DL_DETECT
+// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL,RDMA_SILO
+#define CC_ALG                                          RDMA_SILO
 
 // all transactions acquire tuples according to the primary key order.
 #define KEY_ORDER                                       false
@@ -187,6 +187,7 @@ extern TestCases                                        g_test_case;
 // INDEX_STRUCT
 #define IDX_HASH                                        1
 #define IDX_BTREE                                       2
+#define IDX_RDMA                                        3
 // WORKLOAD
 #define YCSB                                            1
 #define TPCC                                            2

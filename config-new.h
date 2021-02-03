@@ -146,9 +146,10 @@
 // Concurrency Control
 /***********************************************/
 
-// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
+// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL,RDMA_SILO
+#define CC_ALG          RDMA_SILO
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG SILO
+
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -165,7 +166,8 @@
 #define ENABLE_LATCH        false
 #define CENTRAL_INDEX       false
 #define CENTRAL_MANAGER       false
-#define INDEX_STRUCT        IDX_HASH
+#define INDEX_STRUCT        IDX_RDMA
+
 #define BTREE_ORDER         16
 
 // [TIMESTAMP]
@@ -358,6 +360,8 @@ enum PPSTxnType {
 // INDEX_STRUCT
 #define IDX_HASH          1
 #define IDX_BTREE         2
+#define IDX_RDMA          3
+
 // WORKLOAD
 #define YCSB            1
 #define TPCC            2

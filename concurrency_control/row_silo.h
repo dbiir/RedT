@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 
 class table_t;
 class Catalog;
@@ -6,16 +6,16 @@ class txn_man;
 struct TsReqEntry;
 
 #if CC_ALG==SILO
-#define LOCK_BIT (1UL << 63)
+#define LOCK_BIT (1UL << 63)//unsigned long int, put position 63 as 1
 
 class Row_silo {
 public:
 	void 				init(row_t * row);
 	RC 					access(TxnManager * txn, TsType type, row_t * local_row);
-	
+
 	bool				validate(ts_t tid, bool in_write_set);
 	void				write(row_t * data, uint64_t tid);
-	
+
 	void 				lock();
 	void 				release();
 	bool				try_lock();

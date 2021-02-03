@@ -167,7 +167,7 @@ RC OptCC::central_validate(TxnManager * txn) {
   uint64_t hist_checked = 0;
   stop = 0;
 	if (finish_tn > start_tn) {
-    	while (his && his->tn > finish_tn) his = his->next;
+    while (his && his->tn > finish_tn) his = his->next;
 		while (his && his->tn > start_tn) {
       		++hist_checked;
       		++checked;

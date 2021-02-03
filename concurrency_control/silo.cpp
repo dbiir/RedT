@@ -1,6 +1,8 @@
 #include "txn.h"
 #include "row.h"
 #include "row_silo.h"
+#include "lib.hh"
+#include "qps/op.hh"
 
 #if CC_ALG == SILO
 
@@ -17,16 +19,16 @@ TxnManager::validate_silo()
 	for (uint64_t rid = 0; rid < txn->row_cnt; rid ++) {
 		if (txn->accesses[rid]->type == WR)
 			write_set[cur_wr_idx ++] = rid;
-		else 
+		else
 			read_set[cur_rd_idx ++] = rid;
 	}
+	// bubble sort the write_set, in primary key order
 
-	// bubble sort the write_set, in primary key order 
 	if (wr_cnt > 1)
 	{
 		for (uint64_t i = wr_cnt - 1; i >= 1; i--) {
 			for (uint64_t j = 0; j < i; j++) {
-				if (txn->accesses[ write_set[j] ]->orig_row->get_primary_key() > 
+				if (txn->accesses[ write_set[j] ]->orig_row->get_primary_key() >
 					txn->accesses[ write_set[j + 1] ]->orig_row->get_primary_key())
 				{
 					int tmp = write_set[j];
@@ -46,8 +48,8 @@ TxnManager::validate_silo()
 			if (row->manager->get_tid() != txn->accesses[write_set[i]]->tid) {
 				rc = Abort;
 				return rc;
-			}	
-		}	
+			}
+		}
 		for (uint64_t i = 0; i < txn->row_cnt - wr_cnt; i ++) {
 			Access * access = txn->accesses[ read_set[i] ];
 			if (access->orig_row->manager->get_tid() != txn->accesses[read_set[i]]->tid) {
@@ -67,13 +69,15 @@ TxnManager::validate_silo()
 				{
 					// rc = Abort;
 					// return rc;
-					break;
+					break;  //加锁失败
 				}
 				DEBUG("silo %ld write lock row %ld \n", this->get_txn_id(), row->get_primary_key());
 				row->manager->assert_lock();
 				num_locks ++;
 				if (row->manager->get_tid() != txn->accesses[write_set[i]]->tid)
 				{
+					INC_STATS(get_thd_id(), local_lock_fail_abort, 1);
+					INC_STATS(get_thd_id(), valid_abort_cnt, 1);
 					rc = Abort;
 					return rc;
 				}
@@ -96,8 +100,9 @@ TxnManager::validate_silo()
 				// 		if (row->manager->get_tid() != txn->accesses[write_set[i]]->tid) {
 				// 			rc = Abort;
 				// 			return rc;
-				// 		}	
-				// 	}	
+				// 		}
+				// 	}
+
 				// 	for (uint64_t i = 0; i < txn->row_cnt - wr_cnt; i ++) {
 				// 		Access * access = txn->accesses[ read_set[i] ];
 				// 		if (access->orig_row->manager->get_tid() != txn->accesses[read_set[i]]->tid) {
@@ -130,6 +135,8 @@ TxnManager::validate_silo()
 		Access * access = txn->accesses[ read_set[i] ];
 		bool success = access->orig_row->manager->validate(access->tid, false);
 		if (!success) {
+			INC_STATS(get_thd_id(), local_readset_validate_fail_abort, 1);
+			INC_STATS(get_thd_id(), valid_abort_cnt, 1);
 			rc = Abort;
 			return rc;
 		}
@@ -157,7 +164,7 @@ RC
 TxnManager::finish(RC rc)
 {
 	if (rc == Abort) {
-		if (this->num_locks > get_access_cnt()) 
+		if (this->num_locks > get_access_cnt())
 			return rc;
 		// DEBUG("silo abort finish %ld", txn->get_txn_id());
 		for (uint64_t i = 0; i < this->num_locks; i++) {
@@ -165,10 +172,10 @@ TxnManager::finish(RC rc)
 			DEBUG("silo %ld abort release row %ld \n", this->get_txn_id(), txn->accesses[ write_set[i] ]->orig_row->get_primary_key());
 		}
 	} else {
-		
+
 		for (uint64_t i = 0; i < txn->write_cnt; i++) {
 			Access * access = txn->accesses[ write_set[i] ];
-			access->orig_row->manager->write( 
+			access->orig_row->manager->write(
 				access->data, this->commit_timestamp );
 			txn->accesses[ write_set[i] ]->orig_row->manager->release();
 			DEBUG("silo %ld commit release row %ld \n", this->get_txn_id(), txn->accesses[ write_set[i] ]->orig_row->get_primary_key());

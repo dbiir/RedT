@@ -13,14 +13,14 @@ using namespace rdmaio::qp;
 class RCSession : public Session {
 public:
 
-  RC *qp = nullptr;
+  RDMARC *qp = nullptr;
   const usize send_depth; // configured per QP
 
   usize pending_sends = 0;
 
   const int id;
 
-  RCSession(const int &id, Arc<RC> &rc)
+  RCSession(const int &id, Arc<RDMARC> &rc)
       : id(id), qp(rc.get()), send_depth(rc->my_config.max_send_sz() / 4) {}
 
   Result<std::string> send(const MemBlock &msg, const double timeout,
@@ -49,7 +49,7 @@ public:
     if (pending_sends >= send_depth) {
       auto res_p = qp->wait_one_comp();
       RDMA_ASSERT(res_p == IOCode::Ok)
-          << "wait completion error: " << RC::wc_status(res_p.desc);
+          << "wait completion error: " << RDMARC::wc_status(res_p.desc);
       pending_sends = 0;
     } else {
       pending_sends += 1;
@@ -73,7 +73,7 @@ public:
  */
 template <usize R> class RCRecvSession {
   Arc<RecvEntries<R>> recv_entries;
-  Arc<RC> qp;
+  Arc<RDMARC> qp;
 
   usize idle_recv_entries = 0;
   const usize poll_recv_step = R / 2;
@@ -81,7 +81,7 @@ template <usize R> class RCRecvSession {
 public:
   RCSession end_point;
 
-  RCRecvSession(Arc<RC> qp, Arc<RecvEntries<R>> e)
+  RCRecvSession(Arc<RDMARC> qp, Arc<RecvEntries<R>> e)
       : qp(qp), recv_entries(e), end_point(123, qp) {}
 
   void consume_one() {

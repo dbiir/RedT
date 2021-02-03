@@ -27,6 +27,7 @@
 #include "ssi.h"
 #include "wsi.h"
 #include "transport.h"
+#include "rdma.h"
 #include "work_queue.h"
 #include "abort_queue.h"
 #include "client_query.h"
@@ -52,15 +53,15 @@
 #include "maat.h"
 #include "wkdb.h"
 #include "tictoc.h"
+#include "rdma_silo.h"
 #include "key_xid.h"
 #include "rts_cache.h"
-// #include "http.h"
-
-
+#include "src/allocator_master.hh"
+//#include "rdma_ctrl.hpp"
+#include "lib.hh"
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
 #ifdef USE_RDMA
-  #include "lib.hh"
   #include "qps/rc_recv_manager.hh"
   #include "qps/recv_iter.hh"
   #include "qps/mod.hh"
@@ -87,6 +88,10 @@ ssi ssi_man;
 wsi wsi_man;
 Tictoc tictoc_man;
 Transport tport_man;
+Rdma rdma_man;
+#if CC_ALG == RDMA_SILO
+RDMA_silo rsilo_man;
+#endif
 TxnManPool txn_man_pool;
 TxnPool txn_pool;
 AccessPool access_pool;
@@ -215,6 +220,8 @@ UInt64 g_msg_time_limit = MSG_TIME_LIMIT;
 UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
+UInt64 rdma_buffer_size = 12*(1024*1024*1024L);
+UInt64 rdma_index_size = 300*1024*1024;
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;
 UInt64 g_max_pre_req = MAX_PRE_REQ;
@@ -266,5 +273,42 @@ UInt32 g_repl_cnt = REPLICA_CNT;
 
 map<string, string> g_params;
 
+char *rdma_global_buffer;
+//rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
+rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
+// 每个线程只用自己的那一块客户端内存地址
+/* client_rdma_rm 内存地址使用,假设有4个执行线程
+ * size:IndexInfo //0号线程读index
+ * size:IndexInfo //1号线程读index
+ * size:IndexInfo //2号线程读index
+ * size:IndexInfo //3号线程读index
+ * size:Row //0号线程读row
+ * size:Row //1号线程读row
+ * size:Row //2号线程读row
+ * size:Row //3号线程读row
+ */
+rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
+rdmaio::Arc<rdmaio::rmem::RegHandler> rm_handler;
+rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
+
+std::vector<rdmaio::ConnectManager> cm;
+rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
+rdmaio::Arc<rdmaio::RNic> nic;
+rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT];
+
+rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
+
+string rdma_server_add[NODE_CNT];
+string qp_name[NODE_CNT][THREAD_CNT];
+//rdmaio::ConnectManager cm[NODE_CNT];
+
+int rdma_server_port[NODE_CNT];
+
+//rdmaio::Arc<rdmaio::rmem::RegHandler> local_mr[NODE_CNT][THREAD_CNT];
+
+
+
+//r2::Allocator *r2_allocator;
+//rdmaio::RCQP *qp[NODE_CNT][THREAD_CNT];
 bool g_init_done[50] = {false};
 int g_init_cnt = 0;

@@ -31,6 +31,7 @@ void Row_null::init(row_t* row) {
 RC Row_null::access(access_t type, TxnManager* txn) {
   uint64_t starttime = get_sys_clock();
   RC rc = RCOK;
+  // rc = read_and_write(type, txn, row, version);
 
   uint64_t timespan = get_sys_clock() - starttime;
   txn->txn_stats.cc_time += timespan;
@@ -41,6 +42,7 @@ RC Row_null::access(access_t type, TxnManager* txn) {
 RC Row_null::abort(access_t type, TxnManager* txn) {
   return Abort;
 }
+
 
 RC Row_null::commit(access_t type, TxnManager* txn) {
   return RCOK;

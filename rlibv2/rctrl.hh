@@ -163,11 +163,11 @@ public:
 
 private:
   /*!
-    Handling the RC request
+    Handling the RDMARC request
     The process has two steps:
     1. check whether user wants to create a QP
     2. if so, create it using the provided parameters
-    3. query the RC attribute and returns to the user
+    3. query the RDMARC attribute and returns to the user
    */
   ByteBuffer rc_handler(const ByteBuffer &b) {
 

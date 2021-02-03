@@ -24,7 +24,7 @@ template <usize R, usize kRingSz, usize kMaxMsg> class Session {
 
   static_assert(kMaxMsg < std::numeric_limits<u16>::max(), "");
 
-  Arc<RC> qp;
+  Arc<RDMARC> qp;
 
   Arc<RecvBundler<R>> recv_meta;
   RemoteRing<kRingSz> remote_ring;
@@ -53,7 +53,7 @@ public:
    */
   Session(const u16 &id, Arc<RNic> nic, const QPConfig &config, ibv_cq *cq,
           Arc<AbsRecvAllocator> alloc)
-      : qp(RC::create(nic, config, cq).value()), id(id),
+      : qp(RDMARC::create(nic, config, cq).value()), id(id),
         recv_meta(std::make_shared<RecvBundler<R>>(alloc)),
         send_depth(qp->my_config.max_send_sz() / 2),
         local_ring(MemBlock(
@@ -72,7 +72,7 @@ public:
     - local_ring is created
     - id is known
    */
-  Session(const u16 &id, Arc<RC> qp, Arc<RecvBundler<R>> meta,
+  Session(const u16 &id, Arc<RDMARC> qp, Arc<RecvBundler<R>> meta,
           u64 addr /* used for create remote_ring */, const RegAttr &remote_mr,
           const LocalRing<kRingSz> &local_mem)
       : id(id), qp(qp), recv_meta(meta), local_ring(local_mem),
@@ -202,7 +202,7 @@ public:
     if (pending_sends >= send_depth) {
       auto res_p = qp->wait_one_comp();
       RDMA_ASSERT(res_p == IOCode::Ok)
-          << "wait completion error: " << RC::wc_status(res_p.desc);
+          << "wait completion error: " << RDMARC::wc_status(res_p.desc);
       pending_sends = 0;
     } else {
       pending_sends += 1;

@@ -15,7 +15,7 @@ const usize kNMaxDoorbell = 16;
 
 /*!
   currently this class is left with no methods, because I found its hard
-  to abstract many away the UD and RC doorbelled requests
+  to abstract many away the UD and RDMARC doorbelled requests
 
   Example:
   `

@@ -53,8 +53,9 @@
 #include "tictoc.h"
 #include "key_xid.h"
 #include "rts_cache.h"
-// #include "http.h"
 #include "lib.hh"
+#include "rdma.h"
+// #include "http.h"
 //#include "rdma_ctrl.hpp"
 #include "qps/rc_recv_manager.hh"
 #include "qps/recv_iter.hh"
@@ -78,7 +79,14 @@ CalvinSequencerThread * calvin_seq_thds;
 void parser(int argc, char * argv[]);
 
 int main(int argc, char *argv[]) {
+	
 
+#ifdef USE_RDMA
+  if(g_node_id == 0) {
+    // printf("[Memcached Begin Listen]\n");
+    // system("memcached -l 0.0.0.0 -p 10086 &");  
+  }
+#endif
     // 0. initialize global data structure
     parser(argc, argv);
 #if SEED != 0
@@ -112,6 +120,18 @@ int main(int argc, char *argv[]) {
 	simulation->init();
 	printf("Done\n");
 	fflush(stdout);
+
+   
+    
+	//register memeory
+	//prepare QP connection with rdma_global_buffer(as registry memory)
+	#ifdef USE_RDMA //== CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
+    //#if CC_ALG == RDMA_SILO
+        rdma_man.init();
+    #endif
+
+
+   //prepare workload
 	Workload * m_wl;
 	switch (WORKLOAD) {
 		case YCSB :
@@ -361,6 +381,8 @@ int main(int argc, char *argv[]) {
 	warmup_done = true;
 	pthread_barrier_init( &warmup_bar, NULL, all_thd_cnt);
 
+
+
 #if SET_AFFINITY
 	uint64_t cpu_cnt = 0;
 	cpu_set_t cpus;
@@ -439,6 +461,12 @@ int main(int argc, char *argv[]) {
 	// Free things
 	//tport_man.shutdown();
 	m_wl->index_delete_all();
+
+// #if USE_RDMA
+// 	if(g_node_id == 0) {
+// 		system("killall memcached");  
+// 	}
+// #endif
 
 	/*
 	txn_table.delete_all();

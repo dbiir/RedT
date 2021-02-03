@@ -15,8 +15,8 @@ using rpc_id_t = u8;
 enum RCtrlBinderIdType : rpc_id_t {
   HeartBeat = 0, // ping whether RCtrl is started
   FetchMr,       // fetch remote MR
-  CreateRC,      // create an RC for connect (for one-sided)
-  CreateRCM,     // create an RC which uses message (for two-sided)
+  CreateRC,      // create an RDMARC for connect (for one-sided)
+  CreateRCM,     // create an RDMARC which uses message (for two-sided)
   DeleteRC,
   FetchQPAttr,  // fetch a created QP's attr. useful for UD QP
   Reserved,
@@ -52,7 +52,7 @@ struct __attribute__((packed)) QPReq {
 };
 
 /*!
-  Req/Reply for creating ~(RC) QPs
+  Req/Reply for creating ~(RDMARC) QPs
  */
 struct __attribute__((packed)) RCReq {
 

@@ -26,7 +26,7 @@ public:
 
   explicit RecvBundler(Arc<RecvEntries<R>> ent) : recv_entries(ent) {}
 
-  Result<int> consume_one(Arc<RC> &qp) {
+  Result<int> consume_one(Arc<RDMARC> &qp) {
 
     const usize poll_recv_step = R / 2;
     //const usize poll_recv_step = 32;

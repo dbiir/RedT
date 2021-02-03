@@ -1,7 +1,9 @@
 #pragma once
 
-#include "rlib/core/qps/doorbell_helper.hh"
-#include "rlib/core/qps/rc.hh"
+// #include "rlib/core/qps/doorbell_helper.hh"
+// #include "rlib/core/qps/rc.hh"
+#include "qps/doorbell_helper.hh"
+#include "qps/rc.hh"
 
 #include "../libroutine.hh"
 
@@ -78,13 +80,13 @@ public:
     return *this;
   }
 
-  inline auto execute_my(const Arc<RC> &qp, const int &flags, int wr_id = 0)
+  inline auto execute_my(const Arc<RDMARC> &qp, const int &flags, int wr_id = 0)
       -> Result<std::string> {
 
     // to avoid performance overhead of Arc, we first extract QP's raw pointer
     // out
-    RC *qp_ptr = ({ // unsafe code
-      RC *temp = qp.get();
+    RDMARC *qp_ptr = ({ // unsafe code
+      RDMARC *temp = qp.get();
       temp;
     });
 
@@ -98,7 +100,7 @@ public:
     return ::rdmaio::Ok(std::string(""));
   }
 
-  inline auto execute_sync(const Arc<RC> &qp, int flags,
+  inline auto execute_sync(const Arc<RDMARC> &qp, int flags,
                            const double &timeout_usec = 1000000)
       -> Result<ibv_wc> {
     ibv_wc wc;
@@ -114,7 +116,7 @@ public:
     return ::rdmaio::Ok(wc);
   }
 
-  inline auto execute(const Arc<RC> &qp, int flags, R2_ASYNC)
+  inline auto execute(const Arc<RDMARC> &qp, int flags, R2_ASYNC)
       -> Result<ibv_wc> {
     ibv_wc wc;
     auto ret_s = execute_my(qp, flags, R2_COR_ID());
@@ -132,10 +134,10 @@ public:
     which means that we will signal the last request
    */
   template <usize N>
-  inline auto execute_doorbell(const Arc<RC> &qp, DoorbellHelper<N> &doorbell,
+  inline auto execute_doorbell(const Arc<RDMARC> &qp, DoorbellHelper<N> &doorbell,
                                R2_ASYNC) -> Result<ibv_wc> {
-    RC *qp_ptr = ({ // unsafe code
-      RC *temp = qp.get();
+    RDMARC *qp_ptr = ({ // unsafe code
+      RDMARC *temp = qp.get();
       temp;
     });
 
@@ -165,12 +167,12 @@ public:
   }
 
 private:
-  inline auto wait_one(const Arc<RC> &qp, R2_ASYNC) -> Result<ibv_wc> {
+  inline auto wait_one(const Arc<RDMARC> &qp, R2_ASYNC) -> Result<ibv_wc> {
 
     // to avoid performance overhead of Arc, we first extract QP's raw pointer
     // out
-    RC *qp_ptr = ({ // unsafe code
-      RC *temp = qp.get();
+    RDMARC *qp_ptr = ({ // unsafe code
+      RDMARC *temp = qp.get();
       temp;
     });
 

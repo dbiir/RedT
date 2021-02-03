@@ -27,8 +27,10 @@ struct LockEntry {
 
 class Row_lock {
 public:
-  	void init(row_t * row);
-  	// [DL_DETECT] txnids are the txn_ids that current txn is waiting for.
+
+	void init(row_t * row);
+	// [DL_DETECT] txnids are the txn_ids that current txn is waiting for.
+
     RC lock_get(lock_t type, TxnManager * txn);
     RC lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txncnt);
     RC lock_release(TxnManager * txn);

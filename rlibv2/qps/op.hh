@@ -15,12 +15,12 @@ enum op_type {
 
 /*!
  Op states for single RDMA one-sided OP.
- This is a simple wrapper over the RC API provided by the RLib,
+ This is a simple wrapper over the RDMARC API provided by the RLib,
  which itself is a wrapper of libibverbs.
 
  Example usage:  // read 1 bytes at remote machine with address 0xc using
  one-sided RDMA.
-      Arc<RC> qp; // some pre-initialized QP
+      Arc<RDMARC> qp; // some pre-initialized QP
 
       // An example of using Op to post an one-sided RDMA read.
       ::rdmaio::qp::Op op;
