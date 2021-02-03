@@ -24,17 +24,17 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-#define USE_RDMA CHANGE_TCP_ONLY
+#define USE_RDMA CHANGE_MSG_QUEUE
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
 #define RDMA_BUFFER_ITEM_SIZE (1<<12)
 #define RDMA_USE_NIC_IDX 0
 #define RDMA_REG_MEM_NAME 73
 #define RDMA_CQ_NAME "rdma_channel"
-#define RDMA_ENTRY_NUM 1024U
-#define RDMA_SEND_COUNT (128)
+#define RDMA_ENTRY_NUM 2048U
+#define RDMA_SEND_COUNT (256)
 // #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
-//#define RDMA_COLOR_LOG
+// #define RDMA_COLOR_LOG
 
 /************RDMA TYPE**************/
 #define CHANGE_TCP_ONLY 0
@@ -66,11 +66,11 @@
 // #define THD_ID_QUEUE
 #define ONE_NODE_RECIEVE 0 // only node 0 will receive the txn query
 #if 1
- #define LESS_DIS // Reduce the number of yCSB remote data to 1
- #define LESS_DIS_NUM 0 // Reduce the number of yCSB remote data to 1
+// #define LESS_DIS // Reduce the number of yCSB remote data to 1
+// #define LESS_DIS_NUM 0 // Reduce the number of yCSB remote data to 1
 // #define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
- #define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
- #define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
+// #define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
+// #define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
 // #define NO_REMOTE // remove all remote txn
 #endif 
 #define TXN_QUEUE_PERCENT 0.0 // The proportion of the transaction to take from txn_queue firstly.
@@ -179,7 +179,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG CNULL
+#define CC_ALG NO_WAIT
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -262,7 +262,7 @@
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR
-#define REQ_PER_QUERY 1
+#define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 0

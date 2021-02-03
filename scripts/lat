@@ -1,7 +1,7 @@
-CNULL 
+MVCC 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
-0.0
-0.0
-0.0
-1.605592
-0.0
+441672.300117
+2243.639999
+83660.640226
+83664.844422
+12837.006122
