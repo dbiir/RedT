@@ -39,11 +39,11 @@
 #include "row_null.h"
 #include "row_silo.h"
 #include "row_rdma_silo.h"
+#include "row_rdma_nowait.h"
 #include "mem_alloc.h"
 #include "manager.h"
 
 #define SIM_FULL_ROW true
-
 RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 	part_info = true;
 	_row_id = row_id;
@@ -63,6 +63,9 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 #if CC_ALG == RDMA_SILO
   _tid_word = 0;
   timestamp = 0;
+#endif
+#if CC_ALG == RDMA_NO_WAIT
+	_lock_info = 0;
 #endif
 
 	return RCOK;
@@ -108,7 +111,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_silo *) mem_allocator.align_alloc(sizeof(Row_silo));
 #elif CC_ALG == RDMA_SILO
   manager = (Row_rdma_silo *) mem_allocator.align_alloc(sizeof(Row_rdma_silo));
-
+#elif CC_ALG == RDMA_NO_WAIT
+  manager = (Row_rdma_nowait *) mem_allocator.align_alloc(sizeof(Row_rdma_nowait));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -245,6 +249,8 @@ RC row_t::remote_get_row(row_t* remote_row, TxnManager * txn, Access *access) {
   uint64_t copy_time = get_sys_clock();
   memcpy((char*)txn->cur_row, (char*)remote_row, sizeof(row_t));
   access->data = txn->cur_row;
+  //access->orig_row = txn->cur_row;
+
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
   return rc;
 }
@@ -381,15 +387,16 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	goto end;
 
 #endif
-
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT
   uint64_t init_time = get_sys_clock();
 	//uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN) ? DLOCK_SH : DLOCK_EX; // ! this wrong !!
-  INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-
+    INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
+#if CC_ALG!=RDMA_NO_WAIT
 	rc = this->manager->lock_get(lt, txn);
-
+#else
+	rc = this->manager->lock_get(lt,txn,this);
+#endif
   uint64_t copy_time = get_sys_clock();
 	if (rc == RCOK) {
 		access->data = this;
@@ -639,6 +646,12 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		this->copy(row);
 	}
 	this->manager->lock_release(txn);
+	return 0;
+#elif CC_ALG == RDMA_NO_WAIT
+	assert (row == NULL || row == this || type == XP);
+	if (ROLL_BACK && type == XP) {  // recover from previous writes.
+		this->copy(row);  //对于"本地"Abort的写，把orig_data复制到orig_row里面去，注意对"远程"Abort的写无此操作
+	}
 	return 0;
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI
 	// for RD or SCAN or XP, the row should be deleted.

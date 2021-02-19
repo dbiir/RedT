@@ -679,6 +679,12 @@ void Transport::rdma_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, ch
 	    {.local_addr = reinterpret_cast<RMem::raw_ptr_t>(buf),
     .remote_addr = 0,
 		.imm_data = 0});
+	if(res_s != IOCode::Ok){
+		if(res_s == IOCode::Err) printf("res_s == Err");
+		else if(res_s == IOCode::Timeout) printf("res_s == Timeout");
+		else if(res_s == IOCode::NearOk) printf("res_s == NearOk");
+		else if(res_s == IOCode::NotReady) printf("res_s == NotReady");
+	} 
 	RDMA_ASSERT(res_s == IOCode::Ok);
 	// void* pVoid = buf;
 	// RDMA_LOG(4) << port_id-TPORT_TWOSIDE_PORT << " RDMA send " << (send_qpi->count) << " buf size "<< (u32) size + sizeof(size) + 1 << " buf ptr " << pVoid << " flags " << send_flags;

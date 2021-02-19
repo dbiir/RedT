@@ -51,7 +51,9 @@
 #include "wsi.h"
 #include "manager.h"
 #include "rdma_silo.h"
+#include "rdma_nowait.h"
 #include "transport.h"
+#include "row_rdma_nowait.h"
 
 void TxnStats::init() {
 	starttime=0;
@@ -501,10 +503,10 @@ RC TxnManager::abort() {
 	INC_STATS(get_thd_id(), remote_txn_abort_cnt, 1);
 	txn_stats.abort_stats(get_thd_id());
 	}
-
 	aborted = true;
 	//RDMA_SILO - ADD remote release lock by rdma
 	release_locks(Abort);
+	//printf("---线程%lu事务%lu，release_lock(Abort) end.\n",get_thd_id(), get_txn_id());
 #if CC_ALG == MAAT
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
 	time_table.release(get_thd_id(),get_txn_id());
@@ -525,6 +527,7 @@ RC TxnManager::abort() {
 	if (IS_LOCAL(get_txn_id()) && warmup_done) {
 		INC_STATS_ARR(get_thd_id(),start_abort_commit_latency, timespan);
 	}
+
 	/*
 	// latency from most recent start or restart of transaction
 	PRINT_LATENCY("lat_s %ld %ld 0 %f %f %f %f %f %f 0.0\n"
@@ -558,7 +561,7 @@ RC TxnManager::start_abort() {
 	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     INC_STATS(get_thd_id(), trans_prepare_count, 1);
 	//RDMA_SILO:keep message or not
-	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO) {
+	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT) {
 		send_finish_messages();
 		abort();
 		return Abort;
@@ -596,7 +599,7 @@ RC TxnManager::start_commit() {
   	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
-	if(is_multi_part() && CC_ALG != RDMA_SILO) {
+	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT) {
 		if(CC_ALG == TICTOC) {
 			rc = validate();
 			if (rc != Abort) {
@@ -621,7 +624,8 @@ RC TxnManager::start_commit() {
 			rsp_cnt = 0;
 			rc = commit();
 		}
-	} else { // is not multi-part
+	} 
+	else { // is not multi-part or use rdma
 		rc = validate();
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
@@ -634,12 +638,12 @@ RC TxnManager::start_commit() {
 		if(CC_ALG == WSI) {
 			wsi_man.gene_finish_ts(this);
 		}
-		if(rc == RCOK)
+		if(rc == RCOK)   //对NO_WAIT来说，在此处一定由rc==RCOK
 			rc = commit();
 		else {
 			txn->rc = Abort;
 			DEBUG("%ld start_abort\n",get_txn_id());
-			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO) {
+			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO &&  CC_ALG != RDMA_NO_WAIT) {
 				send_finish_messages();
 				abort();
 				rc = Abort;
@@ -827,11 +831,12 @@ void TxnManager::release_last_row_lock() {
 }
 
 void TxnManager::cleanup_row(RC rc, uint64_t rid) {
-	access_t type = txn->accesses[rid]->type;
+	access_t type = txn->accesses[rid]->type;	
 	if (type == WR && rc == Abort && CC_ALG != MAAT) {
-		type = XP;
-	}
-
+		type = XP; 
+	}	
+	bool is_local = true;
+	
 	uint64_t version = 0;
 	// Handle calvin elsewhere
 
@@ -854,28 +859,42 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
   #endif
     }
   }
+#elif CC_ALG == RDMA_NO_WAIT
+	if(txn->accesses[rid]->location == g_node_id) is_local=true;
+	else is_local=false;
+
+	//no wait abort write
+  	if (ROLL_BACK && type == XP && is_local){
+    orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data); 
+	} else {
+#if ISOLATION_LEVEL == READ_COMMITTED
+		if(type == WR) {
+		version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
+		}
+#endif
+	}
 #else
   if (ROLL_BACK && type == XP &&
-      (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
+      (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
       CC_ALG == HSTORE_SPEC)) {
-    orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data);
+    orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data); 
   } else {
 #if ISOLATION_LEVEL == READ_COMMITTED
     if(type == WR) {
       version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
     }
 #else
-    version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
+    version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);  
 #endif
   }
 #endif
 #endif
 
 #if ROLL_BACK && \
-		(CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
-	if (type == WR) {
+		(CC_ALG == RDMA_NO_WAIT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
+	if (type == WR && is_local) {
 		//printf("free 10 %ld\n",get_txn_id());
-				txn->accesses[rid]->orig_data->free_row();
+		txn->accesses[rid]->orig_data->free_row();
 		DEBUG_M("TxnManager::cleanup row_t free\n");
 		row_pool.put(get_thd_id(),txn->accesses[rid]->orig_data);
 		if(rc == RCOK) {
@@ -885,13 +904,14 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 	}
 #endif
 #endif
+
 	if (type == WR) txn->accesses[rid]->version = version;
 #if CC_ALG == TICTOC
 	if (_min_commit_ts > glob_manager.get_max_cts())
 		glob_manager.set_max_cts(_min_commit_ts);
 #endif
 
-#if CC_ALG != SILO
+#if CC_ALG != SILO && CC_ALG != RDMA_NO_WAIT 
   txn->accesses[rid]->data = NULL;
 #endif
 }
@@ -923,9 +943,13 @@ void TxnManager::cleanup(RC rc) {
 	// g_max_items_per_txn*2 + 3));
 
 	DEBUG("Cleanup %ld %ld\n",get_txn_id(),row_cnt);
+	
 	for (int rid = row_cnt - 1; rid >= 0; rid --) {
-		cleanup_row(rc,rid);
+		cleanup_row(rc,rid);  //for RDMA_NO_WAIT: return abort write row
 	}
+#if CC_ALG == RDMA_NO_WAIT
+    rnowait_man.finish(rc,this);
+#endif
 #if CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || \
 		CC_ALG == DLI_MVCC_BASE
 	dli_man.finish_trans(rc, this);
@@ -1023,6 +1047,7 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	//assert(txn->accesses.get_count() - 1 == row_cnt);
 #if CC_ALG != TICTOC
   // uint64_t start_time = get_sys_clock();
+  //对NO_WAIT来说，即加锁并把相应数据读到access中
 	rc = row->get_row(type, this, access);
 	INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
 	INC_STATS(get_thd_id(), trans_get_row_count, 1);
@@ -1047,17 +1072,20 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 		return rc;
 	}
 	access->type = type;
-	access->orig_row = row;
+	access->orig_row = row; //access->data == access->orig_row
 #if CC_ALG == SILO
 	access->tid = last_tid;
 #endif
-
+#if CC_ALG ==RDMA_NO_WAIT
+	access->location = g_node_id;
+	access->offset = (char*)row - rdma_global_buffer;
+#endif
 #if CC_ALG == RDMA_SILO
 	access->timestamp = row->timestamp;
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
 
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == RDMA_NO_WAIT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
 									CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
 	if (type == WR) {
 	//printf("alloc 10 %ld\n",get_txn_id());
@@ -1126,7 +1154,7 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 
 	access->type = type;
 	access->orig_row = row;
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE)
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == RDMA_NO_WAIT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE)
 	if (type == WR) {
 		uint64_t part_id = row->get_part_id();
 	//printf("alloc 10 %ld\n",get_txn_id());
@@ -1193,8 +1221,8 @@ RC TxnManager::validate() {
 			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
 			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO &&
 			CC_ALG != RDMA_SILO) {
-		return RCOK;
-	}
+		return RCOK;  //NO_WAIT不需要验证
+	}  
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
 	if (CC_ALG == OCC && rc == RCOK) rc = occ_man.validate(this);

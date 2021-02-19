@@ -84,6 +84,9 @@ class Rdma;
 #if CC_ALG == RDMA_SILO
 class RDMA_silo;
 #endif
+#if CC_ALG == RDMA_NO_WAIT
+class RDMA_nowait;
+#endif
 class Remote_query;
 class TxnManPool;
 class TxnPool;
@@ -141,6 +144,9 @@ extern Transport tport_man;
 extern Rdma rdma_man;
 #if CC_ALG == RDMA_SILO
 extern RDMA_silo rsilo_man;
+#endif
+#if CC_ALG == RDMA_NO_WAIT
+extern RDMA_nowait rnowait_man;
 #endif
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;

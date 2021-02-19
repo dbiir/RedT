@@ -61,6 +61,11 @@ public:
 	uint64_t    location;
 	uint64_t    offset;
 #endif
+#if CC_ALG == RDMA_NO_WAIT
+	uint64_t    location;   //数据所在的node id
+	uint64_t    offset;
+#endif
+
 	void cleanup();
 };
 
@@ -217,6 +222,11 @@ public:
     int             write_set[100];
     int*            read_set;
 #endif
+#if CC_ALG == RDMA_NO_WAIT
+    int             write_set[100];
+    int*            read_set;
+#endif
+
 #if CC_ALG == SILO || CC_ALG == RDMA_SILO
 	bool 			_pre_abort;
 	bool 			_validation_no_wait;

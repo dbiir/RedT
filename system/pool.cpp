@@ -288,6 +288,7 @@ void AccessPool::get(uint64_t thd_id, Access *& item) {
     DEBUG_M("access_pool alloc\n");
     item = (Access*)mem_allocator.alloc(sizeof(Access));
   }
+
   item->orig_row = NULL;
   item->data = NULL;
   item->orig_data = NULL;
@@ -301,6 +302,10 @@ void AccessPool::get(uint64_t thd_id, Access *& item) {
   item->key = 0;
   item->tid = 0;
   item->test_row = NULL;
+  item->offset = 0;
+  #endif
+  #if CC_ALG == RDMA_NO_WAIT
+  item->location = g_node_id;
   item->offset = 0;
   #endif
 }

@@ -371,7 +371,6 @@ RC WorkerThread::run() {
     txn_man = NULL;
     heartbeat();
 
-
     progress_stats();
     Message* msg;
 
@@ -478,6 +477,7 @@ RC WorkerThread::run() {
     fakeprocess(msg);
 #else
     process(msg);
+
 #endif
     // process(msg);  /// DA
     ready_starttime = get_sys_clock();
@@ -493,7 +493,6 @@ RC WorkerThread::run() {
     msg->release();
 #endif
     INC_STATS(get_thd_id(),worker_release_msg_time,get_sys_clock() - ready_starttime);
-
 	}
   printf("FINISH %ld:%ld\n",_node_id,_thd_id);
   fflush(stdout);

@@ -62,7 +62,7 @@ class Row_si;
 class Row_null;
 class Row_silo;
 class Row_rdma_silo;
-
+class Row_rdma_nowait;
 
 class row_t {
 public:
@@ -119,11 +119,14 @@ public:
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
   #if CC_ALG == RDMA_SILO
-    volatile uint64_t	_tid_word;
+    volatile uint64_t	_tid_word;  //锁：txn_id
 	ts_t 			timestamp;
 	Row_rdma_silo * manager;
+	#elif CC_ALG == RDMA_NO_WAIT
+		volatile uint64_t _lock_info; 
+		Row_rdma_nowait * manager;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
-	Row_lock * manager;
+		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP
 	 	Row_ts * manager;
 	#elif CC_ALG == MVCC

@@ -146,8 +146,8 @@
 // Concurrency Control
 /***********************************************/
 
-// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL,RDMA_SILO
-#define CC_ALG          RDMA_SILO
+// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT
+#define CC_ALG          RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
 #define YCSB_ABORT_MODE false
