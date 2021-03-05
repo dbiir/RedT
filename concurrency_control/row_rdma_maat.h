@@ -14,10 +14,12 @@
    limitations under the License.
 */
 
-#ifndef ROW_MAAT_H
-#define ROW_MAAT_H
-#if CC_ALG == MAAT
-class Row_maat {
+#ifndef ROW_RDMA_MAAT_H
+#define ROW_RDMA_MAAT_H
+
+#if CC_ALG == RDMA_MAAT
+
+class Row_rdma_maat {
 public:
 	void init(row_t * row);
   RC access(access_t type, TxnManager * txn);
@@ -27,14 +29,16 @@ public:
   RC abort(access_t type, TxnManager * txn);
   RC commit(access_t type, TxnManager * txn, row_t * data);
   void write(row_t * data);
+  void ucread_erase(uint64_t txn_id);
+  void ucwrite_erase(uint64_t txn_id);
 
-private:
+
   volatile bool maat_avail;
 
 	row_t * _row;
 
-  std::set<uint64_t> * uncommitted_reads;
-  std::set<uint64_t> * uncommitted_writes;
+  uint64_t uncommitted_reads[ROW_SET_LENGTH];
+  uint64_t uncommitted_writes[ROW_SET_LENGTH];
   uint64_t timestamp_last_read;
   uint64_t timestamp_last_write;
 };

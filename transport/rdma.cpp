@@ -161,7 +161,7 @@ void * Rdma::server_qp(void *){
 								->get_reg_attr()
 								.value()
 								.buf);
-
+	rdma_timetable_buffer = rdma_global_buffer + (rdma_buffer_size - rdma_timetable_size);
 	rm_ctrl->start_daemon();
 
 	return NULL;

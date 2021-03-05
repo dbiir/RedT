@@ -41,6 +41,8 @@
 #include "src/rdma/sop.hh"
 #include "src/sshed.hh"
 #include "transport.h"
+#include "qps/op.hh"
+
 
 void YCSBTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	TxnManager::init(thd_id, h_wl);
@@ -230,7 +232,164 @@ itemid_t* YCSBTxnManager::read_remote_index(ycsb_request * req) {
   	item->table_offset = ((IndexInfo*)test_buf)->table_offset;
 	return item;
 }
+RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
 
+	itemid_t * m_item;
+	m_item = read_remote_index(req);
+  // table_t * table = read_remote_table(m_item);
+
+	uint64_t part_id = _wl->key_to_part( req->key );
+    uint64_t loc = GET_NODE_ID(part_id);
+	assert(loc != g_node_id);
+	uint64_t thd_id = get_thd_id();
+	uint16_t lock = get_txn_id();
+	uint64_t operate_size = sizeof(row_t);
+	uint64_t starttime;
+	uint64_t endtime;
+	starttime = get_sys_clock();
+	uint64_t *tmp_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+	auto mr = client_rm_handler->get_reg_attr().value();
+
+	rdmaio::qp::Op<> op;
+    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + m_item->offset), remote_mr_attr[loc].key).set_cas(0, lock);
+  	assert(op.set_payload(tmp_buf, sizeof(uint64_t), mr.key) == true);
+  	auto res_s = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+	 RDMA_ASSERT(res_s == IOCode::Ok);
+	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == IOCode::Ok);
+
+	if (*tmp_buf != 0) {
+		row_local = NULL;
+		txn->rc = Abort;
+		mem_allocator.free(m_item, sizeof(itemid_t));
+		uint64_t timespan = get_sys_clock() - starttime;
+		INC_STATS(get_thd_id(), trans_store_access_count, 1);
+		INC_STATS(get_thd_id(), txn_manager_time, timespan);
+		INC_STATS(get_thd_id(), txn_conflict_cnt, 1);
+		return Abort; //原子性被破坏，CAS失败
+	}
+	char *tmp_buf2 = Rdma::get_row_client_memory(thd_id);
+	auto res_s2 = rc_qp[loc][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_READ,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
+		.remote_addr = m_item->offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s2 == rdmaio::IOCode::Ok);
+    auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+    RDMA_ASSERT(res_p2 == rdmaio::IOCode::Ok);
+
+	row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	memcpy(temp_row, tmp_buf2, operate_size);
+	assert(temp_row->get_primary_key() == req->key);
+	//read request
+	if(req->acctype == RD) {
+		for(uint64_t i = 0; i < row_set_length; i++) {
+			uint64_t last_write = temp_row->manager->uncommitted_writes[i];
+			assert(i < row_set_length - 1);
+			if(last_write == -1) {
+				break;
+			}
+			uncommitted_writes.insert(last_write);
+		}
+		if(greatest_write_timestamp < temp_row->manager->timestamp_last_write) {
+			greatest_write_timestamp = temp_row->manager->timestamp_last_write;
+		}
+		for(uint64_t i = 0; i < row_set_length; i++) {
+			uint64_t last_read = temp_row->manager->uncommitted_reads[i];
+			assert(i < row_set_length - 1);
+			if(last_read == -1) {
+				temp_row->manager->uncommitted_reads[i] = get_txn_id();
+				break;
+			}
+		}
+		temp_row->_tid_word = 0;
+		memcpy(tmp_buf2, (char *)temp_row, operate_size);
+		auto res_s3 = rc_qp[loc][thd_id]->send_normal(
+			{.op = IBV_WR_RDMA_WRITE,
+			.flags = IBV_SEND_SIGNALED,
+			.len = operate_size,
+			.wr_id = 0},
+			{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
+			.remote_addr = m_item->offset,
+			.imm_data = 0});
+		RDMA_ASSERT(res_s3 == rdmaio::IOCode::Ok);
+		auto res_p3 = rc_qp[loc][thd_id]->wait_one_comp();
+		RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
+	}
+	//	get remote row
+	    
+	if(req->acctype == WR) {
+		for(uint64_t i = 0; i < row_set_length; i++) {
+			uint64_t last_read = temp_row->manager->uncommitted_reads[i];
+			assert(i < row_set_length - 1);
+			if(last_read == -1) {
+				break;
+			}
+			uncommitted_reads.insert(last_read);
+		}
+		if(greatest_write_timestamp < temp_row->manager->timestamp_last_write) {
+			greatest_write_timestamp = temp_row->manager->timestamp_last_write;
+		}
+		if(greatest_read_timestamp < temp_row->manager->timestamp_last_read) {
+			greatest_read_timestamp = temp_row->manager->timestamp_last_read;
+		}
+		for(uint64_t i = 0; i < row_set_length; i++) {
+			uint64_t last_write = temp_row->manager->uncommitted_writes[i];
+			assert(i < row_set_length - 1);
+			if(last_write == -1) {
+				temp_row->manager->uncommitted_writes[i] = get_txn_id();
+				break;
+			}
+			uncommitted_writes_y.insert(last_write);
+		}
+		temp_row->_tid_word = 0;
+		memcpy(tmp_buf2, (char *)temp_row, operate_size);
+		auto res_s3 = rc_qp[loc][thd_id]->send_normal(
+			{.op = IBV_WR_RDMA_WRITE,
+			.flags = IBV_SEND_SIGNALED,
+			.len = operate_size,
+			.wr_id = 0},
+			{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
+			.remote_addr = m_item->offset,
+			.imm_data = 0});
+		RDMA_ASSERT(res_s3 == rdmaio::IOCode::Ok);
+		auto res_p3 = rc_qp[loc][thd_id]->wait_one_comp();
+		RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
+
+	}
+	//preserve the txn->access
+	Access * access = NULL;
+	access_pool.get(get_thd_id(),access);
+
+	this->last_row = temp_row;
+	this->last_type = req->acctype;
+
+
+	RC rc = RCOK;
+	rc = row->remote_get_row(temp_row, this, access);
+	assert(temp_row->get_primary_key() == access->data->get_primary_key());
+
+	access->type = req->acctype;
+	// access->orig_row = temp_row;
+
+	access->orig_row = access->data;
+	access->location = loc;
+	access->offset = m_item->offset;
+
+	row_local = access->data;
+	++txn->row_cnt;
+
+	mem_allocator.free(m_item,sizeof(itemid_t));
+
+	if (req->acctype == WR) ++txn->write_cnt;
+	txn->accesses.add(access);
+	
+	rc = RCOK;
+	return rc;
+}
 RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
 	// get the index of row to be operated
 	itemid_t * m_item;
@@ -362,7 +521,7 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 }
 
 bool YCSBTxnManager::rdma_one_side() {
-  if (CC_ALG == RDMA_SILO) return true;
+  if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MAAT) return true;
   else return false;
 }
 
@@ -378,7 +537,12 @@ RC YCSBTxnManager::run_txn_state() {
 		if(loc) {
 			rc = run_ycsb_0(req,row);
 		} else if (rdma_one_side()) {
+#if CC_ALG == RDMA_SILO
 			rc = send_remote_one_side_request(req,row);
+#endif
+#if CC_ALG == RDMA_MAAT
+            rc = send_maat_remote_one_side_request(req,row);
+#endif
 		} else {
 			rc = send_remote_request();
 		}

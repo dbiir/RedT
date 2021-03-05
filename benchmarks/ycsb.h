@@ -69,7 +69,7 @@ private:
   RC run_txn_state();
   bool rdma_one_side();
   RC send_remote_one_side_request(ycsb_request * req,row_t *& row_local);
-
+  RC send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   itemid_t* read_remote_index(ycsb_request * req);
 
   RC run_ycsb_0(ycsb_request * req,row_t *& row_local);
