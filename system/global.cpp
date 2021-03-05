@@ -54,6 +54,7 @@
 #include "wkdb.h"
 #include "tictoc.h"
 #include "rdma_silo.h"
+#include "rdma_mvcc.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -91,6 +92,8 @@ Transport tport_man;
 Rdma rdma_man;
 #if CC_ALG == RDMA_SILO
 RDMA_silo rsilo_man;
+#elif CC_ALG == RDMA_MVCC
+rdma_mvcc rmvcc_man;
 #endif
 TxnManPool txn_man_pool;
 TxnPool txn_pool;

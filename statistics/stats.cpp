@@ -80,6 +80,13 @@ void Stats_thd::clear() {
   remote_txn_commit_cnt=0;
   //count abort
   valid_abort_cnt = 0;
+
+  lock_row_fail = 0;
+  lock_num_unequal = 0;
+  lock_fail = 0;
+  ts_error = 0;
+  result_false = 0;
+
   local_lock_fail_abort = 0;
   remote_lock_fail_abort = 0;
   local_readset_validate_fail_abort = 0;
@@ -569,16 +576,21 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",local_txn_commit_cnt=%ld"
   ",remote_txn_commit_cnt=%ld"
   ",valid_abort_cnt = %ld"
-  ",local_lock_fail_abort = %f"
-  ",remote_lock_fail_abort = %f"
-  ",local_readset_validate_fail_abort = %f"
-  ",remote_readset_validate_fail_abort = %f"
-  ",local_writeset_validate_fail_abort = %f"
-  ",remote_writeset_validate_fail_abort = %f"
-  ",validate_lock_abort = %f"
-  ",local_try_lock_fail_abort = %f"
-  ",remote_try_lock_fail_abort = %f"
-  ",cnt_unequal_abort = %f"
+  ",lock_row_fail = %ld"
+  ",lock_num_unequal = %ld"
+  " ,lock_fail = %ld"
+  ",ts_error = %ld"
+  ",result_false = %ld"
+//   ",local_lock_fail_abort = %f"
+//   ",remote_lock_fail_abort = %f"
+//   ",local_readset_validate_fail_abort = %f"
+//   ",remote_readset_validate_fail_abort = %f"
+//   ",local_writeset_validate_fail_abort = %f"
+//   ",remote_writeset_validate_fail_abort = %f"
+//   ",validate_lock_abort = %f"
+//   ",local_try_lock_fail_abort = %f"
+//   ",remote_try_lock_fail_abort = %f"
+//   ",cnt_unequal_abort = %f"
   ",total_txn_abort_cnt=%ld"
 
           ",positive_txn_abort_cnt=%ld"
@@ -600,16 +612,21 @@ void Stats_thd::print(FILE * outf, bool prog) {
           tput, txn_cnt, remote_txn_cnt, local_txn_cnt, local_txn_start_cnt, total_txn_commit_cnt,
           local_txn_commit_cnt, remote_txn_commit_cnt,
           valid_abort_cnt,
-          local_lock_fail_abort/valid_abort_cnt,
-          remote_lock_fail_abort/valid_abort_cnt,
-          local_readset_validate_fail_abort/valid_abort_cnt,
-          remote_readset_validate_fail_abort/valid_abort_cnt,
-          local_writeset_validate_fail_abort/valid_abort_cnt,
-          remote_writeset_validate_fail_abort/valid_abort_cnt,
-          validate_lock_abort/valid_abort_cnt,
-          local_try_lock_fail_abort/valid_abort_cnt,
-          remote_try_lock_fail_abort/valid_abort_cnt,
-          cnt_unequal_abort/valid_abort_cnt,
+          lock_row_fail,
+          lock_num_unequal,
+          lock_fail ,
+          ts_error ,
+          result_false ,
+        //   local_lock_fail_abort/valid_abort_cnt,
+        //   remote_lock_fail_abort/valid_abort_cnt,
+        //   local_readset_validate_fail_abort/valid_abort_cnt,
+        //   remote_readset_validate_fail_abort/valid_abort_cnt,
+        //   local_writeset_validate_fail_abort/valid_abort_cnt,
+        //   remote_writeset_validate_fail_abort/valid_abort_cnt,
+        //   validate_lock_abort/valid_abort_cnt,
+        //   local_try_lock_fail_abort/valid_abort_cnt,
+        //   remote_try_lock_fail_abort/valid_abort_cnt,
+        //   cnt_unequal_abort/valid_abort_cnt,
 
           total_txn_abort_cnt,positive_txn_abort_cnt, unique_txn_abort_cnt,
 
@@ -1366,6 +1383,12 @@ void Stats_thd::combine(Stats_thd * stats) {
   local_txn_commit_cnt+=stats->local_txn_commit_cnt;
   remote_txn_commit_cnt+=stats->remote_txn_commit_cnt;
   valid_abort_cnt+=stats->valid_abort_cnt;
+  lock_row_fail+=stats->lock_row_fail;
+  lock_num_unequal+=stats->lock_num_unequal;
+  lock_fail+=stats->lock_fail;
+  ts_error+=stats->ts_error;
+  result_false+=stats->result_false;
+
   local_lock_fail_abort+=stats->local_lock_fail_abort;
   remote_lock_fail_abort+=stats->remote_lock_fail_abort;
   local_readset_validate_fail_abort+=stats->local_readset_validate_fail_abort;

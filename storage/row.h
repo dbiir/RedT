@@ -62,6 +62,20 @@ class Row_si;
 class Row_null;
 class Row_silo;
 class Row_rdma_silo;
+class Row_rdma_mvcc;
+class rdma_mvcc;
+
+//struct RdmaMVHis;
+
+struct RdmaMVHis {
+    uint64_t mutex;//lock
+    char data[ROW_DEFAULT_SIZE];
+    uint64_t rts;
+    uint64_t start_ts;
+    uint64_t end_ts;
+    uint64_t txn_id;
+    //RTS、start_ts、end_ts、txn-id：
+};
 
 
 class row_t {
@@ -128,6 +142,16 @@ public:
 	 	Row_ts * manager;
 	#elif CC_ALG == MVCC
 		Row_mvcc * manager;
+	#elif CC_ALG == RDMA_MVCC
+        volatile uint64_t	_tid_word;
+        uint64_t version_num;
+        //RdmaMVHis historyVer[HIS_CHAIN_NUM];
+        //char datas[HIS_CHAIN_NUM][ROW_DEFAULT_SIZE];
+        uint64_t rts[HIS_CHAIN_NUM];
+        uint64_t start_ts[HIS_CHAIN_NUM];
+        uint64_t end_ts[HIS_CHAIN_NUM];
+        uint64_t txn_id[HIS_CHAIN_NUM];
+		Row_rdma_mvcc *manager;
 	#elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
 		Row_occ * manager;
 
@@ -156,7 +180,7 @@ public:
   #elif CC_ALG == SILO
   	Row_silo * manager;
 	#endif
-#ifdef USE_RDMA// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
+#ifdef USE_RDMA && CC_ALG != RDMA_MVCC// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
 	char data[ROW_DEFAULT_SIZE];
 #else
 	char * data;

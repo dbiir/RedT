@@ -39,6 +39,7 @@
 #include "row_null.h"
 #include "row_silo.h"
 #include "row_rdma_silo.h"
+#include "row_rdma_mvcc.h"
 #include "mem_alloc.h"
 #include "manager.h"
 
@@ -63,6 +64,10 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 #if CC_ALG == RDMA_SILO
   _tid_word = 0;
   timestamp = 0;
+#endif
+
+#if CC_ALG == RDMA_MVCC
+    version_num = 0;
 #endif
 
 	return RCOK;
@@ -271,7 +276,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
   uint64_t init_time = get_sys_clock();
 	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
 	txn->cur_row->init(get_table(), get_part_id());
-  INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
+    INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
 	rc = this->manager->access(type,txn);
 
@@ -279,7 +284,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	txn->cur_row->copy(this);
 	access->data = txn->cur_row;
 	assert(rc == RCOK);
-  INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+  	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #endif
 #if CC_ALG == MAAT
@@ -390,7 +395,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 
 	rc = this->manager->lock_get(lt, txn);
 
-  	uint64_t copy_time = get_sys_clock();
+  uint64_t copy_time = get_sys_clock();
 	if (rc == RCOK) {
 		access->data = this;
 	} else if (rc == Abort) {
@@ -401,7 +406,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	goto end;
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI
 	//uint64_t thd_id = txn->get_thd_id();
-	// For TIMESTAMP RD, a new copy of the access->data will be returned.
+// For TIMESTAMP RD, a new copy of the access->data will be returned.
 
 	// for MVCC RD, the version will be returned instead of a copy
 	// So for MVCC RD-WR, the version should be explicitly copied.
@@ -517,6 +522,11 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
   	access->data = txn->cur_row;
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
+#elif CC_ALG == RDMA_MVCC
+   // rc = this->manager->access(txn, type, txn->cur_row);
+   txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+   txn->cur_row->init(get_table(), get_part_id());
+   access->data = txn->cur_row;
 #elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN
 #if CC_ALG == HSTORE_SPEC
 	if(txn_table.spec_mode) {
@@ -762,12 +772,13 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		this->copy(row);
 	}
 	return 0;
-#elif CC_ALG == SILO || CC_ALG == RDMA_SILO
+#elif CC_ALG == SILO || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC
 	assert (row != NULL);
 	row->free_row();
   DEBUG_M("row_t::return_row XP free \n");
 	mem_allocator.free(row, sizeof(row_t));
 	return 0;
+
 #else
 	assert(false);
 #endif

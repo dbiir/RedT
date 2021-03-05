@@ -83,6 +83,8 @@ class Transport;
 class Rdma;
 #if CC_ALG == RDMA_SILO
 class RDMA_silo;
+#elif CC_ALG == RDMA_MVCC
+class rdma_mvcc;
 #endif
 class Remote_query;
 class TxnManPool;
@@ -141,6 +143,8 @@ extern Transport tport_man;
 extern Rdma rdma_man;
 #if CC_ALG == RDMA_SILO
 extern RDMA_silo rsilo_man;
+#elif CC_ALG == RDMA_MVCC
+extern rdma_mvcc rmvcc_man;
 #endif
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;
@@ -190,7 +194,6 @@ extern string qp_name[NODE_CNT][THREAD_CNT];
 //extern r2::Allocator *r2_allocator;
 
 extern int rdma_server_port[NODE_CNT];
-
 
 extern bool volatile warmup_done;
 extern bool volatile enable_thread_mem_pool;

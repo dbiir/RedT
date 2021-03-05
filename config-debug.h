@@ -100,7 +100,7 @@
 // Concurrency Control
 /***********************************************/
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG,RDMA_SILO
-#define CC_ALG RDMA_SILO
+#define CC_ALG RDMA_MVCC
 
 #define ISOLATION_LEVEL SERIALIZABLE
 #define YCSB_ABORT_MODE false

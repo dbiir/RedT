@@ -51,6 +51,7 @@
 #include "wsi.h"
 #include "manager.h"
 #include "rdma_silo.h"
+#include "rdma_mvcc.h"
 #include "transport.h"
 
 void TxnStats::init() {
@@ -916,6 +917,10 @@ void TxnManager::cleanup(RC rc) {
 #if CC_ALG == RDMA_SILO
     rsilo_man.finish(rc,this);
 #endif
+    rmvcc_man.finish(rc,this);
+#if CC_ALG == RDMA_MVCC
+
+#endif
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
 	assert(txn->accesses.get_count() == txn->row_cnt);
@@ -1055,6 +1060,10 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 #if CC_ALG == RDMA_SILO
 	access->timestamp = row->timestamp;
 	access->offset = (char*)row - rdma_global_buffer;
+#endif
+
+#if CC_ALG == RDMA_MVCC
+   access->offset = (char*)row - rdma_global_buffer;
 #endif
 
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
@@ -1263,6 +1272,9 @@ RC TxnManager::validate() {
       DEBUG("Validate success: %ld, cts: %ld \n", get_txn_id(), commit_timestamp);
     }
   }
+#endif
+#if CC_ALG == RDMA_MVCC
+    rc = rmvcc_man.lock_row(this);
 #endif
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);

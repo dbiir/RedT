@@ -147,7 +147,7 @@
 /***********************************************/
 
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL,RDMA_SILO
-#define CC_ALG          RDMA_SILO
+#define CC_ALG          RDMA_MVCC
 #define ISOLATION_LEVEL SERIALIZABLE
 
 #define YCSB_ABORT_MODE false

@@ -53,7 +53,7 @@ public:
 	ts_t 		tid;
 	// ts_t 		epoch;
 #endif
-#if CC_ALG == RDMA_SILO
+#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC
     uint64_t 	key;
 	ts_t 		tid;
 	ts_t		timestamp;
@@ -209,6 +209,11 @@ public:
     int*            read_set;
     RC              find_tid_silo(ts_t max_tid);
     RC              finish(RC rc);
+#endif
+#if CC_ALG == RDMA_MVCC 
+    int             write_set[100];
+    int*            read_set;
+    uint64_t        num_locks;
 #endif
 	bool send_RQRY_RSP;
 

@@ -34,11 +34,14 @@
 #include "row_lock.h"
 #include "row_ts.h"
 #include "row_mvcc.h"
+#include "rdma_mvcc.h"
+#include "row_rdma_mvcc.h"
 #include "mem_alloc.h"
 #include "query.h"
 #include "msg_queue.h"
 #include "message.h"
 #include "src/rdma/sop.hh"
+#include "qps/op.hh"
 #include "src/sshed.hh"
 #include "transport.h"
 
@@ -333,6 +336,165 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
 	return rc;
 }
 //#endif
+
+#if CC_ALG == RDMA_MVCC
+RC YCSBTxnManager::mvcc_remote_one_side_request(ycsb_request * req,row_t *& row_local){
+    RC rc = RCOK;
+//get location in memory
+    itemid_t * m_item;
+	m_item = read_remote_index(req);
+//lock
+    uint64_t off = m_item->offset;
+    uint64_t part_id = _wl->key_to_part( req->key );
+    uint64_t loc = GET_NODE_ID(part_id);
+	assert(loc != g_node_id);
+	uint64_t thd_id = get_thd_id();
+	uint64_t lock = get_txn_id();
+    uint64_t operate_size = sizeof(row_t);
+
+	uint64_t *test_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+	auto mr = client_rm_handler->get_reg_attr().value();
+
+	rdmaio::qp::Op<> op;
+    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
+  	assert(op.set_payload(test_loc, sizeof(uint64_t), mr.key) == true);
+  	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+
+	RDMA_ASSERT(res_s2 == IOCode::Ok);
+	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p2 == IOCode::Ok);
+//lock fail
+    if((*test_loc) != 0){
+       INC_STATS(get_thd_id(), lock_fail, 1);
+      // printf("row lock = %ld\n",test_loc);
+       rc = Abort;
+       return rc;
+    }
+//get row
+    char *tmp_buf = Rdma::get_row_client_memory(thd_id);
+    auto res_s = rc_qp[loc][thd_id]->send_normal(
+			{.op = IBV_WR_RDMA_READ,
+			.flags = IBV_SEND_SIGNALED,
+			.len = operate_size,
+			.wr_id = 0},
+		   {.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf),
+			.remote_addr = m_item->offset,
+			.imm_data = 0});
+    RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+    auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
+    RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+//store in temp_row
+    row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	memcpy(temp_row, tmp_buf, operate_size);
+	assert(temp_row->get_primary_key() == req->key);
+//rdma_mvcc.cpp_access()
+    //rc = get_row();
+    if(req->acctype == WR){
+       //检查最新版本的txn-id不为0且不等于当前事务或时间戳小于rts，当前事务回滚。
+       uint64_t version = (temp_row->version_num)%HIS_CHAIN_NUM;
+       if((temp_row->txn_id[version] != 0 && temp_row->txn_id[version] != get_txn_id())
+            || txn->timestamp < temp_row->rts[version] ){
+            INC_STATS(get_thd_id(), ts_error, 1);
+            rc = Abort;
+        }
+       else{
+            //其他情况通过单边写修改版本的txn-id为当前事务id，RTS并解锁
+           temp_row->txn_id[version] = get_txn_id();
+           temp_row->rts[version] = txn->timestamp;
+
+           op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(lock,0);
+           assert(op.set_payload(test_loc, sizeof(uint64_t), mr.key) == true);
+           auto res_s3 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+
+           RDMA_ASSERT(res_s3 == IOCode::Ok);
+           auto res_p3 = rc_qp[loc][thd_id]->wait_one_comp();
+           RDMA_ASSERT(res_p3 == IOCode::Ok);
+            //将要写数据存入写集
+       }
+      
+    }else if(req->acctype == RD){
+        //若版本的txn-id不为0且不等于当前事务，则当前事务回滚
+        uint64_t i;
+        uint64_t check_num = temp_row->version_num < HIS_CHAIN_NUM ?  temp_row->version_num : HIS_CHAIN_NUM;
+        bool result = false;
+        for(i = 0;i < check_num ; i++){
+            if(temp_row->txn_id[i] == get_txn_id() || temp_row->txn_id[i] == 0){
+                result = true;
+                break;
+            }
+        }
+        if(result == false){
+           INC_STATS(get_thd_id(), result_false, 1);
+            rc = Abort;
+        }
+        else{
+            //其他情况单边写修改版本的RTS并解锁
+            uint64_t version = (temp_row->version_num)%HIS_CHAIN_NUM;
+            temp_row->rts[version] = txn->timestamp;
+
+            char *test_buf = Rdma::get_row_client_memory(thd_id);
+            memcpy(test_buf, (char*)temp_row, operate_size);
+
+            auto res_s4 = rc_qp[loc][thd_id]->send_normal(
+                {.op = IBV_WR_RDMA_WRITE,
+                .flags = IBV_SEND_SIGNALED,
+                .len = operate_size,
+                .wr_id = 0},
+                {.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+                .remote_addr = off,
+                .imm_data = 0});
+            RDMA_ASSERT(res_s4 == rdmaio::IOCode::Ok);
+            auto res_p4 = rc_qp[loc][thd_id]->wait_one_comp();
+            RDMA_ASSERT(res_p4 == rdmaio::IOCode::Ok);
+            
+	        //将读到数据存入读集
+        }
+    }
+//rlease lock
+    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(lock,0);
+    assert(op.set_payload(test_loc, sizeof(uint64_t), mr.key) == true);
+    auto res_s5 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+
+    RDMA_ASSERT(res_s5 == IOCode::Ok);
+    auto res_p5 = rc_qp[loc][thd_id]->wait_one_comp();
+    RDMA_ASSERT(res_p5 == IOCode::Ok);
+
+    //preserve the txn->access
+	Access * access = NULL;
+	access_pool.get(get_thd_id(),access);
+
+	this->last_row = temp_row;
+	this->last_type = req->acctype;
+
+    RC rc2 = RCOK;
+	rc2 = row->remote_get_row(temp_row, this, access);
+    assert(temp_row->get_primary_key() == access->data->get_primary_key());
+
+    if (rc == Abort || rc == WAIT) {
+        DEBUG_M("TxnManager::get_row(abort) access free\n");
+        access_pool.put(get_thd_id(),access);
+        return rc;
+    }
+
+	access->type = req->acctype;
+	access->orig_row = temp_row;
+    access->key = req->key;
+    //access->tid = last_tid;
+    //access->timestamp = temp_row->timestamp;
+    access->location = loc;
+    access->offset = m_item->offset;
+    row_local = access->data;
+    ++txn->row_cnt;
+
+    mem_allocator.free(m_item,0);
+
+	if (req->acctype == WR) ++txn->write_cnt;
+	txn->accesses.add(access);
+
+    return rc;
+}
+
+#endif
 RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
@@ -379,7 +541,9 @@ RC YCSBTxnManager::run_txn_state() {
 			rc = run_ycsb_0(req,row);
 		} else if (rdma_one_side()) {
 			rc = send_remote_one_side_request(req,row);
-		} else {
+		}else if(CC_ALG == RDMA_MVCC){
+			rc = mvcc_remote_one_side_request(req,row);
+		}else {
 			rc = send_remote_request();
 		}
 
@@ -416,7 +580,6 @@ RC YCSBTxnManager::run_ycsb_0(ycsb_request * req,row_t *& row_local) {
   INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
   rc = get_row(row, type,row_local);
   return rc;
-
 }
 
 RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {

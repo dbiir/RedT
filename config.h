@@ -41,6 +41,8 @@
 #define CHANGE_TCP_ONLY 0
 #define CHANGE_MSG_QUEUE 1
 
+#define HIS_CHAIN_NUM 4
+
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -180,7 +182,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG OCC
+#define CC_ALG RDMA_MVCC
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -255,7 +257,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 2097152
+#define SYNTH_TABLE_SIZE 65536
 #define ZIPF_THETA 0.0
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5
@@ -427,6 +429,7 @@ enum PPSTxnType {
 #define SILO 27
 #define CNULL 28
 #define RDMA_SILO 29
+#define RDMA_MVCC 30
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

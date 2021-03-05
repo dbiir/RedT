@@ -50,7 +50,7 @@
 // Concurrency Control
 /***********************************************/
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL,RDMA_SILO
-#define CC_ALG                                          RDMA_SILO
+#define CC_ALG                                          RDMA_MVCC
 
 // all transactions acquire tuples according to the primary key order.
 #define KEY_ORDER                                       false

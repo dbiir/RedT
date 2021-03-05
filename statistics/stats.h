@@ -61,6 +61,11 @@ public:
 
   //count abort
   uint64_t  valid_abort_cnt;
+  uint64_t  lock_row_fail;
+  uint64_t  lock_num_unequal;
+  uint64_t lock_fail ;
+  uint64_t ts_error;
+  uint64_t result_false;
   double  local_lock_fail_abort;
   double  remote_lock_fail_abort;
   double  local_readset_validate_fail_abort;
