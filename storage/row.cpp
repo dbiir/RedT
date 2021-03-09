@@ -64,7 +64,15 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
   _tid_word = 0;
   timestamp = 0;
 #endif
-
+#if CC_ALG == RDMA_MAAT
+	_tid_word = 0;
+	timestamp_last_read = 0;
+	timestamp_last_write = 0;
+	for (int i = 0; i < row_set_length; i++) {
+		uncommitted_writes[i] = 0;
+		uncommitted_reads[i] = 0;
+	}
+#endif
 	return RCOK;
 }
 
@@ -108,7 +116,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_silo *) mem_allocator.align_alloc(sizeof(Row_silo));
 #elif CC_ALG == RDMA_SILO
   manager = (Row_rdma_silo *) mem_allocator.align_alloc(sizeof(Row_rdma_silo));
-
+#elif CC_ALG == RDMA_MAAT
+  manager = (Row_rdma_maat *) mem_allocator.align_alloc(sizeof(Row_rdma_maat));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -282,7 +291,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #endif
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT || CC_ALG == RDMA_MAAT
   uint64_t init_time = get_sys_clock();
   DEBUG_M("row_t::get_row MAAT alloc \n");
 	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
@@ -700,12 +709,12 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	DEBUG_M("row_t::return_row Maat free \n");
 		mem_allocator.free(row, sizeof(row_t));
 	return 0;
-#elif CC_ALG == MAAT
+#elif CC_ALG == MAAT || CC_ALG == RDMA_MAAT
 	assert (row != NULL);
 	if (rc == Abort) {
 		manager->abort(type,txn);
 	} else {
-		manager->commit(type,txn,row);
+//		manager->commit(type,txn,row);
 	}
 
 		row->free_row();

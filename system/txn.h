@@ -21,6 +21,7 @@
 #include "helper.h"
 #include "semaphore.h"
 #include "array.h"
+#include "row_rdma_maat.h"
 #include "transport/message.h"
 //#include "wl.h"
 
@@ -60,6 +61,10 @@ public:
     row_t * 	test_row;
 	uint64_t    location;
 	uint64_t    offset;
+#endif
+#if CC_ALG == RDMA_MAAT
+    uint64_t	location;
+	uint64_t	offset;
 #endif
 	void cleanup();
 };
@@ -251,9 +256,17 @@ public:
 	void set_commit_timestamp(uint64_t timestamp) {commit_timestamp = timestamp;}
 	uint64_t greatest_write_timestamp;
 	uint64_t greatest_read_timestamp;
+#if CC_ALG == RDMA_MAAT
+	std::set<uint64_t> uncommitted_reads;
+	std::set<uint64_t> uncommitted_writes;
+	std::set<uint64_t> uncommitted_writes_y;
+	int             write_set[100];
+    int*            read_set;
+#else
 	std::set<uint64_t> * uncommitted_reads;
 	std::set<uint64_t> * uncommitted_writes;
 	std::set<uint64_t> * uncommitted_writes_y;
+#endif
 
 	uint64_t twopl_wait_start;
 

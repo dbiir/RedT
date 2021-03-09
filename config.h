@@ -180,7 +180,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG OCC
+#define CC_ALG RDMA_MAAT
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -228,6 +228,9 @@
 #define VALIDATION_LOCK				"no-wait" // no-wait or waiting
 #define PRE_ABORT2					"true"
 #define ATOMIC_WORD					false
+// [RDMA_MAAT]
+#define RDMA_TIMETABLE_MAX 10000000
+#define ROW_SET_LENGTH 30
 /***********************************************/
 // Logging
 /***********************************************/
@@ -427,6 +430,7 @@ enum PPSTxnType {
 #define SILO 27
 #define CNULL 28
 #define RDMA_SILO 29
+#define RDMA_MAAT 31
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

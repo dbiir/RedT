@@ -54,6 +54,7 @@
 #include "wkdb.h"
 #include "tictoc.h"
 #include "rdma_silo.h"
+#include "rdma_maat.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -91,6 +92,10 @@ Transport tport_man;
 Rdma rdma_man;
 #if CC_ALG == RDMA_SILO
 RDMA_silo rsilo_man;
+#endif
+#if CC_ALG == RDMA_MAAT
+RDMA_Maat rmaat_man;
+RdmaTimeTable rdma_time_table;
 #endif
 TxnManPool txn_man_pool;
 TxnPool txn_pool;
@@ -222,6 +227,10 @@ UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
 UInt64 rdma_buffer_size = 12*(1024*1024*1024L);
 UInt64 rdma_index_size = 300*1024*1024;
+// MAAT
+UInt64 rdma_timetable_size = 400*1024*1024;
+UInt64 row_set_length = ROW_SET_LENGTH;
+
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;
 UInt64 g_max_pre_req = MAX_PRE_REQ;
@@ -274,6 +283,7 @@ UInt32 g_repl_cnt = REPLICA_CNT;
 map<string, string> g_params;
 
 char *rdma_global_buffer;
+char *rdma_timetable_buffer;
 //rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
 rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
 // 每个线程只用自己的那一块客户端内存地址

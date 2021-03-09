@@ -62,6 +62,7 @@ class Row_si;
 class Row_null;
 class Row_silo;
 class Row_rdma_silo;
+class Row_rdma_maat;
 
 
 class row_t {
@@ -122,8 +123,15 @@ public:
     volatile uint64_t	_tid_word;
 	ts_t 			timestamp;
 	Row_rdma_silo * manager;
+	#elif CC_ALG == RDMA_MAAT
+	    volatile uint64_t _tid_word;
+		Row_rdma_maat * manager;
+		uint64_t uncommitted_reads[ROW_SET_LENGTH];
+		uint64_t uncommitted_writes[ROW_SET_LENGTH];
+		uint64_t timestamp_last_read;
+		uint64_t timestamp_last_write;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
-	Row_lock * manager;
+		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP
 	 	Row_ts * manager;
 	#elif CC_ALG == MVCC

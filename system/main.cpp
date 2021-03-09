@@ -44,6 +44,7 @@
 #include "ycsb_query.h"
 #include "da.h"
 #include "maat.h"
+#include "rdma_maat.h"
 #include "ssi.h"
 #include "wsi.h"
 #include "focc.h"
@@ -81,12 +82,6 @@ void parser(int argc, char * argv[]);
 int main(int argc, char *argv[]) {
 	
 
-#ifdef USE_RDMA
-  if(g_node_id == 0) {
-    // printf("[Memcached Begin Listen]\n");
-    // system("memcached -l 0.0.0.0 -p 10086 &");  
-  }
-#endif
     // 0. initialize global data structure
     parser(argc, argv);
 #if SEED != 0
@@ -223,6 +218,16 @@ int main(int argc, char *argv[]) {
 	printf("Initializing MaaT manager... ");
 	fflush(stdout);
 	maat_man.init();
+	printf("Done\n");
+#endif
+#if CC_ALG == RDMA_MAAT
+	printf("Initializing Time Table... ");
+	fflush(stdout);
+	rdma_time_table.init();
+	printf("Done\n");
+	printf("Initializing MaaT manager... ");
+	fflush(stdout);
+	rmaat_man.init();
 	printf("Done\n");
 #endif
 #if CC_ALG == SSI
@@ -409,12 +414,13 @@ int main(int argc, char *argv[]) {
 		input_thds[j].init(id,g_node_id,m_wl);
 		pthread_create(&p_thds[id++], NULL, run_thread, (void *)&input_thds[j]);
 	}
-
+//#if USE_RDMA != CHANGE_MSG_QUEUE
 	for (uint64_t j = 0; j < sthd_cnt; j++) {
 		assert(id >= wthd_cnt + rthd_cnt && id < wthd_cnt + rthd_cnt + sthd_cnt);
 		output_thds[j].init(id,g_node_id,m_wl);
 		pthread_create(&p_thds[id++], NULL, run_thread, (void *)&output_thds[j]);
 	}
+//#endif
 #if LOGGING
 	log_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&log_thds[0]);

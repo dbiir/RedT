@@ -52,6 +52,7 @@
 #include "manager.h"
 #include "rdma_silo.h"
 #include "transport.h"
+#include "rdma_maat.h"
 
 void TxnStats::init() {
 	starttime=0;
@@ -293,7 +294,7 @@ void Transaction::release_inserts(uint64_t thd_id) {
 #if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != WOOKONG && \
 		CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != DTA && CC_ALG != DLI_MVCC_OCC && \
 		CC_ALG != DLI_MVCC_BASE && CC_ALG != DLI_DTA && CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && \
-		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC
+		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC && CC_ALG != RDMA_MAAT
 		DEBUG_M("TxnManager::cleanup row->manager free\n");
 		mem_allocator.free(row->manager, 0);
 #endif
@@ -338,6 +339,12 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	uncommitted_writes = new std::set<uint64_t>();
 	uncommitted_writes_y = new std::set<uint64_t>();
 	uncommitted_reads = new std::set<uint64_t>();
+#endif
+#if CC_ALG == RDMA_MAAT
+	// uncommitted_writes = new std::set<uint64_t>();
+	// uncommitted_writes_y = new std::set<uint64_t>();
+	// uncommitted_reads = new std::set<uint64_t>();
+	  memset(write_set, 0, 100);
 #endif
 #if CC_ALG == TICTOC
 	_is_sub_txn = true;
@@ -400,6 +407,11 @@ void TxnManager::reset() {
 	uncommitted_writes_y->clear();
 	uncommitted_reads->clear();
 #endif
+#if CC_ALG == RDMA_MAAT
+	uncommitted_writes.clear();
+	uncommitted_writes_y.clear();
+	uncommitted_reads.clear();
+#endif
 
 #if CC_ALG == CALVIN
 	phase = CALVIN_RW_ANALYSIS;
@@ -425,7 +437,7 @@ void TxnManager::release() {
 	INC_STATS(get_thd_id(),mtx[1],get_sys_clock()-prof_starttime);
 	txn = NULL;
 
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT 
 	delete uncommitted_writes;
 	delete uncommitted_writes_y;
 	delete uncommitted_reads;
@@ -457,6 +469,9 @@ RC TxnManager::commit() {
 	release_locks(RCOK);
 #if CC_ALG == MAAT
 	time_table.release(get_thd_id(),get_txn_id());
+#endif
+#if CC_ALG == RDMA_MAAT
+    rdma_time_table.release(get_thd_id(), get_txn_id());
 #endif
 #if CC_ALG == WOOKONG
 	wkdb_time_table.release(get_thd_id(),get_txn_id());
@@ -509,6 +524,9 @@ RC TxnManager::abort() {
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
 	time_table.release(get_thd_id(),get_txn_id());
 #endif
+#if CC_ALG == RDMA_MAAT
+    rdma_time_table.release(get_thd_id(), get_txn_id());
+#endif
 #if CC_ALG == WOOKONG
 	wkdb_time_table.release(get_thd_id(),get_txn_id());
 #endif
@@ -558,7 +576,7 @@ RC TxnManager::start_abort() {
 	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     INC_STATS(get_thd_id(), trans_prepare_count, 1);
 	//RDMA_SILO:keep message or not
-	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO) {
+	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT) {
 		send_finish_messages();
 		abort();
 		return Abort;
@@ -596,7 +614,7 @@ RC TxnManager::start_commit() {
   	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
-	if(is_multi_part() && CC_ALG != RDMA_SILO) {
+	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT) {
 		if(CC_ALG == TICTOC) {
 			rc = validate();
 			if (rc != Abort) {
@@ -622,7 +640,8 @@ RC TxnManager::start_commit() {
 			rc = commit();
 		}
 	} else { // is not multi-part
-		rc = validate();
+		//rc = validate();
+		rc = RCOK;
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
 
@@ -640,7 +659,7 @@ RC TxnManager::start_commit() {
 		else {
 			txn->rc = Abort;
 			DEBUG("%ld start_abort\n",get_txn_id());
-			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO) {
+			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT) {
 				send_finish_messages();
 				abort();
 				rc = Abort;
@@ -828,10 +847,10 @@ void TxnManager::release_last_row_lock() {
 
 void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 	access_t type = txn->accesses[rid]->type;
-	if (type == WR && rc == Abort && CC_ALG != MAAT) {
+	if (type == WR && rc == Abort && CC_ALG != MAAT && CC_ALG != RDMA_MAAT) {
 		type = XP;
 	}
-
+    bool is_local = true;
 	uint64_t version = 0;
 	// Handle calvin elsewhere
 
@@ -854,6 +873,17 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
   #endif
     }
   }
+#elif CC_ALG == RDMA_MAAT
+    if(txn->accesses[rid]->location == g_node_id) is_local = true;
+	else is_local = false;
+#if ISOLATION_LEVEL == READ_COMMITTED
+	if(type == WR) {
+		version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
+	}
+#else
+    version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
+#endif
+
 #else
   if (ROLL_BACK && type == XP &&
       (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
@@ -915,6 +945,9 @@ void TxnManager::cleanup(RC rc) {
 //TODO-relase lock
 #if CC_ALG == RDMA_SILO
     rsilo_man.finish(rc,this);
+#endif
+#if CC_ALG == RDMA_MAAT
+    rmaat_man.finish(rc, this);
 #endif
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
@@ -1056,7 +1089,10 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	access->timestamp = row->timestamp;
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
-
+#if CC_ALG == RDMA_MAAT
+	access->location = g_node_id;
+	access->offset = (char*)row - rdma_global_buffer;
+#endif
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
 									CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
 	if (type == WR) {
@@ -1192,7 +1228,7 @@ RC TxnManager::validate() {
 			CC_ALG != SSI && CC_ALG != DLI_BASE && CC_ALG != DLI_OCC &&
 			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
 			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO &&
-			CC_ALG != RDMA_SILO) {
+			CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT) {
 		return RCOK;
 	}
 	RC rc = RCOK;
@@ -1209,6 +1245,14 @@ RC TxnManager::validate() {
 			rc = maat_man.find_bound(this);
 		}
 	}
+#if CC_ALG == RDMA_MAAT
+	if(CC_ALG == RDMA_MAAT && rc == RCOK) {
+		rc = rmaat_man.validate(this);
+		if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
+			rc = rmaat_man.find_bound(this);
+		}
+	}
+#endif
 	if(CC_ALG == TICTOC  && rc == RCOK) {
 		rc = tictoc_man.validate(this);
 		// Note: home node must be last to validate
