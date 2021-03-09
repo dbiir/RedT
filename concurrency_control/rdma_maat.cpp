@@ -27,6 +27,7 @@ limitations under the License.
 #include "string.h"
 
 #if CC_ALG == RDMA_MAAT
+
 void RDMA_Maat::init() { sem_init(&_semaphore, 0, 1); }
 
 RC RDMA_Maat::validate(TxnManager * txn) {
@@ -367,6 +368,7 @@ RDMA_Maat::finish(RC rc , TxnManager * txnMng)
 // 	memset(txnMng->write_set, 0, 100);
 	return rc;
 }
+
 void RdmaTimeTable::init() {
 //table_size = g_inflight_max * g_node_cnt * 2 + 1;
 	table_size = (RDMA_TIMETABLE_MAX)*(sizeof(RdmaTimeTableNode)+1);
@@ -381,6 +383,7 @@ void RdmaTimeTable::init() {
 	}
 	printf("%d",table[0].key);
 	printf("init %ld rdmaTimeTable\n", i);
+
 }
 
 uint64_t RdmaTimeTable::hash(uint64_t key) { return key % table_size; }
@@ -648,3 +651,4 @@ void RdmaTimeTable::remote_set_timeNode(uint64_t thd_id, uint64_t key, RdmaTimeT
 // 	return item;
 // }
 #endif
+

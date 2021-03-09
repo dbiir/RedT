@@ -1246,6 +1246,7 @@ RC TxnManager::validate() {
 		}
 	}
 #if CC_ALG == RDMA_MAAT
+
 	if(CC_ALG == RDMA_MAAT && rc == RCOK) {
 		rc = rmaat_man.validate(this);
 		if(IS_LOCAL(get_txn_id()) && rc == RCOK) {

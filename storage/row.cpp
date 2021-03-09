@@ -65,6 +65,7 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
   timestamp = 0;
 #endif
 #if CC_ALG == RDMA_MAAT
+
 	_tid_word = 0;
 	timestamp_last_read = 0;
 	timestamp_last_write = 0;
@@ -72,6 +73,7 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 		uncommitted_writes[i] = 0;
 		uncommitted_reads[i] = 0;
 	}
+
 #endif
 	return RCOK;
 }

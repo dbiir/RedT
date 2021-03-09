@@ -320,4 +320,5 @@ RC Row_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 }
 
 void Row_maat::write(row_t* data) { _row->copy(data); }
+
 #endif

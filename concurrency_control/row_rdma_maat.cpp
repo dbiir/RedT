@@ -28,6 +28,7 @@ void Row_rdma_maat::init(row_t * row) {
 
 	maat_avail = true;
 	
+
 	//uncommitted_writes = new std::set<uint64_t>();
 	//uncommitted_reads = new std::set<uint64_t>();
 	//assert(uncommitted_writes->begin() == uncommitted_writes->end());
@@ -116,6 +117,7 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
+
 	}
 	INC_STATS(txn->get_thd_id(),mtx[30],get_sys_clock() - mtx_wait_starttime);
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
@@ -127,6 +129,7 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 		uint64_t last_write = _row->uncommitted_writes[i];
 		assert(i <= row_set_length - 1);
 		if(last_write == 0) {
+
 			break;
 		}
 		txn->uncommitted_writes.insert(last_write);
@@ -142,6 +145,7 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 		uint64_t last_read = _row->uncommitted_reads[i];
 		assert(i <= row_set_length - 1);
 		if(last_read == 0) {
+
 			last_read = txn->get_txn_id();
 			break;
 		}
@@ -160,6 +164,7 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
+
 	}
 	INC_STATS(txn->get_thd_id(),mtx[31],get_sys_clock() - mtx_wait_starttime);
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
@@ -171,6 +176,7 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 		uint64_t last_read = _row->uncommitted_reads[i];
 		assert(i <= row_set_length - 1);
 		if(last_read == 0) {
+
 			break;
 		}
 		txn->uncommitted_reads.insert(last_read);
@@ -246,6 +252,7 @@ void Row_rdma_maat::ucwrite_erase(uint64_t txn_id) {
 RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
+
 	}
 	INC_STATS(txn->get_thd_id(),mtx[32],get_sys_clock() - mtx_wait_starttime);
 	DEBUG("Maat Abort %ld: %d -- %ld\n",txn->get_txn_id(),type,_row->get_primary_key());
@@ -427,3 +434,4 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 
 void Row_rdma_maat::write(row_t* data) { _row->copy(data); }
 #endif
+

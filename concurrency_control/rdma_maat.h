@@ -23,6 +23,7 @@ limitations under the License.
 #include "row_rdma_maat.h"
 
 #if CC_ALG == RDMA_MAAT
+
 class TxnManager;
 
 // enum MAATState {
@@ -87,3 +88,4 @@ private:
 #endif
 
 #endif
+

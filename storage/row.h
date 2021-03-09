@@ -130,6 +130,7 @@ public:
 		uint64_t uncommitted_writes[ROW_SET_LENGTH];
 		uint64_t timestamp_last_read;
 		uint64_t timestamp_last_write;
+
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
 		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP

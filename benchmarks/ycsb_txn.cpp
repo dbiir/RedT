@@ -233,6 +233,7 @@ itemid_t* YCSBTxnManager::read_remote_index(ycsb_request * req) {
 	return item;
 }
 #if CC_ALG == RDMA_MAAT
+
 RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
 
 	itemid_t * m_item;
@@ -256,6 +257,7 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
   	assert(op.set_payload(tmp_buf, sizeof(uint64_t), mr.key) == true);
   	auto res_s = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
 	RDMA_ASSERT(res_s == IOCode::Ok);
+
 	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == IOCode::Ok);
 
@@ -264,6 +266,7 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 		txn->rc = Abort;
 		mem_allocator.free(m_item, sizeof(itemid_t));
 		printf("RDMA_MAAT cas lock fault\n");
+
 		uint64_t timespan = get_sys_clock() - starttime;
 		INC_STATS(get_thd_id(), trans_store_access_count, 1);
 		INC_STATS(get_thd_id(), txn_manager_time, timespan);
@@ -327,6 +330,7 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 	    
 	if(req->acctype == WR) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
+
 			//uint64_t * last_read = (uint64_t *)mem_allocator.alloc(sizeof(uint64_t));
 			//*last_read = temp_row->uncommitted_reads[i];
 			assert(i < row_set_length - 1);
@@ -395,7 +399,9 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 	rc = RCOK;
 	return rc;
 }
+
 #endif
+
 RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
 	// get the index of row to be operated
 	itemid_t * m_item;
