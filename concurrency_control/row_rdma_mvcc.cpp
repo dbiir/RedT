@@ -22,7 +22,7 @@
 #include "row_rdma_mvcc.h"
 #include "mem_alloc.h"
 #include "qps/op.hh"
-
+#if CC_ALG == RDMA_MVCC
 void Row_rdma_mvcc::init(row_t * row) {
 
 }
@@ -115,3 +115,4 @@ RC Row_rdma_mvcc::finish(RC rc,TxnManager * txnMng){
 void Row_rdma_mvcc::update_buffer(TxnManager * txn) {
 	
 }
+#endif

@@ -11,7 +11,7 @@
 #include "storage/row.h"
 #include "storage/table.h"
 char *Rdma::rdma_buffer; //= new char[RDMA_BUFFER_SIZE];
-char ** Rdma::ifaddr = new char *[g_total_node_cnt+10];
+char ** Rdma::ifaddr = new char *[g_total_node_cnt+20];
 
 uint64_t Rdma::get_socket_count() {
   uint64_t sock_cnt = 0;

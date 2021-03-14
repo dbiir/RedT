@@ -294,7 +294,7 @@ void Transaction::release_inserts(uint64_t thd_id) {
 #if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != WOOKONG && \
 		CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != DTA && CC_ALG != DLI_MVCC_OCC && \
 		CC_ALG != DLI_MVCC_BASE && CC_ALG != DLI_DTA && CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && \
-		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC
+		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC && CC_ALG != RDMA_MVCC
 		DEBUG_M("TxnManager::cleanup row->manager free\n");
 		mem_allocator.free(row->manager, 0);
 #endif
@@ -917,10 +917,11 @@ void TxnManager::cleanup(RC rc) {
 #if CC_ALG == RDMA_SILO
     rsilo_man.finish(rc,this);
 #endif
-    rmvcc_man.finish(rc,this);
-#if CC_ALG == RDMA_MVCC
 
+#if CC_ALG == RDMA_MVCC
+    // rmvcc_man.finish(rc,this);
 #endif
+
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
 	assert(txn->accesses.get_count() == txn->row_cnt);
@@ -1064,6 +1065,7 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 
 #if CC_ALG == RDMA_MVCC
    access->offset = (char*)row - rdma_global_buffer;
+  // access->old_version_num = row->version_num;
 #endif
 
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
@@ -1151,6 +1153,12 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 #if CC_ALG == RDMA_SILO
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
+
+#if CC_ALG == RDMA_MVCC
+   access->offset = (char*)row - rdma_global_buffer;
+   //access->old_version_num = row->version_num;
+#endif
+
 	txn->accesses.add(access);
 	uint64_t timespan = get_sys_clock() - starttime;
 	INC_STATS(get_thd_id(), txn_manager_time, timespan);
@@ -1273,9 +1281,12 @@ RC TxnManager::validate() {
     }
   }
 #endif
+
 #if CC_ALG == RDMA_MVCC
-    rc = rmvcc_man.lock_row(this);
+    //rc = rmvcc_man.lock_row(this);
+   // rc = rmvcc_man.validate_local(this);
 #endif
+
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);
     INC_STATS(get_thd_id(),trans_validate_count, 1);

@@ -151,7 +151,7 @@ public:
         uint64_t start_ts[HIS_CHAIN_NUM];
         uint64_t end_ts[HIS_CHAIN_NUM];
         uint64_t txn_id[HIS_CHAIN_NUM];
-		Row_rdma_mvcc *manager;
+		//Row_rdma_mvcc *manager;
 	#elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
 		Row_occ * manager;
 

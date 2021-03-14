@@ -67,9 +67,15 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 #endif
 
 #if CC_ALG == RDMA_MVCC
-    version_num = 0;
+   _tid_word = 0;
+   version_num = 0;
+   for (int i = 0;i < HIS_CHAIN_NUM;i++){
+       rts[i] = 0;
+       start_ts[i] = 0;
+       end_ts[i] = 0;
+       txn_id[i] = 0;
+   }
 #endif
-
 	return RCOK;
 }
 
@@ -113,10 +119,12 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_silo *) mem_allocator.align_alloc(sizeof(Row_silo));
 #elif CC_ALG == RDMA_SILO
   manager = (Row_rdma_silo *) mem_allocator.align_alloc(sizeof(Row_rdma_silo));
+// #elif CC_ALG == RDMA_MVCC
+//   manager = (Row_rdma_mvcc *) mem_allocator.align_alloc(sizeof(Row_rdma_mvcc));
 
 #endif
 
-#if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
+#if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC && CC_ALG!=RDMA_MVCC
 	manager->init(this);
 #endif
 }
@@ -522,6 +530,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
   	access->data = txn->cur_row;
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
+
 #elif CC_ALG == RDMA_MVCC
    // rc = this->manager->access(txn, type, txn->cur_row);
    txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));

@@ -33,6 +33,7 @@ public:
 	void init(row_t * row);
 	RC access(TxnManager * txn, TsType type, row_t * row);
     RC finish(RC rc,TxnManager * txnMng); 
+    RC validate_local(TxnManager * txnMng);
     RC lock_row(TxnManager * txnMng);
 private:
  	pthread_mutex_t * latch;
