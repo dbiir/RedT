@@ -640,7 +640,7 @@ RC TxnManager::start_commit() {
 			rc = commit();
 		}
 	} else { // is not multi-part
-		//rc = validate();
+		rc = validate();
 		rc = RCOK;
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
@@ -654,8 +654,9 @@ RC TxnManager::start_commit() {
 		if(CC_ALG == WSI) {
 			wsi_man.gene_finish_ts(this);
 		}
-		if(rc == RCOK)
+		if(rc == RCOK){
 			rc = commit();
+		}		
 		else {
 			txn->rc = Abort;
 			DEBUG("%ld start_abort\n",get_txn_id());
@@ -952,8 +953,8 @@ void TxnManager::cleanup(RC rc) {
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
 	assert(txn->accesses.get_count() == txn->row_cnt);
-	// assert((WORKLOAD == YCSB && row_cnt <= g_req_per_query) || (WORKLOAD == TPCC && row_cnt <=
-	// g_max_items_per_txn*2 + 3));
+	assert((WORKLOAD == YCSB && row_cnt <= g_req_per_query) || (WORKLOAD == TPCC && row_cnt <=
+	g_max_items_per_txn*2 + 3));
 
 	DEBUG("Cleanup %ld %ld\n",get_txn_id(),row_cnt);
 	for (int rid = row_cnt - 1; rid >= 0; rid --) {

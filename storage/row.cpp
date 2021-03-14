@@ -712,16 +712,18 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		mem_allocator.free(row, sizeof(row_t));
 	return 0;
 #elif CC_ALG == MAAT || CC_ALG == RDMA_MAAT
-	assert (row != NULL);
-	if (rc == Abort) {
-		manager->abort(type,txn);
-	} else {
-//		manager->commit(type,txn,row);
+	// assert (row != NULL);
+	// if (rc == Abort) {
+	// 	manager->abort(type,txn);
+	// } else {
+	// 	manager->commit(type,txn,row);
+	// }
+	if (row != NULL) {
+		row->free_row();
+		DEBUG_M("row_t::return_row Maat free \n");
+		mem_allocator.free(row, sizeof(row_t));
 	}
 
-		row->free_row();
-	DEBUG_M("row_t::return_row Maat free \n");
-		mem_allocator.free(row, sizeof(row_t));
 	return 0;
 #elif CC_ALG == TICTOC
 	assert (row != NULL);

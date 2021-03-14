@@ -169,6 +169,7 @@ RC Maat::validate(TxnManager * txn) {
   txn->txn_stats.cc_time += timespan;
   txn->txn_stats.cc_time_short += timespan;
   DEBUG("MAAT Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
+  //  printf("MAAT Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
   sem_post(&_semaphore);
   return rc;
 

@@ -42,7 +42,7 @@ RC RDMA_Maat::validate(TxnManager * txn) {
 	start_time = get_sys_clock();
 	RC rc = RCOK;
 	//本地time_table
-	printf("txn_id: %d,node_id: %d\n", txn->get_txn_id(), g_node_id);
+	//printf("txn_id: %d,node_id: %d\n", txn->get_txn_id(), g_node_id);
 	uint64_t lower = rdma_time_table.local_get_lower(txn->get_thd_id(),txn->get_txn_id());
 	uint64_t upper = rdma_time_table.local_get_upper(txn->get_thd_id(),txn->get_txn_id());
 	DEBUG("MAAT Validate Start %ld: [%lu,%lu]\n",txn->get_txn_id(),lower,upper);
@@ -287,6 +287,7 @@ RC RDMA_Maat::validate(TxnManager * txn) {
 	txn->txn_stats.cc_time += timespan;
 	txn->txn_stats.cc_time_short += timespan;
 	DEBUG("MAAT Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
+	//printf("MAAT Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
 	sem_post(&_semaphore);
 	return rc;
 
@@ -312,60 +313,63 @@ RC RDMA_Maat::find_bound(TxnManager * txn) {
 RC
 RDMA_Maat::finish(RC rc , TxnManager * txnMng)
 {
-// 	Transaction *txn = txnMng->txn;
-// 	//abort
-// 	if (rc == Abort) {
-// 		//if (txnMng->num_locks > txnMng->get_access_cnt())
-// 		//	return rc;
-// 		for (uint64_t i = 0; i < txnMng->get_access_cnt(); i++) {
-// 			//local
-// 			if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
-// 				txn->accesses[ txnMng->write_set[i] ]->orig_row->manager->release(txnMng,txnMng->write_set[i]);
-// 			} else{
-// 			//remote
-//         		release_remote_lock(txnMng,txnMng->write_set[i] );
-// 			}
-// 			// DEBUG("silo %ld abort release row %ld \n", txnMng->get_txn_id(), txn->accesses[ txnMng->write_set[i] ]->orig_row->get_primary_key());
-// 		}
-// 	} else {
-// 	//commit
-// 		ts_t time = get_sys_clock();
-// 		for (uint64_t i = 0; i < txn->write_cnt; i++) {
-// 			//local
-// 			if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
-// 				Access * access = txn->accesses[ txnMng->write_set[i] ];
-// 				access->orig_row->manager->write( access->data, txnMng->get_txn_id(),time);
-// 				txn->accesses[ txnMng->write_set[i] ]->orig_row->manager->release(txnMng,txnMng->write_set[i]);
-// 			}else{
-// 			//remote
-// 				Access * access = txn->accesses[ txnMng->write_set[i] ];
-// 				remote_commit_write(txnMng,txnMng->write_set[i],access->data,time);
-// 				release_remote_lock(txnMng,txnMng->write_set[i] );//unlock
-// 			}
-// 			// DEBUG("silo %ld abort release row %ld \n", txnMng->get_txn_id(), txn->accesses[ txnMng->write_set[i] ]->orig_row->get_primary_key());
-// 		}
-// 	}
-//   for (uint64_t i = 0; i < txn->row_cnt; i++) {
-//     //local
-//     if(txn->accesses[i]->location != g_node_id){
-//     //remote
-//       mem_allocator.free(txn->accesses[i]->data,0);
-//       mem_allocator.free(txn->accesses[i]->orig_row,0);
-//       // mem_allocator.free(txn->accesses[i]->test_row,0);
-//       txn->accesses[i]->data = NULL;
-//       txn->accesses[i]->orig_row = NULL;
-//       txn->accesses[i]->orig_data = NULL;
-//       txn->accesses[i]->version = 0;
-
-//       txn->accesses[i]->key = 0;
-//       txn->accesses[i]->tid = 0;
-// 	  txn->accesses[i]->timestamp = 0;
-//       txn->accesses[i]->test_row = NULL;
-//       txn->accesses[i]->offset = 0;
-//     }
-//   }
-// 	txnMng->num_locks = 0;
-// 	memset(txnMng->write_set, 0, 100);
+	Transaction *txn = txnMng->txn;
+	//abort
+	int read_set[txn->row_cnt - txn->write_cnt];
+	int cur_rd_idx = 0;
+    int cur_wr_idx = 0;
+	for (uint64_t rid = 0; rid < txn->row_cnt; rid ++) {
+		if (txn->accesses[rid]->type == WR)
+			txnMng->write_set[cur_wr_idx ++] = rid;
+		else
+			read_set[cur_rd_idx ++] = rid;
+	}
+	if (rc == Abort) {
+		//if (txnMng->num_locks > txnMng->get_access_cnt())
+		//	return rc;
+		for (uint64_t i = 0; i < txnMng->get_access_cnt(); i++) {
+			//local
+			if(txn->accesses[i]->location == g_node_id){
+				rc = txn->accesses[i]->orig_row->manager->abort(txn->accesses[i]->type,txnMng);
+			} else{
+			//remote
+        		//release_remote_lock(txnMng,txnMng->write_set[i] );
+			}
+			// DEBUG("silo %ld abort release row %ld \n", txnMng->get_txn_id(), txn->accesses[ txnMng->write_set[i] ]->orig_row->get_primary_key());
+		}
+	} else {
+	//commit
+		ts_t time = get_sys_clock();
+		for (uint64_t i = 0; i < txnMng->get_access_cnt(); i++) {
+			//local
+			if(txn->accesses[i]->location == g_node_id){
+				Access * access = txn->accesses[i];
+				access->orig_row->manager->write( access->data);
+				rc = txn->accesses[i]->orig_row->manager->commit(txn->accesses[i]->type, txnMng, access->data);
+			}else{
+			//remote
+				//Access * access = txn->accesses[ txnMng->write_set[i] ];
+				//remote_commit_write(txnMng,txnMng->write_set[i],access->data,time);
+				//release_remote_lock(txnMng,txnMng->write_set[i] );//unlock
+			}
+			// DEBUG("silo %ld abort release row %ld \n", txnMng->get_txn_id(), txn->accesses[ txnMng->write_set[i] ]->orig_row->get_primary_key());
+		}
+	}
+  for (uint64_t i = 0; i < txn->row_cnt; i++) {
+    //local
+    if(txn->accesses[i]->location != g_node_id){
+    //remote
+      mem_allocator.free(txn->accesses[i]->data,0);
+      mem_allocator.free(txn->accesses[i]->orig_row,0);
+      // mem_allocator.free(txn->accesses[i]->test_row,0);
+      txn->accesses[i]->data = NULL;
+      txn->accesses[i]->orig_row = NULL;
+      txn->accesses[i]->orig_data = NULL;
+      txn->accesses[i]->version = 0;
+      txn->accesses[i]->offset = 0;
+    }
+  }
+	memset(txnMng->write_set, 0, 100);
 	return rc;
 }
 
@@ -379,9 +383,9 @@ void RdmaTimeTable::init() {
 	//printf("%d",table[0].key);
 	uint64_t i = 0;
 	for( i = 0; i < RDMA_TIMETABLE_MAX; i++) {
-		table[i].init(-1);
+		table[i].init(i);
 	}
-	printf("%d",table[0].key);
+	printf("%d",table[200].key);
 	printf("init %ld rdmaTimeTable\n", i);
 
 }
@@ -402,7 +406,7 @@ void RdmaTimeTable::release(uint64_t thd_id, uint64_t key) {
 	table[key]._lock = g_node_id;
 	table[key].lower = 0;
 	table[key].upper = UINT64_MAX;
-	table[key].key = -1;
+	table[key].key = key;
 	table[key].state = MAAT_RUNNING;
 	table[key]._lock = 0;
 }
@@ -414,13 +418,6 @@ uint64_t RdmaTimeTable::local_get_lower(uint64_t thd_id, uint64_t key) {
 	table[key]._lock = 0;
 	return value;
 }
-// uint64_t RdmaTimeTable::remote_get_lower(uint64_t thd_id, UC_SET key) {
-
-//     table[key]._lock = g_node_id;
-//     uint64_t value = table[key].lower;
-//     table[key]._lock = 0;
-//     return value;
-// }
 
 uint64_t RdmaTimeTable::local_get_upper(uint64_t thd_id, uint64_t key) {
 	table[key]._lock = g_node_id;
@@ -461,7 +458,7 @@ RdmaTimeTableNode * RdmaTimeTable::remote_get_timeNode(uint64_t thd_id, uint64_t
 	uint64_t node_id = key % g_node_cnt;
 	// todo: 这里需要获取对应的索引
 	// uint64_t index_key = 0;
-	uint64_t timenode_addr = (key) * sizeof(RdmaTimeTableNode);
+	uint64_t timenode_addr = (key) * sizeof(RdmaTimeTableNode) + (rdma_buffer_size - rdma_timetable_size);
 	uint64_t timenode_size = sizeof(RdmaTimeTableNode);
 	// 每个线程只用自己的那一块客户端内存地址
 	uint64_t *tmp_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
@@ -477,7 +474,7 @@ RdmaTimeTableNode * RdmaTimeTable::remote_get_timeNode(uint64_t thd_id, uint64_t
 
 	//timetable读取失败
 	if (*tmp_buf != 0) {
-		
+		//return;
 	}
 	char *test_buf = Rdma::get_index_client_memory(thd_id);
 	::memset(test_buf, 0, timenode_size);
@@ -502,6 +499,7 @@ RdmaTimeTableNode * RdmaTimeTable::remote_get_timeNode(uint64_t thd_id, uint64_t
 	//INC_STATS(get_thd_id(), rdma_read_cnt, 1);
 	RdmaTimeTableNode * item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
 	::memcpy(item, test_buf, timenode_size);
+	//printf("get remote timetable node %u\n", item->key);
 	assert(item->key == key);
 	uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
 	auto mr2 = client_rm_handler->get_reg_attr().value();
@@ -516,7 +514,7 @@ RdmaTimeTableNode * RdmaTimeTable::remote_get_timeNode(uint64_t thd_id, uint64_t
 
 	//timetable读取失败
 	if (*tmp_buf != 0) {
-		
+		//return;
 	}
 	return item;        
 }
@@ -526,7 +524,7 @@ void RdmaTimeTable::remote_set_timeNode(uint64_t thd_id, uint64_t key, RdmaTimeT
 
 	// todo: 这里需要获取对应的索引
 	// uint64_t index_key = 0;
-	uint64_t timenode_addr = (key) * sizeof(RdmaTimeTableNode);
+	uint64_t timenode_addr = (key) * sizeof(RdmaTimeTableNode) + (rdma_buffer_size - rdma_timetable_size);
 	uint64_t timenode_size = sizeof(RdmaTimeTableNode);
 	// 每个线程只用自己的那一块客户端内存地址
 	uint64_t *tmp_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
@@ -542,7 +540,7 @@ void RdmaTimeTable::remote_set_timeNode(uint64_t thd_id, uint64_t key, RdmaTimeT
 
 	//timetable读取失败
 	if (*tmp_buf != 0) {
-		
+		return;
 	}
 	char *test_buf = Rdma::get_index_client_memory(thd_id);
 	::memset(test_buf, 0, timenode_size);
@@ -580,7 +578,7 @@ void RdmaTimeTable::remote_set_timeNode(uint64_t thd_id, uint64_t key, RdmaTimeT
 	RDMA_ASSERT(res_p3 == IOCode::Ok);
 	//timetable读取失败
 	if (*tmp_buf != 0) {
-		
+		return;
 	}
 }
 

@@ -210,28 +210,28 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 }
 
 void Row_rdma_maat::ucread_erase(uint64_t txn_id) {
-	while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
-	}
+	// while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
+	// }
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last = _row->uncommitted_reads[i];
 		assert(i < row_set_length - 1);
-		if(last == 0) break;
+		if(last == 0 || txn_id == 0) break;
 		if(last == txn_id) {
 			if(_row->uncommitted_reads[i+1] == 0) {
 				_row->uncommitted_reads[i] = 0;
 				break;
 			}
 			for(uint64_t j = i; j < row_set_length; j++) {
-				_row->uncommitted_reads[j] = _row->uncommitted_reads[j+1];
 				if(_row->uncommitted_reads[j+1] == 0) break;
+				_row->uncommitted_reads[j] = _row->uncommitted_reads[j+1];
 			}
 		}
 	}
-	ATOM_CAS(_row->_tid_word,1,0);
+	// ATOM_CAS(_row->_tid_word,1,0);
 }
 void Row_rdma_maat::ucwrite_erase(uint64_t txn_id) {
-	while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
-	}
+	// while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
+	// }
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last = _row->uncommitted_writes[i];
 		assert(i < row_set_length - 1);
@@ -247,7 +247,7 @@ void Row_rdma_maat::ucwrite_erase(uint64_t txn_id) {
 			}
 		}
 	}
-	ATOM_CAS(_row->_tid_word,1,0);
+	//ATOM_CAS(_row->_tid_word,1,0);
 }
 RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
@@ -276,7 +276,7 @@ RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
 }
 
 RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
-	printf("the first txn will commit %d\n", txn->get_txn_id());
+	//printf("the first txn will commit %d\n", txn->get_txn_id());
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
 	}
@@ -346,6 +346,8 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 			if (_row->uncommitted_writes[i] == 0) {
 				break;
 			}
+			//printf("row->uncommitted_writes has txn: %u\n", _row->uncommitted_writes[i]);
+			//exit(0);
 			if(txn->uncommitted_writes.count(_row->uncommitted_writes[i]) == 0) {
 				if(_row->uncommitted_writes[i] % g_node_cnt == g_node_id) {
 					uint64_t it_lower = rdma_time_table.local_get_lower(txn->get_thd_id(),_row->uncommitted_writes[i]);

@@ -379,8 +379,8 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 	for(auto it = partitions_accessed.begin(); it != partitions_accessed.end(); ++it) {
 		query->partitions.add(*it);
 	}
-	DEBUG("YCSB QUERY: homeid %ld and the first partion: %ld\n",
-				home_partition_id, query->partitions[0]);
+	// DEBUG("YCSB QUERY: homeid %ld and the first partion: %ld\n",
+	// 			home_partition_id, query->partitions[0]);
 	//query->print();
 	return query;
 
