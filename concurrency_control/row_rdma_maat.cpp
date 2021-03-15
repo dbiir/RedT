@@ -146,7 +146,7 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 		assert(i <= row_set_length - 1);
 		if(last_read == 0) {
 
-			last_read = txn->get_txn_id();
+			_row->uncommitted_reads[i] = txn->get_txn_id();
 			break;
 		}
 
@@ -363,6 +363,7 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 						item->lower = txn_commit_ts+1;
 						rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i], item);
 					}
+					mem_allocator.free(item, sizeof(RdmaTimeTableNode));
 				}
 				DEBUG("MAAT forward val set lower %ld: %lu\n",_row->uncommitted_writes[i],txn_commit_ts+1);
 			} 
@@ -400,6 +401,7 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 						item->upper = txn_commit_ts-1;
 						rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i], item);
 					}
+					mem_allocator.free(item, sizeof(RdmaTimeTableNode));
 				}
 				DEBUG("MAAT forward val set upper %ld: %lu\n",_row->uncommitted_writes[i],txn_commit_ts -1);
 			} 
@@ -422,6 +424,7 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 						item->upper = lower-1;
 						rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_reads[i], item);
 					}
+					mem_allocator.free(item, sizeof(RdmaTimeTableNode));
 				}
 				DEBUG("MAAT forward val set upper %ld: %lu\n",_row->uncommitted_reads[i],lower -1);
 			} 

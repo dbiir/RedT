@@ -56,6 +56,8 @@ public:
 	RC validate(TxnManager * txn);
 	RC finish(RC rc, TxnManager *txnMng);
 	RC find_bound(TxnManager * txn);
+	RC remote_abort(TxnManager * txn, Access * data);
+	RC remote_commit(TxnManager * txn, Access * data);
 	RdmaTimeTableNode * read_remote_timetable(TxnManager * txn, uint64_t node_id);
 private:
 	sem_t 	_semaphore;

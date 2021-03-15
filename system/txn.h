@@ -63,6 +63,7 @@ public:
 	uint64_t    offset;
 #endif
 #if CC_ALG == RDMA_MAAT
+	uint64_t 	key;
     uint64_t	location;
 	uint64_t	offset;
 #endif

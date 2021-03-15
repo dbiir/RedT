@@ -289,6 +289,7 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 	row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
 	memcpy(temp_row, tmp_buf2, operate_size);
 	assert(temp_row->get_primary_key() == req->key);
+	
 	//read request
 	if(req->acctype == RD) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
@@ -383,9 +384,9 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 	assert(temp_row->get_primary_key() == access->data->get_primary_key());
 
 	access->type = req->acctype;
-	// access->orig_row = temp_row;
-
-	access->orig_row = access->data;
+	access->orig_row = temp_row;
+	access->key = req->key;
+	// access->orig_row = access->data;
 	access->location = loc;
 	access->offset = m_item->offset;
 
@@ -395,7 +396,10 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 	mem_allocator.free(m_item,sizeof(itemid_t));
 	if (req->acctype == WR) ++txn->write_cnt;
 	txn->accesses.add(access);
-	
+	// for(int i = 0; i < txn->accesses.size(); i++) {
+	// 	printf(" %d read access txn %ld, off: %ld loc: %ld and key: %ld and key2: %ld\n",i, txn->txn_id, txn->accesses[i]->offset, txn->accesses[i]->location, txn->accesses[i]->data->get_primary_key(), txn->accesses[i]->key);
+	// }
+	// cout << endl;
 	rc = RCOK;
 	return rc;
 }
