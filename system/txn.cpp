@@ -597,7 +597,7 @@ RC TxnManager::start_commit() {
   	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
-	if(is_multi_part() && CC_ALG != RDMA_SILO) {
+	if(is_multi_part() && CC_ALG != RDMA_SILO ) {
 		if(CC_ALG == TICTOC) {
 			rc = validate();
 			if (rc != Abort) {
@@ -919,7 +919,7 @@ void TxnManager::cleanup(RC rc) {
 #endif
 
 #if CC_ALG == RDMA_MVCC
-    // rmvcc_man.finish(rc,this);
+    rmvcc_man.finish(rc,this);
 #endif
 
 	ts_t starttime = get_sys_clock();
@@ -1065,7 +1065,7 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 
 #if CC_ALG == RDMA_MVCC
    access->offset = (char*)row - rdma_global_buffer;
-  // access->old_version_num = row->version_num;
+   access->old_version_num = row->version_num;
 #endif
 
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
@@ -1156,7 +1156,7 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 
 #if CC_ALG == RDMA_MVCC
    access->offset = (char*)row - rdma_global_buffer;
-   //access->old_version_num = row->version_num;
+   access->old_version_num = row->version_num;
 #endif
 
 	txn->accesses.add(access);
@@ -1209,7 +1209,7 @@ RC TxnManager::validate() {
 			CC_ALG != SSI && CC_ALG != DLI_BASE && CC_ALG != DLI_OCC &&
 			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
 			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO &&
-			CC_ALG != RDMA_SILO) {
+			CC_ALG != RDMA_SILO && CC_ALG != RDMA_MVCC) {
 		return RCOK;
 	}
 	RC rc = RCOK;
@@ -1284,7 +1284,9 @@ RC TxnManager::validate() {
 
 #if CC_ALG == RDMA_MVCC
     //rc = rmvcc_man.lock_row(this);
-   // rc = rmvcc_man.validate_local(this);
+    if(CC_ALG == RDMA_MVCC && rc == RCOK){
+         rc = rmvcc_man.validate_local(this);
+    }
 #endif
 
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);

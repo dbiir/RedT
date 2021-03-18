@@ -24,7 +24,7 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-#define USE_RDMA CHANGE_MSG_QUEUE
+// #define USE_RDMA CHANGE_MSG_QUEUE
 // #define USE_RDMA CHANGE_TCP_ONLY
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
@@ -182,7 +182,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG RDMA_MVCC
+#define CC_ALG MVCC
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -199,7 +199,7 @@
 #define ENABLE_LATCH        false
 #define CENTRAL_INDEX       false
 #define CENTRAL_MANAGER       false
-#define INDEX_STRUCT        IDX_RDMA
+#define INDEX_STRUCT        IDX_HASH
 #define BTREE_ORDER         16
 
 // [TIMESTAMP]
@@ -257,7 +257,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 65536
+#define SYNTH_TABLE_SIZE 2097152
 #define ZIPF_THETA 0.0
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5

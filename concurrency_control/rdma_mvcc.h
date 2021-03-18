@@ -56,8 +56,11 @@ private:
     uint64_t local_lock(TxnManager * txnMng , uint64_t num);
     uint64_t lock_write_set(TxnManager * txnMng , uint64_t num);
     row_t * read_remote_row(TxnManager * txnMng , uint64_t num);
+    void * local_write_back(TxnManager * txnMng , uint64_t num);
     void * remote_write_back(TxnManager * txnMng , uint64_t num);
     void * remote_release_lock(TxnManager * txnMng , uint64_t num);
+    void * abort_release_local_lock(TxnManager * txnMng , uint64_t num);
+    void * abort_release_remote_lock(TxnManager * txnMng , uint64_t num);
   
 
 	row_t * clear_history(TsType type, ts_t ts);

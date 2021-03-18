@@ -86,6 +86,7 @@ void Stats_thd::clear() {
   lock_fail = 0;
   ts_error = 0;
   result_false = 0;
+  cas_cnt = 0;
 
   local_lock_fail_abort = 0;
   remote_lock_fail_abort = 0;
@@ -581,6 +582,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   " ,lock_fail = %ld"
   ",ts_error = %ld"
   ",result_false = %ld"
+  ",cas_cnt = %ld "
 //   ",local_lock_fail_abort = %f"
 //   ",remote_lock_fail_abort = %f"
 //   ",local_readset_validate_fail_abort = %f"
@@ -617,6 +619,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
           lock_fail ,
           ts_error ,
           result_false ,
+          cas_cnt , 
         //   local_lock_fail_abort/valid_abort_cnt,
         //   remote_lock_fail_abort/valid_abort_cnt,
         //   local_readset_validate_fail_abort/valid_abort_cnt,
@@ -893,38 +896,38 @@ void Stats_thd::print(FILE * outf, bool prog) {
             i, worker_process_cnt_by_type[i], i, worker_process_time_by_type[i] / BILLION);
   }
 
-  for(uint64_t i = 0; i < SECOND; i ++) {
-    fprintf(outf,
-      ",work_queue_wq_cnt%lu=%lu"
-      ",work_queue_tx_cnt%lu=%lu"
-      ,i
-      ,work_queue_wq_cnt[i]
-      ,i
-      ,work_queue_tx_cnt[i]
-    );
-  }
+//   for(uint64_t i = 0; i < SECOND; i ++) {
+//     fprintf(outf,
+//       ",work_queue_wq_cnt%lu=%lu"
+//       ",work_queue_tx_cnt%lu=%lu"
+//       ,i
+//       ,work_queue_wq_cnt[i]
+//       ,i
+//       ,work_queue_tx_cnt[i]
+//     );
+//   }
 
-  for(uint64_t i = 0; i < SECOND; i ++) {
-    fprintf(outf,
-      ",work_queue_ewq_cnt%lu=%lu"
-      ",work_queue_dwq_cnt%lu=%lu"
-      ,i
-      ,work_queue_ewq_cnt[i]
-      ,i
-      ,work_queue_dwq_cnt[i]
-    );
-  }
+//   for(uint64_t i = 0; i < SECOND; i ++) {
+//     fprintf(outf,
+//       ",work_queue_ewq_cnt%lu=%lu"
+//       ",work_queue_dwq_cnt%lu=%lu"
+//       ,i
+//       ,work_queue_ewq_cnt[i]
+//       ,i
+//       ,work_queue_dwq_cnt[i]
+//     );
+//   }
 
-  for(uint64_t i = 0; i < SECOND; i ++) {
-    fprintf(outf,
-      ",work_queue_etx_cnt%lu=%lu"
-      ",work_queue_dtx_cnt%lu=%lu"
-      ,i
-      ,work_queue_etx_cnt[i]
-      ,i
-      ,work_queue_dtx_cnt[i]
-    );
-  }
+//   for(uint64_t i = 0; i < SECOND; i ++) {
+//     fprintf(outf,
+//       ",work_queue_etx_cnt%lu=%lu"
+//       ",work_queue_dtx_cnt%lu=%lu"
+//       ,i
+//       ,work_queue_etx_cnt[i]
+//       ,i
+//       ,work_queue_dtx_cnt[i]
+//     );
+//   }
 
   // IO
   double mbuf_send_intv_time_avg = 0;
@@ -1388,6 +1391,7 @@ void Stats_thd::combine(Stats_thd * stats) {
   lock_fail+=stats->lock_fail;
   ts_error+=stats->ts_error;
   result_false+=stats->result_false;
+  cas_cnt+=stats->cas_cnt;
 
   local_lock_fail_abort+=stats->local_lock_fail_abort;
   remote_lock_fail_abort+=stats->remote_lock_fail_abort;

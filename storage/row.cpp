@@ -72,7 +72,7 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
    for (int i = 0;i < HIS_CHAIN_NUM;i++){
        rts[i] = 0;
        start_ts[i] = 0;
-       end_ts[i] = 0;
+       end_ts[i] = UINT64_MAX;
        txn_id[i] = 0;
    }
 #endif

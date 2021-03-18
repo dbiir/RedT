@@ -1,43 +1,45 @@
 digraph graphname {
-  total [label="trans total time \n trans_total_run_time \n 100 %",
+  total [label="trans total time \n 188776.40\n 100 %",
 		shape=box]
-	process [label="trans process time \n trans_process_time \n trans_process_time_percent %",
+	process [label="trans process time \n 125219.92\n 66.33%",
 			shape=box]
-    txn_process [label="run benchmark read and write \n txn_process_time \n txn_process_time_percent %",
+    txn_process [label="run benchmark read and write \n 9.45\n 0.01%",
 			shape=box]
-      init [label="trans init time \n trans_init_time \n trans_init_time_percent %",
+      init [label="trans init time \n 0.43\n 0.00%",
         shape=box]
-      index [label="trans index time \n txn_index_time \n txn_index_time_percent %",
+      index [label="trans index time \n 0.53\n 0.00%",
           shape=box]
-      txn_compute [label="run benchmark compute \n trans_benchmark_compute_time \n trans_benchmark_compute_time_percent %",
+      txn_compute [label="run benchmark compute \n 0.89\n 0.00%",
 			            shape=box]
-      access_rwset [label="access data and store in rwset \n txn_manager_time \n txn_manager_time_percent %",
+      access_rwset [label="access data and store in rwset \n 37.12\n 0.02%",
             shape=box]
-        get_access [label="get rwset struct \n trans_get_access_time \n trans_get_access_time_percent %",
+        get_access [label="get rwset struct \n 2.58\n 0.00%",
             shape=box]
-        get_row [label="get row \n trans_get_row_time \n trans_get_row_time_percent %",
+        get_row [label="get row \n 33.99\n 0.02%",
             shape=box]
-          init_row [label="init row \n trans_cur_row_init_time \n trans_cur_row_init_time_percent %",
+          init_row [label="init row \n 0.29\n 0.00%",
               shape=box]
-          rw_row [label="read and write row \n lat_l_loc_cc_time \n lat_l_loc_cc_time_percent %",
+          rw_row [label="read and write row \n 2.94\n 0.00%",
               shape=box]
-          cur_row_copy [label="copy row \n trans_cur_row_copy_time \n trans_cur_row_copy_time_percent %",
+              clear_history [label="clear row's history \n 0.91\n 0.00%",
+                            shape=box]
+          cur_row_copy [label="copy row \n 25.32\n 0.01%",
               shape=box]
-        store_access [label="store row into rwset \n trans_store_access_time \n trans_store_access_time_percent %",
+        store_access [label="store row into rwset \n 0.25\n 0.00%",
               shape=box]
-    block [label="trans block time \n trans_block_time \n trans_block_time_percent %",
-        shape=box]
-	twopc [label="trans 2pc time \n trans_2pc_time \n trans_2pc_time_percent %",
+      block [label="trans block time \n 3455.23\n 1.83%",
+          shape=box]
+	twopc [label="trans 2pc time \n 63505.45\n 33.64%",
 		shape=box]
-		prepare [label="trans prepare time \n trans_prepare_time \n trans_prepare_time_percent %",
+		prepare [label="trans prepare time \n 22006.17\n 11.66%",
 				shape=box]
-			validate [label="trans validate time \n trans_validate_time \n trans_validate_time_percent %",
+			validate [label="trans validate time \n 0.00\n 0.00%",
 					shape=box]
-		finish [label="trans finish time \n trans_finish_time \n trans_finish_time_percent %",
+		finish [label="trans finish time \n 41499.39\n 21.98%",
 				shape=box]
-			commit [label="trans commit time \n trans_commit_time \n trans_commit_time_percent %",
+			commit [label="trans commit time \n 22008.51\n 11.66%",
 				shape=box]
-			abort [label="trans abort time \n trans_abort_time \n trans_abort_time_percent %",
+			abort [label="trans abort time \n 19490.88\n 10.32%",
 				shape=box]
 
   total->process
@@ -50,9 +52,10 @@ digraph graphname {
         access_rwset->get_row
           get_row->init_row
           get_row->rw_row
+            rw_row->clear_history
           get_row->cur_row_copy
         access_rwset->store_access
-    process->block
+      process->block
   total->twopc
     twopc->prepare
       prepare->validate

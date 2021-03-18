@@ -1,2 +1,7 @@
-RDMA_MVCC 
+MVCC 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
+121764.694496
+3455.226088
+22006.170502
+22008.510586
+19490.876775

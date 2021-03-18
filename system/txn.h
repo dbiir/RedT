@@ -60,7 +60,7 @@ public:
     row_t * 	test_row;
 	uint64_t    location;
 	uint64_t    offset;
-  //  uint64_t    old_version_num;
+    uint64_t    old_version_num;
 #endif
 	void cleanup();
 };
