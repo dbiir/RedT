@@ -67,6 +67,10 @@ public:
     uint64_t	location;
 	uint64_t	offset;
 #endif
+#if CC_ALG ==RDMA_TS1
+    uint64_t	location;
+	uint64_t	offset;
+#endif
 	void cleanup();
 };
 

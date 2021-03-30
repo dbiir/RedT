@@ -257,32 +257,32 @@ then
     let indexlen--
     indexofcc=0
     indexofnn=0
-    addTableTitle
-    addTableTuple "实验参数" "rundbCPU使用率" "rundb内存使用率" "runclCPU使用率" "runcl内存使用率" "性能监控"
-    for index in $(seq 0 ${indexlen})
-    do
-        ft=${FT[${index}]}
-        ft0=$(echo $ft | cut -b -10)
-        tt=${TT[${index}]}
-        tt0=$(echo $tt | cut -b -10)
-        let pt0=tt0-ft0
-        a=($(curl -g "http://9.39.242.189:8080/api/v1/query?query=avg_over_time(KPI_PROCESS_cpu{pname=\"rundb\"}[${pt0}s])&time=${tt0}" | tr "\"" "\n"))
-        rundbcpu=${a[-2]}
-        a=($(curl -g "http://9.39.242.189:8080/api/v1/query?query=avg_over_time(KPI_PROCESS_mem{pname=\"rundb\"}[${pt0}s])&time=${tt0}" | tr "\"" "\n"))
-        rundbmem=${a[-2]}
-        a=($(curl -g "http://9.39.242.189:8080/api/v1/query?query=avg_over_time(KPI_PROCESS_cpu{pname=\"runcl\"}[${pt0}s])&time=${tt0}" | tr "\"" "\n"))
-        runclcpu=${a[-2]}
-        a=($(curl -g "http://9.39.242.189:8080/api/v1/query?query=avg_over_time(KPI_PROCESS_mem{pname=\"runcl\"}[${pt0}s])&time=${tt0}" | tr "\"" "\n"))
-        runclmem=${a[-2]}
-        addTableTuple ${CC[${indexofcc}]}"\\"${NUMBEROFNODE[${indexofnn}]} $rundbcpu $rundbmem $runclcpu $runclmem "<a href=\"http://9.39.242.189:8081/d/e2HCbA5Gk/denevamonitor?orgId=1&from=${ft}&to=${tt}\">性能监控</a>"
-        let indexofcc++
-        if [[ "$indexofcc" == "${#CC[@]}" ]]
-        then
-            indexofcc=0
-            let indexofnn++
-        fi
-    done
-    addTableTail
+    # addTableTitle
+    # addTableTuple "实验参数" "rundbCPU使用率" "rundb内存使用率" "runclCPU使用率" "runcl内存使用率" "性能监控"
+    # for index in $(seq 0 ${indexlen})
+    # do
+    #     ft=${FT[${index}]}
+    #     ft0=$(echo $ft | cut -b -10)
+    #     tt=${TT[${index}]}
+    #     tt0=$(echo $tt | cut -b -10)
+    #     let pt0=tt0-ft0
+    #     a=($(curl -g "http://9.39.242.189:8080/api/v1/query?query=avg_over_time(KPI_PROCESS_cpu{pname=\"rundb\"}[${pt0}s])&time=${tt0}" | tr "\"" "\n"))
+    #     rundbcpu=${a[-2]}
+    #     a=($(curl -g "http://9.39.242.189:8080/api/v1/query?query=avg_over_time(KPI_PROCESS_mem{pname=\"rundb\"}[${pt0}s])&time=${tt0}" | tr "\"" "\n"))
+    #     rundbmem=${a[-2]}
+    #     a=($(curl -g "http://9.39.242.189:8080/api/v1/query?query=avg_over_time(KPI_PROCESS_cpu{pname=\"runcl\"}[${pt0}s])&time=${tt0}" | tr "\"" "\n"))
+    #     runclcpu=${a[-2]}
+    #     a=($(curl -g "http://9.39.242.189:8080/api/v1/query?query=avg_over_time(KPI_PROCESS_mem{pname=\"runcl\"}[${pt0}s])&time=${tt0}" | tr "\"" "\n"))
+    #     runclmem=${a[-2]}
+    #     addTableTuple ${CC[${indexofcc}]}"\\"${NUMBEROFNODE[${indexofnn}]} $rundbcpu $rundbmem $runclcpu $runclmem "<a href=\"http://9.39.242.189:8081/d/e2HCbA5Gk/denevamonitor?orgId=1&from=${ft}&to=${tt}\">性能监控</a>"
+    #     let indexofcc++
+    #     if [[ "$indexofcc" == "${#CC[@]}" ]]
+    #     then
+    #         indexofcc=0
+    #         let indexofnn++
+    #     fi
+    # done
+    # addTableTail
 
     for cc in ${CC[@]}
     do

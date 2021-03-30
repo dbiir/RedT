@@ -34,6 +34,8 @@
 #include "row_lock.h"
 #include "row_ts.h"
 #include "row_mvcc.h"
+#include "row_rdma_ts1.h"
+#include "rdma_ts1.h"
 #include "mem_alloc.h"
 #include "query.h"
 #include "msg_queue.h"
@@ -104,6 +106,9 @@ RC YCSBTxnManager::run_txn() {
 
 	if(IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
 		DEBUG("Running txn %ld\n",txn->txn_id);
+#if DEBUG_PRINTF
+		printf("[txn start]事务号：%d，ts：%lu\n",txn->txn_id,get_timestamp());
+#endif
 		//query->print();
 		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
 	}
@@ -406,6 +411,119 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 
 #endif
 
+#if CC_ALG == RDMA_TS1
+RC YCSBTxnManager::send_timestamp_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
+	// get the index of row to be operated
+	itemid_t * m_item;
+	m_item = read_remote_index(req);
+
+	uint64_t part_id = _wl->key_to_part( req->key );
+    uint64_t loc = GET_NODE_ID(part_id);
+	assert(loc != g_node_id);
+	uint64_t offset = m_item->offset;
+	uint64_t thd_id = get_thd_id();
+	uint64_t operate_size = sizeof(row_t);
+
+	//preserve the txn->access
+	uint64_t starttime = get_sys_clock();
+	uint64_t timespan;
+	Access * access = NULL;
+	access_pool.get(get_thd_id(),access);
+	uint64_t get_access_end_time = get_sys_clock();
+	INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
+	INC_STATS(get_thd_id(), trans_get_access_count, 1);
+	access->location = loc;
+	access->offset = offset;
+	access->type = req->acctype;
+
+	uint64_t endtime;
+	starttime = get_sys_clock();
+	RC rc = RCOK;
+	ts_t ts = get_timestamp();
+
+	//validate lock suc
+	row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	//lock remote row
+	bool suc = rdmats_man.remote_try_lock(this, temp_row, loc, offset);
+	if(suc == false) {
+		rc = Abort;
+#if DEBUG_PRINTF
+		printf("[远程读写回滚]事务号：%d，加锁失败\n",get_txn_id());
+#endif
+	}
+
+	//read remote row
+	row_t *remote_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	rdmats_man.read_remote_row(this, remote_row, loc, offset);
+
+	if(req->acctype == RD) {
+		if(ts < remote_row->wts || (ts > remote_row->tid && remote_row->tid != 0)) {
+			rc = Abort;
+#if DEBUG_PRINTF
+			printf("[远程读回滚]事务号：%d，主键：%d，ts:%lu，锁：%lu，tid：%lu,rts：%lu,wts：%lu\n",get_txn_id(),remote_row->get_primary_key(),ts,remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
+#endif
+		}
+		else {
+			if (remote_row->rts < ts) remote_row->rts = ts;
+			rc = RCOK;
+		}
+	} 
+	else if(req->acctype == WR) {	
+		if (remote_row->tid != 0 || ts < remote_row->rts || ts < remote_row->wts) {
+			rc = Abort;
+#if DEBUG_PRINTF
+			printf("[远程写回滚]事务号：%d，主键：%d，ts:%lu，锁：%lu，tid：%lu,rts：%lu,wts：%lu\n",get_txn_id(),remote_row->get_primary_key(),ts,remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
+#endif
+		}	
+		else {
+			remote_row->tid = ts;
+			rc = RCOK;	
+		}
+	} else {
+		assert(false);
+	}
+	remote_row->mutx = 0;
+	uint64_t init_time = get_sys_clock();
+  	cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+  	INC_STATS(get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
+	uint64_t copy_time = get_sys_clock();
+	memcpy((char*)cur_row, (char*)remote_row, sizeof(row_t));
+	access->data = cur_row;
+	INC_STATS(get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+	assert(remote_row->get_primary_key() == access->data->get_primary_key());
+	
+	//rdma wirte back
+	if (rc == Abort){
+		DEBUG_M("TxnManager::get_row(abort) access free\n");
+#if DEBUG_PRINTF
+		printf("YCSB_TXN::get_row(abort) txn:%lu,key:%lu\n",get_txn_id(),remote_row->get_primary_key());
+#endif
+		rdmats_man.write_remote(rc, this, access);
+		access_pool.put(get_thd_id(),access);
+		mem_allocator.free(m_item,sizeof(itemid_t));
+		mem_allocator.free(remote_row,sizeof(row_t));
+		mem_allocator.free(temp_row,sizeof(row_t));
+		return rc;
+	}
+	rdmats_man.write_remote(rc, this, access);
+	
+	row_local = access->data;
+	this->last_row = remote_row;
+	this->last_type = req->acctype;
+	++txn->row_cnt;
+	if (req->acctype == WR) ++txn->write_cnt;
+	txn->accesses.add(access);
+#if DEBUG_PRINTF
+	printf("[远程访问后]事务号：%d，主键：%d，tid：%lu,rts：%lu,wts：%lu\n",get_txn_id(),cur_row->get_primary_key(),access->data->tid,access->data->rts,access->data->wts);
+#endif
+	mem_allocator.free(m_item,sizeof(itemid_t));
+	mem_allocator.free(remote_row,sizeof(row_t));
+	mem_allocator.free(temp_row,sizeof(row_t));
+	rc = RCOK;
+	return rc;
+}
+#endif
+
 RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
 	// get the index of row to be operated
 	itemid_t * m_item;
@@ -537,7 +655,7 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 }
 
 bool YCSBTxnManager::rdma_one_side() {
-  if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MAAT) return true;
+  if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1) return true;
   else return false;
 }
 
@@ -558,6 +676,9 @@ RC YCSBTxnManager::run_txn_state() {
 #endif
 #if CC_ALG == RDMA_MAAT
             rc = send_maat_remote_one_side_request(req,row);
+#endif
+#if CC_ALG == RDMA_TS1
+            rc = send_timestamp_remote_one_side_request(req,row);
 #endif
 		} else {
 			rc = send_remote_request();

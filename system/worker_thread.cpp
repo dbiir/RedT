@@ -1023,7 +1023,7 @@ RC WorkerThread::process_calvin_rtxn(Message * msg) {
 }
 
 bool WorkerThread::is_cc_new_timestamp() {
-  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == DTA || CC_ALG == WOOKONG);
+  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG ==RDMA_TS1 || CC_ALG == DTA || CC_ALG == WOOKONG);
 }
 
 ts_t WorkerThread::get_next_ts() {

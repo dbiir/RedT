@@ -85,6 +85,11 @@ public:
   uint64_t txn_write_cnt;
   uint64_t record_write_cnt;
 
+//RDMA_TS
+  uint64_t preqlen_over_cnt;
+  uint64_t lock_retry_cnt;
+  uint64_t read_retry_cnt;
+  uint64_t write_retry_cnt;
   // Transaction stats
   double txn_total_process_time;
   double txn_process_time;

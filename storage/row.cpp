@@ -39,6 +39,8 @@
 #include "row_null.h"
 #include "row_silo.h"
 #include "row_rdma_silo.h"
+#include "row_rdma_ts1.h"
+#include "rdma_ts1.h"
 #include "mem_alloc.h"
 #include "manager.h"
 
@@ -63,6 +65,12 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 #if CC_ALG == RDMA_SILO
   _tid_word = 0;
   timestamp = 0;
+#endif
+#if CC_ALG ==RDMA_TS1
+	mutx = 0;
+	tid = 0;
+	wts = 0;
+	rts = 0;
 #endif
 #if CC_ALG == RDMA_MAAT
 
@@ -120,6 +128,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_rdma_silo *) mem_allocator.align_alloc(sizeof(Row_rdma_silo));
 #elif CC_ALG == RDMA_MAAT
   manager = (Row_rdma_maat *) mem_allocator.align_alloc(sizeof(Row_rdma_maat));
+#elif CC_ALG ==RDMA_TS1
+  manager = (Row_rdma_ts1 *) mem_allocator.align_alloc(sizeof(Row_rdma_ts1));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -214,6 +224,9 @@ void row_t::set_data(char * data) {
 // copy from the src to this
 void row_t::copy(row_t * src) {
 	assert(src->get_schema() == this->get_schema());
+#if CC_ALG ==RDMA_TS1
+	set_primary_key(src->get_primary_key());
+#endif
 #if SIM_FULL_ROW
 	set_data(src->get_data());
 #else
@@ -461,6 +474,25 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	}
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
+#elif CC_ALG ==RDMA_TS1
+	uint64_t init_time = get_sys_clock();
+	DEBUG_M("row_t::get_rowRDMA_TS1 alloc \n");
+	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row->init(get_table(), this->get_part_id());
+	assert(txn->cur_row->get_schema() == this->get_schema());
+
+	INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
+	uint64_t copy_time = get_sys_clock();
+
+	rc = this->manager->access(txn, access, type);
+	if (rc == RCOK) {
+		access->data = txn->cur_row;
+		assert(access->data->get_data() != NULL);
+		assert(access->data->get_table() != NULL);
+		assert(access->data->get_schema() == this->get_schema());
+		assert(access->data->get_table_name() != NULL);
+	}
+	goto end;
 #elif CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC
 	// OCC always make a local copy regardless of read or write
   uint64_t init_time = get_sys_clock();
@@ -629,6 +661,31 @@ RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 // delete during history cleanup.
 // For TIMESTAMP, the row will be explicity deleted at the end of access().
 // (c.f. row_ts.cpp)
+#if CC_ALG ==RDMA_TS1
+uint64_t row_t::return_row(access_t type, TxnManager *txn, Access *access) {
+#if MODE==NOCC_MODE || MODE==QRY_ONLY_MODE
+	return 0;
+#endif
+#if ISOLATION_LEVEL == NOLOCK
+	return 0;
+#endif
+	if (type == RD || type == SCAN) {
+		access->data->free_row();
+		DEBUG_M("row_t::return_rowRDMA_TS1 RD free \n");
+		mem_allocator.free(access->data, sizeof(row_t));
+	}
+	else if (type == WR || type == XP) {
+#if DEBUG_PRINTF
+		printf("[return_row本地提交]事务号：%d，主键：%d\n",txn->get_txn_id(),this->get_primary_key());
+#endif
+		RC rc =  this->manager->local_commit(txn, access, type);
+		assert(rc == RCOK);
+	}
+	else
+		assert(false);
+	return 0;
+}
+#endif
 uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 #if MODE==NOCC_MODE || MODE==QRY_ONLY_MODE
 	return 0;

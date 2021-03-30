@@ -105,6 +105,12 @@ void Stats_thd::clear() {
   record_write_cnt=0;
   parts_touched=0;
 
+  //RDMA_TS
+  preqlen_over_cnt=0;
+  lock_retry_cnt=0;
+  read_retry_cnt=0;
+  write_retry_cnt=0;
+
   // Breakdown
   ts_alloc_time=0;
   abort_time=0;
@@ -550,10 +556,12 @@ void Stats_thd::print(FILE * outf, bool prog) {
   double multi_part_txn_avg_time = 0;
   double single_part_txn_avg_time = 0;
   double avg_parts_touched = 0;
+  double avg_preqlen_over_cnt = 0;
   if (total_runtime > 0) tput = txn_cnt / (total_runtime / BILLION);
   if(txn_cnt > 0) {
     txn_run_avg_time = txn_run_time / txn_cnt;
     avg_parts_touched = ((double)parts_touched) / txn_cnt;
+    avg_preqlen_over_cnt = ((double)preqlen_over_cnt) / txn_cnt;
   }
   if(multi_part_txn_cnt > 0)
     multi_part_txn_avg_time = multi_part_txn_run_time / multi_part_txn_cnt;
@@ -568,17 +576,17 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",total_txn_commit_cnt=%ld"
   ",local_txn_commit_cnt=%ld"
   ",remote_txn_commit_cnt=%ld"
-  ",valid_abort_cnt = %ld"
-  ",local_lock_fail_abort = %f"
-  ",remote_lock_fail_abort = %f"
-  ",local_readset_validate_fail_abort = %f"
-  ",remote_readset_validate_fail_abort = %f"
-  ",local_writeset_validate_fail_abort = %f"
-  ",remote_writeset_validate_fail_abort = %f"
-  ",validate_lock_abort = %f"
-  ",local_try_lock_fail_abort = %f"
-  ",remote_try_lock_fail_abort = %f"
-  ",cnt_unequal_abort = %f"
+  ",valid_abort_cnt=%ld"
+  ",local_lock_fail_abort=%f"
+  ",remote_lock_fail_abort=%f"
+  ",local_readset_validate_fail_abort=%f"
+  ",remote_readset_validate_fail_abort=%f"
+  ",local_writeset_validate_fail_abort=%f"
+  ",remote_writeset_validate_fail_abort=%f"
+  ",validate_lock_abort=%f"
+  ",local_try_lock_fail_abort=%f"
+  ",remote_try_lock_fail_abort=%f"
+  ",cnt_unequal_abort=%f"
   ",total_txn_abort_cnt=%ld"
 
           ",positive_txn_abort_cnt=%ld"
@@ -596,7 +604,12 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",txn_write_cnt=%ld"
   ",record_write_cnt=%ld"
   ",parts_touched=%ld"
-          ",avg_parts_touched=%f",
+          ",avg_parts_touched=%f"
+  ",preqlen_over_cnt=%ld"
+          ",avg_preqlen_over_cnt=%f"
+  ",lock_retry_cnt=%ld"
+  ",read_retry_cnt=%ld"
+  ",write_retry_cnt=%ld",
           tput, txn_cnt, remote_txn_cnt, local_txn_cnt, local_txn_start_cnt, total_txn_commit_cnt,
           local_txn_commit_cnt, remote_txn_commit_cnt,
           valid_abort_cnt,
@@ -617,7 +630,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
           txn_run_avg_time / BILLION, multi_part_txn_cnt, multi_part_txn_run_time / BILLION,
           multi_part_txn_avg_time / BILLION, single_part_txn_cnt,
           single_part_txn_run_time / BILLION, single_part_txn_avg_time / BILLION, txn_write_cnt,
-          record_write_cnt, parts_touched, avg_parts_touched);
+          record_write_cnt, parts_touched, avg_parts_touched, preqlen_over_cnt, avg_preqlen_over_cnt,
+          lock_retry_cnt, read_retry_cnt, write_retry_cnt);
 
   // Breakdown
   fprintf(outf,
@@ -640,8 +654,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_benchmark_compute_time=%f"
   ",trans_2pc_time=%f"
   ",trans_prepare_time=%f"
-  ",rdma_read_time = %f"
-  ",rdma_write_time = %f"
+  ",rdma_read_time=%f"
+  ",rdma_write_time=%f"
 
   ",trans_validate_time=%f"
   ",trans_finish_time=%f"
@@ -704,8 +718,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",avg_trans_get_row_time=%f"
   ",avg_trans_2pc_time=%f"
   ",avg_trans_prepare_time=%f"
-  ",avg_rdma_read_time = %f"
-  ",avg_rdma_write_time = %f"
+  ",avg_rdma_read_time=%f"
+  ",avg_rdma_write_time=%f"
 
   ",avg_trans_validate_time=%f"
   ",avg_trans_finish_time=%f"
@@ -728,8 +742,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_get_row_count=%ld"
   ",trans_2pc_count=%ld"
   ",trans_prepare_count=%ld"
-  ",rdma_read_cnt = %ld"
-  ",rdma_write_cnt = %ld"
+  ",rdma_read_cnt=%ld"
+  ",rdma_write_cnt=%ld"
   ",trans_validate_count=%ld"
   ",trans_finish_count=%ld"
   ",trans_commit_count=%ld"
@@ -1390,6 +1404,10 @@ void Stats_thd::combine(Stats_thd * stats) {
   txn_write_cnt+=stats->txn_write_cnt;
   record_write_cnt+=stats->record_write_cnt;
   parts_touched+=stats->parts_touched;
+  preqlen_over_cnt+=stats->preqlen_over_cnt;
+  lock_retry_cnt+=stats->lock_retry_cnt;
+  read_retry_cnt+=stats->read_retry_cnt;
+  write_retry_cnt+=stats->write_retry_cnt;
 
   // Breakdown
   ts_alloc_time+=stats->ts_alloc_time;

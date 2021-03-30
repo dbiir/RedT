@@ -117,6 +117,12 @@ stat_map = OrderedDict([
   ('record_write_cnt', []),
   ('parts_touched', []),
   ('avg_parts_touched', []),
+  ('preqlen_over_cnt', []),
+  ('avg_preqlen_over_cnt', []),
+  ('lock_retry_cnt', []),
+  ('read_retry_cnt', []),
+  ('write_retry_cnt', []),
+  
 
   # Client
   ('txn_sent_cnt', []),
@@ -458,6 +464,8 @@ stat_map2 = {
   'single_part_txn_avg_time': [],
   'parts_touched': [],
   'avg_parts_touched': [],
+  'preqlen_over_cnt': [],
+  'avg_preqlen_over_cnt': [],
 
   # Client
   'txn_sent_cnt': [],

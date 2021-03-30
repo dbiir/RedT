@@ -230,7 +230,7 @@ void Rdma::init(){
 	rm_handler = RegHandler::create(rdma_rm, nic).value();
 
 	//as client
-	client_rdma_rm = Arc<RMem>(new RMem(10240));
+	client_rdma_rm = Arc<RMem>(new RMem(RDMA_LOCAL_BUFFER_SIZE));
 	client_rm_handler = RegHandler::create(client_rdma_rm, nic).value();
 
 	uint64_t thread_num = 0;

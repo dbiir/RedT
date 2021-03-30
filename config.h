@@ -24,10 +24,11 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-#define USE_RDMA CHANGE_MSG_QUEUE
-// #define USE_RDMA CHANGE_TCP_ONLY
+// #define USE_RDMA CHANGE_MSG_QUEUE
+#define USE_RDMA CHANGE_TCP_ONLY
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
+#define RDMA_LOCAL_BUFFER_SIZE (10240)
 #define RDMA_BUFFER_ITEM_SIZE (1<<12)
 #define RDMA_USE_NIC_IDX 0
 #define RDMA_REG_MEM_NAME 73
@@ -180,7 +181,8 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG MAAT
+#define CC_ALG RDMA_TS1
+#define DEBUG_PRINTF false
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -267,7 +269,7 @@
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR
-#define REQ_PER_QUERY 10
+#define REQ_PER_QUERY 3
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 0
@@ -432,6 +434,8 @@ enum PPSTxnType {
 #define CNULL 28
 #define RDMA_SILO 29
 #define RDMA_MAAT 31
+#define RDMA_TS1 34
+
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

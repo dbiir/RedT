@@ -55,6 +55,7 @@
 #include "tictoc.h"
 #include "rdma_silo.h"
 #include "rdma_maat.h"
+#include "rdma_ts1.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -96,6 +97,9 @@ RDMA_silo rsilo_man;
 #if CC_ALG == RDMA_MAAT
 RDMA_Maat rmaat_man;
 RdmaTimeTable rdma_time_table;
+#endif
+#if CC_ALG == RDMA_TS1
+RDMA_ts1 rdmats_man;
 #endif
 TxnManPool txn_man_pool;
 TxnPool txn_pool;

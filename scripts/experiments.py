@@ -75,7 +75,7 @@ def ycsb_scaling():
 	# algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     # algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    algos=['MAAT']
+    algos=['RDMA_TS1']
 
     base_table_size=1048576
     # base_table_size=1048576*8
@@ -866,7 +866,7 @@ configs = {
     "ZIPF_THETA":0.3,
     "ACCESS_PERC":0.03,
     "DATA_PERC": 100,
-    "REQ_PER_QUERY": 10,
+    "REQ_PER_QUERY": 3,
     "SYNTH_TABLE_SIZE":"65536",
 #TPCC
     "NUM_WH": 'PART_CNT',

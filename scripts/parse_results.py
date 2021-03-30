@@ -21,13 +21,24 @@ for arg in sys.argv[1:]:
     get_summary(arg)
 names = summary.keys()
 
-a, b, c = 0, 0, 0
+# a, b, c = 0, 0, 0
+# if 'tput' in summary:
+#     a = sum(summary['tput'])
+# if 'total_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
+#     b = summary['total_txn_abort_cnt'][0] / (summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0])
+# if 'remote_txn_commit_cnt' in summary and 'remote_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and 'total_txn_abort_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
+#     c = (summary['remote_txn_commit_cnt'][0] + summary['remote_txn_abort_cnt'][0]) / (
+#             summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0])
+
+# print a, b, c
+
+a, b, c, d = 0, 0, 0, 0
 if 'tput' in summary:
     a = sum(summary['tput'])
 if 'total_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
     b = summary['total_txn_abort_cnt'][0] / (summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0])
-if 'remote_txn_commit_cnt' in summary and 'remote_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and 'total_txn_abort_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
-    c = (summary['remote_txn_commit_cnt'][0] + summary['remote_txn_abort_cnt'][0]) / (
-            summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0])
-
-print a, b, c
+if 'lock_retry_cnt' in summary:
+    c = sum(summary['lock_retry_cnt'])
+if 'read_retry_cnt' in summary:
+    d = sum(summary['read_retry_cnt'])
+print a, b, c, d

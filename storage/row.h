@@ -63,6 +63,7 @@ class Row_null;
 class Row_silo;
 class Row_rdma_silo;
 class Row_rdma_maat;
+class Row_rdma_ts1;
 
 
 class row_t {
@@ -117,6 +118,9 @@ public:
 	RC get_row(access_t type, TxnManager *txn, Access *access);
 	RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row);
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
+#if CC_ALG == RDMA_TS1
+	uint64_t return_row(access_t type, TxnManager *txn, Access *access);
+#endif
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
   #if CC_ALG == RDMA_SILO
@@ -131,6 +135,12 @@ public:
 		uint64_t timestamp_last_read;
 		uint64_t timestamp_last_write;
 
+	#elif CC_ALG == RDMA_TS1
+		volatile uint64_t	mutx;
+		volatile uint64_t	tid;
+		ts_t wts;
+    	ts_t rts;
+		Row_rdma_ts1 * manager;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
 		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP

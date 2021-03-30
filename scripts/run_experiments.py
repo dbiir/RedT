@@ -134,7 +134,11 @@ for exp in exps:
                         cmd = 'scp {}/{} {}:/{}'.format(PATH, f, m, uname)
                     print cmd
                     os.system(cmd)
-
+                    # if cluster == 'istc':
+                    #     cmd = 'ssh {}.csail.mit.edu:/{}/'.format(PATH, f, m, uname)
+                    # elif cluster == 'vcloud':
+                    #     os.system('./scripts/kill.sh {}'.format(m))
+                    #     cmd = 'ssh {}/{} {}:/{}'.format(PATH, f, m, uname)
                 print("Deploying: {}".format(output_f))
                 os.chdir('./scripts')
                 if cluster == 'istc':

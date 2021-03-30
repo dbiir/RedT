@@ -88,6 +88,9 @@ class RDMA_silo;
 class RDMA_Maat;
 class RdmaTimeTable;
 #endif
+#if CC_ALG == RDMA_TS1
+class RDMA_ts1;
+#endif
 class Remote_query;
 class TxnManPool;
 class TxnPool;
@@ -149,6 +152,9 @@ extern RDMA_silo rsilo_man;
 #if CC_ALG == RDMA_MAAT
 extern RDMA_Maat rmaat_man;
 extern RdmaTimeTable rdma_time_table;
+#endif
+#if CC_ALG ==RDMA_TS1
+extern RDMA_ts1 rdmats_man;
 #endif
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;

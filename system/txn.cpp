@@ -53,6 +53,7 @@
 #include "rdma_silo.h"
 #include "transport.h"
 #include "rdma_maat.h"
+#include "rdma_ts1.h"
 
 void TxnStats::init() {
 	starttime=0;
@@ -614,7 +615,7 @@ RC TxnManager::start_commit() {
   	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
-	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT) {
+	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT && CC_ALG !=RDMA_TS1) {
 		if(CC_ALG == TICTOC) {
 			rc = validate();
 			if (rc != Abort) {
@@ -639,7 +640,7 @@ RC TxnManager::start_commit() {
 			rsp_cnt = 0;
 			rc = commit();
 		}
-	} else { // is not multi-part
+	} else { // is not multi-part or use one-side rdma
 		rc = validate();
 		rc = RCOK;
 		uint64_t finish_start_time = get_sys_clock();
@@ -884,6 +885,27 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 #else
     version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
 #endif
+#elif CC_ALG ==RDMA_TS1 
+	if (type == RD || type == SCAN) {
+		version = orig_r->return_row(type, this, txn->accesses[rid]);
+	} else if (type == WR || type == XP) { 
+		if(type == WR)
+			assert(txn->accesses[rid]->data != NULL);
+		
+		//1.不区分本地和远程写
+		// rdmats_man.commit_write(this, rid, type); //在这里提交
+
+		//2.区分本地和远程
+		if (txn->accesses[rid]->location != g_node_id)
+			is_local = false;
+		if (is_local) {
+			version = orig_r->return_row(type, this, txn->accesses[rid]);
+		} else {
+			rdmats_man.commit_write(this, rid, type);
+		}
+	} else {
+		assert(false);
+	}
 
 #else
   if (ROLL_BACK && type == XP &&
@@ -1055,6 +1077,10 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 #endif
 	//uint64_t row_cnt = txn->row_cnt;
 	//assert(txn->accesses.get_count() - 1 == row_cnt);
+#if CC_ALG == RDMA_TS1
+	access->location = g_node_id;
+	access->offset = (char*)row - rdma_global_buffer;
+#endif
 #if CC_ALG != TICTOC
   // uint64_t start_time = get_sys_clock();
 	rc = row->get_row(type, this, access);
@@ -1064,7 +1090,7 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 #if CC_ALG == FOCC
 	focc_man.active_storage(type, this, access);
 #endif
-  uint64_t middle_time = get_sys_clock();
+  	uint64_t middle_time = get_sys_clock();
 	if (rc == Abort || rc == WAIT) {
 		row_rtn = NULL;
 		DEBUG_M("TxnManager::get_row(abort) access free\n");

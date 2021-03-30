@@ -1,13 +1,14 @@
+python run_experiments.py -e -c vcloud ycsb_scaling
 #python run_experiments.py -e -c vcloud tpcc_stress1
 #sleep 10
 
 
-python run_experiments.py -e -c vcloud tpcc_cstress
-sleep 10
-python run_experiments.py -e -c vcloud tpcc_cstress1
-sleep 10
-python run_experiments.py -e -c vcloud tpcc_cstress2
-sleep 10
+# python run_experiments.py -e -c vcloud tpcc_cstress
+# sleep 10
+# python run_experiments.py -e -c vcloud tpcc_cstress1
+# sleep 10
+# python run_experiments.py -e -c vcloud tpcc_cstress2
+# sleep 10
 #python run_experiments.py -e -c vcloud tpcc_cstress3
 #sleep 10
 #cd ../draw
