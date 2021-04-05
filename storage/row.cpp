@@ -75,6 +75,14 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 	}
 
 #endif
+#if CC_ALG == RDMA_CICADA
+	_tid_word = 0;
+	for (int i = 0; i < HIS_CHAIN_NUM; i++) {
+		cicada_version[i].init(i);
+	}
+	cicada_version[0].state = Cicada_COMMITTED;
+	version_cnt = 1;
+#endif
 	return RCOK;
 }
 
@@ -120,6 +128,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_rdma_silo *) mem_allocator.align_alloc(sizeof(Row_rdma_silo));
 #elif CC_ALG == RDMA_MAAT
   manager = (Row_rdma_maat *) mem_allocator.align_alloc(sizeof(Row_rdma_maat));
+#elif CC_ALG == RDMA_CICADA
+  manager = (Row_rdma_cicada *) mem_allocator.align_alloc(sizeof(Row_rdma_cicada));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -301,6 +311,23 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
   rc = this->manager->access(type,txn);
+
+  uint64_t copy_time = get_sys_clock();
+  txn->cur_row->copy(this);
+	access->data = txn->cur_row;
+	assert(rc == RCOK);
+  INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+	goto end;
+#endif
+
+#if CC_ALG == RDMA_CICADA
+  uint64_t init_time = get_sys_clock();
+  DEBUG_M("row_t::get_row MAAT alloc \n");
+	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row->init(get_table(), get_part_id());
+  INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
+
+  rc = this->manager->access(type,txn, txn->cur_row);
 
   uint64_t copy_time = get_sys_clock();
   txn->cur_row->copy(this);
@@ -711,7 +738,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	DEBUG_M("row_t::return_row Maat free \n");
 		mem_allocator.free(row, sizeof(row_t));
 	return 0;
-#elif CC_ALG == MAAT || CC_ALG == RDMA_MAAT
+#elif CC_ALG == MAAT || CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
 	// assert (row != NULL);
 	// if (rc == Abort) {
 	// 	manager->abort(type,txn);

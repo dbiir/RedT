@@ -41,6 +41,9 @@
 #define CHANGE_TCP_ONLY 0
 #define CHANGE_MSG_QUEUE 1
 
+#define HIS_CHAIN_NUM 4
+
+#define ROW_DEFAULT_SIZE 1100
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -85,7 +88,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
+#define NODE_CNT 1
 #define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -180,7 +183,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG MAAT
+#define CC_ALG RDMA_CICADA
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -432,6 +435,7 @@ enum PPSTxnType {
 #define CNULL 28
 #define RDMA_SILO 29
 #define RDMA_MAAT 31
+#define RDMA_CICADA 33
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
@@ -478,8 +482,8 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 10 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false

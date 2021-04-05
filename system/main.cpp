@@ -45,6 +45,7 @@
 #include "da.h"
 #include "maat.h"
 #include "rdma_maat.h"
+#include "rdma_cicada.h"
 #include "ssi.h"
 #include "wsi.h"
 #include "focc.h"
@@ -228,6 +229,12 @@ int main(int argc, char *argv[]) {
 	printf("Initializing MaaT manager... ");
 	fflush(stdout);
 	rmaat_man.init();
+	printf("Done\n");
+#endif
+#if CC_ALG == RDMA_CICADA
+	printf("Initializing CICADA manager... ");
+	fflush(stdout);
+	rcicada_man.init();
 	printf("Done\n");
 #endif
 #if CC_ALG == SSI

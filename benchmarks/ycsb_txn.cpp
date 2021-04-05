@@ -232,14 +232,16 @@ itemid_t* YCSBTxnManager::read_remote_index(ycsb_request * req) {
   	item->table_offset = ((IndexInfo*)test_buf)->table_offset;
 	return item;
 }
-#if CC_ALG == RDMA_MAAT
+#if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
 
-RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
-
+RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
+	RC rc;
 	itemid_t * m_item;
 	m_item = read_remote_index(req);
   // table_t * table = read_remote_table(m_item);
-
+#if CC_ALG == RDMA_CICADA
+	uint64_t version = 0;
+#endif
 	uint64_t part_id = _wl->key_to_part( req->key );
     uint64_t loc = GET_NODE_ID(part_id);
 	assert(loc != g_node_id);
@@ -289,7 +291,7 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 	row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
 	memcpy(temp_row, tmp_buf2, operate_size);
 	assert(temp_row->get_primary_key() == req->key);
-	
+#if CC_ALG == RDMA_MAAT
 	//read request
 	if(req->acctype == RD) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
@@ -372,24 +374,210 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 
 	}
 	//preserve the txn->access
+#endif
+#if CC_ALG == RDMA_CICADA
+	//read request
+	if(req->acctype == RD) {
+		assert(temp_row->version_cnt > 0);
+		for(int cnt = temp_row->version_cnt - 1; cnt >= temp_row->version_cnt - 5 && cnt >= 0; cnt--) {
+			int i = cnt % HIS_CHAIN_NUM;
+			if(temp_row->cicada_version[i].Wts > this->start_ts || temp_row->cicada_version[i].state == Cicada_ABORTED) {
+				continue;
+			}
+			if(temp_row->cicada_version[i].state == Cicada_PENDING) {
+				rc = WAIT;
+				while(rc == WAIT) {
+					temp_row->_tid_word = 0;
+					memcpy(tmp_buf2, (char *)temp_row, operate_size);
+					auto res_s3 = rc_qp[loc][thd_id]->send_normal(
+						{.op = IBV_WR_RDMA_WRITE,
+						.flags = IBV_SEND_SIGNALED,
+						.len = operate_size,
+						.wr_id = 0},
+						{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
+						.remote_addr = m_item->offset,
+						.imm_data = 0});
+					RDMA_ASSERT(res_s3 == rdmaio::IOCode::Ok);
+					auto res_p3 = rc_qp[loc][thd_id]->wait_one_comp();
+					RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
+					rdmaio::qp::Op<> op;
+					// retry CAS 
+					op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + m_item->offset), remote_mr_attr[loc].key).set_cas(0, lock);
+					assert(op.set_payload(tmp_buf, sizeof(uint64_t), mr.key) == true);
+					auto res_s = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+					RDMA_ASSERT(res_s == IOCode::Ok);
+
+					auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
+					RDMA_ASSERT(res_p == IOCode::Ok);
+
+					if (*tmp_buf != 0) {
+						row_local = NULL;
+						txn->rc = Abort;
+						mem_allocator.free(m_item, sizeof(itemid_t));
+						printf("RDMA_MAAT cas lock fault\n");
+
+						uint64_t timespan = get_sys_clock() - starttime;
+						INC_STATS(get_thd_id(), trans_store_access_count, 1);
+						INC_STATS(get_thd_id(), txn_manager_time, timespan);
+						INC_STATS(get_thd_id(), txn_conflict_cnt, 1);
+						return Abort; //原子性被破坏，CAS失败
+					}
+					char *tmp_buf2 = Rdma::get_row_client_memory(thd_id);
+					auto res_s2 = rc_qp[loc][thd_id]->send_normal(
+						{.op = IBV_WR_RDMA_READ,
+						.flags = IBV_SEND_SIGNALED,
+						.len = operate_size,
+						.wr_id = 0},
+						{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
+						.remote_addr = m_item->offset,
+						.imm_data = 0});
+					RDMA_ASSERT(res_s2 == rdmaio::IOCode::Ok);
+					auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+					RDMA_ASSERT(res_p2 == rdmaio::IOCode::Ok);
+
+					row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+					memcpy(temp_row, tmp_buf2, operate_size);
+					assert(temp_row->get_primary_key() == req->key);
+					if(temp_row->cicada_version[i].state == Cicada_PENDING) {
+						rc = WAIT;
+					} else {
+						rc = RCOK;
+						version = temp_row->cicada_version[i].key;
+					}
+				}
+				
+				
+			} else {
+				rc = RCOK;
+				version = temp_row->cicada_version[i].key;
+			}
+			
+		}
+
+	}
+	//	get remote row
+	    
+	if(req->acctype == WR) {
+		assert(temp_row->version_cnt > 0);
+		for(int cnt = temp_row->version_cnt - 1; cnt >= temp_row->version_cnt - 5 && cnt >= 0; cnt--) {
+			int i = cnt % HIS_CHAIN_NUM;
+			if(temp_row->cicada_version[i].Wts > this->start_ts || temp_row->cicada_version[i].state == Cicada_ABORTED) {
+				continue;
+			}
+			if(temp_row->cicada_version[i].state == Cicada_PENDING) {
+				// --todo !---pendind need wait //
+				rc = WAIT;
+				while(rc == WAIT) {
+					temp_row->_tid_word = 0;
+					memcpy(tmp_buf2, (char *)temp_row, operate_size);
+					auto res_s3 = rc_qp[loc][thd_id]->send_normal(
+						{.op = IBV_WR_RDMA_WRITE,
+						.flags = IBV_SEND_SIGNALED,
+						.len = operate_size,
+						.wr_id = 0},
+						{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
+						.remote_addr = m_item->offset,
+						.imm_data = 0});
+					RDMA_ASSERT(res_s3 == rdmaio::IOCode::Ok);
+					auto res_p3 = rc_qp[loc][thd_id]->wait_one_comp();
+					RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
+					rdmaio::qp::Op<> op;
+					// retry CAS 
+					op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + m_item->offset), remote_mr_attr[loc].key).set_cas(0, lock);
+					assert(op.set_payload(tmp_buf, sizeof(uint64_t), mr.key) == true);
+					auto res_s = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+					RDMA_ASSERT(res_s == IOCode::Ok);
+
+					auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
+					RDMA_ASSERT(res_p == IOCode::Ok);
+
+					if (*tmp_buf != 0) {
+						row_local = NULL;
+						txn->rc = Abort;
+						mem_allocator.free(m_item, sizeof(itemid_t));
+						printf("RDMA_MAAT cas lock fault\n");
+
+						uint64_t timespan = get_sys_clock() - starttime;
+						INC_STATS(get_thd_id(), trans_store_access_count, 1);
+						INC_STATS(get_thd_id(), txn_manager_time, timespan);
+						INC_STATS(get_thd_id(), txn_conflict_cnt, 1);
+						return Abort; //原子性被破坏，CAS失败
+					}
+					char *tmp_buf2 = Rdma::get_row_client_memory(thd_id);
+					auto res_s2 = rc_qp[loc][thd_id]->send_normal(
+						{.op = IBV_WR_RDMA_READ,
+						.flags = IBV_SEND_SIGNALED,
+						.len = operate_size,
+						.wr_id = 0},
+						{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
+						.remote_addr = m_item->offset,
+						.imm_data = 0});
+					RDMA_ASSERT(res_s2 == rdmaio::IOCode::Ok);
+					auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+					RDMA_ASSERT(res_p2 == rdmaio::IOCode::Ok);
+
+					row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+					memcpy(temp_row, tmp_buf2, operate_size);
+					assert(temp_row->get_primary_key() == req->key);
+					if(temp_row->cicada_version[i].state == Cicada_PENDING) {
+						rc = WAIT;
+					} else {
+						version = temp_row->cicada_version[i].key;
+						rc = RCOK;
+					}
+				}
+			} else {
+				if(temp_row->cicada_version[i].Wts > this->start_ts || temp_row->cicada_version[i].Rts > this->start_ts) {
+					rc = Abort;
+				} else {
+					rc = RCOK;
+					version = temp_row->cicada_version[i].key;
+				}
+				
+			}
+			
+		}
+	}
+	temp_row->_tid_word = 0;
+	memcpy(tmp_buf2, (char *)temp_row, operate_size);
+	auto res_s3 = rc_qp[loc][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_WRITE,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
+		.remote_addr = m_item->offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s3 == rdmaio::IOCode::Ok);
+	auto res_p3 = rc_qp[loc][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
+	//preserve the txn->access
+#endif
+    if(rc == Abort) {
+		return Abort;
+	}
 	Access * access = NULL;
 	access_pool.get(get_thd_id(),access);
 
 	this->last_row = temp_row;
 	this->last_type = req->acctype;
+	
 
-
-	RC rc = RCOK;
+	rc = RCOK;
 	rc = row->remote_get_row(temp_row, this, access);
 	assert(temp_row->get_primary_key() == access->data->get_primary_key());
 
 	access->type = req->acctype;
 	access->orig_row = temp_row;
+#if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
 	access->key = req->key;
 	// access->orig_row = access->data;
 	access->location = loc;
 	access->offset = m_item->offset;
-
+#endif
+#if CC_ALG == RDMA_CICADA
+	this->version_num.push_back(version);
+#endif
 	row_local = access->data;
 	++txn->row_cnt;
 
@@ -405,7 +593,7 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 }
 
 #endif
-
+#if CC_ALG == RDMA_SILO
 RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
 	// get the index of row to be operated
 	itemid_t * m_item;
@@ -507,7 +695,8 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
 	RC rc = RCOK;
 	return rc;
 }
-//#endif
+#endif
+
 RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
@@ -556,8 +745,8 @@ RC YCSBTxnManager::run_txn_state() {
 #if CC_ALG == RDMA_SILO
 			rc = send_remote_one_side_request(req,row);
 #endif
-#if CC_ALG == RDMA_MAAT
-            rc = send_maat_remote_one_side_request(req,row);
+#if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
+            rc = send_remote_one_side_request(req,row);
 #endif
 		} else {
 			rc = send_remote_request();

@@ -19,8 +19,7 @@
 
 #include <cassert>
 #include "global.h"
-
-#define ROW_DEFAULT_SIZE 1100
+#include "row_rdma_cicada.h"
 
 
 #define DECL_SET_VALUE(type) void set_value(int col_id, type value);
@@ -63,7 +62,7 @@ class Row_null;
 class Row_silo;
 class Row_rdma_silo;
 class Row_rdma_maat;
-
+class Row_rdma_cicada;
 
 class row_t {
 public:
@@ -130,6 +129,11 @@ public:
 		uint64_t uncommitted_writes[ROW_SET_LENGTH];
 		uint64_t timestamp_last_read;
 		uint64_t timestamp_last_write;
+	#elif CC_ALG == RDMA_CICADA
+		volatile uint64_t _tid_word;
+		RdmaCicadaVersion cicada_version[HIS_CHAIN_NUM];
+		Row_rdma_cicada * manager;
+		uint64_t version_cnt;
 
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
 		Row_lock * manager;
@@ -165,8 +169,10 @@ public:
   #elif CC_ALG == SILO
   	Row_silo * manager;
 	#endif
-#ifdef USE_RDMA// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
-	char data[ROW_DEFAULT_SIZE];
+#ifdef USE_RDMA
+	//#if CC_ALG != RDMA_CICADA
+		char data[ROW_DEFAULT_SIZE];
+	//#endif
 #else
 	char * data;
 #endif

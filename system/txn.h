@@ -67,6 +67,11 @@ public:
     uint64_t	location;
 	uint64_t	offset;
 #endif
+#if CC_ALG == RDMA_CICADA
+	uint64_t 	key;
+    uint64_t	location;
+	uint64_t	offset;
+#endif
 	void cleanup();
 };
 
@@ -267,6 +272,13 @@ public:
 	std::set<uint64_t> * uncommitted_reads;
 	std::set<uint64_t> * uncommitted_writes;
 	std::set<uint64_t> * uncommitted_writes_y;
+#endif
+
+#if CC_ALG == RDMA_CICADA
+	uint64_t start_ts;
+	std::set<uint64_t> uncommitted_set;
+	int write_set[100];
+	std::vector<uint64_t> version_num; 
 #endif
 
 	uint64_t twopl_wait_start;

@@ -68,8 +68,11 @@ private:
   void next_ycsb_state();
   RC run_txn_state();
   bool rdma_one_side();
+  #if CC_ALG == RDMA_SILO
   RC send_remote_one_side_request(ycsb_request * req,row_t *& row_local);
-  RC send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local);
+  #else
+  RC send_remote_one_side_request(ycsb_request * req,row_t *& row_local);
+  #endif
   itemid_t* read_remote_index(ycsb_request * req);
 
   RC run_ycsb_0(ycsb_request * req,row_t *& row_local);

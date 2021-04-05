@@ -75,7 +75,7 @@ def ycsb_scaling():
 	# algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     # algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    algos=['MAAT']
+    algos=['MVCC']
 
     base_table_size=1048576
     # base_table_size=1048576*8

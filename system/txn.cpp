@@ -53,6 +53,7 @@
 #include "rdma_silo.h"
 #include "transport.h"
 #include "rdma_maat.h"
+#include "rdma_cicada.h"
 
 void TxnStats::init() {
 	starttime=0;
@@ -294,7 +295,7 @@ void Transaction::release_inserts(uint64_t thd_id) {
 #if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != WOOKONG && \
 		CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != DTA && CC_ALG != DLI_MVCC_OCC && \
 		CC_ALG != DLI_MVCC_BASE && CC_ALG != DLI_DTA && CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && \
-		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC && CC_ALG != RDMA_MAAT
+		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA
 		DEBUG_M("TxnManager::cleanup row->manager free\n");
 		mem_allocator.free(row->manager, 0);
 #endif
@@ -345,6 +346,12 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	// uncommitted_writes_y = new std::set<uint64_t>();
 	// uncommitted_reads = new std::set<uint64_t>();
 	  memset(write_set, 0, 100);
+#endif
+#if CC_ALG == RDMA_CICADA
+	start_ts = get_sys_clock();
+	memset(write_set, 0, 100);
+	
+	// uncommit_set = new std::set<uint64_t>();
 #endif
 #if CC_ALG == TICTOC
 	_is_sub_txn = true;
@@ -411,6 +418,10 @@ void TxnManager::reset() {
 	uncommitted_writes.clear();
 	uncommitted_writes_y.clear();
 	uncommitted_reads.clear();
+#endif
+#if CC_ALG == RDMA_CICADA
+	uncommitted_set.clear();
+	start_ts = 0;
 #endif
 
 #if CC_ALG == CALVIN
@@ -576,7 +587,7 @@ RC TxnManager::start_abort() {
 	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     INC_STATS(get_thd_id(), trans_prepare_count, 1);
 	//RDMA_SILO:keep message or not
-	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT) {
+	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA) {
 		send_finish_messages();
 		abort();
 		return Abort;
@@ -614,7 +625,7 @@ RC TxnManager::start_commit() {
   	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
-	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT) {
+	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA) {
 		if(CC_ALG == TICTOC) {
 			rc = validate();
 			if (rc != Abort) {
@@ -660,7 +671,7 @@ RC TxnManager::start_commit() {
 		else {
 			txn->rc = Abort;
 			DEBUG("%ld start_abort\n",get_txn_id());
-			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT) {
+			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA) {
 				send_finish_messages();
 				abort();
 				rc = Abort;
@@ -874,7 +885,7 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
   #endif
     }
   }
-#elif CC_ALG == RDMA_MAAT
+#elif CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
     if(txn->accesses[rid]->location == g_node_id) is_local = true;
 	else is_local = false;
 #if ISOLATION_LEVEL == READ_COMMITTED
@@ -949,6 +960,9 @@ void TxnManager::cleanup(RC rc) {
 #endif
 #if CC_ALG == RDMA_MAAT
     rmaat_man.finish(rc, this);
+#endif
+#if CC_ALG == RDMA_CICADA
+	//rcicada_man.finish(rc, this);
 #endif
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
@@ -1094,6 +1108,11 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	access->location = g_node_id;
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
+#if CC_ALG == RDMA_CICADA
+	access->location = g_node_id;
+	access->offset = (char*)row - rdma_global_buffer;
+	
+#endif
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
 									CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
 	if (type == WR) {
@@ -1229,7 +1248,7 @@ RC TxnManager::validate() {
 			CC_ALG != SSI && CC_ALG != DLI_BASE && CC_ALG != DLI_OCC &&
 			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
 			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO &&
-			CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT) {
+			CC_ALG != RDMA_SILO && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA) {
 		return RCOK;
 	}
 	RC rc = RCOK;
