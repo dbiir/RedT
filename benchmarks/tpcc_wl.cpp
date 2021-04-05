@@ -103,7 +103,7 @@ RC TPCCWorkload::init_table() {
 /**********************************/
 
 	pthread_t * p_thds = new pthread_t[g_init_parallelism - 1];
-  thr_args * tt = new thr_args[g_init_parallelism];
+    thr_args * tt = new thr_args[g_init_parallelism];
 	for (UInt32 i = 0; i < g_init_parallelism ; i++) {
 	tt[i].wl = this;
 	tt[i].id = i;
@@ -167,7 +167,7 @@ RC TPCCWorkload::init_table() {
   printf("ORDER Done\n");
   fflush(stdout);
   */
-	threadInitWh(this);
+  threadInitWh(this);
   printf("WAREHOUSE Done\n");
   fflush(stdout);
 	threadInitDist(this);
@@ -232,7 +232,7 @@ void TPCCWorkload::init_tab_item(int id) {
 	//MakeAlphaString(26, 50, data);
 	if (RAND(10) == 0) strcpy(data, "original");
 		row->set_value(I_DATA, data);
-
+        if(i <= 1000)printf("【tpcc_wl.cpp:235】item_key = %ld\n",i);
 		index_insert(i_item, i, row, 0);
 	}
 }
@@ -267,8 +267,8 @@ void TPCCWorkload::init_tab_wh() {
 		double w_ytd=300000.00;
 		row->set_value(W_TAX, tax);
 		row->set_value(W_YTD, w_ytd);
-
-		index_insert(i_warehouse, wid, row, wh_to_part(wid));
+        if(wid<=1000)printf("【tpcc_wl.cpp:270】wh_key = %ld\n",wid);
+		index_insert(i_warehouse, wid + item_idx_num, row, wh_to_part(wid));
 	}
 
 	return;
@@ -304,7 +304,7 @@ void TPCCWorkload::init_tab_dist(uint64_t wid) {
 		row->set_value(D_TAX, tax);
 		row->set_value(D_YTD, w_ytd);
 		row->set_value(D_NEXT_O_ID, 3001);
-
+        if(distKey(did, wid) <= 1000)printf("【tpcc_wl.cpp:307】dis_key = %ld\n",distKey(did, wid));
 		index_insert(i_district, distKey(did, wid), row, wh_to_part(wid));
 	}
 }
@@ -347,6 +347,9 @@ void TPCCWorkload::init_tab_stock(int id, uint64_t wid) {
 	*/
 		row->set_value(S_DATA, s_data);
 #endif
+        // if(stockKey(sid, wid) <= 1000){
+        //     printf("【tpcc_wl.cpp:350】stock_key = %ld\n",stockKey(sid, wid));
+        // }
 		index_insert(i_stock, stockKey(sid, wid), row, wh_to_part(wid));
 	}
 }
@@ -415,6 +418,7 @@ void TPCCWorkload::init_tab_cust(int id, uint64_t did, uint64_t wid) {
 		row->set_value(C_PAYMENT_CNT, 1);
 		uint64_t key;
 		key = custNPKey(c_last, did, wid);
+        if(key <=1000)printf("【tpcc_wl.cpp:419】customer_key = %ld\n",key);
 		index_insert(i_customer_last, key, row, wh_to_part(wid));
 		key = custKey(cid, did, wid);
 		index_insert(i_customer_id, key, row, wh_to_part(wid));

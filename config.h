@@ -24,7 +24,7 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-// #define USE_RDMA CHANGE_MSG_QUEUE
+ #define USE_RDMA CHANGE_MSG_QUEUE
 // #define USE_RDMA CHANGE_TCP_ONLY
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
@@ -158,7 +158,7 @@
 /***********************************************/
 #define TPORT_TYPE tcp
 #define TPORT_PORT 7000
-#define TPORT_TWOSIDE_PORT 15000
+#define TPORT_TWOSIDE_PORT 13000
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -182,7 +182,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG MVCC
+#define CC_ALG RDMA_SILO
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -199,7 +199,7 @@
 #define ENABLE_LATCH        false
 #define CENTRAL_INDEX       false
 #define CENTRAL_MANAGER       false
-#define INDEX_STRUCT        IDX_HASH
+#define INDEX_STRUCT        IDX_RDMA
 #define BTREE_ORDER         16
 
 // [TIMESTAMP]
@@ -284,6 +284,7 @@
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
 #define NUM_WH PART_CNT
+#define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0
 #define MPIR 0.01

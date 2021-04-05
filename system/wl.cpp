@@ -297,6 +297,7 @@ void Workload::index_insert(string index_name, uint64_t key, row_t * row) {
 }
 
 void Workload::index_insert(INDEX * index, uint64_t key, row_t * row, int64_t part_id) {
+   // printf("【wl.cpp:300】index_key = %ld\n",key);
 	uint64_t pid = part_id;
   if (part_id == -1) pid = get_part_id(row);
   itemid_t *m_item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));

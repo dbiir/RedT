@@ -302,6 +302,13 @@ extern UInt32 g_dist_per_wh;
 extern UInt32 g_cust_per_dist;
 extern UInt32 g_max_items_per_txn;
 
+extern uint64_t tpcc_idx_per_num;
+extern uint64_t item_idx_num;
+extern uint64_t wh_idx_num;
+extern uint64_t stock_idx_num;
+extern uint64_t dis_idx_num;
+extern uint64_t cust_idx_num;
+
 // PPS (Product-Part-Supplier)
 extern UInt32 g_max_parts_per;
 extern UInt32 g_max_part_key;
@@ -443,6 +450,8 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 #define INDEX		index_btree
 #elif (INDEX_STRUCT == IDX_HASH)
 #define  INDEX		IndexHash
+// #elif (INDEX_STRUCT == IDX_RDMA_TPCC)
+// #define INDEX       IndexRdmaTpcc
 #else
 #define INDEX		IndexRdma
 #endif

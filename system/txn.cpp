@@ -54,6 +54,12 @@
 #include "rdma_mvcc.h"
 #include "transport.h"
 
+#include "lib.hh"
+#include "qps/op.hh"
+#include "transport/rdma.h"
+#include "src/rdma/sop.hh"
+#include "src/sshed.hh"
+
 void TxnStats::init() {
 	starttime=0;
 	wait_starttime=get_sys_clock();
@@ -1339,4 +1345,133 @@ void TxnManager::release_locks(RC rc) {
 
 	uint64_t timespan = (get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(), txn_cleanup_time,  timespan);
+}
+
+row_t * TxnManager::read_remote_content(uint64_t target_server,uint64_t remote_offset){
+    uint64_t operate_size = sizeof(row_t);
+    uint64_t thd_id = get_thd_id();
+    char *local_buf = Rdma::get_row_client_memory(thd_id);
+   
+    auto res_s = rc_qp[target_server][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_READ,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(local_buf),
+		.remote_addr = remote_offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+    row_t *test_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+    memcpy(test_row, local_buf, operate_size);
+
+    return test_row;
+ }
+
+ itemid_t * TxnManager::read_remote_index(uint64_t target_server,uint64_t remote_offset,uint64_t key){
+    uint64_t operate_size = sizeof(IndexInfo);
+    uint64_t thd_id = get_thd_id();
+    char *test_buf = Rdma::get_index_client_memory(thd_id);
+    memset(test_buf, 0, operate_size);
+   
+    auto res_s = rc_qp[target_server][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_READ,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+		.remote_addr = remote_offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+    itemid_t* item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
+	assert(((IndexInfo*)test_buf)->key == key);
+
+	item->location = ((IndexInfo*)test_buf)->address;
+	item->type = ((IndexInfo*)test_buf)->type;
+	item->valid = ((IndexInfo*)test_buf)->valid;
+	item->offset = ((IndexInfo*)test_buf)->offset;
+  	item->table_offset = ((IndexInfo*)test_buf)->table_offset;
+
+    return item;
+ }
+
+ bool TxnManager::write_remote_content(uint64_t target_server,uint64_t thd_id,uint64_t operate_size,uint64_t remote_offset,char *local_buf){
+    
+    auto res_s = rc_qp[target_server][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_WRITE,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(local_buf),
+		.remote_addr = remote_offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+    return true;
+ }
+
+ uint64_t TxnManager::cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value ){
+    
+    rdmaio::qp::Op<> op;
+    uint64_t thd_id = get_thd_id();
+    uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+    auto mr = client_rm_handler->get_reg_attr().value();
+    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[target_server].buf + remote_offset), remote_mr_attr[target_server].key).set_cas(old_value, new_value);
+    assert(op.set_payload(local_buf, sizeof(uint64_t), mr.key) == true);
+    auto res_s2 = op.execute(rc_qp[target_server][thd_id], IBV_SEND_SIGNALED);
+
+    RDMA_ASSERT(res_s2 == IOCode::Ok);
+    auto res_p2 = rc_qp[target_server][thd_id]->wait_one_comp();
+    RDMA_ASSERT(res_p2 == IOCode::Ok);
+
+    return *local_buf;
+ }
+
+RC TxnManager::preserve_access(row_t *row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc){
+    Access * access = NULL;
+	access_pool.get(get_thd_id(),access);
+
+	this->last_row = test_row;
+    this->last_type = type;
+
+    RC rc = RCOK;
+	rc = row_local->remote_copy_row(test_row, this, access);
+    assert(test_row->get_primary_key() == access->data->get_primary_key());
+
+    if (rc == Abort || rc == WAIT) {
+        DEBUG_M("TxnManager::get_row(abort) access free\n");
+        access_pool.put(get_thd_id(),access);
+        return rc;
+    }
+
+    access->type = type;
+    access->orig_row = test_row;
+    access->key = test_row->get_primary_key();
+    access->location =loc;
+	access->offset = m_item->offset;
+
+#if CC_ALG == RDMA_SILO
+	access->tid = last_tid;
+	access->timestamp = test_row->timestamp;	
+#endif
+
+#if CC_ALG == RDMA_MVCC
+    access->old_version_num = test_row->version_num;//记录写的时候通过txn_id加锁的版本
+#endif
+    row_local = access->data;
+    ++txn->row_cnt;
+
+    mem_allocator.free(m_item,0);
+
+    if (type == WR) ++txn->write_cnt;//this->last_type = WR
+    txn->accesses.add(access);
+
+    return rc;
 }

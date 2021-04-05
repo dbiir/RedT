@@ -186,6 +186,17 @@ public:
 	RC abort();
 
 	void release_locks(RC rc);
+
+    bool rdma_one_side() {
+        if (CC_ALG == RDMA_SILO) return true;
+        else return false;
+    }
+
+    row_t * read_remote_content(uint64_t target_server,uint64_t remote_offset);
+    itemid_t * read_remote_index(uint64_t target_server,uint64_t remote_offset,uint64_t key);
+    bool write_remote_content(uint64_t target_server,uint64_t thd_id,uint64_t operate_size,uint64_t remote_offset,char *local_buf);
+    uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
+    RC preserve_access(row_t *row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
 	bool isRecon() {
 		assert(CC_ALG == CALVIN || !recon);
 		return recon;

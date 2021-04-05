@@ -84,7 +84,7 @@ public:
 	RC switch_schema(table_t * host_table);
 	// not every row has a manager
 	void init_manager(row_t * row);
-  	RC remote_get_row(row_t* remote_row, TxnManager * txn, Access *access);
+  	RC remote_copy_row(row_t* remote_row, TxnManager * txn, Access *access);
 
 	table_t * get_table();
 	Catalog * get_schema();
@@ -180,8 +180,10 @@ public:
   #elif CC_ALG == SILO
   	Row_silo * manager;
 	#endif
-#ifdef USE_RDMA && CC_ALG != RDMA_MVCC// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
-	char data[ROW_DEFAULT_SIZE];
+#ifdef USE_RDMA// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
+	//#if CC_ALG != RDMA_MVCC
+     char data[ROW_DEFAULT_SIZE];
+    //#endif
 #else
 	char * data;
 #endif

@@ -13,15 +13,15 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+/*
 
 #include "global.h"
-#include "index_rdma.h"
+#include "index_rdma_tpcc.h"
 #include "mem_alloc.h"
 #include "row.h"
 #include "src/allocator_master.hh"
 
-#if WORKLOAD == TPCC
-RC IndexRdma::init(uint64_t bucket_cnt) {
+RC IndexRdmaTpcc::init(uint64_t bucket_cnt) {
    // UInt64 rdma_index_size = 2*(1024*1024*1024L);
     // uint64_t item_index_size = (item_idx_num/g_node_cnt)*(sizeof(IndexInfo)+1);
     // uint64_t wh_index_size = (wh_idx_num/g_node_cnt)*(sizeof(IndexInfo)+1);
@@ -30,31 +30,30 @@ RC IndexRdma::init(uint64_t bucket_cnt) {
     // uint64_t cust_index_size = (cust_idx_num/g_node_cnt)*(sizeof(IndexInfo)+1);
     // uint64_t cl_index_size = (cust_idx_num/g_node_cnt)*(sizeof(IndexInfo)+1);
 
-    uint64_t item_index_size = (90 * 1024 *1024L) ;
-    uint64_t wh_index_size = (1024 * 1024L);
-    uint64_t stock_index_size = (300 * 1024 *1024L);
-    uint64_t dis_index_size = (10 * 1024 *1024L);
-    uint64_t cust_index_size = (100 * 1024 *1024L);
-    uint64_t cl_index_size = (100 * 1024 *1024L);
+    uint64 item_index_size = (90 * 1024 *1024L) ;
+    uint64 wh_index_size = (1024 * 1024L);
+    uint64 stock_index_size = (300 * 1024 *1024L);
+    uint64 dis_index_size = (10 * 1024 *1024L);
+    uint64 cust_index_size = (100 * 1024 *1024L);
+    uint64 cl_index_size = (100 * 1024 *1024L);
     uint64_t index_size;
 
-   // if(this == i_item){
-    if(bucket_cnt == 0)
+    if(this == i_item){
         index_info = (IndexInfo*)rdma_global_buffer;
         index_size = item_idx_num/g_node_cnt; 
-    }else if (bucket_cnt == 1){
+    }else if (this == i_warehouse){
         index_info = (IndexInfo*)rdma_global_buffer + item_index_size;
         index_size = wh_idx_num/g_node_cnt;
-    }else if (bucket_cnt == 2){
+    }else if (this == i_stock){
         index_info = (IndexInfo*)rdma_global_buffer + item_index_size + wh_index_size;
         index_size = stock_idx_num/g_node_cnt;
-    }else if (bucket_cnt == 3){
+    }else if (this == i_district){
         index_info = (IndexInfo*)rdma_global_buffer + item_index_size + wh_index_size + stock_index_size;
         index_size = dis_idx_num/g_node_cnt;
-    }else if (bucket_cnt == 4){
+    }else if (this == i_customer_id){
         index_info = (IndexInfo*)rdma_global_buffer + item_index_size + wh_index_size + stock_index_size + cust_index_size;
         index_size = cust_idx_num/g_node_cnt;
-    }else if (bucket_cnt == 5){
+    }else if (this == i_customer_last){
         index_info = (IndexInfo*)rdma_global_buffer + item_index_size + wh_index_size + stock_index_size + cust_index_size + cl_index_size;
         index_size = cust_idx_num/g_node_cnt;
     }
@@ -73,39 +72,14 @@ RC IndexRdma::init(uint64_t bucket_cnt) {
  	printf("init %ld index\n",i);
 	return RCOK;
 }
-#else
-RC IndexRdma::init(uint64_t bucket_cnt) {
-	uint64_t index_size = (g_synth_table_size/g_node_cnt)*(sizeof(IndexInfo)+1);
 
-	index_info = (IndexInfo*)rdma_global_buffer;
-
-	printf("%d",index_info[0].key);
-
-	uint64_t i = 0;
-	for (i = 0; i < g_synth_table_size/g_node_cnt; i ++) {
-		index_info[i].init();
-	}
-
- 	printf("init %ld index\n",i);
-	return RCOK;
-}
-#endif
-
-RC IndexRdma::init(int part_cnt, table_t *table, uint64_t bucket_cnt) {
+RC IndexRdmaTpcc::init(int part_cnt, table_t *table, uint64_t bucket_cnt) {
 	init(bucket_cnt);
 	this->table = table;
-#if WORKLOAD == TPCC
-    if(table->get_table_name()=="ITEM")bucket_cnt = 0;
-    else if(table->get_table_name()=="WAREHOUSE")bucket_cnt = 1;
-    else if(table->get_table_name()=="STOCK")bucket_cnt = 2;
-    else if(table->get_table_name()=="DISTRICT")bucket_cnt = 3;
-    else if(table->get_table_name()=="CUSTOMER")bucket_cnt = 4;
-    else bucket_cnt = 5;
-#endif
 	return RCOK;
 }
 
-void IndexRdma::index_delete() {
+void IndexRdmaTpcc::index_delete() {
 	for (UInt32 n = 0; n < _bucket_cnt_per_part; n ++) {
 		_buckets[0][n].delete_bucket();
 	}
@@ -113,29 +87,29 @@ void IndexRdma::index_delete() {
 	delete _buckets;
 }
 
-void IndexRdma::index_reset() {
+void IndexRdmaTpcc::index_reset() {
 	for (UInt32 n = 0; n < _bucket_cnt_per_part; n ++) {
 		_buckets[0][n].delete_bucket();
 	}
 }
 
-bool IndexRdma::index_exist(idx_key_t key) {
+bool IndexRdmaTpcc::index_exist(idx_key_t key) {
 	assert(false);
 }
 
 void
-IndexRdma::get_latch(BucketHeader * bucket) {
+IndexRdmaTpcc::get_latch(BucketHeader * bucket) {
 	while (!ATOM_CAS(bucket->locked, false, true)) {}
 }
 
 void
-IndexRdma::release_latch(BucketHeader * bucket) {
+IndexRdmaTpcc::release_latch(BucketHeader * bucket) {
 	bool ok = ATOM_CAS(bucket->locked, true, false);
 	assert(ok);
 }
 
 
-RC IndexRdma::index_insert(idx_key_t key, itemid_t * item, int part_id) {
+RC IndexRdmaTpcc::index_insert(idx_key_t key, itemid_t * item, int part_id) {
 	RC rc = RCOK;
 
 	uint64_t index_key = key/g_node_cnt;
@@ -148,7 +122,7 @@ RC IndexRdma::index_insert(idx_key_t key, itemid_t * item, int part_id) {
 }
 
 // todo:之后可能要改
-RC IndexRdma::index_insert_nonunique(idx_key_t key, itemid_t * item, int part_id) {
+RC IndexRdmaTpcc::index_insert_nonunique(idx_key_t key, itemid_t * item, int part_id) {
 	RC rc = RCOK;
 	uint64_t bkt_idx = hash(key);
 	assert(bkt_idx < _bucket_cnt_per_part);
@@ -165,7 +139,7 @@ RC IndexRdma::index_insert_nonunique(idx_key_t key, itemid_t * item, int part_id
 	return rc;
 }
 
-RC IndexRdma::index_read(idx_key_t key, itemid_t * &item, int part_id) {
+RC IndexRdmaTpcc::index_read(idx_key_t key, itemid_t * &item, int part_id) {
 	RC rc = RCOK;
 
 	uint64_t index_key = key/g_node_cnt;
@@ -180,7 +154,7 @@ RC IndexRdma::index_read(idx_key_t key, itemid_t * &item, int part_id) {
 
 }
 // todo:之后可能要改
-RC IndexRdma::index_read(idx_key_t key, int count, itemid_t * &item, int part_id) {
+RC IndexRdmaTpcc::index_read(idx_key_t key, int count, itemid_t * &item, int part_id) {
 	uint64_t bkt_idx = hash(key);
 	assert(bkt_idx < _bucket_cnt_per_part);
 	//BucketHeader * cur_bkt = &_buckets[part_id][bkt_idx];
@@ -198,7 +172,7 @@ RC IndexRdma::index_read(idx_key_t key, int count, itemid_t * &item, int part_id
 }
 
 // todo:之后可能要改
-RC IndexRdma::index_read(idx_key_t key, itemid_t * &item,int part_id, int thd_id) {
+RC IndexRdmaTpcc::index_read(idx_key_t key, itemid_t * &item,int part_id, int thd_id) {
 	RC rc = RCOK;
 
 	uint64_t index_key = key/g_node_cnt;
@@ -210,3 +184,4 @@ RC IndexRdma::index_read(idx_key_t key, itemid_t * &item,int part_id, int thd_id
 
 	return rc;
 }
+*/

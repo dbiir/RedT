@@ -133,7 +133,7 @@ public:
 private:
 	TPCCWorkload * _wl;
 	volatile RC _rc;
-  row_t * row;
+    row_t * row;
 
   uint64_t next_item_id;
 
@@ -142,6 +142,9 @@ RC run_txn_state();
   bool is_done();
   bool is_local_item(uint64_t idx);
   RC send_remote_request();
+
+  itemid_t* tpcc_read_remote_index(TPCCQuery * query);
+  RC send_remote_one_side_request(TPCCQuery * query,row_t *& row_local);
 
   RC run_payment_0(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
                    row_t*& r_wh_local);

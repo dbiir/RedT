@@ -249,7 +249,7 @@ RC row_t::get_lock(access_t type, TxnManager * txn) {
 }
 
 
-RC row_t::remote_get_row(row_t* remote_row, TxnManager * txn, Access *access) {
+RC row_t::remote_copy_row(row_t* remote_row, TxnManager * txn, Access *access) {
   RC rc = RCOK;
   uint64_t init_time = get_sys_clock();
   txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));

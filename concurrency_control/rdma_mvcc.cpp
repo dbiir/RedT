@@ -76,7 +76,7 @@ bool rdma_mvcc::conflict(TsType type, ts_t ts) {
 
 RC rdma_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 	RC rc = RCOK;
-	ts_t ts = txn->get_timestamp();
+    ts_t ts = txn->get_timestamp();
 	uint64_t starttime = get_sys_clock();
 
 	if (g_central_man)
@@ -165,7 +165,6 @@ RC rdma_mvcc::access(TxnManager * txn, TsType type, row_t * row) {
 		glob_manager.release_row(_row);
 	else
 		pthread_mutex_unlock( latch );
-
 	return rc;
 }
 
@@ -201,15 +200,15 @@ row_t * rdma_mvcc::read_remote_row(TxnManager * txn , uint64_t num){
 	return temp_row;
 }
 
-uint64_t rdma_mvcc::lock_write_set(TxnManager * txnMng , uint64_t num){
+bool rdma_mvcc::lock_write_set(TxnManager * txnMng , uint64_t num){
    // INC_STATS(txnMng->get_thd_id(), cas_cnt, 1);
-   
+    bool res = false;
 	Transaction *txn = txnMng->txn;
 
     uint64_t off = txn->accesses[num]->offset;
     uint64_t loc = txn->accesses[num]->location;
 	uint64_t thd_id = txnMng->get_thd_id();
-	uint64_t lock = txnMng->get_txn_id();
+	uint64_t lock = txnMng->get_txn_id() + 1;
 
 	uint64_t *test_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
 	auto mr = client_rm_handler->get_reg_attr().value();
@@ -223,8 +222,16 @@ uint64_t rdma_mvcc::lock_write_set(TxnManager * txnMng , uint64_t num){
 	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p2 == IOCode::Ok);
 
-    return *test_loc;
+    // return *test_loc;
+    // row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
 
+    // row_t *temp_row = read_remote_row(txnMng,num);
+    // uint64_t result = temp_row->_tid_word;
+    // mem_allocator.free(temp_row,sizeof(row_t));
+
+    // if(result == lock)res=true;
+    if(*test_loc == 0)res = true;
+    return res;
   // return 0;
 }
 
@@ -235,7 +242,7 @@ void * rdma_mvcc::remote_release_lock(TxnManager * txnMng , uint64_t num){
     uint64_t off = txn->accesses[num]->offset;
     uint64_t loc = txn->accesses[num]->location;
 	uint64_t thd_id = txnMng->get_thd_id();
-	uint64_t lock = txnMng->get_txn_id();
+	uint64_t lock = txnMng->get_txn_id() + 1;
 
 	uint64_t *test_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
 	auto mr = client_rm_handler->get_reg_attr().value();
@@ -305,7 +312,7 @@ void * rdma_mvcc::remote_write_back(TxnManager * txnMng , uint64_t num){
     uint64_t off = txn->accesses[num]->offset;
     uint64_t loc = txn->accesses[num]->location;
 	uint64_t thd_id = txnMng->get_thd_id();
-	uint64_t lock = txnMng->get_txn_id();
+	uint64_t lock = txnMng->get_txn_id() + 1;
     uint64_t operate_size = sizeof(row_t);
 
     char *test_buf = Rdma::get_row_client_memory(thd_id);
@@ -322,6 +329,34 @@ void * rdma_mvcc::remote_write_back(TxnManager * txnMng , uint64_t num){
   	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 
+}
+
+bool rdma_mvcc::get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn){
+    bool result = false;
+    uint64_t check_num = temp_row->version_num < HIS_CHAIN_NUM ?  temp_row->version_num : HIS_CHAIN_NUM;
+               
+    uint64_t k = 0;
+    if(temp_row->version_num < HIS_CHAIN_NUM){//查找符合版本的事务
+        for(k = 0;k <= check_num ; k++){
+            if((temp_row->start_ts[k] < txn->timestamp || temp_row->start_ts[k] == 0)&& (temp_row->end_ts[k] > txn->timestamp || temp_row->end_ts[k] == UINT64_MAX)){
+                result = true;
+                *change_num = k;
+                break;
+            }
+        }
+    }else{
+        for( k = 0 ; k < HIS_CHAIN_NUM ; k++){
+            uint64_t j = 0;
+            j = (temp_row->version_num + k)%HIS_CHAIN_NUM;
+            if((temp_row->start_ts[j] < txn->timestamp || temp_row->start_ts[j] == 0) && (temp_row->end_ts[j] > txn->timestamp || temp_row->end_ts[k] == UINT64_MAX)){
+                result = true;
+                *change_num = j;
+                break;
+            }
+        }
+    }
+
+    return result;
 }
 
 RC rdma_mvcc::validate_local(TxnManager * txnMng){
@@ -345,50 +380,26 @@ RC rdma_mvcc::validate_local(TxnManager * txnMng){
     for(i = 0;i < txn->row_cnt;i ++ ){
         if(txn->accesses[i]->location == g_node_id){//local data
             //加锁
-            while(lock_write_set(txnMng, i) != 0){
+            //while(!lock_write_set(txnMng, i));
+            if(!lock_write_set(txnMng, i)){
+                rc = Abort;
             }
-            // if(lock_write_set(txnMng, i) != 0){
-            //     rc = Abort;
-            //     return rc;
-            // }
-
 
             if(txn->accesses[i]->type == RD){
                  //若版本的txn-id不为0且不等于当前事务，则当前事务回滚
-               
                 row_t *temp_row = txn->accesses[i]->orig_row;
-                uint64_t check_num = temp_row->version_num < HIS_CHAIN_NUM ?  temp_row->version_num : HIS_CHAIN_NUM;
+
                 uint64_t change_num = 0;
                 bool result = false;
-                int k = 0;
-                if(temp_row->version_num < HIS_CHAIN_NUM){//查找符合版本的事务
-                    for(k = 0;k <= check_num ; k++){
-                        if((temp_row->start_ts[k] < txn->timestamp || temp_row->start_ts[k] == 0)&& (temp_row->end_ts[k] > txn->timestamp || temp_row->end_ts[k] == UINT64_MAX)){
-                            result = true;
-                            change_num = k;
-                            break;
-                        }
-                    }
-                }else{
-                    for( k = 0 ; k < HIS_CHAIN_NUM ; k++){
-                        uint64_t j = 0;
-                        j = (temp_row->version_num + k)%HIS_CHAIN_NUM;
-                        if((temp_row->start_ts[j] < txn->timestamp || temp_row->start_ts[j] == 0) && (temp_row->end_ts[j] > txn->timestamp || temp_row->end_ts[k] == UINT64_MAX)){
-                            result = true;
-                            change_num = j;
-                            break;
-                        }
-                    }
-                }
- 
+                result = get_version(temp_row,&change_num,txn);
+                
                 if(result == false){//无合适版本
                     INC_STATS(txnMng->get_thd_id(), result_false, 1);
                     // printf("rdam_mvcc:377 version_num = %ld , txn_id = %ld %ld %ld %ld \n",temp_row->version_num, temp_row->txn_id[0],temp_row->txn_id[1],temp_row->txn_id[2],temp_row->txn_id[3]);
-                    
                     rc = Abort;
                 }
                 else{//check txn_id
-                    if(temp_row->txn_id[change_num] != 0 && temp_row->txn_id[change_num] != txnMng->get_txn_id()){
+                    if(temp_row->txn_id[change_num] != 0 && temp_row->txn_id[change_num] != txnMng->get_txn_id() + 1){
                         INC_STATS(txnMng->get_thd_id(), result_false, 1);
                         // printf("【rdma_mvcc:356】version_num = %ld , txn_id = %ld %ld %ld %ld \n",temp_row->version_num, temp_row->txn_id[0],temp_row->txn_id[1],temp_row->txn_id[2],temp_row->txn_id[3]);
                         rc = Abort;//版本不符合条件
@@ -406,7 +417,7 @@ RC rdma_mvcc::validate_local(TxnManager * txnMng){
             else if(txn->accesses[i]->type == WR){
                 row_t * temp_row = txn->accesses[i]->orig_row;  
                 uint64_t version = (temp_row->version_num)%HIS_CHAIN_NUM;
-                if(temp_row->txn_id[version] != 0 && temp_row->txn_id[version] != txnMng->get_txn_id() ){
+                if(temp_row->txn_id[version] != 0 && temp_row->txn_id[version] != txnMng->get_txn_id() + 1){
                     INC_STATS(txnMng->get_thd_id(), ts_error, 1);
                     // printf("【rdma_mvcc:322】version_num = %ld , txn_id = %ld %ld %ld %ld \n",temp_row->version_num, temp_row->txn_id[0],temp_row->txn_id[1],temp_row->txn_id[2],temp_row->txn_id[3]);
                     rc = Abort;
@@ -418,13 +429,122 @@ RC rdma_mvcc::validate_local(TxnManager * txnMng){
                 }
                 else{
                     //其他情况通过单边写修改版本的txn-id为当前事务id，RTS并解锁
-                   temp_row->txn_id[version] = txnMng->get_txn_id();
+                   temp_row->txn_id[version] = txnMng->get_txn_id() + 1;
                    temp_row->rts[version] = txn->timestamp;
                   //temp_row->version_num = temp_row->version_num + 1;
                    //temp_row->_tid_word = 0;//解锁
                 }
            }
             remote_release_lock(txnMng,i);//解锁
+        }else{
+           // while(!lock_write_set(txnMng, i));//lock in loop
+             if(!lock_write_set(txnMng, i)){
+                rc = Abort;
+            }
+
+            bool write_back = false;
+
+            uint64_t thd_id = txnMng->get_thd_id();
+            uint64_t operate_size = sizeof(row_t);
+            uint64_t loc = txn->accesses[i]->location;
+            uint64_t off = txn->accesses[i]->offset;
+
+            row_t *temp_row = txn->accesses[i]->orig_row;
+            if(txn->accesses[i]->type == RD){
+                //get target version
+              
+                uint64_t change_num = 0;
+                bool result = false;
+                result = get_version(temp_row,&change_num,txn);
+
+                if(result == false){//no proper version
+                    INC_STATS(txnMng->get_thd_id(), result_false, 1);
+                    rc = Abort;
+                }
+                else{//check txn_id
+                    if(temp_row->txn_id[change_num] != 0 && temp_row->txn_id[change_num] != txnMng->get_txn_id() + 1){
+                        INC_STATS(txnMng->get_thd_id(), result_false, 1);
+                        rc = Abort;//version dont match condition
+                    }
+                    else{
+                        //uint64_t version = (temp_row->version_num)%HIS_CHAIN_NUM;
+                        uint64_t version = change_num;
+                        temp_row->rts[version] = txn->timestamp;
+                        temp_row->_tid_word = 0;
+                        write_back = true;
+
+                        char *test_buf = Rdma::get_row_client_memory(thd_id);
+                        memcpy(test_buf, (char*)temp_row, operate_size);
+
+                        assert(txnMng->write_remote_content(loc,thd_id,operate_size,off,test_buf)==true);
+    
+/*
+                        auto res_s4 = rc_qp[loc][thd_id]->send_normal(
+                            {.op = IBV_WR_RDMA_WRITE,
+                            .flags = IBV_SEND_SIGNALED,
+                            .len = operate_size,
+                            .wr_id = 0},
+                            {.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+                            .remote_addr = off,
+                            .imm_data = 0});                             
+                        RDMA_ASSERT(res_s4 == rdmaio::IOCode::Ok);
+                        auto res_p4 = rc_qp[loc][thd_id]->wait_one_comp();
+                        RDMA_ASSERT(res_p4 == rdmaio::IOCode::Ok);
+  */                      
+                        //将读到数据存入读集
+                    }
+                }
+                
+            }else if(txn->accesses[i]->type == WR){
+                uint64_t version = (temp_row->version_num)%HIS_CHAIN_NUM;
+                if(temp_row->txn_id[version] != 0 && temp_row->txn_id[version] != txnMng->get_txn_id() + 1){
+                    INC_STATS(txnMng->get_thd_id(), ts_error, 1);
+                    rc = Abort;
+                }else if(txn->timestamp <= temp_row->rts[version]){
+                    INC_STATS(txnMng->get_thd_id(), ts_error, 1);
+                    rc = Abort;
+                }else{
+                        //其他情况通过单边写修改版本的txn-id为当前事务id，RTS并解锁
+                    temp_row->txn_id[version] = txnMng->get_txn_id() + 1;
+                    temp_row->rts[version] = txn->timestamp;
+                    //temp_row->version_num = temp_row->version_num + 1;
+                    temp_row->_tid_word = 0;//解锁
+
+                    char *test_buf = Rdma::get_row_client_memory(thd_id);
+                    memcpy(test_buf, (char*)temp_row, operate_size);
+
+                    assert(txnMng->write_remote_content(loc,thd_id,operate_size,off,test_buf)==true);
+                    write_back = true;
+                    /*
+                    auto res_s4 = rc_qp[loc][thd_id]->send_normal(
+                        {.op = IBV_WR_RDMA_WRITE,
+                        .flags = IBV_SEND_SIGNALED,
+                        .len = operate_size,
+                        .wr_id = 0},
+                        {.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+                        .remote_addr = off,
+                        .imm_data = 0});
+                    RDMA_ASSERT(res_s4 == rdmaio::IOCode::Ok);
+                    auto res_p4 = rc_qp[loc][thd_id]->wait_one_comp();
+                    RDMA_ASSERT(res_p4 == rdmaio::IOCode::Ok);
+                    */
+                }
+            }
+
+             //rlease lock
+            if(write_back == false){
+                rdmaio::qp::Op<> op;
+                auto mr = client_rm_handler->get_reg_attr().value();
+                uint64_t *test_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+                op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(txnMng->get_txn_id() + 1,0);
+                assert(op.set_payload(test_loc, sizeof(uint64_t), mr.key) == true);
+                auto res_s5 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+
+                RDMA_ASSERT(res_s5 == IOCode::Ok);
+                auto res_p5 = rc_qp[loc][thd_id]->wait_one_comp();
+                RDMA_ASSERT(res_p5 == IOCode::Ok);
+            }
+
         }
 
     if(rc == Abort)break;
@@ -444,10 +564,10 @@ RC rdma_mvcc::lock_row(TxnManager * txnMng){
 		if (txn->accesses[rid]->type == WR)
 			txnMng->write_set[cur_wr_idx ++] = rid;
 	    }
-        uint64_t lock = txnMng->get_txn_id();
+        uint64_t lock = txnMng->get_txn_id() + 1;
         for (uint64_t i = 0; i < wr_cnt; i++) {
             row_t * row = txn->accesses[ txnMng->write_set[i] ]->orig_row;
-            if(lock_write_set(txnMng,txnMng->write_set[i]) != 0 ){//lock fail
+            if(!lock_write_set(txnMng,txnMng->write_set[i]) ){//lock fail
                 rc = Abort;
                 INC_STATS(txnMng->get_thd_id(), lock_row_fail, 1);
                 return rc;
@@ -481,7 +601,7 @@ void * rdma_mvcc::abort_release_remote_lock(TxnManager * txnMng , uint64_t num){
         uint64_t off = txn->accesses[num]->offset;
         uint64_t loc = txn->accesses[num]->location;
         uint64_t thd_id = txnMng->get_thd_id();
-        uint64_t lock = txnMng->get_txn_id();
+        uint64_t lock = txnMng->get_txn_id() + 1;
         uint64_t operate_size = sizeof(row_t);
 
         char *test_buf = Rdma::get_row_client_memory(thd_id);
@@ -497,6 +617,36 @@ void * rdma_mvcc::abort_release_remote_lock(TxnManager * txnMng , uint64_t num){
         RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
         auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
         RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+}
+
+row_t * rdma_mvcc::read_again(TxnManager * txnMng,uint64_t num){
+        Transaction *txn = txnMng->txn;
+
+        uint64_t off = txn->accesses[num]->offset;
+        uint64_t loc = txn->accesses[num]->location;
+        uint64_t thd_id = txnMng->get_thd_id();
+        uint64_t operate_size = sizeof(row_t);
+
+        char *test_buf = Rdma::get_row_client_memory(thd_id);
+       // memcpy(test_buf, (char*)temp_row , operate_size);
+        auto res_s = rc_qp[loc][thd_id]->send_normal(
+            {.op = IBV_WR_RDMA_READ,
+            .flags = IBV_SEND_SIGNALED,
+            .len = operate_size,
+            .wr_id = 0},
+            {.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+            .remote_addr = off,
+            .imm_data = 0});
+        RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+        auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
+        RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+        row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	    memcpy(temp_row, test_buf, operate_size);
+
+        //assert(temp_row->_tid_word != 0);
+
+        return temp_row;
 }
 
 RC rdma_mvcc::finish(RC rc,TxnManager * txnMng){
@@ -519,13 +669,19 @@ RC rdma_mvcc::finish(RC rc,TxnManager * txnMng){
        
         for (uint64_t i = 0; i < wr_cnt; i++) {
            //循环加锁
-           uint64_t lock = -1;
+           bool lock = false;
+           
            do {
                // if(lock!=-1)printf("[rdma_mvcc:499]lock = %ld\n",lock);
                 lock = lock_write_set(txnMng,txnMng->write_set[i]);
                  INC_STATS(txnMng->get_thd_id(), cas_cnt, 1);
-           }while(lock != 0);
+           }while(lock == false);
 
+        //   row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+        //   temp_row = read_again(txnMng,txnMng->write_set[i]);
+
+        //   assert(temp_row->_tid_word != 0);
+        //  assert(txn->accesses[txnMng->write_set[i]]->orig_row->_tid_word != 0);
            //解锁
            if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
                abort_release_local_lock(txnMng,txnMng->write_set[i]);
@@ -542,11 +698,11 @@ RC rdma_mvcc::finish(RC rc,TxnManager * txnMng){
       //  printf("【529\n】");
        for (uint64_t i = 0; i < wr_cnt; i++) {
            //循环加锁
-           uint64_t lock = -1;
+           bool lock = false;
            do { 
                 lock = lock_write_set(txnMng,txnMng->write_set[i]);
                 INC_STATS(txnMng->get_thd_id(), cas_cnt, 1);
-           }while(lock != 0);
+           }while(lock == false);
 
            if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){//local
                 local_write_back(txnMng , txnMng->write_set[i]);

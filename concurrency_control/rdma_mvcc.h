@@ -51,16 +51,18 @@ private:
 	void update_buffer(TxnManager * txn);
 	void insert_history( ts_t ts, row_t * row);
 
-    
+    bool get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn);
     uint64_t remote_lock(TxnManager * txnMng , uint64_t num);
     uint64_t local_lock(TxnManager * txnMng , uint64_t num);
-    uint64_t lock_write_set(TxnManager * txnMng , uint64_t num);
+    bool lock_write_set(TxnManager * txnMng , uint64_t num);
     row_t * read_remote_row(TxnManager * txnMng , uint64_t num);
     void * local_write_back(TxnManager * txnMng , uint64_t num);
     void * remote_write_back(TxnManager * txnMng , uint64_t num);
     void * remote_release_lock(TxnManager * txnMng , uint64_t num);
     void * abort_release_local_lock(TxnManager * txnMng , uint64_t num);
     void * abort_release_remote_lock(TxnManager * txnMng , uint64_t num);
+
+    row_t * read_again(TxnManager * txnMng,uint64_t num);
   
 
 	row_t * clear_history(TsType type, ts_t ts);

@@ -224,7 +224,7 @@ UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
 UInt64 rdma_buffer_size = 12*(1024*1024*1024L);
-UInt64 rdma_index_size = 300*1024*1024;
+UInt64 rdma_index_size = 2*(1024*1024*1024L);
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;
 UInt64 g_max_pre_req = MAX_PRE_REQ;
@@ -273,6 +273,20 @@ UInt32 g_dist_per_wh = DIST_PER_WH;
 
 UInt32 g_repl_type = REPL_TYPE;
 UInt32 g_repl_cnt = REPLICA_CNT;
+
+uint64_t tpcc_idx_per_num = (700000 * NUM_WH)/PART_CNT ;
+
+uint64_t item_idx_num = 100000 * g_node_cnt;//item表在每个server上都存一份，*g_node_cnt便于计算
+uint64_t wh_idx_num = NUM_WH;
+uint64_t stock_idx_num = 100000 * NUM_WH;
+uint64_t dis_idx_num = 10 * NUM_WH;
+uint64_t cust_idx_num = 30000 * NUM_WH;
+// uint64_t his_idx_num = ;
+// uint64_t new_o_idx_num = ;
+// uint64_t order_idx_num = ;
+// uint64_t ol_idx_num = ;
+
+
 
 map<string, string> g_params;
 

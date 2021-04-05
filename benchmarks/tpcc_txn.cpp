@@ -24,10 +24,16 @@
 #include "row.h"
 #include "index_hash.h"
 #include "index_btree.h"
+#include "index_rdma.h"
 #include "tpcc_const.h"
 #include "transport.h"
 #include "msg_queue.h"
 #include "message.h"
+#include "rdma.h"
+#include "src/rdma/sop.hh"
+#include "qps/op.hh"
+#include "src/sshed.hh"
+#include "transport.h"
 
 void TPCCTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	TxnManager::init(thd_id, h_wl);
@@ -376,6 +382,106 @@ void TPCCTxnManager::copy_remote_items(TPCCQueryMessage * msg) {
 		msg->items.add(req);
 	}
 }
+itemid_t* TPCCTxnManager::tpcc_read_remote_index(TPCCQuery * query) {
+    TPCCQuery* tpcc_query = (TPCCQuery*) query;
+	uint64_t w_id = tpcc_query->w_id;
+	uint64_t d_id = tpcc_query->d_id;
+	uint64_t c_id = tpcc_query->c_id;
+	uint64_t d_w_id = tpcc_query->d_w_id;
+	uint64_t c_w_id = tpcc_query->c_w_id;
+	uint64_t c_d_id = tpcc_query->c_d_id;
+    uint64_t ol_i_id = 0;
+	uint64_t ol_supply_w_id = 0;
+	uint64_t ol_quantity = 0;
+	if(tpcc_query->txn_type == TPCC_NEW_ORDER) {
+			ol_i_id = tpcc_query->items[next_item_id]->ol_i_id;
+			ol_supply_w_id = tpcc_query->items[next_item_id]->ol_supply_w_id;
+			ol_quantity = tpcc_query->items[next_item_id]->ol_quantity;
+	}
+
+    uint64_t part_id_w = wh_to_part(w_id);
+	uint64_t part_id_c_w = wh_to_part(c_w_id);
+	//uint64_t part_id_ol_supply_w = wh_to_part(ol_supply_w_id);
+	uint64_t w_loc = GET_NODE_ID(part_id_w);
+    uint64_t remote_offset = 0;
+    int key = 0;
+    switch(state){
+        	case TPCC_PAYMENT0 ://operate table WH
+                key = w_id/w_loc;
+                remote_offset = (90 * 1024 *1024L) + (w_id/w_loc)*sizeof(IndexInfo);
+                break;
+            case TPCC_PAYMENT4 ://operate table CUSTOMER
+                if(query->by_last_name){
+
+                }else{
+                    key = custKey(c_id, c_d_id, c_w_id);
+                                                               // return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id );
+                    remote_offset = (391 * 1024 * 1024L) + key * sizeof(IndexInfo);
+                }
+                break;
+            case TPCC_NEWORDER0 ://operate table WH
+                key = w_id/w_loc;
+                remote_offset = (90 * 1024 *1024L) + (w_id/w_loc)*sizeof(IndexInfo);
+                break;
+            case TPCC_NEWORDER8 ://operate table STOCK
+                key = stockKey(ol_i_id, ol_supply_w_id);
+                remote_offset = (91 * 1024 * 1024L) + key * sizeof(IndexInfo);
+                break;
+    }
+
+   // uint64_t part_id = _wl->key_to_part( req->key );
+  	//uint64_t loc = GET_NODE_ID(part_id);
+    uint64_t loc = w_loc; 
+	assert(loc != g_node_id);
+	uint64_t thd_id = get_thd_id();
+
+  // uint64_t index_key = 0;
+	//uint64_t index_size = sizeof(IndexInfo);
+
+    itemid_t *item = read_remote_index(loc,remote_offset,key);
+
+	return item;
+}
+
+RC TPCCTxnManager::send_remote_one_side_request(TPCCQuery * query,row_t *& row_local){
+
+	// get the index of row to be operated
+	itemid_t * m_item;
+	m_item = tpcc_read_remote_index(query);
+  // table_t * table = read_remote_table(m_item);
+
+    TPCCQuery* tpcc_query = (TPCCQuery*) query;
+	uint64_t w_id = tpcc_query->w_id;
+    uint64_t part_id_w = wh_to_part(w_id);
+    uint64_t w_loc = GET_NODE_ID(part_id_w);
+    uint64_t loc = w_loc;
+	assert(loc != g_node_id);
+	uint64_t thd_id = get_thd_id();
+	uint64_t operate_size = sizeof(row_t);
+    uint64_t remote_offset = m_item->offset;
+
+    access_t type;
+    if(g_wh_update)type = WR;
+    else type == RD;
+
+	//read request
+	if(type == RD || type == WR){
+
+	//	get remote row
+	    row_t * test_row = read_remote_content(loc,remote_offset);
+
+        if(g_wh_update)this->last_type = WR;
+        else this->last_type == RD;
+
+
+        //preserve the txn->access
+        RC rc = RCOK;
+        rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+        return rc;
+    }	
+    RC rc = RCOK;
+	return rc;
+}
 
 
 RC TPCCTxnManager::run_txn_state() {
@@ -418,6 +524,9 @@ RC TPCCTxnManager::run_txn_state() {
 		case TPCC_PAYMENT0 :
 						if(w_loc)
 										rc = run_payment_0(w_id, d_id, d_w_id, h_amount, row);
+                        else if(rdma_one_side()){//rdma_silo
+                            rc = send_remote_one_side_request(tpcc_query,row);
+                        }
 						else {
 							rc = send_remote_request();
 						}
@@ -434,7 +543,9 @@ RC TPCCTxnManager::run_txn_state() {
 		case TPCC_PAYMENT4 :
 						if(c_w_loc)
 								rc = run_payment_4( w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row);
-						else {
+						else if(rdma_one_side()){//rdma_silo
+                            rc = send_remote_one_side_request(tpcc_query,row);
+                        }else {
 								rc = send_remote_request();
 						}
 						break;
@@ -444,7 +555,9 @@ RC TPCCTxnManager::run_txn_state() {
 		case TPCC_NEWORDER0 :
 						if(w_loc)
 								rc = new_order_0( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
-						else {
+						else if(rdma_one_side()){//rdma_silo
+                            rc = send_remote_one_side_request(tpcc_query,row);
+                        }else {
 								rc = send_remote_request();
 						}
 			break;
@@ -473,7 +586,9 @@ RC TPCCTxnManager::run_txn_state() {
 					if(ol_supply_w_loc) {
 				rc = new_order_8(w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,
 												 row);
-			} else {
+			}else if(rdma_one_side()){//rdma_silo
+                            rc = send_remote_one_side_request(tpcc_query,row);
+                        } else {
 									rc = send_remote_request();
 					}
 							break;
