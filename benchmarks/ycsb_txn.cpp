@@ -378,7 +378,7 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
 #if CC_ALG == RDMA_CICADA
 	//read request
 	if(req->acctype == RD) {
-		assert(temp_row->version_cnt > 0);
+		assert(temp_row->version_cnt >= 0);
 		for(int cnt = temp_row->version_cnt - 1; cnt >= temp_row->version_cnt - 5 && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(temp_row->cicada_version[i].Wts > this->start_ts || temp_row->cicada_version[i].state == Cicada_ABORTED) {
@@ -458,10 +458,10 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
 	//	get remote row
 	    
 	if(req->acctype == WR) {
-		assert(temp_row->version_cnt > 0);
+		assert(temp_row->version_cnt >= 0);
 		for(int cnt = temp_row->version_cnt - 1; cnt >= temp_row->version_cnt - 5 && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
-			if(temp_row->cicada_version[i].Wts > this->start_ts || temp_row->cicada_version[i].state == Cicada_ABORTED) {
+			if(temp_row->cicada_version[i].Wts > this->start_ts || temp_row->cicada_version[i].Rts > this->start_ts || temp_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
 			}
 			if(temp_row->cicada_version[i].state == Cicada_PENDING) {

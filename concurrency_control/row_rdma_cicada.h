@@ -33,7 +33,7 @@ struct RdmaCicadaVersion{
 	void init(uint64_t key) {
 		this->key = key;
 		Rts = 0;
-		Wts = 0;
+		Wts = get_sys_clock();
 		state = Cicada_PENDING;
 	}
 };
@@ -42,8 +42,8 @@ class Row_rdma_cicada {
 public:
 	void init(row_t * row);
   RC access(access_t type, TxnManager * txn, row_t * local_row);
-  RC abort(access_t type, TxnManager * txn);
-  RC commit(access_t type, TxnManager * txn, row_t * data);
+  RC abort(uint64_t num, TxnManager * txn);
+  RC commit(uint64_t num, TxnManager * txn, row_t * data);
   void write(row_t * data);
 
 	row_t * _row;

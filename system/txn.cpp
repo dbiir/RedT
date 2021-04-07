@@ -518,6 +518,7 @@ RC TxnManager::abort() {
 	inout_table.clear_Conflict(get_thd_id(), get_txn_id());
 #endif
 	DEBUG("Abort %ld\n",get_txn_id());
+	//printf("Abort %ld\n",get_txn_id());
 	txn->rc = Abort;
 	INC_STATS(get_thd_id(),total_txn_abort_cnt,1);
 	txn_stats.abort_cnt++;
@@ -962,7 +963,7 @@ void TxnManager::cleanup(RC rc) {
     rmaat_man.finish(rc, this);
 #endif
 #if CC_ALG == RDMA_CICADA
-	//rcicada_man.finish(rc, this);
+	rcicada_man.finish(rc, this);
 #endif
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
@@ -1327,6 +1328,11 @@ RC TxnManager::validate() {
       commit_timestamp = _cur_tid;
       DEBUG("Validate success: %ld, cts: %ld \n", get_txn_id(), commit_timestamp);
     }
+  }
+#endif
+#if CC_ALG == RDMA_CICADA
+  if(CC_ALG == RDMA_CICADA && rc == RCOK) {
+	  rc = rcicada_man.validate(this); 
   }
 #endif
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);

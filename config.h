@@ -24,8 +24,8 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-#define USE_RDMA CHANGE_MSG_QUEUE
-// #define USE_RDMA CHANGE_TCP_ONLY
+// #define USE_RDMA CHANGE_MSG_QUEUE
+#define USE_RDMA CHANGE_TCP_ONLY
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
 #define RDMA_BUFFER_ITEM_SIZE (1<<12)
@@ -88,7 +88,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 1
+#define NODE_CNT 2
 #define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -482,8 +482,8 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 10 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false

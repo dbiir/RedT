@@ -29,8 +29,9 @@ public:
 	void init();
 	RC validate(TxnManager * txn);
 	RC finish(RC rc, TxnManager *txnMng);
-	RC remote_abort(TxnManager * txn, Access * data);
-	RC remote_commit(TxnManager * txn, Access * data);
+	RC remote_abort(TxnManager * txn, Access * data, uint64_t num);
+	RC remote_commit(TxnManager * txn, Access * data, uint64_t num);
+	RC remote_read_or_write(Access * access, TxnManager * txn, uint64_t num, bool real_write);
 private:
 	sem_t 	_semaphore;
 };
