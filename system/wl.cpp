@@ -33,6 +33,7 @@ RC Workload::init_schema(const char * schema_file) {
 	assert(sizeof(double) == 8);
 	string line;
   	uint32_t id = 0;
+    int num = 0,order_num = 0;
 	ifstream fin(schema_file);
 	while (getline(fin, line)) {
 		if (line.compare(0, 6, "TABLE=") == 0) {
@@ -93,29 +94,41 @@ RC Workload::init_schema(const char * schema_file) {
 			part_cnt = (CENTRAL_INDEX)? 1 : g_part_cnt;
 
 	  		uint64_t table_size = g_synth_table_size;
+            uint64_t index_table = 0; 
 #if WORKLOAD == TPCC
-			if ( !tname.compare(1, 9, "WAREHOUSE") ) {
+            if ( !tname.compare(1, 4, "ITEM") ) {
+				table_size = g_max_items;
+                index_table = 0;
+				printf("ITEM size %ld\n",table_size);
+			} else if ( !tname.compare(1, 9, "WAREHOUSE") ) {
 				table_size = g_num_wh / g_part_cnt;
+                index_table = 1;
 				printf("WAREHOUSE size %ld\n",table_size);
 			} else if ( !tname.compare(1, 8, "DISTRICT") ) {
 				table_size = g_num_wh / g_part_cnt * g_dist_per_wh;
+                index_table = 2;
 				printf("DISTRICT size %ld\n",table_size);
 			} else if ( !tname.compare(1, 8, "CUSTOMER") ) {
 				table_size = g_num_wh / g_part_cnt * g_dist_per_wh * g_cust_per_dist;
 				printf("CUSTOMER size %ld\n",table_size);
-			} else if ( !tname.compare(1, 7, "HISTORY") ) {
-				table_size = g_num_wh / g_part_cnt * g_dist_per_wh * g_cust_per_dist;
-				printf("HISTORY size %ld\n",table_size);
+                printf("tname = %s\n",tname.c_str());
+                printf("iname = %s\n",iname.c_str());
+                if ( iname=="CUSTOMER_LAST_IDX" )index_table = 4;
+                else index_table = 3;
+			} else if ( !tname.compare(1, 5, "STOCK") ) {
+				table_size = g_num_wh / g_part_cnt * g_max_items;
+                index_table = 5;
+				printf("STOCK size %ld\n",table_size);
 			} else if ( !tname.compare(1, 5, "ORDER") ) {
 				table_size = g_num_wh / g_part_cnt * g_dist_per_wh * g_cust_per_dist;
 				printf("ORDER size %ld\n",table_size);
-			} else if ( !tname.compare(1, 4, "ITEM") ) {
-				table_size = g_max_items;
-				printf("ITEM size %ld\n",table_size);
-			} else if ( !tname.compare(1, 5, "STOCK") ) {
-				table_size = g_num_wh / g_part_cnt * g_max_items;
-				printf("STOCK size %ld\n",table_size);
-			}
+                if(iname == "ORDER-LINE_IDX")index_table = 7;
+                else index_table = 6;
+			}else if ( !tname.compare(1, 7, "HISTORY") ) {
+				table_size = g_num_wh / g_part_cnt * g_dist_per_wh * g_cust_per_dist;
+                index_table = 8;
+				printf("HISTORY size %ld\n",table_size);
+			}  
 #elif WORKLOAD == PPS
 			if ( !tname.compare(1, 5, "PARTS") ) {
 				table_size = MAX_PPS_PART_KEY;
@@ -141,7 +154,13 @@ RC Workload::init_schema(const char * schema_file) {
 			index->init(1024, tables[tname], table_size);
 
 #elif INDEX_STRUCT == IDX_RDMA
+          //  printf("********%s*********\n",tables[tname]->get_table_name());
+        #if WORKLOAD == TPCC
+            printf("\n***table index = %ld **\n",index_table);
+            index->init(index_table, tables[tname], table_size); 
+        #else
             index->init(1024, tables[tname], table_size); 
+        #endif        
 #else
 			index->init(part_cnt, tables[tname]);
 #endif

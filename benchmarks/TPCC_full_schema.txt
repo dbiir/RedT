@@ -1,5 +1,5 @@
-//size,type,name w
-TABLE=WAREHOUSE 
+//size,type,name w 105
+TABLE=WAREHOUSE
 	8,int64_t,W_ID
 	10,string,W_NAME
 	20,string,W_STREET_1
@@ -10,8 +10,8 @@ TABLE=WAREHOUSE
 	8,double,W_TAX
 	8,double,W_YTD
 
-//w*10
-TABLE=DISTRICT 
+//w*10  121
+TABLE=DISTRICT
 	8,int64_t,D_ID
 	8,int64_t,D_W_ID
 	10,string,D_NAME
@@ -24,8 +24,8 @@ TABLE=DISTRICT
 	8,double,D_YTD
 	8,int64_t,D_NEXT_O_ID
 
-//w*30k
-TABLE=CUSTOMER 
+//w*30k 653
+TABLE=CUSTOMER
 	8,int64_t,C_ID
 	8,int64_t,C_D_ID
 	8,int64_t,C_W_ID
@@ -49,7 +49,7 @@ TABLE=CUSTOMER
 	500,string,C_DATA
 
 //w*30k
-TABLE=HISTORY 
+TABLE=HISTORY
 	8,int64_t,H_C_ID
 	8,int64_t,H_C_D_ID
 	8,int64_t,H_C_W_ID
@@ -60,13 +60,13 @@ TABLE=HISTORY
 	24,string,H_DATA
 
 //w*9k+
-TABLE=NEW-ORDER 
+TABLE=NEW-ORDER
 	8,int64_t,NO_O_ID
 	8,int64_t,NO_D_ID
 	8,int64_t,NO_W_ID
 
 //w*30k
-TABLE=ORDER 
+TABLE=ORDER
 	8,int64_t,O_ID
 	8,int64_t,O_C_ID
 	8,int64_t,O_D_ID

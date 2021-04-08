@@ -223,7 +223,7 @@ UInt64 g_msg_time_limit = MSG_TIME_LIMIT;
 UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
-UInt64 rdma_buffer_size = 12*(1024*1024*1024L);
+UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
 UInt64 rdma_index_size = 2*(1024*1024*1024L);
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;
@@ -283,8 +283,17 @@ uint64_t dis_idx_num = 10 * NUM_WH;
 uint64_t cust_idx_num = 30000 * NUM_WH;
 // uint64_t his_idx_num = ;
 // uint64_t new_o_idx_num = ;
-// uint64_t order_idx_num = ;
-// uint64_t ol_idx_num = ;
+uint64_t order_idx_num = 30000 * NUM_WH;
+uint64_t ol_idx_num = 300000 * NUM_WH;
+
+uint64_t item_index_size = (10 * 1024 *1024L) ;
+uint64_t wh_index_size = (1024 * 1024L);
+uint64_t stock_index_size = (10 * 1024 *1024L);
+uint64_t dis_index_size = (1024 *1024L);
+uint64_t cust_index_size = (2 * 1024 *1024L);
+uint64_t cl_index_size = (2 * 1024 *1024L);
+uint64_t order_index_size = (2 * 1024 *1024L);
+uint64_t ol_index_size = (20 * 1024 *1024L);
 
 
 

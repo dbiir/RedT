@@ -18,6 +18,7 @@
 #include "index_rdma.h"
 #include "mem_alloc.h"
 #include "row.h"
+#include "table.h"
 #include "src/allocator_master.hh"
 
 #if WORKLOAD == TPCC
@@ -30,33 +31,36 @@ RC IndexRdma::init(uint64_t bucket_cnt) {
     // uint64_t cust_index_size = (cust_idx_num/g_node_cnt)*(sizeof(IndexInfo)+1);
     // uint64_t cl_index_size = (cust_idx_num/g_node_cnt)*(sizeof(IndexInfo)+1);
 
-    uint64_t item_index_size = (90 * 1024 *1024L) ;
-    uint64_t wh_index_size = (1024 * 1024L);
-    uint64_t stock_index_size = (300 * 1024 *1024L);
-    uint64_t dis_index_size = (10 * 1024 *1024L);
-    uint64_t cust_index_size = (100 * 1024 *1024L);
-    uint64_t cl_index_size = (100 * 1024 *1024L);
     uint64_t index_size;
 
    // if(this == i_item){
-    if(bucket_cnt == 0)
+    if(bucket_cnt == 0){
         index_info = (IndexInfo*)rdma_global_buffer;
         index_size = item_idx_num/g_node_cnt; 
     }else if (bucket_cnt == 1){
-        index_info = (IndexInfo*)rdma_global_buffer + item_index_size;
+        index_info = (IndexInfo*)(rdma_global_buffer + item_index_size);
         index_size = wh_idx_num/g_node_cnt;
     }else if (bucket_cnt == 2){
-        index_info = (IndexInfo*)rdma_global_buffer + item_index_size + wh_index_size;
-        index_size = stock_idx_num/g_node_cnt;
-    }else if (bucket_cnt == 3){
-        index_info = (IndexInfo*)rdma_global_buffer + item_index_size + wh_index_size + stock_index_size;
+        index_info = (IndexInfo*)(rdma_global_buffer + item_index_size + wh_index_size);
         index_size = dis_idx_num/g_node_cnt;
+    }else if (bucket_cnt == 3){
+        index_info = (IndexInfo*)(rdma_global_buffer + item_index_size + wh_index_size + dis_index_size);
+        index_size = cust_idx_num/g_node_cnt;
     }else if (bucket_cnt == 4){
-        index_info = (IndexInfo*)rdma_global_buffer + item_index_size + wh_index_size + stock_index_size + cust_index_size;
+        index_info = (IndexInfo*)(rdma_global_buffer + item_index_size + wh_index_size + dis_index_size + cust_index_size);
         index_size = cust_idx_num/g_node_cnt;
     }else if (bucket_cnt == 5){
-        index_info = (IndexInfo*)rdma_global_buffer + item_index_size + wh_index_size + stock_index_size + cust_index_size + cl_index_size;
-        index_size = cust_idx_num/g_node_cnt;
+        index_info = (IndexInfo*)(rdma_global_buffer + item_index_size + wh_index_size + dis_index_size + cust_index_size + cl_index_size);
+        index_size = stock_idx_num/g_node_cnt;
+    }else if (bucket_cnt == 6){
+        index_info = (IndexInfo*)(rdma_global_buffer + item_index_size + wh_index_size + dis_index_size + cust_index_size + cl_index_size + stock_index_size);
+        index_size = order_idx_num/g_node_cnt;
+    }else if (bucket_cnt == 7){
+        index_info = (IndexInfo*)(rdma_global_buffer + item_index_size + wh_index_size + dis_index_size + cust_index_size + cl_index_size + stock_index_size + order_index_size);
+        index_size = ol_idx_num/g_node_cnt;
+    }else{
+        index_info = (IndexInfo*)(rdma_global_buffer + item_index_size + wh_index_size + dis_index_size + cust_index_size + cl_index_size + stock_index_size + order_index_size + ol_index_size);
+        index_size = 1000;
     }
     // }else if (this == i_order){
     // }else if (this == i_orderline){
@@ -92,16 +96,17 @@ RC IndexRdma::init(uint64_t bucket_cnt) {
 #endif
 
 RC IndexRdma::init(int part_cnt, table_t *table, uint64_t bucket_cnt) {
-	init(bucket_cnt);
-	this->table = table;
 #if WORKLOAD == TPCC
-    if(table->get_table_name()=="ITEM")bucket_cnt = 0;
-    else if(table->get_table_name()=="WAREHOUSE")bucket_cnt = 1;
-    else if(table->get_table_name()=="STOCK")bucket_cnt = 2;
-    else if(table->get_table_name()=="DISTRICT")bucket_cnt = 3;
-    else if(table->get_table_name()=="CUSTOMER")bucket_cnt = 4;
-    else bucket_cnt = 5;
+    bucket_cnt = part_cnt;
+    // if(table->get_table_name()=="ITEM")bucket_cnt = 0;
+    // else if(table->get_table_name()=="WAREHOUSE")bucket_cnt = 1;
+    // else if(table->get_table_name()=="DISTRICT")bucket_cnt = 2;
+    // else if(table->get_table_name()=="CUSTOMER")bucket_cnt = 3;
+     // else if(table->get_table_name()=="STOCK")bucket_cnt = 4;
+    // else bucket_cnt = 5;
 #endif
+    init(bucket_cnt);
+	this->table = table;
 	return RCOK;
 }
 
@@ -137,8 +142,11 @@ IndexRdma::release_latch(BucketHeader * bucket) {
 
 RC IndexRdma::index_insert(idx_key_t key, itemid_t * item, int part_id) {
 	RC rc = RCOK;
-
+#if WORKLOAD == YCSB
 	uint64_t index_key = key/g_node_cnt;
+#else
+    uint64_t index_key = key;
+#endif
 	index_info[index_key].key = key;
 	index_info[index_key].address = (row_t*)(item->location);
 	index_info[index_key].table_offset = (char*)table - rdma_global_buffer;
@@ -200,8 +208,11 @@ RC IndexRdma::index_read(idx_key_t key, int count, itemid_t * &item, int part_id
 // todo:之后可能要改
 RC IndexRdma::index_read(idx_key_t key, itemid_t * &item,int part_id, int thd_id) {
 	RC rc = RCOK;
-
+#if WORKLOAD == YCSB
 	uint64_t index_key = key/g_node_cnt;
+#else
+    uint64_t index_key = key;
+#endif
 	item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
 	assert(index_info[index_key].key == key);
 	item->location = index_info[index_key].address;

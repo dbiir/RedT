@@ -35,7 +35,7 @@ public:
 	uint64_t key;
 	row_t* address;
 	uint64_t offset;
-  uint64_t table_offset;
+    uint64_t table_offset;
 	uint64_t length;
 	bool valid;
 	Data_type type;

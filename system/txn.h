@@ -188,7 +188,7 @@ public:
 	void release_locks(RC rc);
 
     bool rdma_one_side() {
-        if (CC_ALG == RDMA_SILO) return true;
+        if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC) return true;
         else return false;
     }
 

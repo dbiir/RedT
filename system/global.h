@@ -308,6 +308,17 @@ extern uint64_t wh_idx_num;
 extern uint64_t stock_idx_num;
 extern uint64_t dis_idx_num;
 extern uint64_t cust_idx_num;
+extern uint64_t order_idx_num ;
+extern uint64_t ol_idx_num ;
+
+extern uint64_t item_index_size ;
+extern uint64_t wh_index_size ;
+extern uint64_t stock_index_size ;
+extern uint64_t dis_index_size ;
+extern uint64_t cust_index_size ;
+extern uint64_t cl_index_size ;
+extern uint64_t order_index_size ;
+extern uint64_t ol_index_size ;
 
 // PPS (Product-Part-Supplier)
 extern UInt32 g_max_parts_per;

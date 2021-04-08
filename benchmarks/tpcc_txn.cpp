@@ -47,9 +47,14 @@ void TPCCTxnManager::reset() {
 	state = TPCC_PAYMENT0;
 	if(tpcc_query->txn_type == TPCC_PAYMENT) {
 		state = TPCC_PAYMENT0;
-	} else if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
+	}else if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
 		state = TPCC_NEWORDER0;
 	}
+    // if(((TPCCQuery*) query)->txn_type == TPCC_PAYMENT) {
+	// 	state = TPCC_PAYMENT0;
+	// }else if (((TPCCQuery*) query)->txn_type == TPCC_NEW_ORDER) {
+	// 	state = TPCC_NEWORDER0;
+	// }
 	next_item_id = 0;
 	TxnManager::reset();
 }
@@ -169,7 +174,8 @@ RC TPCCTxnManager::acquire_locks() {
 			// Cust
 				if (tpcc_query->by_last_name) {
 
-					key = custNPKey(c_last, c_d_id, c_w_id);
+					//key = custNPKey(c_last, c_d_id, c_w_id);
+                    key = custKey(c_id, c_d_id, c_w_id);
 					index = _wl->i_customer_last;
 					item = index_read(index, key, part_id_c_w);
 					int cnt = 0;
@@ -401,42 +407,46 @@ itemid_t* TPCCTxnManager::tpcc_read_remote_index(TPCCQuery * query) {
 
     uint64_t part_id_w = wh_to_part(w_id);
 	uint64_t part_id_c_w = wh_to_part(c_w_id);
-	//uint64_t part_id_ol_supply_w = wh_to_part(ol_supply_w_id);
+	uint64_t part_id_ol_supply_w = wh_to_part(ol_supply_w_id);
 	uint64_t w_loc = GET_NODE_ID(part_id_w);
     uint64_t remote_offset = 0;
     int key = 0;
+    uint64_t loc = w_loc; 
     switch(state){
         	case TPCC_PAYMENT0 ://operate table WH
                 key = w_id/w_loc;
-                remote_offset = (90 * 1024 *1024L) + (w_id/w_loc)*sizeof(IndexInfo);
+                loc = GET_NODE_ID(wh_to_part(w_id));
+                remote_offset = item_index_size + (w_id/w_loc)*sizeof(IndexInfo);
                 break;
             case TPCC_PAYMENT4 ://operate table CUSTOMER
                 if(query->by_last_name){
-
+                    key = custKey(c_id, c_d_id, c_w_id);
+                                                               // return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id );
+                    remote_offset = item_index_size + wh_index_size + dis_index_size + cust_index_size 
+                                    + (key ) * sizeof(IndexInfo);
                 }else{
                     key = custKey(c_id, c_d_id, c_w_id);
                                                                // return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id );
-                    remote_offset = (391 * 1024 * 1024L) + key * sizeof(IndexInfo);
+                    remote_offset = item_index_size + wh_index_size + dis_index_size 
+                                    + (key ) * sizeof(IndexInfo);
                 }
+                loc = GET_NODE_ID(wh_to_part(c_w_id));
                 break;
             case TPCC_NEWORDER0 ://operate table WH
                 key = w_id/w_loc;
-                remote_offset = (90 * 1024 *1024L) + (w_id/w_loc)*sizeof(IndexInfo);
+                loc = GET_NODE_ID(wh_to_part(w_id));
+                remote_offset = item_index_size + (w_id/w_loc )*sizeof(IndexInfo);
                 break;
             case TPCC_NEWORDER8 ://operate table STOCK
                 key = stockKey(ol_i_id, ol_supply_w_id);
-                remote_offset = (91 * 1024 * 1024L) + key * sizeof(IndexInfo);
+                loc = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
+                //loc = GET_NODE_ID(part_id_ol_supply_w);
+                remote_offset = item_index_size + wh_index_size + dis_index_size + cust_index_size + cl_index_size
+                                + (key ) * sizeof(IndexInfo);
                 break;
     }
-
-   // uint64_t part_id = _wl->key_to_part( req->key );
-  	//uint64_t loc = GET_NODE_ID(part_id);
-    uint64_t loc = w_loc; 
+    
 	assert(loc != g_node_id);
-	uint64_t thd_id = get_thd_id();
-
-  // uint64_t index_key = 0;
-	//uint64_t index_size = sizeof(IndexInfo);
 
     itemid_t *item = read_remote_index(loc,remote_offset,key);
 
@@ -444,20 +454,29 @@ itemid_t* TPCCTxnManager::tpcc_read_remote_index(TPCCQuery * query) {
 }
 
 RC TPCCTxnManager::send_remote_one_side_request(TPCCQuery * query,row_t *& row_local){
-
+    RC rc = RCOK;
 	// get the index of row to be operated
 	itemid_t * m_item;
 	m_item = tpcc_read_remote_index(query);
-  // table_t * table = read_remote_table(m_item);
 
     TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	uint64_t w_id = tpcc_query->w_id;
     uint64_t part_id_w = wh_to_part(w_id);
     uint64_t w_loc = GET_NODE_ID(part_id_w);
+    uint64_t c_w_id = tpcc_query->c_w_id;
+
     uint64_t loc = w_loc;
+    if(state == TPCC_PAYMENT0) {
+		loc = GET_NODE_ID(wh_to_part(w_id));
+	} else if(state == TPCC_PAYMENT4) {
+		loc = GET_NODE_ID(wh_to_part(c_w_id));
+	} else if(state == TPCC_NEWORDER0) {
+		loc = GET_NODE_ID(wh_to_part(w_id));
+	} else if(state == TPCC_NEWORDER8) {
+		loc = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
+    }
 	assert(loc != g_node_id);
-	uint64_t thd_id = get_thd_id();
-	uint64_t operate_size = sizeof(row_t);
+
     uint64_t remote_offset = m_item->offset;
 
     access_t type;
@@ -467,19 +486,31 @@ RC TPCCTxnManager::send_remote_one_side_request(TPCCQuery * query,row_t *& row_l
 	//read request
 	if(type == RD || type == WR){
 
+#if CC_ALG == RDMA_MVCC
+    uint64_t lock = get_txn_id()+1;
+    uint64_t test_loc = -1;
+    test_loc = cas_remote_content(loc,remote_offset,0,lock);
+    if(test_loc != 0){
+       INC_STATS(get_thd_id(), lock_fail, 1);
+       rc = Abort;
+       return rc;
+    }
+#endif
+
 	//	get remote row
 	    row_t * test_row = read_remote_content(loc,remote_offset);
-
+#if CC_ALG == RDMA_MVCC
+        test_loc = cas_remote_content(loc,remote_offset,lock,0);
+#endif
         if(g_wh_update)this->last_type = WR;
         else this->last_type == RD;
-
 
         //preserve the txn->access
         RC rc = RCOK;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
         return rc;
     }	
-    RC rc = RCOK;
+
 	return rc;
 }
 
@@ -584,14 +615,13 @@ RC TPCCTxnManager::run_txn_state() {
 			break;
 		case TPCC_NEWORDER8 :
 					if(ol_supply_w_loc) {
-				rc = new_order_8(w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,
-												 row);
-			}else if(rdma_one_side()){//rdma_silo
+				rc = new_order_8(w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,row);
+			        }else if(rdma_one_side()){//rdma_silo
                             rc = send_remote_one_side_request(tpcc_query,row);
-                        } else {
-									rc = send_remote_request();
+                    } else {
+							rc = send_remote_request();
 					}
-							break;
+					break;
 		case TPCC_NEWORDER9 :
 			rc = new_order_9(w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number,
 											 ol_amount, o_id, row);
@@ -734,7 +764,8 @@ inline RC TPCCTxnManager::run_payment_4(uint64_t w_id, uint64_t d_id, uint64_t c
 			EXEC SQL OPEN c_byname;
 		+===========================================================================*/
 
-		key = custNPKey(c_last, c_d_id, c_w_id);
+		//key = custNPKey(c_last, c_d_id, c_w_id);
+        key = custKey(c_id, c_d_id, c_w_id);
 		// XXX: the list is not sorted. But let's assume it's sorted...
 		// The performance won't be much different.
 		INDEX * index = _wl->i_customer_last;
@@ -848,6 +879,8 @@ inline RC TPCCTxnManager::new_order_0(uint64_t w_id, uint64_t d_id, uint64_t c_i
 	key = w_id;
 	INDEX * index = _wl->i_warehouse;
 	INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
+        // key = w_id/w_loc;
+        // remote_offset = (90 * 1024 *1024L) + (w_id/w_loc)*sizeof(IndexInfo);
 	item = index_read(index, key, wh_to_part(w_id));
 	starttime = get_sys_clock();
 	assert(item != NULL);

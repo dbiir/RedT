@@ -503,10 +503,10 @@ RC TxnManager::abort() {
 	INC_STATS(get_thd_id(),total_txn_abort_cnt,1);
 	txn_stats.abort_cnt++;
 	if(IS_LOCAL(get_txn_id())) {
-	INC_STATS(get_thd_id(), local_txn_abort_cnt, 1);
+	    INC_STATS(get_thd_id(), local_txn_abort_cnt, 1);
 	} else {
-	INC_STATS(get_thd_id(), remote_txn_abort_cnt, 1);
-	txn_stats.abort_stats(get_thd_id());
+        INC_STATS(get_thd_id(), remote_txn_abort_cnt, 1);
+        txn_stats.abort_stats(get_thd_id());
 	}
 
 	aborted = true;
@@ -1453,17 +1453,22 @@ RC TxnManager::preserve_access(row_t *row_local,itemid_t* m_item,row_t *test_row
 
     access->type = type;
     access->orig_row = test_row;
-    access->key = test_row->get_primary_key();
-    access->location =loc;
-	access->offset = m_item->offset;
 
 #if CC_ALG == RDMA_SILO
 	access->tid = last_tid;
-	access->timestamp = test_row->timestamp;	
+	access->timestamp = test_row->timestamp;
+
+    access->key = test_row->get_primary_key();
+    access->location =loc;
+	access->offset = m_item->offset;	
 #endif
 
 #if CC_ALG == RDMA_MVCC
     access->old_version_num = test_row->version_num;//记录写的时候通过txn_id加锁的版本
+
+    access->key = test_row->get_primary_key();
+    access->location =loc;
+	access->offset = m_item->offset;
 #endif
     row_local = access->data;
     ++txn->row_cnt;

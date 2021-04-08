@@ -16,14 +16,25 @@
 
 #include "tpcc_helper.h"
 
-uint64_t distKey(uint64_t d_id, uint64_t d_w_id) { 
+uint64_t distKey(uint64_t d_id, uint64_t d_w_id) { //d_id - distrct num in g_node;d_w_id - warehouse ahead
     uint64_t index_ahead = wh_idx_num + item_idx_num + stock_idx_num;
+#ifdef USE_RDMA
+    return (d_w_id - 1)  * g_dist_per_wh + d_id;
+    // d_w_id = (d_w_id - 1)/g_node_cnt;
+    // return d_w_id  * g_dist_per_wh + d_id;
+    
+#else
     return d_w_id * g_dist_per_wh + d_id;// + index_ahead; 
+#endif
 }
 
 uint64_t custKey(uint64_t c_id, uint64_t c_d_id, uint64_t c_w_id) {
     uint64_t index_ahead = wh_idx_num + item_idx_num + stock_idx_num + dis_idx_num;
+#ifdef USE_RDMA
+    return (distKey(c_d_id, c_w_id) - 1) * g_cust_per_dist + c_id ;
+#else
 	return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id );
+#endif
 }
 
 uint64_t orderlineKey(uint64_t w_id, uint64_t d_id, uint64_t o_id) {
@@ -37,7 +48,7 @@ uint64_t orderPrimaryKey(uint64_t w_id, uint64_t d_id, uint64_t o_id) {
 uint64_t custNPKey(char * c_last, uint64_t c_d_id, uint64_t c_w_id) {
 	uint64_t key = 0;
 	char offset = 'A';
-  for (uint32_t i = 0; i < strlen(c_last); i++) key = (key << 1) + (c_last[i] - offset);
+    for (uint32_t i = 0; i < strlen(c_last); i++) key = (key << 1) + (c_last[i] - offset);
 	key = key << 10;
 	key += c_w_id * g_dist_per_wh + c_d_id;
 	return key;
@@ -45,9 +56,15 @@ uint64_t custNPKey(char * c_last, uint64_t c_d_id, uint64_t c_w_id) {
 
 uint64_t stockKey(uint64_t s_i_id, uint64_t s_w_id) { 
     uint64_t index_ahead = wh_idx_num + item_idx_num ;
+#ifdef USE_RDMA
+    return (s_w_id - 1)  * g_max_items + s_i_id ;//+ index_ahead; 
+    // s_w_id = (s_w_id - 1) / g_node_cnt;
+    // return s_w_id  * g_max_items + s_i_id ;//+ index_ahead; 
+#else
     return s_w_id * g_max_items + s_i_id ;//+ index_ahead; 
+#endif
     
-    }
+}
 
 uint64_t w_from_distKey(uint64_t d_key) { return d_key / g_dist_per_wh; }
 
