@@ -110,6 +110,7 @@ class DABlockQueue;
 class DtaTimeTable;
 class KeyXidCache;
 class RtsCache;
+class Workload;
 // class QTcpQueue;
 // class TcpTimestamp;
 
@@ -146,6 +147,7 @@ extern RDMA_silo rsilo_man;
 #elif CC_ALG == RDMA_MVCC
 extern rdma_mvcc rmvcc_man;
 #endif
+extern Workload * m_wl;
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;
 extern AccessPool access_pool;

@@ -42,18 +42,32 @@
 #include "row_rdma_mvcc.h"
 #include "mem_alloc.h"
 #include "manager.h"
+#include "wl.h"
 
 #define SIM_FULL_ROW true
+
+int row_t::get_row_size(int tuple_size){
+#ifdef USE_RDMA
+	// int tuple_size = schema->get_tuple_size();
+	int size = sizeof(row_t) + tuple_size;
+#else
+	int size = sizeof(row_t);
+#endif
+	return size;
+} 
 
 RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 	part_info = true;
 	_row_id = row_id;
 	_part_id = part_id;
 	this->table = host_table;
+    table_idx = host_table->table_id;
 
 	Catalog * schema = host_table->get_schema();
 	tuple_size = schema->get_tuple_size();
-
+    
+	memset(table_name, 0, 15);
+	memcpy(table_name, host_table->get_table_name(), strlen(host_table->get_table_name()));
 #ifndef USE_RDMA// == false
 	#if SIM_FULL_ROW
 		data = (char *) mem_allocator.alloc(sizeof(char) * tuple_size);
@@ -129,20 +143,29 @@ void row_t::init_manager(row_t * row) {
 #endif
 }
 
-table_t *row_t::get_table() { return table; }
+
 
 #ifdef USE_RDMA
-Catalog *row_t::get_schema() { return &table->schema; }
+table_t *row_t::get_table() { 
+	// std::string tbl_name(table_name);
+
+	// table_t * tbl = m_wl->get_table(tbl_name);
+	table_t * tbl = m_wl->get_table(table_idx);
+	return tbl;
+}
+// Catalog *row_t::get_schema() { return &table->schema; }
 #else
-Catalog *row_t::get_schema() { return get_table()->get_schema(); }
+table_t *row_t::get_table() { return table; }
 #endif
+Catalog *row_t::get_schema() { return get_table()->get_schema(); }
 
 const char *row_t::get_table_name() { return get_table()->get_table_name(); };
-uint64_t row_t::get_tuple_size() { return get_schema()->get_tuple_size(); }
+uint64_t row_t::get_tuple_size() { return tuple_size; }
 
 uint64_t row_t::get_field_cnt() { return get_schema()->field_cnt; }
 
 void row_t::set_value(int id, void * ptr) {
+	// table* table = get_table();
 	int datasize = get_schema()->get_field_size(id);
 	int pos = get_schema()->get_field_index(id);
 	DEBUG("set_value pos %d datasize %d -- %lx\n", pos, datasize, (uint64_t)this);
@@ -176,7 +199,13 @@ SET_VALUE(UInt32);
 SET_VALUE(SInt32);
 
 GET_VALUE(uint64_t);
-GET_VALUE(int64_t);
+// GET_VALUE(int64_t);
+void row_t::get_value(int col_id, int64_t & value) {
+	int pos = get_schema()->get_field_index(col_id);
+	DEBUG("get_value pos %d -- %lx\n",pos,(uint64_t)this); 
+	assert(pos <= tuple_size);
+	value = *(int64_t *)&data[pos];
+}
 GET_VALUE(double);
 GET_VALUE(UInt32);
 GET_VALUE(SInt32);
@@ -205,12 +234,12 @@ char * row_t::get_value(char * col_name) {
 char *row_t::get_data() { return data; }
 
 void row_t::set_data(char * data) {
-	int tuple_size = get_schema()->get_tuple_size();
+	int ts = tuple_size;
 #if SIM_FULL_ROW
-	memcpy(this->data, data, tuple_size);
+	memcpy(this->data, data, ts);
 #else
-	char d[tuple_size];
-	memcpy(d, data, tuple_size);
+	char d[ts];
+	memcpy(d, data, ts);
 #endif
 }
 // copy from the src to this
@@ -252,11 +281,11 @@ RC row_t::get_lock(access_t type, TxnManager * txn) {
 RC row_t::remote_copy_row(row_t* remote_row, TxnManager * txn, Access *access) {
   RC rc = RCOK;
   uint64_t init_time = get_sys_clock();
-  txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+  txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
   uint64_t copy_time = get_sys_clock();
-  memcpy((char*)txn->cur_row, (char*)remote_row, sizeof(row_t));
+  memcpy((char*)txn->cur_row, (char*)remote_row, row_t::get_row_size(tuple_size));
   access->data = txn->cur_row;
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
   return rc;
@@ -282,7 +311,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 */
 #if CC_ALG == CNULL
   uint64_t init_time = get_sys_clock();
-	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), get_part_id());
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
@@ -298,7 +327,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 #if CC_ALG == MAAT
   uint64_t init_time = get_sys_clock();
   DEBUG_M("row_t::get_row MAAT alloc \n");
-	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), get_part_id());
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
@@ -314,7 +343,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 
 #if CC_ALG == TICTOC
 		DEBUG_M("row_t::get_row TICTOC alloc \n");
-	// txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	// txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 	// txn->cur_row->init(get_table(), get_part_id());
 		// rc = this->manager->access(type,txn);
 		// txn->cur_row->copy(this);
@@ -351,7 +380,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 
 	if (rc != Abort && type == WR) {
 		DEBUG_M("row_t::get_row WKDB alloc \n");
-		row_t * newr = (row_t *) mem_allocator.alloc(sizeof(row_t));
+		row_t * newr = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 		newr->init(this->get_table(), this->get_part_id());
 		newr->copy(access->data);
 		access->data = newr;
@@ -386,7 +415,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 
 	if (rc != Abort && type == WR) {
 		DEBUG_M("row_t::get_row DTA alloc \n");
-		row_t * newr = (row_t *) mem_allocator.alloc(sizeof(row_t));
+		row_t * newr = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 		newr->init(this->get_table(), get_part_id());
 		newr->copy(access->data);
 		access->data = newr;
@@ -422,7 +451,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
   uint64_t init_time = get_sys_clock();
 #if CC_ALG == TIMESTAMP
 	DEBUG_M("row_t::get_row TIMESTAMP alloc \n");
-	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), this->get_part_id());
 	assert(txn->cur_row->get_schema() == this->get_schema());
 #endif
@@ -456,7 +485,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	}
 	if (rc != Abort && (CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI) && type == WR) {
 			DEBUG_M("row_t::get_row MVCC alloc \n");
-		row_t * newr = (row_t *) mem_allocator.alloc(sizeof(row_t));
+		row_t * newr = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 		newr->init(this->get_table(), get_part_id());
 		newr->copy(access->data);
 		access->data = newr;
@@ -467,7 +496,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	// OCC always make a local copy regardless of read or write
   uint64_t init_time = get_sys_clock();
 	DEBUG_M("row_t::get_row OCC alloc \n");
-	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), get_part_id());
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
@@ -481,7 +510,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
   uint64_t init_time = get_sys_clock();
 	// DLI always make a local copy regardless of read or write
 	DEBUG_M("row_t::get_row DLI alloc \n");
-	txn->cur_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), get_part_id());
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
@@ -502,7 +531,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
   uint64_t copy_time = get_sys_clock();
 	if (type == WR) {
 		DEBUG_M("row_t::get_row SI alloc \n");
-		row_t *newer = (row_t *)mem_allocator.alloc(sizeof(row_t));
+		row_t *newer = (row_t *)mem_allocator.alloc(row_t::get_row_size(tuple_size));
 		newer->init(get_table(), get_part_id());
 		newer->copy(txn->cur_row);
 		txn->cur_row = newer;
@@ -519,7 +548,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	// like OCC, tictoc also makes a local copy for each read/write
  	uint64_t init_time = get_sys_clock();
  	DEBUG_M("row_t::get_row SILO alloc \n");
-	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), get_part_id());
 	TsType ts_type = (type == RD)? R_REQ : P_REQ;
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
@@ -533,14 +562,14 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 
 #elif CC_ALG == RDMA_MVCC
    // rc = this->manager->access(txn, type, txn->cur_row);
-   txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+   txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
    txn->cur_row->init(get_table(), get_part_id());
    access->data = txn->cur_row;
 #elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN
 #if CC_ALG == HSTORE_SPEC
 	if(txn_table.spec_mode) {
 		DEBUG_M("row_t::get_row HSTORE_SPEC alloc \n");
-		txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+		txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 		txn->cur_row->init(get_table(), get_part_id());
 		rc = this->manager->access(txn, R_REQ);
 		access->data = txn->cur_row;
@@ -574,7 +603,7 @@ RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row, uint64_t &orig_
 #if CC_ALG == TICTOC
   uint64_t init_time = get_sys_clock();
   DEBUG_M("row_t::get_row tictoc alloc \n");
-	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), get_part_id());
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
   rc = this->manager->access(type,txn,row,orig_wts,orig_rts);
@@ -609,7 +638,7 @@ RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 	assert(row->get_table_name() != NULL);
 	if (( CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TICTOC || CC_ALG == SSI || CC_ALG == WSI) && type == WR) {
 		DEBUG_M("row_t::get_row_post_wait MVCC alloc \n");
-		row_t * newr = (row_t *) mem_allocator.alloc(sizeof(row_t));
+		row_t * newr = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 		newr->init(this->get_table(), get_part_id());
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
     uint64_t copy_time = get_sys_clock();
@@ -619,7 +648,7 @@ RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 	}
 	if ((CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3) && type == WR) {
 		//DEBUG_M("row_t::get_row_post_wait MVCC alloc \n");
-		//row_t *newr = (row_t *)mem_allocator.alloc(sizeof(row_t));
+		//row_t *newr = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 		//newr->init(this->get_table(), get_part_id());
 
 		//newr->copy(row);
@@ -666,12 +695,12 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	if (CC_ALG == TIMESTAMP && (type == RD || type == SCAN)) {
 		row->free_row();
 			DEBUG_M("row_t::return_row TIMESTAMP free \n");
-		mem_allocator.free(row, sizeof(row_t));
+		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	if (type == XP) {
 		row->free_row();
 			DEBUG_M("row_t::return_row XP free \n");
-		mem_allocator.free(row, sizeof(row_t));
+		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 		this->manager->access(txn, XP_REQ, NULL);
 	} else if (type == WR) {
 		assert (type == WR && row != NULL);
@@ -685,7 +714,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	if (type == WR) manager->write(row, txn->get_end_timestamp());
 	row->free_row();
 	DEBUG_M("row_t::return_row OCC free \n");
-	mem_allocator.free(row, sizeof(row_t));
+	mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	manager->release();
 	return 0;
 #elif CC_ALG == DLI_BASE || CC_ALG == DLI_OCC
@@ -694,7 +723,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	version = manager->write(row, txn, type);
 	row->free_row();
 	DEBUG_M("row_t::return_row DLT1 free \n");
-	mem_allocator.free(row, sizeof(row_t));
+	mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return version;
 #elif CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
 	assert(row != NULL);
@@ -704,7 +733,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	} else if (type == XP) {
 		manager->write(row, txn, type);
 		row->free_row();
-		mem_allocator.free(row, sizeof(row_t));
+		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	return version;
 #elif CC_ALG == CNULL
@@ -717,7 +746,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 
 		row->free_row();
 	DEBUG_M("row_t::return_row Maat free \n");
-		mem_allocator.free(row, sizeof(row_t));
+		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return 0;
 #elif CC_ALG == MAAT
 	assert (row != NULL);
@@ -729,7 +758,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 
 		row->free_row();
 	DEBUG_M("row_t::return_row Maat free \n");
-		mem_allocator.free(row, sizeof(row_t));
+		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return 0;
 #elif CC_ALG == TICTOC
 	assert (row != NULL);
@@ -742,7 +771,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	if (type == XP) {
 		row->free_row();
 			DEBUG_M("row_t::return_row XP free \n");
-		mem_allocator.free(row, sizeof(row_t));
+		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	return 0;
 #elif CC_ALG == WOOKONG
@@ -757,7 +786,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	if (type == XP) {
 		row->free_row();
 		DEBUG_M("row_t::return_row XP free \n");
-		mem_allocator.free(row, sizeof(row_t));
+		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	return 0;
 #elif CC_ALG == DTA
@@ -772,7 +801,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	if (type == XP) {
 		row->free_row();
 			DEBUG_M("row_t::return_row XP free \n");
-		mem_allocator.free(row, sizeof(row_t));
+		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	return version;
 #elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC
@@ -785,7 +814,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	assert (row != NULL);
 	row->free_row();
   DEBUG_M("row_t::return_row XP free \n");
-	mem_allocator.free(row, sizeof(row_t));
+	mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return 0;
 
 #else

@@ -132,9 +132,9 @@ public:
   void put(uint64_t thd_id, row_t * items);
   void free_all();
 
+  Workload * _wl;
 private:
   boost::lockfree::queue<row_t* > ** pool;
-  Workload * _wl;
 
 };
 

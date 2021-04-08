@@ -86,6 +86,33 @@ RC TPCCWorkload::init_schema(const char * schema_file) {
 	return RCOK;
 }
 
+table_t* TPCCWorkload::get_table(const std::string& tbl_name) {
+	if (tbl_name == "WAREHOUSE") return t_warehouse;
+	if (tbl_name == "DISTRICT") return t_district;
+	if (tbl_name == "CUSTOMER") return t_customer;
+	if (tbl_name == "ITEM") return t_item;
+	if (tbl_name == "STOCK") return t_stock;
+	if (tbl_name == "HISTORY") return t_history;
+	if (tbl_name == "NEW-ORDER") return t_neworder;
+	if (tbl_name == "ORDER") return t_order;
+	if (tbl_name == "ORDER-LINE") return t_orderline;
+	return NULL;
+}
+
+table_t* TPCCWorkload::get_table(int tbl_idx) {
+	switch (tbl_idx) {
+		case 0: return t_warehouse;
+		case 1: return t_district;
+		case 2: return t_customer;
+		case 3: return t_history;
+		case 4: return t_neworder;
+		case 5: return t_order;
+		case 6: return t_orderline;
+		case 7: return t_item;
+		case 8: return t_stock;
+	}
+}
+
 RC TPCCWorkload::init_table() {
 	num_wh = g_num_wh;
 
@@ -232,7 +259,7 @@ void TPCCWorkload::init_tab_item(int id) {
 	//MakeAlphaString(26, 50, data);
 	if (RAND(10) == 0) strcpy(data, "original");
 		row->set_value(I_DATA, data);
-       // if(i <= 1000)printf("【tpcc_wl.cpp:235】item_key = %ld\n",i);
+       if(i <= 1000)printf("【tpcc_wl.cpp:243】item_key = %ld\n",i);
 		index_insert(i_item, i, row, 0);
 	}
 }

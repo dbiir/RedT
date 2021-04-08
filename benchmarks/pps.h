@@ -74,6 +74,8 @@ class PPSWorkload : public Workload {
 public:
 	RC init();
 	RC init_table();
+  table_t* get_table(const std::string& tbl_name);
+  table_t* get_table(int tbl_idx);
 	RC init_schema(const char * schema_file);
 	RC get_txn_man(TxnManager *& txn_manager);
 	table_t * 		t_suppliers;

@@ -47,7 +47,7 @@ MVHisEntry * rdma_mvcc::get_his_entry() {
 void rdma_mvcc::return_his_entry(MVHisEntry * entry) {
 	if (entry->row != NULL) {
 		entry->row->free_row();
-		mem_allocator.free(entry->row, sizeof(row_t));
+		mem_allocator.free(entry->row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	mem_allocator.free(entry, sizeof(MVHisEntry));
 }
@@ -176,7 +176,7 @@ row_t * rdma_mvcc::read_remote_row(TxnManager * txn , uint64_t num){
  	uint64_t loc = txn->txn->accesses[num]->location;
 	uint64_t thd_id = txn->get_thd_id();
 
-	uint64_t operate_size = sizeof(row_t);
+	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
 
 	char *test_buf = Rdma::get_row_client_memory(thd_id);
     memset(test_buf, 0, operate_size);
@@ -193,7 +193,7 @@ row_t * rdma_mvcc::read_remote_row(TxnManager * txn , uint64_t num){
   	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 
-	row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	row_t *temp_row = (row_t *)mem_allocator.alloc((row_t::get_row_size(get_schema()->get_tuple_size())));
 	memcpy(temp_row, test_buf, operate_size);
 	assert(temp_row->get_primary_key() == row->get_primary_key());
 
@@ -221,13 +221,6 @@ bool rdma_mvcc::lock_write_set(TxnManager * txnMng , uint64_t num){
 	RDMA_ASSERT(res_s2 == IOCode::Ok);
 	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p2 == IOCode::Ok);
-
-    // return *test_loc;
-    // row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
-
-    // row_t *temp_row = read_remote_row(txnMng,num);
-    // uint64_t result = temp_row->_tid_word;
-    // mem_allocator.free(temp_row,sizeof(row_t));
 
     // if(result == lock)res=true;
     if(*test_loc == 0)res = true;
@@ -313,7 +306,7 @@ void * rdma_mvcc::remote_write_back(TxnManager * txnMng , uint64_t num){
     uint64_t loc = txn->accesses[num]->location;
 	uint64_t thd_id = txnMng->get_thd_id();
 	uint64_t lock = txnMng->get_txn_id() + 1;
-    uint64_t operate_size = sizeof(row_t);
+    uint64_t operate_size = row_t::get_row_size(temp_row->tuple_size);
 
     char *test_buf = Rdma::get_row_client_memory(thd_id);
     memcpy(test_buf, (char*)temp_row , operate_size);
@@ -445,11 +438,12 @@ RC rdma_mvcc::validate_local(TxnManager * txnMng){
             bool write_back = false;
 
             uint64_t thd_id = txnMng->get_thd_id();
-            uint64_t operate_size = sizeof(row_t);
+            
             uint64_t loc = txn->accesses[i]->location;
             uint64_t off = txn->accesses[i]->offset;
 
             row_t *temp_row = txn->accesses[i]->orig_row;
+            uint64_t operate_size = row_t::get_row_size(temp_row->tuple_size);
             if(txn->accesses[i]->type == RD){
                 //get target version
               
@@ -602,7 +596,7 @@ void * rdma_mvcc::abort_release_remote_lock(TxnManager * txnMng , uint64_t num){
         uint64_t loc = txn->accesses[num]->location;
         uint64_t thd_id = txnMng->get_thd_id();
         uint64_t lock = txnMng->get_txn_id() + 1;
-        uint64_t operate_size = sizeof(row_t);
+        uint64_t operate_size = row_t::get_row_size(temp_row->tuple_size);
 
         char *test_buf = Rdma::get_row_client_memory(thd_id);
         memcpy(test_buf, (char*)temp_row , operate_size);
@@ -625,7 +619,7 @@ row_t * rdma_mvcc::read_again(TxnManager * txnMng,uint64_t num){
         uint64_t off = txn->accesses[num]->offset;
         uint64_t loc = txn->accesses[num]->location;
         uint64_t thd_id = txnMng->get_thd_id();
-        uint64_t operate_size = sizeof(row_t);
+        uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
 
         char *test_buf = Rdma::get_row_client_memory(thd_id);
        // memcpy(test_buf, (char*)temp_row , operate_size);
@@ -641,7 +635,7 @@ row_t * rdma_mvcc::read_again(TxnManager * txnMng,uint64_t num){
         auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
         RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 
-        row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+        row_t *temp_row = (row_t *)mem_allocator.alloc((row_t::get_row_size(get_schema()->get_tuple_size())));
 	    memcpy(temp_row, test_buf, operate_size);
 
         //assert(temp_row->_tid_word != 0);
@@ -674,14 +668,9 @@ RC rdma_mvcc::finish(RC rc,TxnManager * txnMng){
            do {
                // if(lock!=-1)printf("[rdma_mvcc:499]lock = %ld\n",lock);
                 lock = lock_write_set(txnMng,txnMng->write_set[i]);
-                 INC_STATS(txnMng->get_thd_id(), cas_cnt, 1);
+                // INC_STATS(txnMng->get_thd_id(), cas_cnt, 1);
            }while(lock == false);
 
-        //   row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
-        //   temp_row = read_again(txnMng,txnMng->write_set[i]);
-
-        //   assert(temp_row->_tid_word != 0);
-        //  assert(txn->accesses[txnMng->write_set[i]]->orig_row->_tid_word != 0);
            //解锁
            if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
                abort_release_local_lock(txnMng,txnMng->write_set[i]);

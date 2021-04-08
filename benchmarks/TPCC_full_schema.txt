@@ -48,7 +48,7 @@ TABLE=CUSTOMER
 	8,uint64_t,C_DELIVERY_CNT
 	500,string,C_DATA
 
-//w*30k
+//w*30k 80
 TABLE=HISTORY
 	8,int64_t,H_C_ID
 	8,int64_t,H_C_D_ID
@@ -59,13 +59,13 @@ TABLE=HISTORY
 	8,double,H_AMOUNT
 	24,string,H_DATA
 
-//w*9k+
+//w*9k+ 24
 TABLE=NEW-ORDER
 	8,int64_t,NO_O_ID
 	8,int64_t,NO_D_ID
 	8,int64_t,NO_W_ID
 
-//w*30k
+//w*30k 64
 TABLE=ORDER
 	8,int64_t,O_ID
 	8,int64_t,O_C_ID
@@ -76,7 +76,7 @@ TABLE=ORDER
 	8,int64_t,O_OL_CNT
 	8,int64_t,O_ALL_LOCAL
 
-//w*300k
+//w*300k 80
 TABLE=ORDER-LINE
 	8,int64_t,OL_O_ID
 	8,int64_t,OL_D_ID
@@ -89,7 +89,7 @@ TABLE=ORDER-LINE
 	8,double,OL_AMOUNT
 	8,int64_t,OL_DIST_INFO
 
-//100k
+//100k 98
 TABLE=ITEM
 	8,int64_t,I_ID
 	8,int64_t,I_IM_ID

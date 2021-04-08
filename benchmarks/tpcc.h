@@ -59,6 +59,8 @@ public:
 	RC init_table();
 	RC init_schema(const char * schema_file);
 	RC get_txn_man(TxnManager *& txn_manager);
+  table_t* get_table(const std::string& tbl_name);
+  table_t* get_table(int tbl_idx);
 	table_t * 		t_warehouse;
 	table_t * 		t_district;
 	table_t * 		t_customer;

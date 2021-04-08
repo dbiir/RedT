@@ -1348,7 +1348,7 @@ void TxnManager::release_locks(RC rc) {
 }
 
 row_t * TxnManager::read_remote_content(uint64_t target_server,uint64_t remote_offset){
-    uint64_t operate_size = sizeof(row_t);
+    uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
     uint64_t thd_id = get_thd_id();
     char *local_buf = Rdma::get_row_client_memory(thd_id);
    
@@ -1364,7 +1364,7 @@ row_t * TxnManager::read_remote_content(uint64_t target_server,uint64_t remote_o
 	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 
-    row_t *test_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+    row_t *test_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
     memcpy(test_row, local_buf, operate_size);
 
     return test_row;
@@ -1434,7 +1434,7 @@ row_t * TxnManager::read_remote_content(uint64_t target_server,uint64_t remote_o
     return *local_buf;
  }
 
-RC TxnManager::preserve_access(row_t *row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc){
+RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc){
     Access * access = NULL;
 	access_pool.get(get_thd_id(),access);
 
@@ -1444,7 +1444,7 @@ RC TxnManager::preserve_access(row_t *row_local,itemid_t* m_item,row_t *test_row
     RC rc = RCOK;
 	rc = row_local->remote_copy_row(test_row, this, access);
     assert(test_row->get_primary_key() == access->data->get_primary_key());
-
+	// printf("preserve_access %s %s\n", test_row->table_name, access->data->table_name);
     if (rc == Abort || rc == WAIT) {
         DEBUG_M("TxnManager::get_row(abort) access free\n");
         access_pool.put(get_thd_id(),access);

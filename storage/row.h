@@ -20,7 +20,7 @@
 #include <cassert>
 #include "global.h"
 
-#define ROW_DEFAULT_SIZE 1100
+#define ROW_DEFAULT_SIZE 1000
 
 
 #define DECL_SET_VALUE(type) void set_value(int col_id, type value);
@@ -69,17 +69,18 @@ class rdma_mvcc;
 
 struct RdmaMVHis {
     uint64_t mutex;//lock
-    char data[ROW_DEFAULT_SIZE];
     uint64_t rts;
     uint64_t start_ts;
     uint64_t end_ts;
     uint64_t txn_id;
     //RTS、start_ts、end_ts、txn-id：
+	char data[ROW_DEFAULT_SIZE];
 };
 
 
 class row_t {
 public:
+	static int get_row_size(int tuple_size);
 	RC init(table_t * host_table, uint64_t part_id, uint64_t row_id = 0);
 	RC switch_schema(table_t * host_table);
 	// not every row has a manager
@@ -132,12 +133,12 @@ public:
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
-  #if CC_ALG == RDMA_SILO
-    volatile uint64_t	_tid_word;
-	ts_t 			timestamp;
-	Row_rdma_silo * manager;
+  	#if CC_ALG == RDMA_SILO
+		volatile uint64_t	_tid_word;
+		ts_t 			timestamp;
+		Row_rdma_silo * manager;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
-	Row_lock * manager;
+		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP
 	 	Row_ts * manager;
 	#elif CC_ALG == MVCC
@@ -177,25 +178,28 @@ public:
 		Row_wsi * manager;
 	#elif CC_ALG == CNULL
 		Row_null * manager;
-  #elif CC_ALG == SILO
-  	Row_silo * manager;
+	#elif CC_ALG == SILO
+		Row_silo * manager;
 	#endif
-#ifdef USE_RDMA// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
-	//#if CC_ALG != RDMA_MVCC
-     char data[ROW_DEFAULT_SIZE];
-    //#endif
-#else
-	char * data;
-#endif
-
 	int tuple_size;
 	table_t * table;
+	char table_name[15];
+    int table_idx;
 private:
 	// primary key should be calculated from the data stored in the row.
 	uint64_t 		_primary_key;
 	uint64_t		_part_id;
 	bool part_info;
 	uint64_t _row_id;
+public:
+#ifdef USE_RDMA// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
+	//#if CC_ALG != RDMA_MVCC
+    char data[1];
+	// char data[HIS_CHAIN_NUM * sizeof(get_row_size)]
+    //#endif
+#else
+	char * data;
+#endif
 };
 
 #endif

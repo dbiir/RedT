@@ -62,6 +62,7 @@
 #include "lib.hh"
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
+#include "wl.h"
 #ifdef USE_RDMA
   #include "qps/rc_recv_manager.hh"
   #include "qps/recv_iter.hh"
@@ -95,6 +96,7 @@ RDMA_silo rsilo_man;
 #elif CC_ALG == RDMA_MVCC
 rdma_mvcc rmvcc_man;
 #endif
+Workload * m_wl;
 TxnManPool txn_man_pool;
 TxnPool txn_pool;
 AccessPool access_pool;

@@ -505,11 +505,18 @@ RC TPCCTxnManager::send_remote_one_side_request(TPCCQuery * query,row_t *& row_l
         if(g_wh_update)this->last_type = WR;
         else this->last_type == RD;
 
+		// string tbl_name(test_row->table_name);
+		// assert(tbl_name != "ITEM");
         //preserve the txn->access
         RC rc = RCOK;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+		// string tbl_name2(row_local->table_name);
+		// printf("%s %s\n", test_row->table_name, row_local->table_name);
+		// assert(tbl_name2 != "ITEM");	
         return rc;
-    }	
+    } else {
+		assert(false);
+	}
 
 	return rc;
 }

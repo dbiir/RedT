@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
     #endif
 
    //prepare workload
-	Workload * m_wl;
+	// Workload * m_wl;
 	switch (WORKLOAD) {
 		case YCSB :
 			m_wl = new YCSBWorkload;

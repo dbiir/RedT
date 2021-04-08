@@ -36,6 +36,7 @@ public:
 	// new row.
 	RC get_new_row(row_t *& row); // this is equivalent to insert()
 	RC get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id);
+    RC general_get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id);
 
 	void delete_row(); // TODO delete_row is not supportet yet
 
@@ -44,9 +45,9 @@ public:
 	uint32_t get_table_id() { return table_id; };
 
 	Catalog  		schema;
+	uint32_t        table_id;
 private:
 	char  	table_name[20];
-	uint32_t        table_id;
 	char 			pad[CL_SIZE - sizeof(void *)*3 - sizeof(uint32_t)];
 };
 #else
@@ -71,10 +72,10 @@ public:
 	uint32_t get_table_id() { return table_id; };
 
 	Catalog * 		schema;
+  	uint32_t        table_id;
 private:
 	const char * 	table_name;
 
-  	uint32_t        table_id;
 	uint64_t * 		cur_tab_size;
 	char 			pad[CL_SIZE - sizeof(void *)*3 - sizeof(uint32_t)];
 };

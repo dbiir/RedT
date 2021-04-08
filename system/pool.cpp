@@ -434,7 +434,7 @@ void RowPool::put(uint64_t thd_id, row_t* item) {
   while (!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) {
   }
   if(tries >= TRY_LIMIT) {
-    mem_allocator.free(item,sizeof(row_t));
+    mem_allocator.free(item,row_t::get_row_size(ROW_DEFAULT_SIZE));
   }
 }
 
@@ -443,7 +443,7 @@ void RowPool::free_all() {
   for(uint64_t thd_id = 0; thd_id < g_total_thread_cnt; thd_id++) {
   while(pool[thd_id]->pop(item)) {
     DEBUG_M("row_pool free\n");
-    mem_allocator.free(item,sizeof(row_t));
+    mem_allocator.free(item,row_t::get_row_size(ROW_DEFAULT_SIZE));
   }
   }
 }

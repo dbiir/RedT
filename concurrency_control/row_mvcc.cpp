@@ -61,7 +61,7 @@ row_t * Row_mvcc::clear_history(TsType type, ts_t ts) {
 		assert(prev->ts >= his->ts);
 		if (row != NULL) {
 			row->free_row();
-			mem_allocator.free(row, sizeof(row_t));
+			mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 		}
 		row = his->row;
 		his->row = NULL;
@@ -93,7 +93,7 @@ MVHisEntry * Row_mvcc::get_his_entry() {
 void Row_mvcc::return_his_entry(MVHisEntry * entry) {
 	if (entry->row != NULL) {
 		entry->row->free_row();
-		mem_allocator.free(entry->row, sizeof(row_t));
+		mem_allocator.free(entry->row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	mem_allocator.free(entry, sizeof(MVHisEntry));
 }
