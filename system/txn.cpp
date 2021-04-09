@@ -1459,7 +1459,7 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
 	access->timestamp = test_row->timestamp;
 
     access->key = test_row->get_primary_key();
-    access->location =loc;
+    access->location = loc;
 	access->offset = m_item->offset;	
 #endif
 

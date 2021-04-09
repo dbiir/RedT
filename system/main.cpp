@@ -130,8 +130,9 @@ int main(int argc, char *argv[]) {
     order_index_size = order_index_size * (g_num_wh/g_node_cnt);
     ol_index_size = ol_index_size * (g_num_wh/g_node_cnt);
 
-    // rdma_index_size = item_index_size + wh_index_size + stock_index_size + dis_index_size +
-    //                 + cust_index_size +  cl_index_size + order_index_size + ol_index_size ;
+    rdma_index_size = item_index_size + wh_index_size + stock_index_size + dis_index_size +
+                    + cust_index_size +  cl_index_size + order_index_size + ol_index_size 
+                    + (1024*1024L);
     
 	//register memeory
 	//prepare QP connection with rdma_global_buffer(as registry memory)
@@ -218,6 +219,7 @@ int main(int argc, char *argv[]) {
 	fflush(stdout);
 	txn_table.init();
 	printf("Done\n");
+    printf("***********num_wh = %d**********\n",NUM_WH);
 #if CC_ALG == CALVIN
 	printf("Initializing sequencer... ");
 	fflush(stdout);
