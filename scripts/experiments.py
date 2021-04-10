@@ -448,11 +448,11 @@ def tpcc_scaling():
     nnodes = [2]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     #nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
-    nalgos=['RDMA_SILO']
+    nalgos=['RDMA_MVCC']
     # nalgos=['NO_WAIT']
     npercpay=[0.0]
     # npercpay=[0.0]
-    wh=16
+    wh=64
     # wh=64
     load = [10000]
     tcnt = [4]

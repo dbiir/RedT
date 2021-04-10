@@ -182,9 +182,9 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG RDMA_SILO
+#define CC_ALG RDMA_MVCC
 #define YCSB_ABORT_MODE false
-#define QUEUE_CAPACITY_NEW 1000000
+#define QUEUE_C  APACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
 #define KEY_ORDER         false
 // transaction roll back changes after abort
@@ -283,7 +283,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH 32
+#define NUM_WH 128
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0

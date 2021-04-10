@@ -635,7 +635,9 @@ RC TPCCTxnManager::run_txn_state() {
 						break;
 		case TPCC_FIN :
 				state = TPCC_FIN;
-			if (tpcc_query->rbk) return Abort;
+			if (tpcc_query->rbk) 
+	            INC_STATS(get_thd_id(),tpcc_fin_abort,get_sys_clock() - starttime);
+                return Abort;
 						//return finish(tpcc_query,false);
 				break;
 		default:

@@ -1442,7 +1442,7 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
     this->last_type = type;
 
     RC rc = RCOK;
-	rc = row_local->remote_copy_row(test_row, this, access);
+	rc = test_row->remote_copy_row(test_row, this, access);
     assert(test_row->get_primary_key() == access->data->get_primary_key());
 	// printf("preserve_access %s %s\n", test_row->table_name, access->data->table_name);
     if (rc == Abort || rc == WAIT) {

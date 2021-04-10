@@ -226,7 +226,9 @@ UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
 UInt64 rdma_buffer_size = 30*(1024*1024*1024L);
+UInt64 client_rdma_buffer_size = 30*(1024L);
 UInt64 rdma_index_size = (1024*1024*1024L);
+
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;
 UInt64 g_max_pre_req = MAX_PRE_REQ;

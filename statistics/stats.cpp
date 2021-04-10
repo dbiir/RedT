@@ -98,6 +98,13 @@ void Stats_thd::clear() {
   local_try_lock_fail_abort = 0;
   remote_try_lock_fail_abort = 0;
   cnt_unequal_abort = 0;
+
+  tpcc_fin_abort = 0;
+  silo_lock_write_abort = 0;
+  silo_lock_read_abort = 0;
+  silo_127_abort = 0;
+  silo_155_abort = 0;
+  cnt_un_abort = 0;
   //
 
   total_txn_abort_cnt=0;
@@ -583,6 +590,13 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",ts_error = %ld"
   ",result_false = %ld"
   ",cas_cnt = %ld "
+
+  ",tpcc_fin_abort = %ld "
+  ",silo_lock_write_abort = %ld "
+  ",silo_lock_read_abort = %ld"
+  ",silo_127_abort = %ld "
+  ",silo_155_abort =%ld"
+  ",cnt_un_abort=%ld"
 //   ",local_lock_fail_abort = %f"
 //   ",remote_lock_fail_abort = %f"
 //   ",local_readset_validate_fail_abort = %f"
@@ -620,6 +634,13 @@ void Stats_thd::print(FILE * outf, bool prog) {
           ts_error ,
           result_false ,
           cas_cnt , 
+
+          tpcc_fin_abort,
+          silo_lock_write_abort,
+          silo_lock_read_abort ,
+          silo_127_abort ,
+          silo_155_abort ,
+          cnt_un_abort,
         //   local_lock_fail_abort/valid_abort_cnt,
         //   remote_lock_fail_abort/valid_abort_cnt,
         //   local_readset_validate_fail_abort/valid_abort_cnt,
@@ -1403,6 +1424,13 @@ void Stats_thd::combine(Stats_thd * stats) {
   local_try_lock_fail_abort+=stats->local_try_lock_fail_abort;
   remote_try_lock_fail_abort+=stats->remote_try_lock_fail_abort;
   cnt_unequal_abort+=stats->cnt_unequal_abort;
+
+   tpcc_fin_abort += stats->tpcc_fin_abort;
+   silo_lock_write_abort += stats->silo_lock_write_abort;
+   silo_lock_read_abort+=stats->silo_lock_read_abort;
+   silo_127_abort+=stats->silo_127_abort;
+   silo_155_abort+=stats->silo_155_abort;
+   cnt_un_abort+=stats->cnt_un_abort;
 
   total_txn_abort_cnt+=stats->total_txn_abort_cnt;
   positive_txn_abort_cnt += stats->positive_txn_abort_cnt;

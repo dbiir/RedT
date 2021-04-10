@@ -18,10 +18,12 @@
 #include "txn.h"
 #include "row.h"
 #include "manager.h"
+#include "helper.h"
 #include "rdma.h"
 #include "rdma_mvcc.h"
 #include "row_rdma_mvcc.h"
 #include "mem_alloc.h"
+#include "lib.hh"
 #include "qps/op.hh"
 #if CC_ALG == RDMA_MVCC
 void rdma_mvcc::init(row_t * row) {
@@ -193,7 +195,7 @@ row_t * rdma_mvcc::read_remote_row(TxnManager * txn , uint64_t num){
   	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 
-	row_t *temp_row = (row_t *)mem_allocator.alloc((row_t::get_row_size(get_schema()->get_tuple_size())));
+	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 	memcpy(temp_row, test_buf, operate_size);
 	assert(temp_row->get_primary_key() == row->get_primary_key());
 
@@ -635,7 +637,7 @@ row_t * rdma_mvcc::read_again(TxnManager * txnMng,uint64_t num){
         auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
         RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 
-        row_t *temp_row = (row_t *)mem_allocator.alloc((row_t::get_row_size(get_schema()->get_tuple_size())));
+        row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 	    memcpy(temp_row, test_buf, operate_size);
 
         //assert(temp_row->_tid_word != 0);

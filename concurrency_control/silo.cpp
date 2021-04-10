@@ -46,6 +46,7 @@ TxnManager::validate_silo()
 		for (uint64_t i = 0; i < wr_cnt; i++) {
 			row_t * row = txn->accesses[ write_set[i] ]->orig_row;
 			if (row->manager->get_tid() != txn->accesses[write_set[i]]->tid) {
+	            INC_STATS(get_thd_id(),silo_lock_write_abort,get_sys_clock() );
 				rc = Abort;
 				return rc;
 			}
@@ -53,6 +54,7 @@ TxnManager::validate_silo()
 		for (uint64_t i = 0; i < txn->row_cnt - wr_cnt; i ++) {
 			Access * access = txn->accesses[ read_set[i] ];
 			if (access->orig_row->manager->get_tid() != txn->accesses[read_set[i]]->tid) {
+	            INC_STATS(get_thd_id(),silo_lock_read_abort,get_sys_clock());
 				rc = Abort;
 				return rc;
 			}
@@ -86,6 +88,7 @@ TxnManager::validate_silo()
 				DEBUG("TRY LOCK true %ld\n", get_txn_id());
 				done = true;
 			} else {
+                INC_STATS(get_thd_id(), cnt_un_abort, 1);
 				rc = Abort;
 				return rc;
 
@@ -121,6 +124,7 @@ TxnManager::validate_silo()
 			DEBUG("silo %ld write lock row %ld \n", this->get_txn_id(), row->get_primary_key());
 			num_locks++;
 			if (row->manager->get_tid() != txn->accesses[write_set[i]]->tid) {
+				INC_STATS(get_thd_id(), silo_127_abort, 1);
 				rc = Abort;
 				return rc;
 			}
@@ -148,6 +152,7 @@ TxnManager::validate_silo()
 		Access * access = txn->accesses[ write_set[i] ];
 		bool success = access->orig_row->manager->validate(access->tid, true);
 		if (!success) {
+			INC_STATS(get_thd_id(), silo_155_abort, 1);
 			rc = Abort;
 			return rc;
 		}

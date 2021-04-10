@@ -23,7 +23,6 @@
 #include "txn.h"
 #include "row.h"
 #include "rdma_silo.h"
-#include "manager.h"
 #include "mem_alloc.h"
 #include "lib.hh"
 #include "qps/op.hh"
@@ -361,7 +360,7 @@ bool RDMA_silo::remote_commit_write(TxnManager * txnMng , uint64_t num , row_t *
 	data->_tid_word = lock;
 	data->timestamp = time;
     uint64_t operate_size = row_t::get_row_size(data->tuple_size) - sizeof(data->_tid_word);
-
+    // printf("【rdma_silo.cpp:364】table_name = %s, loc = %ld , thd_id = %ld, off = %ld, lock = %ld,operate_size = %ld tuple_size = %ld , sizeof(row_t)=%d\n",data->table_name,loc,thd_id,off,lock,operate_size,data->tuple_size,sizeof(row_t));
     char *test_buf = Rdma::get_row_client_memory(thd_id);
     memcpy(test_buf, (char*)data + sizeof(data->_tid_word), operate_size);
 

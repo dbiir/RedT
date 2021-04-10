@@ -79,6 +79,13 @@ public:
   double  remote_try_lock_fail_abort;
   double  cnt_unequal_abort;
 
+  uint64_t tpcc_fin_abort ;
+  uint64_t silo_lock_write_abort;
+  uint64_t silo_lock_read_abort;
+  uint64_t silo_127_abort;
+  uint64_t silo_155_abort;
+  uint64_t cnt_un_abort;
+
   uint64_t total_txn_abort_cnt;
   uint64_t positive_txn_abort_cnt;
   uint64_t unique_txn_abort_cnt;

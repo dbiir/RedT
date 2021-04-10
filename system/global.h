@@ -254,6 +254,7 @@ extern uint64_t g_msg_size;
 extern uint64_t g_log_buf_max;
 extern uint64_t g_log_flush_timeout;
 extern uint64_t rdma_buffer_size;
+extern uint64_t client_rdma_buffer_size;
 extern uint64_t rdma_index_size;
 extern UInt32 g_max_txn_per_part;
 extern int32_t g_load_per_server;

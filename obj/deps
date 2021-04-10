@@ -252,31 +252,6 @@ obj/tpcc_helper.o: benchmarks/tpcc_helper.cpp benchmarks/tpcc_helper.h \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h
-obj/da_query.o: benchmarks/da_query.cpp system/query.h system/global.h \
- config.h statistics/stats.h statistics/../system/global.h \
- statistics/stats_array.h system/pool.h system/helper.h \
- system/concurrentqueue.h system/txn_table.h system/logger.h \
- system/sim_manager.h benchmarks/da_block_queue.h system/global.h \
- r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
- r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
- rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
- rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
- rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
- rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
- rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
- rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
- rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
- rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
- rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
- rlibv2/././bootstrap/./channel.hh \
- rlibv2/././bootstrap/./../utils/ipname.hh \
- rlibv2/././bootstrap/./../utils/marshal.hh \
- rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/array.h \
- system/mem_alloc.h benchmarks/da_query.h system/helper.h benchmarks/da.h \
- storage/row.h system/txn.h transport/message.h system/logger.h \
- system/array.h system/wl.h benchmarks/creator.h benchmarks/generic.h \
- system/mem_alloc.h storage/table.h storage/catalog.h transport/message.h
 obj/pps_wl.o: benchmarks/pps_wl.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/global.h system/helper.h \
@@ -405,6 +380,31 @@ obj/pps_txn.o: benchmarks/pps_txn.cpp benchmarks/pps.h system/wl.h \
  storage/index_base.h storage/index_btree.h transport/transport.h \
  transport/nn.hpp transport/msg_thread.h system/msg_queue.h \
  system/lock_free_queue.h transport/message.h
+obj/da_query.o: benchmarks/da_query.cpp system/query.h system/global.h \
+ config.h statistics/stats.h statistics/../system/global.h \
+ statistics/stats_array.h system/pool.h system/helper.h \
+ system/concurrentqueue.h system/txn_table.h system/logger.h \
+ system/sim_manager.h benchmarks/da_block_queue.h system/global.h \
+ r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
+ r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
+ rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
+ rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
+ rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
+ rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
+ rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+ rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
+ rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
+ rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
+ rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
+ rlibv2/././bootstrap/./channel.hh \
+ rlibv2/././bootstrap/./../utils/ipname.hh \
+ rlibv2/././bootstrap/./../utils/marshal.hh \
+ rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/array.h \
+ system/mem_alloc.h benchmarks/da_query.h system/helper.h benchmarks/da.h \
+ storage/row.h system/txn.h transport/message.h system/logger.h \
+ system/array.h system/wl.h benchmarks/creator.h benchmarks/generic.h \
+ system/mem_alloc.h storage/table.h storage/catalog.h transport/message.h
 obj/client_query.o: client/client_query.cpp client/client_query.h \
  system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
@@ -454,8 +454,8 @@ obj/client_txn.o: client/client_txn.cpp client/client_txn.h system/global.h \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/mem_alloc.h
-obj/wsi.o: concurrency_control/wsi.cpp system/global.h config.h \
- statistics/stats.h statistics/../system/global.h \
+obj/row_si.o: concurrency_control/row_si.cpp storage/row.h system/global.h \
+ config.h statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/global.h system/helper.h \
  system/concurrentqueue.h system/txn_table.h system/logger.h \
  system/sim_manager.h benchmarks/da_block_queue.h \
@@ -474,22 +474,54 @@ obj/wsi.o: concurrency_control/wsi.cpp system/global.h config.h \
  rlibv2/././bootstrap/./../utils/ipname.hh \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h \
- system/txn.h system/array.h system/mem_alloc.h transport/message.h \
- system/logger.h system/array.h concurrency_control/wsi.h storage/row.h \
- system/manager.h system/mem_alloc.h concurrency_control/row_wsi.h
-obj/wkdb.o: concurrency_control/wkdb.cpp system/global.h config.h \
- statistics/stats.h statistics/../system/global.h \
- statistics/stats_array.h system/pool.h system/global.h system/helper.h \
- system/concurrentqueue.h system/txn_table.h system/logger.h \
- system/sim_manager.h benchmarks/da_block_queue.h \
- r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
- r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
- rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
- rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
- rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
- rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
- rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/mem_alloc.h \
+ concurrency_control/row_si.h concurrency_control/../system/txn.h \
+ concurrency_control/../system/global.h \
+ concurrency_control/../system/helper.h \
+ concurrency_control/../system/array.h \
+ concurrency_control/../system/mem_alloc.h transport/message.h \
+ system/helper.h system/logger.h system/array.h system/manager.h \
+ concurrency_control/dli.h
+obj/row_wkdb.o: concurrency_control/row_wkdb.cpp storage/table.h \
+ system/global.h config.h statistics/stats.h \
+ statistics/../system/global.h statistics/stats_array.h system/pool.h \
+ system/global.h system/helper.h system/concurrentqueue.h \
+ system/txn_table.h system/logger.h system/sim_manager.h \
+ benchmarks/da_block_queue.h r2/src/allocator_master.hh \
+ r2/src/allocator.hh r2/src/common.hh r2/src/./utils/option.hh \
+ r2/src/./logging.hh rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh \
+ rlibv2/././common.hh rlibv2/./././utils/logging.hh \
+ rlibv2/./././utils/option.hh rlibv2/./././result.hh rlibv2/././naming.hh \
+ rlibv2/./rctrl.hh rlibv2/././rmem/handler.hh \
+ rlibv2/././rmem/../utils/abs_factory.hh rlibv2/././rmem/./config.hh \
+ rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+ rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
+ rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
+ rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
+ rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
+ rlibv2/././bootstrap/./channel.hh \
+ rlibv2/././bootstrap/./../utils/ipname.hh \
+ rlibv2/././bootstrap/./../utils/marshal.hh \
+ rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh storage/catalog.h \
+ system/helper.h storage/row.h system/txn.h system/array.h \
+ system/mem_alloc.h transport/message.h system/logger.h system/array.h \
+ concurrency_control/row_wkdb.h system/mem_alloc.h system/manager.h \
+ concurrency_control/wkdb.h
+obj/row_null.o: concurrency_control/row_null.cpp \
+ concurrency_control/row_null.h concurrency_control/../storage/row.h \
+ system/global.h config.h statistics/stats.h \
+ statistics/../system/global.h statistics/stats_array.h system/pool.h \
+ system/global.h system/helper.h system/concurrentqueue.h \
+ system/txn_table.h system/logger.h system/sim_manager.h \
+ benchmarks/da_block_queue.h r2/src/allocator_master.hh \
+ r2/src/allocator.hh r2/src/common.hh r2/src/./utils/option.hh \
+ r2/src/./logging.hh rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh \
+ rlibv2/././common.hh rlibv2/./././utils/logging.hh \
+ rlibv2/./././utils/option.hh rlibv2/./././result.hh rlibv2/././naming.hh \
+ rlibv2/./rctrl.hh rlibv2/././rmem/handler.hh \
+ rlibv2/././rmem/../utils/abs_factory.hh rlibv2/././rmem/./config.hh \
+ rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
  rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
  rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
  rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
@@ -499,9 +531,8 @@ obj/wkdb.o: concurrency_control/wkdb.cpp system/global.h config.h \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h \
- system/txn.h system/array.h system/mem_alloc.h transport/message.h \
- system/logger.h system/array.h storage/row.h concurrency_control/wkdb.h \
- system/manager.h system/mem_alloc.h concurrency_control/row_wkdb.h
+ system/manager.h system/mem_alloc.h system/txn.h system/array.h \
+ system/mem_alloc.h transport/message.h system/logger.h system/array.h
 obj/row_wsi.o: concurrency_control/row_wsi.cpp system/txn.h system/global.h \
  config.h statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
@@ -548,30 +579,6 @@ obj/row_father.o: concurrency_control/row_father.cpp \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh
-obj/row_occ.o: concurrency_control/row_occ.cpp system/txn.h system/global.h \
- config.h statistics/stats.h statistics/../system/global.h \
- statistics/stats_array.h system/pool.h system/helper.h \
- system/concurrentqueue.h system/txn_table.h system/logger.h \
- system/sim_manager.h benchmarks/da_block_queue.h system/global.h \
- r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
- r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
- rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
- rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
- rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
- rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
- rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
- rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
- rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
- rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
- rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
- rlibv2/././bootstrap/./channel.hh \
- rlibv2/././bootstrap/./../utils/ipname.hh \
- rlibv2/././bootstrap/./../utils/marshal.hh \
- rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/array.h \
- system/mem_alloc.h transport/message.h system/helper.h system/logger.h \
- system/array.h storage/row.h concurrency_control/row_occ.h \
- system/mem_alloc.h
 obj/dta.o: concurrency_control/dta.cpp concurrency_control/dta.h \
  concurrency_control/../storage/row.h system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
@@ -605,8 +612,8 @@ obj/dta.o: concurrency_control/dta.cpp concurrency_control/dta.h \
  concurrency_control/../system/mem_alloc.h transport/message.h \
  system/helper.h system/logger.h system/array.h concurrency_control/dli.h \
  storage/row.h concurrency_control/row_dta.h
-obj/dli.o: concurrency_control/dli.cpp system/txn.h system/global.h config.h \
- statistics/stats.h statistics/../system/global.h \
+obj/row_ts.o: concurrency_control/row_ts.cpp system/txn.h system/global.h \
+ config.h statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
  system/concurrentqueue.h system/txn_table.h system/logger.h \
  system/sim_manager.h benchmarks/da_block_queue.h system/global.h \
@@ -627,40 +634,13 @@ obj/dli.o: concurrency_control/dli.cpp system/txn.h system/global.h config.h \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/array.h \
  system/mem_alloc.h transport/message.h system/helper.h system/logger.h \
- system/array.h concurrency_control/dli.h storage/row.h system/manager.h \
- concurrency_control/dta.h concurrency_control/../storage/row.h \
- concurrency_control/row_si.h concurrency_control/../system/txn.h \
- concurrency_control/row_dli_based.h
-obj/occ.o: concurrency_control/occ.cpp concurrency_control/occ.h \
- storage/row.h system/global.h config.h statistics/stats.h \
- statistics/../system/global.h statistics/stats_array.h system/pool.h \
- system/global.h system/helper.h system/concurrentqueue.h \
- system/txn_table.h system/logger.h system/sim_manager.h \
- benchmarks/da_block_queue.h r2/src/allocator_master.hh \
- r2/src/allocator.hh r2/src/common.hh r2/src/./utils/option.hh \
- r2/src/./logging.hh rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh \
- rlibv2/././common.hh rlibv2/./././utils/logging.hh \
- rlibv2/./././utils/option.hh rlibv2/./././result.hh rlibv2/././naming.hh \
- rlibv2/./rctrl.hh rlibv2/././rmem/handler.hh \
- rlibv2/././rmem/../utils/abs_factory.hh rlibv2/././rmem/./config.hh \
- rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
- rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
- rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
- rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
- rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
- rlibv2/././bootstrap/./channel.hh \
- rlibv2/././bootstrap/./../utils/ipname.hh \
- rlibv2/././bootstrap/./../utils/marshal.hh \
- rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h \
- system/manager.h system/mem_alloc.h concurrency_control/row_occ.h \
- system/txn.h system/array.h system/mem_alloc.h transport/message.h \
- system/logger.h system/array.h
-obj/bocc.o: concurrency_control/bocc.cpp system/global.h config.h \
- statistics/stats.h statistics/../system/global.h \
- statistics/stats_array.h system/pool.h system/global.h system/helper.h \
+ system/array.h storage/row.h concurrency_control/row_ts.h \
+ system/mem_alloc.h system/manager.h
+obj/row_occ.o: concurrency_control/row_occ.cpp system/txn.h system/global.h \
+ config.h statistics/stats.h statistics/../system/global.h \
+ statistics/stats_array.h system/pool.h system/helper.h \
  system/concurrentqueue.h system/txn_table.h system/logger.h \
- system/sim_manager.h benchmarks/da_block_queue.h \
+ system/sim_manager.h benchmarks/da_block_queue.h system/global.h \
  r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
  r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
  rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
@@ -676,10 +656,10 @@ obj/bocc.o: concurrency_control/bocc.cpp system/global.h config.h \
  rlibv2/././bootstrap/./../utils/ipname.hh \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h \
- system/txn.h system/array.h system/mem_alloc.h transport/message.h \
- system/logger.h system/array.h concurrency_control/bocc.h storage/row.h \
- system/manager.h system/mem_alloc.h concurrency_control/row_occ.h
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/array.h \
+ system/mem_alloc.h transport/message.h system/helper.h system/logger.h \
+ system/array.h storage/row.h concurrency_control/row_occ.h \
+ system/mem_alloc.h
 obj/row_dta.o: concurrency_control/row_dta.cpp concurrency_control/row_dta.h \
  concurrency_control/../storage/row.h system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
@@ -705,18 +685,19 @@ obj/row_dta.o: concurrency_control/row_dta.cpp concurrency_control/row_dta.h \
  concurrency_control/dta.h system/helper.h system/manager.h \
  system/mem_alloc.h system/txn.h system/array.h system/mem_alloc.h \
  transport/message.h system/logger.h system/array.h
-obj/row_ts.o: concurrency_control/row_ts.cpp system/txn.h system/global.h \
- config.h statistics/stats.h statistics/../system/global.h \
- statistics/stats_array.h system/pool.h system/helper.h \
- system/concurrentqueue.h system/txn_table.h system/logger.h \
- system/sim_manager.h benchmarks/da_block_queue.h system/global.h \
- r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
- r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
- rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
- rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
- rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
- rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
- rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+obj/occ.o: concurrency_control/occ.cpp concurrency_control/occ.h \
+ storage/row.h system/global.h config.h statistics/stats.h \
+ statistics/../system/global.h statistics/stats_array.h system/pool.h \
+ system/global.h system/helper.h system/concurrentqueue.h \
+ system/txn_table.h system/logger.h system/sim_manager.h \
+ benchmarks/da_block_queue.h r2/src/allocator_master.hh \
+ r2/src/allocator.hh r2/src/common.hh r2/src/./utils/option.hh \
+ r2/src/./logging.hh rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh \
+ rlibv2/././common.hh rlibv2/./././utils/logging.hh \
+ rlibv2/./././utils/option.hh rlibv2/./././result.hh rlibv2/././naming.hh \
+ rlibv2/./rctrl.hh rlibv2/././rmem/handler.hh \
+ rlibv2/././rmem/../utils/abs_factory.hh rlibv2/././rmem/./config.hh \
+ rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
  rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
  rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
  rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
@@ -725,10 +706,10 @@ obj/row_ts.o: concurrency_control/row_ts.cpp system/txn.h system/global.h \
  rlibv2/././bootstrap/./../utils/ipname.hh \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/array.h \
- system/mem_alloc.h transport/message.h system/helper.h system/logger.h \
- system/array.h storage/row.h concurrency_control/row_ts.h \
- system/mem_alloc.h system/manager.h
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h \
+ system/manager.h system/mem_alloc.h concurrency_control/row_occ.h \
+ system/txn.h system/array.h system/mem_alloc.h transport/message.h \
+ system/logger.h system/array.h
 obj/focc.o: concurrency_control/focc.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/global.h system/helper.h \
@@ -752,6 +733,30 @@ obj/focc.o: concurrency_control/focc.cpp system/global.h config.h \
  rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h \
  system/txn.h system/array.h system/mem_alloc.h transport/message.h \
  system/logger.h system/array.h concurrency_control/focc.h storage/row.h \
+ system/manager.h system/mem_alloc.h concurrency_control/row_occ.h
+obj/bocc.o: concurrency_control/bocc.cpp system/global.h config.h \
+ statistics/stats.h statistics/../system/global.h \
+ statistics/stats_array.h system/pool.h system/global.h system/helper.h \
+ system/concurrentqueue.h system/txn_table.h system/logger.h \
+ system/sim_manager.h benchmarks/da_block_queue.h \
+ r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
+ r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
+ rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
+ rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
+ rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
+ rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
+ rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+ rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
+ rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
+ rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
+ rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
+ rlibv2/././bootstrap/./channel.hh \
+ rlibv2/././bootstrap/./../utils/ipname.hh \
+ rlibv2/././bootstrap/./../utils/marshal.hh \
+ rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h \
+ system/txn.h system/array.h system/mem_alloc.h transport/message.h \
+ system/logger.h system/array.h concurrency_control/bocc.h storage/row.h \
  system/manager.h system/mem_alloc.h concurrency_control/row_occ.h
 obj/maat.o: concurrency_control/maat.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
@@ -849,31 +854,6 @@ obj/rts_cache.o: concurrency_control/rts_cache.cpp system/global.h config.h \
  concurrency_control/rts_cache.h concurrency_control/key_xid.h \
  concurrency_control/spin_lock.h concurrency_control/hash.h \
  system/mem_alloc.h
-obj/row_null.o: concurrency_control/row_null.cpp \
- concurrency_control/row_null.h concurrency_control/../storage/row.h \
- system/global.h config.h statistics/stats.h \
- statistics/../system/global.h statistics/stats_array.h system/pool.h \
- system/global.h system/helper.h system/concurrentqueue.h \
- system/txn_table.h system/logger.h system/sim_manager.h \
- benchmarks/da_block_queue.h r2/src/allocator_master.hh \
- r2/src/allocator.hh r2/src/common.hh r2/src/./utils/option.hh \
- r2/src/./logging.hh rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh \
- rlibv2/././common.hh rlibv2/./././utils/logging.hh \
- rlibv2/./././utils/option.hh rlibv2/./././result.hh rlibv2/././naming.hh \
- rlibv2/./rctrl.hh rlibv2/././rmem/handler.hh \
- rlibv2/././rmem/../utils/abs_factory.hh rlibv2/././rmem/./config.hh \
- rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
- rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
- rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
- rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
- rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
- rlibv2/././bootstrap/./channel.hh \
- rlibv2/././bootstrap/./../utils/ipname.hh \
- rlibv2/././bootstrap/./../utils/marshal.hh \
- rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h \
- system/manager.h system/mem_alloc.h system/txn.h system/array.h \
- system/mem_alloc.h transport/message.h system/logger.h system/array.h
 obj/rdma_mvcc.o: concurrency_control/rdma_mvcc.cpp system/txn.h \
  system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
@@ -900,8 +880,8 @@ obj/rdma_mvcc.o: concurrency_control/rdma_mvcc.cpp system/txn.h \
  transport/nn.hpp concurrency_control/rdma_mvcc.h \
  concurrency_control/row_mvcc.h concurrency_control/row_rdma_mvcc.h \
  system/mem_alloc.h rlibv2/qps/op.hh
-obj/silo.o: concurrency_control/silo.cpp system/txn.h system/global.h \
- config.h statistics/stats.h statistics/../system/global.h \
+obj/dli.o: concurrency_control/dli.cpp system/txn.h system/global.h config.h \
+ statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
  system/concurrentqueue.h system/txn_table.h system/logger.h \
  system/sim_manager.h benchmarks/da_block_queue.h system/global.h \
@@ -922,8 +902,10 @@ obj/silo.o: concurrency_control/silo.cpp system/txn.h system/global.h \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/array.h \
  system/mem_alloc.h transport/message.h system/helper.h system/logger.h \
- system/array.h storage/row.h concurrency_control/row_silo.h \
- rlibv2/qps/op.hh
+ system/array.h concurrency_control/dli.h storage/row.h system/manager.h \
+ concurrency_control/dta.h concurrency_control/../storage/row.h \
+ concurrency_control/row_si.h concurrency_control/../system/txn.h \
+ concurrency_control/row_dli_based.h
 obj/row_rdma_mvcc.o: concurrency_control/row_rdma_mvcc.cpp system/txn.h \
  system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
@@ -973,14 +955,14 @@ obj/row_ssi.o: concurrency_control/row_ssi.cpp system/txn.h system/global.h \
  system/mem_alloc.h transport/message.h system/helper.h system/logger.h \
  system/array.h storage/row.h system/manager.h concurrency_control/ssi.h \
  concurrency_control/row_ssi.h system/mem_alloc.h
-obj/row_si.o: concurrency_control/row_si.cpp storage/row.h system/global.h \
- config.h statistics/stats.h statistics/../system/global.h \
- statistics/stats_array.h system/pool.h system/global.h system/helper.h \
- system/concurrentqueue.h system/txn_table.h system/logger.h \
- system/sim_manager.h benchmarks/da_block_queue.h \
- r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
- r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
- rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
+obj/row_lock.o: concurrency_control/row_lock.cpp system/helper.h \
+ system/global.h config.h statistics/stats.h \
+ statistics/../system/global.h statistics/stats_array.h system/pool.h \
+ system/helper.h system/concurrentqueue.h system/txn_table.h \
+ system/logger.h system/sim_manager.h benchmarks/da_block_queue.h \
+ system/global.h r2/src/allocator_master.hh r2/src/allocator.hh \
+ r2/src/common.hh r2/src/./utils/option.hh r2/src/./logging.hh \
+ rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
  rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
  rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
  rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
@@ -993,14 +975,10 @@ obj/row_si.o: concurrency_control/row_si.cpp storage/row.h system/global.h \
  rlibv2/././bootstrap/./../utils/ipname.hh \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/mem_alloc.h \
- concurrency_control/row_si.h concurrency_control/../system/txn.h \
- concurrency_control/../system/global.h \
- concurrency_control/../system/helper.h \
- concurrency_control/../system/array.h \
- concurrency_control/../system/mem_alloc.h transport/message.h \
- system/helper.h system/logger.h system/array.h system/manager.h \
- concurrency_control/dli.h
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/manager.h \
+ system/mem_alloc.h storage/row.h system/txn.h system/array.h \
+ system/mem_alloc.h transport/message.h system/logger.h system/array.h \
+ concurrency_control/row_lock.h
 obj/rdma_silo.o: concurrency_control/rdma_silo.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/global.h system/helper.h \
@@ -1076,19 +1054,18 @@ obj/row_rdma_silo.o: concurrency_control/row_rdma_silo.cpp system/txn.h \
  system/mem_alloc.h transport/message.h system/helper.h system/logger.h \
  system/array.h storage/row.h concurrency_control/row_rdma_silo.h \
  system/mem_alloc.h transport/rdma.h transport/nn.hpp rlibv2/qps/op.hh
-obj/row_wkdb.o: concurrency_control/row_wkdb.cpp storage/table.h \
- system/global.h config.h statistics/stats.h \
- statistics/../system/global.h statistics/stats_array.h system/pool.h \
- system/global.h system/helper.h system/concurrentqueue.h \
- system/txn_table.h system/logger.h system/sim_manager.h \
- benchmarks/da_block_queue.h r2/src/allocator_master.hh \
- r2/src/allocator.hh r2/src/common.hh r2/src/./utils/option.hh \
- r2/src/./logging.hh rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh \
- rlibv2/././common.hh rlibv2/./././utils/logging.hh \
- rlibv2/./././utils/option.hh rlibv2/./././result.hh rlibv2/././naming.hh \
- rlibv2/./rctrl.hh rlibv2/././rmem/handler.hh \
- rlibv2/././rmem/../utils/abs_factory.hh rlibv2/././rmem/./config.hh \
- rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+obj/wkdb.o: concurrency_control/wkdb.cpp system/global.h config.h \
+ statistics/stats.h statistics/../system/global.h \
+ statistics/stats_array.h system/pool.h system/global.h system/helper.h \
+ system/concurrentqueue.h system/txn_table.h system/logger.h \
+ system/sim_manager.h benchmarks/da_block_queue.h \
+ r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
+ r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
+ rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
+ rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
+ rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
+ rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
+ rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
  rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
  rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
  rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
@@ -1097,11 +1074,10 @@ obj/row_wkdb.o: concurrency_control/row_wkdb.cpp storage/table.h \
  rlibv2/././bootstrap/./../utils/ipname.hh \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh storage/catalog.h \
- system/helper.h storage/row.h system/txn.h system/array.h \
- system/mem_alloc.h transport/message.h system/logger.h system/array.h \
- concurrency_control/row_wkdb.h system/mem_alloc.h system/manager.h \
- concurrency_control/wkdb.h
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h \
+ system/txn.h system/array.h system/mem_alloc.h transport/message.h \
+ system/logger.h system/array.h storage/row.h concurrency_control/wkdb.h \
+ system/manager.h system/mem_alloc.h concurrency_control/row_wkdb.h
 obj/row_maat.o: concurrency_control/row_maat.cpp storage/row.h \
  system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
@@ -1127,6 +1103,30 @@ obj/row_maat.o: concurrency_control/row_maat.cpp storage/row.h \
  system/array.h system/mem_alloc.h transport/message.h system/helper.h \
  system/logger.h system/array.h concurrency_control/row_maat.h \
  system/mem_alloc.h system/manager.h concurrency_control/maat.h
+obj/silo.o: concurrency_control/silo.cpp system/txn.h system/global.h \
+ config.h statistics/stats.h statistics/../system/global.h \
+ statistics/stats_array.h system/pool.h system/helper.h \
+ system/concurrentqueue.h system/txn_table.h system/logger.h \
+ system/sim_manager.h benchmarks/da_block_queue.h system/global.h \
+ r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
+ r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
+ rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
+ rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
+ rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
+ rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
+ rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+ rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
+ rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
+ rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
+ rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
+ rlibv2/././bootstrap/./channel.hh \
+ rlibv2/././bootstrap/./../utils/ipname.hh \
+ rlibv2/././bootstrap/./../utils/marshal.hh \
+ rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/array.h \
+ system/mem_alloc.h transport/message.h system/helper.h system/logger.h \
+ system/array.h storage/row.h concurrency_control/row_silo.h \
+ rlibv2/qps/op.hh
 obj/row_dli_based.o: concurrency_control/row_dli_based.cpp \
  concurrency_control/row_dli_based.h storage/row.h system/global.h \
  config.h statistics/stats.h statistics/../system/global.h \
@@ -1176,14 +1176,14 @@ obj/row_tictoc.o: concurrency_control/row_tictoc.cpp storage/row.h \
  system/array.h system/mem_alloc.h transport/message.h system/helper.h \
  system/logger.h system/array.h concurrency_control/row_tictoc.h \
  system/mem_alloc.h system/manager.h concurrency_control/tictoc.h
-obj/row_lock.o: concurrency_control/row_lock.cpp system/helper.h \
- system/global.h config.h statistics/stats.h \
- statistics/../system/global.h statistics/stats_array.h system/pool.h \
- system/helper.h system/concurrentqueue.h system/txn_table.h \
- system/logger.h system/sim_manager.h benchmarks/da_block_queue.h \
- system/global.h r2/src/allocator_master.hh r2/src/allocator.hh \
- r2/src/common.hh r2/src/./utils/option.hh r2/src/./logging.hh \
- rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
+obj/wsi.o: concurrency_control/wsi.cpp system/global.h config.h \
+ statistics/stats.h statistics/../system/global.h \
+ statistics/stats_array.h system/pool.h system/global.h system/helper.h \
+ system/concurrentqueue.h system/txn_table.h system/logger.h \
+ system/sim_manager.h benchmarks/da_block_queue.h \
+ r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
+ r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
+ rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
  rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
  rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
  rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
@@ -1196,10 +1196,10 @@ obj/row_lock.o: concurrency_control/row_lock.cpp system/helper.h \
  rlibv2/././bootstrap/./../utils/ipname.hh \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/manager.h \
- system/mem_alloc.h storage/row.h system/txn.h system/array.h \
- system/mem_alloc.h transport/message.h system/logger.h system/array.h \
- concurrency_control/row_lock.h
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/helper.h \
+ system/txn.h system/array.h system/mem_alloc.h transport/message.h \
+ system/logger.h system/array.h concurrency_control/wsi.h storage/row.h \
+ system/manager.h system/mem_alloc.h concurrency_control/row_wsi.h
 obj/row_silo.o: concurrency_control/row_silo.cpp system/txn.h system/global.h \
  config.h statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
@@ -1349,7 +1349,7 @@ obj/row.o: storage/row.cpp system/global.h config.h statistics/stats.h \
  concurrency_control/row_tictoc.h concurrency_control/row_ssi.h \
  concurrency_control/row_wsi.h concurrency_control/row_null.h \
  concurrency_control/row_silo.h concurrency_control/row_rdma_silo.h \
- concurrency_control/row_rdma_mvcc.h system/manager.h
+ concurrency_control/row_rdma_mvcc.h system/manager.h system/wl.h
 obj/table.o: storage/table.cpp system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
  system/global.h system/helper.h system/concurrentqueue.h \
@@ -1394,7 +1394,8 @@ obj/index_rdma.o: storage/index_rdma.cpp system/global.h config.h \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh \
  storage/index_rdma.h system/helper.h storage/index_base.h \
- storage/index_hash.h system/mem_alloc.h storage/row.h
+ storage/index_hash.h system/mem_alloc.h storage/row.h storage/table.h \
+ storage/catalog.h
 obj/index_rdma_tpcc.o: storage/index_rdma_tpcc.cpp
 obj/message.o: transport/message.cpp system/mem_alloc.h system/global.h \
  config.h statistics/stats.h statistics/../system/global.h \
@@ -1501,7 +1502,7 @@ obj/transport.o: transport/transport.cpp transport/transport.h \
  transport/msg_thread.h system/helper.h system/query.h system/array.h \
  system/mem_alloc.h system/manager.h transport/message.h system/logger.h \
  system/array.h benchmarks/tpcc_query.h transport/sig_sync.hpp
-obj/log_thread.o: system/log_thread.cpp system/global.h config.h \
+obj/io_thread.o: system/io_thread.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
  system/concurrentqueue.h system/txn_table.h system/logger.h \
@@ -1521,8 +1522,15 @@ obj/log_thread.o: system/log_thread.cpp system/global.h config.h \
  rlibv2/././bootstrap/./../utils/ipname.hh \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/thread.h \
- system/log_thread.h
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/manager.h \
+ system/thread.h system/io_thread.h transport/message.h system/helper.h \
+ system/logger.h system/array.h system/global.h system/helper.h \
+ system/mem_alloc.h system/query.h system/array.h benchmarks/ycsb_query.h \
+ system/query.h benchmarks/tpcc_query.h system/mem_alloc.h \
+ transport/transport.h transport/nn.hpp transport/msg_thread.h \
+ transport/msg_thread.h system/msg_queue.h system/lock_free_queue.h \
+ client/client_txn.h system/work_queue.h system/txn.h transport/message.h \
+ benchmarks/ycsb.h system/wl.h system/txn.h
 obj/manager.o: system/manager.cpp system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
  system/helper.h system/concurrentqueue.h system/txn_table.h \
@@ -1545,6 +1553,35 @@ obj/manager.o: system/manager.cpp system/global.h config.h statistics/stats.h \
  rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/manager.h \
  storage/row.h system/txn.h system/array.h system/mem_alloc.h \
  transport/message.h system/helper.h system/logger.h system/array.h
+obj/pool.o: system/pool.cpp system/pool.h system/global.h config.h \
+ statistics/stats.h statistics/../system/global.h \
+ statistics/stats_array.h system/txn_table.h system/helper.h \
+ system/logger.h system/concurrentqueue.h system/sim_manager.h \
+ benchmarks/da_block_queue.h system/global.h r2/src/allocator_master.hh \
+ r2/src/allocator.hh r2/src/common.hh r2/src/./utils/option.hh \
+ r2/src/./logging.hh rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh \
+ rlibv2/././common.hh rlibv2/./././utils/logging.hh \
+ rlibv2/./././utils/option.hh rlibv2/./././result.hh rlibv2/././naming.hh \
+ rlibv2/./rctrl.hh rlibv2/././rmem/handler.hh \
+ rlibv2/././rmem/../utils/abs_factory.hh rlibv2/././rmem/./config.hh \
+ rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+ rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
+ rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
+ rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
+ rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
+ rlibv2/././bootstrap/./channel.hh \
+ rlibv2/././bootstrap/./../utils/ipname.hh \
+ rlibv2/././bootstrap/./../utils/marshal.hh \
+ rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/txn.h \
+ system/array.h system/mem_alloc.h transport/message.h system/helper.h \
+ system/logger.h system/array.h system/wl.h benchmarks/ycsb_query.h \
+ system/query.h system/global.h system/helper.h system/array.h \
+ benchmarks/ycsb.h system/wl.h system/txn.h benchmarks/tpcc_query.h \
+ benchmarks/pps_query.h benchmarks/da.h storage/row.h \
+ benchmarks/creator.h benchmarks/generic.h benchmarks/da_query.h \
+ benchmarks/da.h system/query.h system/msg_queue.h \
+ system/lock_free_queue.h
 obj/client_thread.o: system/client_thread.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
@@ -1598,40 +1635,6 @@ obj/thread.o: system/thread.cpp system/thread.h system/global.h config.h \
  system/lock_free_queue.h transport/transport.h transport/nn.hpp \
  transport/msg_thread.h system/query.h system/array.h system/query.h \
  system/txn.h system/array.h transport/message.h system/wl.h
-obj/global.o: system/global.cpp system/global.h config.h statistics/stats.h \
- statistics/../system/global.h statistics/stats_array.h system/pool.h \
- system/helper.h system/concurrentqueue.h system/txn_table.h \
- system/logger.h system/sim_manager.h benchmarks/da_block_queue.h \
- system/global.h r2/src/allocator_master.hh r2/src/allocator.hh \
- r2/src/common.hh r2/src/./utils/option.hh r2/src/./logging.hh \
- rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
- rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
- rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
- rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
- rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
- rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
- rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
- rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
- rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
- rlibv2/././bootstrap/./channel.hh \
- rlibv2/././bootstrap/./../utils/ipname.hh \
- rlibv2/././bootstrap/./../utils/marshal.hh \
- rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/mem_alloc.h \
- system/manager.h system/query.h system/array.h client/client_query.h \
- system/helper.h system/query.h concurrency_control/occ.h storage/row.h \
- concurrency_control/bocc.h concurrency_control/focc.h \
- concurrency_control/ssi.h concurrency_control/wsi.h \
- transport/transport.h transport/nn.hpp transport/msg_thread.h \
- transport/rdma.h system/work_queue.h system/abort_queue.h \
- client/client_txn.h concurrency_control/maat.h system/msg_queue.h \
- system/lock_free_queue.h system/sequencer.h concurrency_control/dli.h \
- concurrency_control/dta.h concurrency_control/../storage/row.h \
- concurrency_control/wkdb.h concurrency_control/tictoc.h \
- concurrency_control/rdma_silo.h concurrency_control/rdma_mvcc.h \
- concurrency_control/row_mvcc.h concurrency_control/key_xid.h \
- concurrency_control/spin_lock.h concurrency_control/hash.h \
- system/rts_cache.h
 obj/sim_manager.o: system/sim_manager.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
@@ -1741,7 +1744,7 @@ obj/abort_queue.o: system/abort_queue.cpp system/mem_alloc.h system/global.h \
  system/abort_queue.h transport/message.h system/helper.h system/logger.h \
  system/array.h system/global.h system/helper.h system/mem_alloc.h \
  system/work_queue.h
-obj/io_thread.o: system/io_thread.cpp system/global.h config.h \
+obj/log_thread.o: system/log_thread.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
  system/concurrentqueue.h system/txn_table.h system/logger.h \
@@ -1761,44 +1764,8 @@ obj/io_thread.o: system/io_thread.cpp system/global.h config.h \
  rlibv2/././bootstrap/./../utils/ipname.hh \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/manager.h \
- system/thread.h system/io_thread.h transport/message.h system/helper.h \
- system/logger.h system/array.h system/global.h system/helper.h \
- system/mem_alloc.h system/query.h system/array.h benchmarks/ycsb_query.h \
- system/query.h benchmarks/tpcc_query.h system/mem_alloc.h \
- transport/transport.h transport/nn.hpp transport/msg_thread.h \
- transport/msg_thread.h system/msg_queue.h system/lock_free_queue.h \
- client/client_txn.h system/work_queue.h system/txn.h transport/message.h \
- benchmarks/ycsb.h system/wl.h system/txn.h
-obj/pool.o: system/pool.cpp system/pool.h system/global.h config.h \
- statistics/stats.h statistics/../system/global.h \
- statistics/stats_array.h system/txn_table.h system/helper.h \
- system/logger.h system/concurrentqueue.h system/sim_manager.h \
- benchmarks/da_block_queue.h system/global.h r2/src/allocator_master.hh \
- r2/src/allocator.hh r2/src/common.hh r2/src/./utils/option.hh \
- r2/src/./logging.hh rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh \
- rlibv2/././common.hh rlibv2/./././utils/logging.hh \
- rlibv2/./././utils/option.hh rlibv2/./././result.hh rlibv2/././naming.hh \
- rlibv2/./rctrl.hh rlibv2/././rmem/handler.hh \
- rlibv2/././rmem/../utils/abs_factory.hh rlibv2/././rmem/./config.hh \
- rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
- rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
- rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
- rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
- rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
- rlibv2/././bootstrap/./channel.hh \
- rlibv2/././bootstrap/./../utils/ipname.hh \
- rlibv2/././bootstrap/./../utils/marshal.hh \
- rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/txn.h \
- system/array.h system/mem_alloc.h transport/message.h system/helper.h \
- system/logger.h system/array.h system/wl.h benchmarks/ycsb_query.h \
- system/query.h system/global.h system/helper.h system/array.h \
- benchmarks/ycsb.h system/wl.h system/txn.h benchmarks/tpcc_query.h \
- benchmarks/pps_query.h benchmarks/da.h storage/row.h \
- benchmarks/creator.h benchmarks/generic.h benchmarks/da_query.h \
- benchmarks/da.h system/query.h system/msg_queue.h \
- system/lock_free_queue.h
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/thread.h \
+ system/log_thread.h
 obj/abort_thread.o: system/abort_thread.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
@@ -1864,6 +1831,40 @@ obj/helper.o: system/helper.cpp system/global.h config.h statistics/stats.h \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/mem_alloc.h
+obj/global.o: system/global.cpp system/global.h config.h statistics/stats.h \
+ statistics/../system/global.h statistics/stats_array.h system/pool.h \
+ system/helper.h system/concurrentqueue.h system/txn_table.h \
+ system/logger.h system/sim_manager.h benchmarks/da_block_queue.h \
+ system/global.h r2/src/allocator_master.hh r2/src/allocator.hh \
+ r2/src/common.hh r2/src/./utils/option.hh r2/src/./logging.hh \
+ rlibv2/lib.hh rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
+ rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
+ rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
+ rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
+ rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+ rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
+ rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
+ rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
+ rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
+ rlibv2/././bootstrap/./channel.hh \
+ rlibv2/././bootstrap/./../utils/ipname.hh \
+ rlibv2/././bootstrap/./../utils/marshal.hh \
+ rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
+ rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh system/mem_alloc.h \
+ system/manager.h system/query.h system/array.h client/client_query.h \
+ system/helper.h system/query.h concurrency_control/occ.h storage/row.h \
+ concurrency_control/bocc.h concurrency_control/focc.h \
+ concurrency_control/ssi.h concurrency_control/wsi.h \
+ transport/transport.h transport/nn.hpp transport/msg_thread.h \
+ transport/rdma.h system/work_queue.h system/abort_queue.h \
+ client/client_txn.h concurrency_control/maat.h system/msg_queue.h \
+ system/lock_free_queue.h system/sequencer.h concurrency_control/dli.h \
+ concurrency_control/dta.h concurrency_control/../storage/row.h \
+ concurrency_control/wkdb.h concurrency_control/tictoc.h \
+ concurrency_control/rdma_silo.h concurrency_control/rdma_mvcc.h \
+ concurrency_control/row_mvcc.h concurrency_control/key_xid.h \
+ concurrency_control/spin_lock.h concurrency_control/hash.h \
+ system/rts_cache.h system/wl.h
 obj/work_queue.o: system/work_queue.cpp system/work_queue.h system/global.h \
  config.h statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
