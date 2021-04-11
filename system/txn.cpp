@@ -51,9 +51,9 @@
 #include "wsi.h"
 #include "manager.h"
 #include "rdma_silo.h"
-#include "rdma_nowait.h"
+#include "rdma_2pl.h"
 #include "transport.h"
-#include "row_rdma_nowait.h"
+#include "row_rdma_2pl.h"
 
 void TxnStats::init() {
 	starttime=0;
@@ -369,7 +369,9 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
   memset(write_set, 0, 100);
   // write_set = (int *) mem_allocator.alloc(sizeof(int) * 100);
 #endif
-
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+	num_atomic_retry = 0;
+#endif
 	registed_ = false;
 	txn_ready = true;
 	twopl_wait_start = 0;
@@ -506,7 +508,9 @@ RC TxnManager::abort() {
 	aborted = true;
 	//RDMA_SILO - ADD remote release lock by rdma
 	release_locks(Abort);
-	//printf("---线程%lu事务%lu，release_lock(Abort) end.\n",get_thd_id(), get_txn_id());
+#if DEBUG_PRINTF
+	printf("---线程%lu事务%lu，release_lock(Abort) end.\n",get_thd_id(), get_txn_id());
+#endif
 #if CC_ALG == MAAT
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
 	time_table.release(get_thd_id(),get_txn_id());
@@ -561,7 +565,7 @@ RC TxnManager::start_abort() {
 	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     INC_STATS(get_thd_id(), trans_prepare_count, 1);
 	//RDMA_SILO:keep message or not
-	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT) {
+	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2) {
 		send_finish_messages();
 		abort();
 		return Abort;
@@ -599,7 +603,7 @@ RC TxnManager::start_commit() {
   	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
-	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT) {
+	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2) {
 		if(CC_ALG == TICTOC) {
 			rc = validate();
 			if (rc != Abort) {
@@ -643,7 +647,7 @@ RC TxnManager::start_commit() {
 		else {
 			txn->rc = Abort;
 			DEBUG("%ld start_abort\n",get_txn_id());
-			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO &&  CC_ALG != RDMA_NO_WAIT) {
+			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO &&  CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2) {
 				send_finish_messages();
 				abort();
 				rc = Abort;
@@ -859,7 +863,7 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
   #endif
     }
   }
-#elif CC_ALG == RDMA_NO_WAIT
+#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 	if(txn->accesses[rid]->location == g_node_id) is_local=true;
 	else is_local=false;
 
@@ -875,7 +879,7 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 	}
 #else
   if (ROLL_BACK && type == XP &&
-      (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
+      (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
       CC_ALG == HSTORE_SPEC)) {
     orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data); 
   } else {
@@ -891,7 +895,7 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 #endif
 
 #if ROLL_BACK && \
-		(CC_ALG == RDMA_NO_WAIT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
+		(CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
 	if (type == WR && is_local) {
 		//printf("free 10 %ld\n",get_txn_id());
 		txn->accesses[rid]->orig_data->free_row();
@@ -911,7 +915,7 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 		glob_manager.set_max_cts(_min_commit_ts);
 #endif
 
-#if CC_ALG != SILO && CC_ALG != RDMA_NO_WAIT 
+#if CC_ALG != SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2
   txn->accesses[rid]->data = NULL;
 #endif
 }
@@ -947,8 +951,8 @@ void TxnManager::cleanup(RC rc) {
 	for (int rid = row_cnt - 1; rid >= 0; rid --) {
 		cleanup_row(rc,rid);  //for RDMA_NO_WAIT: return abort write row
 	}
-#if CC_ALG == RDMA_NO_WAIT
-    rnowait_man.finish(rc,this);
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+    r2pl_man.finish(rc,this);
 #endif
 #if CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || \
 		CC_ALG == DLI_MVCC_BASE
@@ -1076,7 +1080,7 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 #if CC_ALG == SILO
 	access->tid = last_tid;
 #endif
-#if CC_ALG ==RDMA_NO_WAIT
+#if CC_ALG ==RDMA_NO_WAIT || CC_ALG ==RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 
 	access->location = g_node_id;
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
@@ -1085,7 +1089,7 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
 
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == RDMA_NO_WAIT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
 									CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
 	if (type == WR) {
 	//printf("alloc 10 %ld\n",get_txn_id());
@@ -1154,7 +1158,7 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 
 	access->type = type;
 	access->orig_row = row;
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == RDMA_NO_WAIT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE)
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE)
 	if (type == WR) {
 		uint64_t part_id = row->get_part_id();
 	//printf("alloc 10 %ld\n",get_txn_id());

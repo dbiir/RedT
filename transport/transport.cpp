@@ -517,53 +517,57 @@ void Transport::init() {
 	read_ifconfig(path.c_str());
 
   for(uint64_t node_id = 0; node_id < g_total_node_cnt; node_id++) {
-	if (node_id == g_node_id) continue;
-	// Listening ports
-	if(ISCLIENTN(node_id)) {
-	  for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
-		   client_thread_id <
-			   g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
-		   client_thread_id++) {
-		uint64_t port_id =
-			get_port_id(node_id, g_node_id, client_thread_id % g_client_send_thread_cnt);
-		Socket * sock = bind(port_id);
-		recv_sockets.push_back(sock);
-		DEBUG("Socket insert: {%ld}: %ld\n",node_id,(uint64_t)sock);
-	  }
-	} else {
-	  for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
-		   server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
-		   server_thread_id++) {
-		uint64_t port_id = get_port_id(node_id,g_node_id,server_thread_id % g_send_thread_cnt);
-		Socket * sock = bind(port_id);
-		recv_sockets.push_back(sock);
-		DEBUG("Socket insert: {%ld}: %ld\n",node_id,(uint64_t)sock);
-	  }
-	}
-	// Sending ports
-	if(ISCLIENTN(g_node_id)) {
-	  for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
-		   client_thread_id <
-			   g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
-		   client_thread_id++) {
-		uint64_t port_id =
-			get_port_id(g_node_id, node_id, client_thread_id % g_client_send_thread_cnt);
-		std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,client_thread_id);
-		Socket * sock = connect(node_id,port_id);
-		send_sockets.insert(std::make_pair(sender,sock));
-		DEBUG("Socket insert: {%ld,%ld}: %ld\n",node_id,client_thread_id,(uint64_t)sock);
-	  }
-	} else {
-	  for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
-		   server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
-		   server_thread_id++) {
-		uint64_t port_id = get_port_id(g_node_id,node_id,server_thread_id % g_send_thread_cnt);
-		std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,server_thread_id);
-		Socket * sock = connect(node_id,port_id);
-		send_sockets.insert(std::make_pair(sender,sock));
-		DEBUG("Socket insert: {%ld,%ld}: %ld\n",node_id,server_thread_id,(uint64_t)sock);
-	  }
-	}
+
+    #if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
+    #else
+    if (node_id == g_node_id) continue;
+    #endif
+    // Listening ports
+    if(ISCLIENTN(node_id)) {
+      for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
+           client_thread_id <
+               g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
+           client_thread_id++) {
+        uint64_t port_id =
+            get_port_id(node_id, g_node_id, client_thread_id % g_client_send_thread_cnt);
+        Socket * sock = bind(port_id);
+        recv_sockets.push_back(sock);
+        DEBUG("Socket insert: {%ld}: %ld\n",node_id,(uint64_t)sock);
+      }
+    } else {
+      for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
+           server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
+           server_thread_id++) {
+        uint64_t port_id = get_port_id(node_id,g_node_id,server_thread_id % g_send_thread_cnt);
+        Socket * sock = bind(port_id);
+        recv_sockets.push_back(sock);
+        DEBUG("Socket insert: {%ld}: %ld\n",node_id,(uint64_t)sock);
+      }
+    }
+    // Sending ports
+    if(ISCLIENTN(g_node_id)) {
+      for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt;
+           client_thread_id <
+               g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
+           client_thread_id++) {
+        uint64_t port_id =
+            get_port_id(g_node_id, node_id, client_thread_id % g_client_send_thread_cnt);
+        std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,client_thread_id);
+        Socket * sock = connect(node_id,port_id);
+        send_sockets.insert(std::make_pair(sender,sock));
+        DEBUG("Socket insert: {%ld,%ld}: %ld\n",node_id,client_thread_id,(uint64_t)sock);
+      }
+    } else {
+      for (uint64_t server_thread_id = g_thread_cnt + g_rem_thread_cnt;
+           server_thread_id < g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt;
+           server_thread_id++) {
+        uint64_t port_id = get_port_id(g_node_id,node_id,server_thread_id % g_send_thread_cnt);
+        std::pair<uint64_t,uint64_t> sender = std::make_pair(node_id,server_thread_id);
+        Socket * sock = connect(node_id,port_id);
+        send_sockets.insert(std::make_pair(sender,sock));
+        DEBUG("Socket insert: {%ld,%ld}: %ld\n",node_id,server_thread_id,(uint64_t)sock);
+      }
+    }
   }
 
 
@@ -679,12 +683,6 @@ void Transport::rdma_send_msg(uint64_t send_thread_id, uint64_t dest_node_id, ch
 	    {.local_addr = reinterpret_cast<RMem::raw_ptr_t>(buf),
     .remote_addr = 0,
 		.imm_data = 0});
-	if(res_s != IOCode::Ok){
-		if(res_s == IOCode::Err) printf("res_s == Err");
-		else if(res_s == IOCode::Timeout) printf("res_s == Timeout");
-		else if(res_s == IOCode::NearOk) printf("res_s == NearOk");
-		else if(res_s == IOCode::NotReady) printf("res_s == NotReady");
-	} 
 	RDMA_ASSERT(res_s == IOCode::Ok);
 	// void* pVoid = buf;
 	// RDMA_LOG(4) << port_id-TPORT_TWOSIDE_PORT << " RDMA send " << (send_qpi->count) << " buf size "<< (u32) size + sizeof(size) + 1 << " buf ptr " << pVoid << " flags " << send_flags;
@@ -734,13 +732,29 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
   	int bytes = 0;
 	char * buf;
 	uint64_t starttime = get_sys_clock();
-
-	uint64_t ctr;
-	ctr = starttime % (g_node_cnt + g_client_node_cnt);
-	while(ctr == g_node_id) {
-		starttime = get_sys_clock();
-		ctr = starttime % (g_node_cnt + g_client_node_cnt);
+// 	uint64_t starttime = get_sys_clock();
+//   std::vector<Message*> * msgs = NULL;
+//   //uint64_t ctr = starttime % recv_sockets.size();
+    uint64_t rand = (starttime % (g_total_node_cnt)) / g_this_rem_thread_cnt;
+//   // uint64_t ctr = ((thd_id % g_this_rem_thread_cnt) % recv_sockets.size()) + rand *
+//   // g_this_rem_thread_cnt;
+    uint64_t ctr = thd_id % g_this_rem_thread_cnt;
+	assert(ctr < g_total_node_cnt);
+	if(g_this_rem_thread_cnt < g_total_node_cnt) {
+		ctr += rand * g_this_rem_thread_cnt;
+		while(ctr >= g_total_node_cnt) {
+			ctr -= g_this_rem_thread_cnt;
+		}
 	}
+	if(ctr == g_node_id) ctr = (ctr + 1) % g_total_node_cnt;
+	assert(ctr < g_total_node_cnt);
+	uint64_t start_ctr = ctr;
+	// uint64_t ctr;
+	// ctr = starttime % (g_node_cnt + g_client_node_cnt);
+	// while(ctr == g_node_id) {
+	// 	starttime = get_sys_clock();
+	// 	ctr = starttime % (g_node_cnt + g_client_node_cnt);
+	// }
 	std::vector<Message*> * msgs =new std::vector<Message*>;
 	uint64_t port_id;
 #if USE_RDMA == CHANGE_TCP_ONLY
@@ -757,28 +771,20 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 	port_id = get_thd_port_id(ctr, g_node_id, send_thd_id);
 #endif
 	//uint64_t start_ctr = ctr;
+	//printf("%rdma will recv msg from node %ld\n", ctr);
 	while (bytes <= 0 && (!simulation->is_setup_done() ||
 							(simulation->is_setup_done() && !simulation->is_done()))) {
 
 		//sleep(1);
-		starttime = get_sys_clock();
-		ctr = starttime % (g_node_cnt + g_client_node_cnt);
-		while(ctr == g_node_id) {
-			starttime = get_sys_clock();
-			ctr = starttime % (g_node_cnt + g_client_node_cnt);
-		}
+		// starttime = get_sys_clock();
+		// ctr = starttime % (g_node_cnt + g_client_node_cnt);
+		// while(ctr == g_node_id) {
+		// 	starttime = get_sys_clock();
+		// 	ctr = starttime % (g_node_cnt + g_client_node_cnt);
+		// }
+		//printf("%rdma will recv msg from node %ld\n", ctr);
 
-#if USE_RDMA == CHANGE_TCP_ONLY
-		if(ISCLIENTN(g_node_id)) {
-			port_id = get_twoside_port_id(ctr, g_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt);
-		} else {
-			port_id = get_twoside_port_id(ctr, g_node_id, (g_thread_cnt + g_rem_thread_cnt) % g_send_thread_cnt);
-		}
-#elif USE_RDMA == CHANGE_MSG_QUEUE
-		starttime = get_sys_clock();
-		send_thd_id = starttime % (g_thread_cnt);
-		port_id = get_thd_port_id(ctr, g_node_id, send_thd_id);
-#endif
+
         //cout << "recv message from :" << ctr << " send_thd " << send_thd_id << endl;
 		pthread_mutex_lock( tport_man.latch );
 		auto recv_qpi = tport_man.recv_qps[port_id-TPORT_TWOSIDE_PORT];
@@ -798,9 +804,35 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 		}
 
 		if (msgs->size() > 0) break;
+	    
+		
+#if USE_RDMA == CHANGE_TCP_ONLY
+		ctr = (ctr + g_this_rem_thread_cnt);
 
+		if (ctr >= g_total_node_cnt) ctr = (thd_id % g_this_rem_thread_cnt) % g_total_node_cnt;
+		if(ctr == g_node_id) ctr = (ctr + 1) % g_total_node_cnt;
+		if (ctr == start_ctr) break;
+		if(ISCLIENTN(g_node_id)) {
+			port_id = get_twoside_port_id(ctr, g_node_id, (g_client_thread_cnt + g_client_rem_thread_cnt) % g_client_send_thread_cnt);
+		} else {
+			port_id = get_twoside_port_id(ctr, g_node_id, (g_thread_cnt + g_rem_thread_cnt) % g_send_thread_cnt);
+		}
+#elif USE_RDMA == CHANGE_MSG_QUEUE
+		if (send_thd_id == g_thread_cnt - 1) {
+			ctr = (ctr + g_this_rem_thread_cnt);
+
+			if (ctr >= g_total_node_cnt) ctr = (thd_id % g_this_rem_thread_cnt) % g_total_node_cnt;
+			if(ctr == g_node_id) ctr = (ctr + 1) % g_total_node_cnt;
+			if (ctr == start_ctr) break;
+			send_thd_id = 0;
+		} else {
+			send_thd_id += 1;
+		}
+		port_id = get_thd_port_id(ctr, g_node_id, send_thd_id);
+#endif
 	}
   // if (msgs->size() > 0) RDMA_LOG(4) << " RDMA recv node id "<< msgs->front()->return_node_id;
+	
 	if(bytes <= 0 ) {
 		INC_STATS(thd_id,msg_recv_idle_time, get_sys_clock() - starttime);
 		return msgs;

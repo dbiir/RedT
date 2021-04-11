@@ -62,8 +62,7 @@ void MessageQueue::statqueue(uint64_t thd_id, msg_entry * entry) {
 }
 
 void MessageQueue::enqueue(uint64_t thd_id, Message * msg,uint64_t dest) {
-  if(thd_id > 3)
-  printf("MQ Enqueue thread id: %ld\n", thd_id);
+  //if(thd_id > 3) printf("MQ Enqueue thread id: %ld\n", thd_id);
   DEBUG("MQ Enqueue %ld\n",dest)
   assert(dest < g_total_node_cnt);
   assert(dest != g_node_id);

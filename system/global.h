@@ -84,8 +84,8 @@ class Rdma;
 #if CC_ALG == RDMA_SILO
 class RDMA_silo;
 #endif
-#if CC_ALG == RDMA_NO_WAIT
-class RDMA_nowait;
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+class RDMA_2pl;
 #endif
 class Remote_query;
 class TxnManPool;
@@ -145,8 +145,8 @@ extern Rdma rdma_man;
 #if CC_ALG == RDMA_SILO
 extern RDMA_silo rsilo_man;
 #endif
-#if CC_ALG == RDMA_NO_WAIT
-extern RDMA_nowait rnowait_man;
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+extern RDMA_2pl r2pl_man;
 #endif
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;
@@ -457,3 +457,6 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 #endif // UINT64_MAX
 
 #endif
+
+extern int total_num_atomic_retry;  
+extern int max_num_atomic_retry;

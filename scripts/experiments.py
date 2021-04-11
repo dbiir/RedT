@@ -75,7 +75,7 @@ def ycsb_scaling():
 	# algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     # algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    algos=['RDMA_NO_WAIT']
+    algos=['RDMA_SILO']
 
     base_table_size=1048576
     # base_table_size=1048576*8
@@ -83,10 +83,10 @@ def ycsb_scaling():
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
     load = [10000]
-    tcnt = [4]
-    ctcnt = [4]
+    tcnt = [4]  #THREAD_CNT
+    ctcnt = [4]  #CLIENT_THREAD_CNT
     skew = [0.0]
-    #skew = [0.0,0.5,0.9]
+    #skew = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,cthr] for thr,cthr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,ctcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
     #txn_write_perc = [0.0]
@@ -143,19 +143,24 @@ def ycsb_scaling_abort():
 
 def ycsb_skew():
     wl = 'YCSB'
-    nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
-    algos=dta_target_algos
-    base_table_size=2097152*8
-    txn_write_perc = [0.5]
-    tup_write_perc = [0.5]
+    nnodes = [2]
+    algos=['NO_WAIT']
+    base_table_size=1048576
+    txn_write_perc = [0.0]
+    tup_write_perc = [0.0]
     load = [10000]
-    tcnt = [4]
-    #skew = [0.0,0.25,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.9]
-    skew = [0.0,0.6,0.9]
+
+    tcnt = [8]  #THREAD_CNT
+
+    #skew = [0.0,0.4,0.6,0.8,0.9]
+    #skew = [0.2,0.6,0.85,0.95]
+    skew = [0.0,0.2,0.4,0.6,0.8,0.85,0.9,0.95]
+    #skew = [0.0]
+
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
     return fmt,exp
+
 
 def ycsb_skew1():
     wl = 'YCSB'
@@ -831,7 +836,7 @@ configs = {
     "REM_THREAD_CNT": 1,
     "SEND_THREAD_CNT": 1,
     "CLIENT_NODE_CNT" : "NODE_CNT",
-    "CLIENT_THREAD_CNT" : 4,
+    "CLIENT_THREAD_CNT" : 8,
     "CLIENT_REM_THREAD_CNT" : 1,
     "CLIENT_SEND_THREAD_CNT" : 1,
     "MAX_TXN_PER_PART" : 500000,

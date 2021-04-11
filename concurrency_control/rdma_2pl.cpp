@@ -5,19 +5,21 @@
 #include "txn.h"
 #include "rdma.h"
 #include "qps/op.hh"
-#include "rdma_nowait.h"
-#include "row_rdma_nowait.h"
+#include "rdma_2pl.h"
+#include "row_rdma_2pl.h"
 
-#if CC_ALG == RDMA_NO_WAIT
-void RDMA_nowait::write_and_unlock(row_t * row, row_t * data, TxnManager * txnMng) {
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+void RDMA_2pl::write_and_unlock(row_t * row, row_t * data, TxnManager * txnMng) {
 	//row->copy(data);  //复制access->data到access->orig_row
     //上一步不需要：如果是本地：data和orig_row相同
     uint64_t lock_info = row->_lock_info;
     row->_lock_info = 0;
-    //printf("---线程号：%lu, 本地解写锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), g_node_id, &row->_lock_info, txnMng->get_txn_id(), lock_info);
+#if DEBUG_PRINTF
+    printf("---线程号：%lu, 本地解写锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), g_node_id, &row->_lock_info, txnMng->get_txn_id(), lock_info);
+#endif
 }
 
-void RDMA_nowait::remote_write_and_unlock(RC rc, TxnManager * txnMng , uint64_t num){
+void RDMA_2pl::remote_write_and_unlock(RC rc, TxnManager * txnMng , uint64_t num){
     Access *access = txnMng->txn->accesses[num];
     row_t *data = access->data;
     data->_lock_info = 0; //直接把unlock的结果一起写回
@@ -37,7 +39,8 @@ void RDMA_nowait::remote_write_and_unlock(RC rc, TxnManager * txnMng , uint64_t 
     uint64_t starttime = get_sys_clock();
 	uint64_t endtime;
 
-    /*uint64_t *sec_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+#if DEBUG_PRINTF
+    uint64_t *sec_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
 	auto res_s0 = rc_qp[loc][thd_id]->send_normal(
 		{.op = IBV_WR_RDMA_READ,
 		.flags = IBV_SEND_SIGNALED,
@@ -50,7 +53,9 @@ void RDMA_nowait::remote_write_and_unlock(RC rc, TxnManager * txnMng , uint64_t 
   	auto res_p0 = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p0 == rdmaio::IOCode::Ok);
     uint64_t orig_lock_info = *sec_buf;
-    assert(orig_lock_info == 2);*/
+    if(CC_ALG == RDMA_NO_WAIT) assert(orig_lock_info == 3);
+    else if(CC_ALG == RDMA_NO_WAIT2) assert(orig_lock_info == 1);
+#endif
 
 	auto res_s = rc_qp[loc][thd_id]->send_normal(
 		{.op = IBV_WR_RDMA_WRITE,
@@ -67,29 +72,80 @@ void RDMA_nowait::remote_write_and_unlock(RC rc, TxnManager * txnMng , uint64_t 
 	endtime = get_sys_clock();
 	INC_STATS(txnMng->get_thd_id(), rdma_write_time, endtime-starttime);
 	INC_STATS(txnMng->get_thd_id(), rdma_write_cnt, 1);
-    //printf("---线程号：%lu, 远程解写锁成功，锁位置: %lu;..., 事务号: %lu, 原lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), loc, txnMng->get_txn_id(), orig_lock_info);
-    //printf("---线程号：%lu, 远程解写锁成功，锁位置: %lu;..., 事务号: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), loc, txnMng->get_txn_id());
+#if DEBUG_PRINTF 
+    printf("---线程号：%lu, 远程解写锁成功，锁位置: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), orig_lock_info);
+#endif
 }
 
-void RDMA_nowait::unlock(row_t * row , TxnManager * txnMng){
+void RDMA_2pl::unlock(row_t * row , TxnManager * txnMng){
+#if CC_ALG == RDMA_NO_WAIT
 retry_unlock: 
-    int lock_type;
-    int lock_num;
+    uint64_t lock_type;
+    uint64_t lock_num;
     uint64_t lock_info = row->_lock_info;
+    uint64_t new_lock_num;
     uint64_t new_lock_info;
-    Row_rdma_nowait::info_decode(lock_info,lock_type,lock_num);
-    if(lock_type!=0) printf("---lock_info:%lu\n",lock_info);
+    Row_rdma_2pl::info_decode(lock_info,lock_type,lock_num);
+    new_lock_num = lock_num-1;
+    Row_rdma_2pl::info_encode(new_lock_info,lock_type,new_lock_num);
+    
+    if(lock_type!=0 || lock_num <= 0) {
+        printf("---线程号：%lu, 本地解读锁失败!!!!!!锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_lock_info, txnMng->get_txn_id(), lock_info, new_lock_info);
+    }
     assert(lock_type == 0);  //一定是读锁
-    Row_rdma_nowait::info_encode(new_lock_info,lock_type,lock_num-1);
+    assert(lock_num > 0); //一定有锁
+
+    //RDMA CAS，不用本地CAS
+        uint64_t loc = g_node_id;
+        uint64_t thd_id = txnMng->get_thd_id();
+		uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+		auto mr = client_rm_handler->get_reg_attr().value();
+
+		rdmaio::qp::Op<> op;
+		op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(lock_info,new_lock_info);
+		assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
+		auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+
+		RDMA_ASSERT(res_s2 == IOCode::Ok);
+		auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+		RDMA_ASSERT(res_p2 == IOCode::Ok);
+
+		if(*tmp_buf2 != lock_info){
+        //原子性被破坏
+        txnMng->num_atomic_retry++;
+        total_num_atomic_retry++;
+        if(txnMng->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txnMng->num_atomic_retry;
+
+#if DEBUG_PRINTF
+        printf("---retry_unlock读集元素\n");
+#endif
+        goto retry_unlock;
+        }
+#if DEBUG_PRINTF
+    printf("---线程号：%lu, 本地解读锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_lock_info, txnMng->get_txn_id(), lock_info, new_lock_info);
+#endif     
+/*
     //本地CAS，成功返回1，失败返回0
     if(!__sync_bool_compare_and_swap(&row->_lock_info, lock_info, new_lock_info)){
     //原子性被破坏
+#if DEBUG_PRINTF
+        printf("---retry_unlock读集元素\n");
+#endif
         goto retry_unlock;
     }
-    //printf("---线程号：%lu, 本地解读锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_lock_info, txnMng->get_txn_id(), lock_info, new_lock_info);
+*/
+
+#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+    assert(row->_lock_info != 0);
+    row->_lock_info = 0;
+#if DEBUG_PRINTF
+    printf("---线程号：%lu, 本地解读锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: 1, new_lock_info: 0\n", txnMng->get_thd_id(), g_node_id, &row->_lock_info, txnMng->get_txn_id());
+#endif
+#endif
 }
 
-void RDMA_nowait::remote_unlock(TxnManager * txnMng , uint64_t num){
+void RDMA_2pl::remote_unlock(TxnManager * txnMng , uint64_t num){
+#if CC_ALG == RDMA_NO_WAIT
 remote_retry_unlock:    
     Access *access = txnMng->txn->accesses[num];
 
@@ -115,12 +171,18 @@ remote_retry_unlock:
     uint64_t *lock_info = (uint64_t *)mem_allocator.alloc(sizeof(uint64_t));
 	memcpy(lock_info, test_buf, operate_size);
     uint64_t new_lock_info;
-    int lock_type;
-    int lock_num;
-    Row_rdma_nowait::info_decode(*lock_info,lock_type,lock_num);
-    if(lock_type!=0) printf("---lock_info:%lu\n",*lock_info);
+    uint64_t lock_type;
+    uint64_t lock_num;
+    uint64_t new_lock_num;
+    Row_rdma_2pl::info_decode(*lock_info,lock_type,lock_num);
+    new_lock_num = lock_num-1;
+    Row_rdma_2pl::info_encode(new_lock_info,lock_type,new_lock_num);
+
+    if(lock_type!=0 || lock_num<=0){
+        printf("---线程号：%lu, 远程解读锁失败！锁位置: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), *lock_info, new_lock_info);
+    }
     assert(lock_type == 0);  //一定是读锁
-    Row_rdma_nowait::info_encode(new_lock_info,lock_type,lock_num-1);
+    assert(lock_num > 0); //一定有锁
 
     //远程CAS解锁
     uint64_t *tmp_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
@@ -135,14 +197,48 @@ remote_retry_unlock:
     auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
     RDMA_ASSERT(res_p2 == IOCode::Ok);
     if(*tmp_loc != *lock_info){ //原子性被破坏，CAS失败
+        txnMng->num_atomic_retry++;
+        total_num_atomic_retry++;
+        if(txnMng->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txnMng->num_atomic_retry;
+#if DEBUG_PRINTF
+        printf("---remote_retry_unlock读集元素\n");
+#endif
         goto remote_retry_unlock;
     }
-    //printf("---线程号：%lu, 远程解读锁成功，锁位置: %lu;..., 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, txnMng->get_txn_id(), *lock_info, new_lock_info);
+#if DEBUG_PRINTF
+    printf("---线程号：%lu, 远程解读锁成功，锁位置: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), *lock_info, new_lock_info);
+#endif
+	mem_allocator.free(lock_info, sizeof(uint64_t));
+#elif CC_ALG == RDMA_NO_WAIT2 ||  CC_ALG == RDMA_WAIT_DIE2
+    Access *access = txnMng->txn->accesses[num];
+    uint64_t off = access->offset;
+    uint64_t loc = access->location;
+	uint64_t thd_id = txnMng->get_thd_id();
+    uint64_t operate_size = sizeof(uint64_t);
+
+    uint64_t *test_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+    *test_buf = 0;
+
+	auto res_s = rc_qp[loc][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_WRITE,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+		.remote_addr = off,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+  	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+#if DEBUG_PRINTF
+    printf("---线程号：%lu, 远程解读锁成功，锁位置: %lu; %p, 事务号: %lu, 原lock_info: 1, new_lock_info: 0\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id());
+#endif
+#endif
 }
 
 
 //实现write back and unlock
-void RDMA_nowait::finish(RC rc, TxnManager * txnMng){
+void RDMA_2pl::finish(RC rc, TxnManager * txnMng){
 	Transaction *txn = txnMng->txn;
     uint64_t starttime = get_sys_clock();
 	//得到读集和写集

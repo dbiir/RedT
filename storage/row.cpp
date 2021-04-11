@@ -39,7 +39,7 @@
 #include "row_null.h"
 #include "row_silo.h"
 #include "row_rdma_silo.h"
-#include "row_rdma_nowait.h"
+#include "row_rdma_2pl.h"
 #include "mem_alloc.h"
 #include "manager.h"
 
@@ -64,7 +64,7 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
   _tid_word = 0;
   timestamp = 0;
 #endif
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 	_lock_info = 0;
 #endif
 
@@ -111,8 +111,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_silo *) mem_allocator.align_alloc(sizeof(Row_silo));
 #elif CC_ALG == RDMA_SILO
   manager = (Row_rdma_silo *) mem_allocator.align_alloc(sizeof(Row_rdma_silo));
-#elif CC_ALG == RDMA_NO_WAIT
-  manager = (Row_rdma_nowait *) mem_allocator.align_alloc(sizeof(Row_rdma_nowait));
+#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+  manager = (Row_rdma_2pl *) mem_allocator.align_alloc(sizeof(Row_rdma_2pl));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -387,12 +387,12 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	goto end;
 
 #endif
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
   uint64_t init_time = get_sys_clock();
 	//uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN) ? DLOCK_SH : DLOCK_EX; // ! this wrong !!
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-#if CC_ALG!=RDMA_NO_WAIT
+#if CC_ALG!=RDMA_NO_WAIT && CC_ALG!=RDMA_NO_WAIT2 && CC_ALG!=RDMA_WAIT_DIE2
 	rc = this->manager->lock_get(lt, txn);
 #else
 	rc = this->manager->lock_get(lt,txn,this);
@@ -402,7 +402,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 		access->data = this;
 	} else if (rc == Abort) {
 	} else if (rc == WAIT) {
-		ASSERT(CC_ALG == WAIT_DIE);
+		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2);
 	}
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
@@ -647,7 +647,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	}
 	this->manager->lock_release(txn);
 	return 0;
-#elif CC_ALG == RDMA_NO_WAIT
+#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 	assert (row == NULL || row == this || type == XP);
 	if (ROLL_BACK && type == XP) {  // recover from previous writes.
 		this->copy(row);  //对于"本地"Abort的写，把orig_data复制到orig_row里面去，注意对"远程"Abort的写无此操作

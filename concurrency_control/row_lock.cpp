@@ -86,10 +86,11 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
             _row->get_primary_key(), (uint64_t)_row);
       //printf("abort %ld %ld %lx\n",txn->get_txn_id(),_row->get_primary_key(),(uint64_t)_row);
             goto final;
-        } else if (CC_ALG == WAIT_DIE) {
+        } 
+        else if (CC_ALG == WAIT_DIE) {
             ///////////////////////////////////////////////////////////
             //  - T is the txn currently running
-            //  IF T.ts > min ts of owners
+            //  IF T.ts <= min ts of owners
             //      T can wait
             //  ELSE
             //      T should abort
@@ -115,7 +116,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
                 en = en->next;
               }
         if (!canwait) break;
-            }
+            } //每一个owner是一个事务，而一个事务可能加多个锁
             if (canwait) {
                 // insert txn to the right position
                 // the waiter list is always in timestamp order
@@ -135,9 +136,9 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
                     en = en->next;
                 }
                 if (en) {
-                    LIST_INSERT_BEFORE(en, entry,waiters_head);
+                    LIST_INSERT_BEFORE(en, entry,waiters_head); //把entry插入到en之前
                 } else {
-                    LIST_PUT_TAIL(waiters_head, waiters_tail, entry);
+                    LIST_PUT_TAIL(waiters_head, waiters_tail, entry); //把entry插入到链表尾
                 }
 
                 waiter_cnt ++;
@@ -147,13 +148,15 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
                 //txn->twopl_wait_start = get_sys_clock();
                 rc = WAIT;
                 //txn->wait_starttime = get_sys_clock();
-            } else {
+            } 
+            else {
         DEBUG("abort (%ld,%ld): owners %d, own type %d, req type %d, key %ld %lx\n",
               txn->get_txn_id(), txn->get_batch_id(), owner_cnt, lock_type, type,
               _row->get_primary_key(), (uint64_t)_row);
               rc = Abort;
             }
-        } else if (CC_ALG == CALVIN){
+        } 
+        else if (CC_ALG == CALVIN){
             LockEntry * entry = get_entry();
             entry->start_ts = get_sys_clock();
             entry->txn = txn;
@@ -174,7 +177,8 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
             rc = WAIT;
             //txn->wait_starttime = get_sys_clock();
         }
-    } else {
+    } 
+    else {  //no conflict
     DEBUG("1lock (%ld,%ld): owners %d, own type %d, req type %d, key %ld %lx\n", txn->get_txn_id(),
           txn->get_batch_id(), owner_cnt, lock_type, type, _row->get_primary_key(), (uint64_t)_row);
 #if DEBUG_TIMELINE
@@ -289,8 +293,8 @@ RC Row_lock::lock_release(TxnManager * txn) {
         }
         lock_type = LOCK_NONE;
       }
-
-    } else {
+    } 
+    else { // NOT find the entry in the owner list
       assert(false);
           en = waiters_head;
     while (en != NULL && en->txn != txn) en = en->next;

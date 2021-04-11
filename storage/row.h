@@ -62,7 +62,7 @@ class Row_si;
 class Row_null;
 class Row_silo;
 class Row_rdma_silo;
-class Row_rdma_nowait;
+class Row_rdma_2pl;
 
 class row_t {
 public:
@@ -122,9 +122,9 @@ public:
     volatile uint64_t	_tid_word;  //锁：txn_id
 	ts_t 			timestamp;
 	Row_rdma_silo * manager;
-	#elif CC_ALG == RDMA_NO_WAIT
-		volatile uint64_t _lock_info; 
-		Row_rdma_nowait * manager;
+	#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+		volatile uint64_t _lock_info; //RDMA_NO_WAIT2: only 0 or 1; RDMA_WAIT_DIE2: only 0 or ts
+		Row_rdma_2pl * manager;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
 		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP

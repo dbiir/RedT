@@ -1,7 +1,7 @@
 
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 
-class RDMA_nowait{
+class RDMA_2pl{
 public:
 
     void finish(RC rc, TxnManager * txn);
