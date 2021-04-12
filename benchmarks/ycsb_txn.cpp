@@ -267,7 +267,7 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
 		row_local = NULL;
 		txn->rc = Abort;
 		mem_allocator.free(m_item, sizeof(itemid_t));
-		printf("RDMA_MAAT cas lock fault\n");
+		printf("RDMA_CC_ALG cas lock fault\n");
 
 		uint64_t timespan = get_sys_clock() - starttime;
 		INC_STATS(get_thd_id(), trans_store_access_count, 1);

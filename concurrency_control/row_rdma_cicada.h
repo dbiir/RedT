@@ -45,7 +45,7 @@ public:
   RC abort(uint64_t num, TxnManager * txn);
   RC commit(uint64_t num, TxnManager * txn, row_t * data);
   void write(row_t * data);
-
+  bool local_cas_lock(TxnManager * txnMng , uint64_t info, uint64_t new_info);
 	row_t * _row;
 };
 

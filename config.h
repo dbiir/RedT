@@ -24,7 +24,7 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-// #define USE_RDMA CHANGE_MSG_QUEUE
+//#define USE_RDMA CHANGE_MSG_QUEUE
 #define USE_RDMA CHANGE_TCP_ONLY
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
@@ -32,7 +32,7 @@
 #define RDMA_USE_NIC_IDX 0
 #define RDMA_REG_MEM_NAME 73
 #define RDMA_CQ_NAME "rdma_channel"
-#define RDMA_ENTRY_NUM 2048U
+#define RDMA_ENTRY_NUM 8192U
 #define RDMA_SEND_COUNT (256)
 // #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
 // #define RDMA_COLOR_LOG
@@ -42,7 +42,7 @@
 #define CHANGE_MSG_QUEUE 1
 
 #define HIS_CHAIN_NUM 4
-
+#define USE_CAS
 #define ROW_DEFAULT_SIZE 1100
 /***********************************************/
 // DA Trans Creator
@@ -88,7 +88,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
+#define NODE_CNT 4
 #define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -183,7 +183,7 @@
 
 // WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG RDMA_CICADA
+#define CC_ALG RDMA_SILO
 #define YCSB_ABORT_MODE false
 #define QUEUE_CAPACITY_NEW 1000000
 // all transactions acquire tuples according to the primary key order.
@@ -232,7 +232,7 @@
 #define PRE_ABORT2					"true"
 #define ATOMIC_WORD					false
 // [RDMA_MAAT]
-#define RDMA_TIMETABLE_MAX 10000000
+#define RDMA_TIMETABLE_MAX 20000000
 #define ROW_SET_LENGTH 30
 
 /***********************************************/
@@ -262,7 +262,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 2097152
+#define SYNTH_TABLE_SIZE 4194304
 #define ZIPF_THETA 0.0
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5
@@ -482,8 +482,8 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 10 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false

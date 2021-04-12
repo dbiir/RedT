@@ -593,7 +593,8 @@ obj/row_rdma_cicada.o: concurrency_control/row_rdma_cicada.cpp storage/row.h \
  system/mem_alloc.h concurrency_control/row_rdma_maat.h \
  transport/message.h system/helper.h system/logger.h system/array.h \
  concurrency_control/row_rdma_cicada.h system/mem_alloc.h \
- system/manager.h concurrency_control/rdma_cicada.h
+ system/manager.h concurrency_control/rdma_cicada.h rlibv2/qps/op.hh \
+ transport/rdma.h transport/nn.hpp
 obj/row_wsi.o: concurrency_control/row_wsi.cpp system/txn.h system/global.h \
  config.h statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
@@ -883,7 +884,8 @@ obj/row_rdma_maat.o: concurrency_control/row_rdma_maat.cpp storage/row.h \
  system/mem_alloc.h concurrency_control/row_rdma_maat.h \
  transport/message.h system/helper.h system/logger.h system/array.h \
  concurrency_control/row_rdma_maat.h system/mem_alloc.h system/manager.h \
- concurrency_control/rdma_maat.h concurrency_control/maat.h
+ concurrency_control/rdma_maat.h concurrency_control/maat.h \
+ rlibv2/qps/op.hh transport/rdma.h transport/nn.hpp
 obj/maat.o: concurrency_control/maat.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/global.h system/helper.h \

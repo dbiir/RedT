@@ -406,12 +406,12 @@ int main(int argc, char *argv[]) {
 
 	uint64_t id = 0;
 	for (uint64_t i = 0; i < wthd_cnt; i++) {
-#if SET_AFFINITY
-		CPU_ZERO(&cpus);
-		CPU_SET(cpu_cnt, &cpus);
-		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-		cpu_cnt++;
-#endif
+// #if SET_AFFINITY
+// 		CPU_ZERO(&cpus);
+// 		CPU_SET(cpu_cnt, &cpus);
+// 		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+// 		cpu_cnt++;
+// #endif
 		assert(id >= 0 && id < wthd_cnt);
 		worker_thds[i].init(id,g_node_id,m_wl);
 		pthread_create(&p_thds[id++], &attr, run_thread, (void *)&worker_thds[i]);

@@ -229,10 +229,11 @@ UInt64 g_msg_time_limit = MSG_TIME_LIMIT;
 UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
-UInt64 rdma_buffer_size = 12*(1024*1024*1024L);
+UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
+UInt64 client_rdma_buffer_size = 60*1024;
 UInt64 rdma_index_size = 300*1024*1024;
 // MAAT
-UInt64 rdma_timetable_size = 400*1024*1024;
+UInt64 rdma_timetable_size = 3*400*1024*1024;
 UInt64 row_set_length = ROW_SET_LENGTH;
 
 // MVCC

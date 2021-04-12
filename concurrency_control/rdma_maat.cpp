@@ -226,6 +226,7 @@ RC RDMA_Maat::validate(TxnManager * txn) {
 					} else {
 						item->upper = lower;
 					}
+					if(*it != 0)
 					rdma_time_table.remote_set_timeNode(txn->get_thd_id(), *it, item);
 				}
 				mem_allocator.free(item, sizeof(RdmaTimeTableNode));
@@ -276,6 +277,7 @@ RC RDMA_Maat::validate(TxnManager * txn) {
 					} else {
 						item->lower = upper;
 					}
+					if(*it != 0)
 					rdma_time_table.remote_set_timeNode(txn->get_thd_id(), *it, item);
 				}
 				mem_allocator.free(item, sizeof(RdmaTimeTableNode));
@@ -564,6 +566,7 @@ RC RDMA_Maat::remote_commit(TxnManager * txnMng, Access * data) {
 					uint64_t it_lower = item->lower;
 					if(it_lower <= txn_commit_ts) {
 						item->lower = txn_commit_ts+1;
+						if(temp_row->uncommitted_writes[i] != 0)
 						rdma_time_table.remote_set_timeNode(txnMng->get_thd_id(), temp_row->uncommitted_writes[i], item);
 					}
 					mem_allocator.free(item, sizeof(RdmaTimeTableNode));
@@ -621,6 +624,7 @@ RC RDMA_Maat::remote_commit(TxnManager * txnMng, Access * data) {
 					uint64_t it_upper = item->upper;
 					if(it_upper >= txn_commit_ts) {
 						item->upper = txn_commit_ts-1;
+						if(temp_row->uncommitted_writes[i] != 0)
 						rdma_time_table.remote_set_timeNode(txnMng->get_thd_id(), temp_row->uncommitted_writes[i], item);
 					}
 					mem_allocator.free(item, sizeof(RdmaTimeTableNode));
@@ -644,6 +648,7 @@ RC RDMA_Maat::remote_commit(TxnManager * txnMng, Access * data) {
 					uint64_t it_upper = item->upper;
 					if(it_upper >= lower) {
 						item->upper = lower-1;
+						if(temp_row->uncommitted_reads[i] != 0)
 						rdma_time_table.remote_set_timeNode(txnMng->get_thd_id(), temp_row->uncommitted_reads[i], item);
 					}
 					mem_allocator.free(item, sizeof(RdmaTimeTableNode));
@@ -691,7 +696,7 @@ uint64_t RdmaTimeTable::hash(uint64_t key) { return key % table_size; }
 
 
 void RdmaTimeTable::init(uint64_t thd_id, uint64_t key) {
-	table[key]._lock = g_node_id;
+	//table[key]._lock = g_node_id;
 	table[key].lower = 0;
 	table[key].upper = UINT64_MAX;
 	table[key].key = key;
@@ -700,54 +705,54 @@ void RdmaTimeTable::init(uint64_t thd_id, uint64_t key) {
 }
 
 void RdmaTimeTable::release(uint64_t thd_id, uint64_t key) {
-	table[key]._lock = g_node_id;
+	//table[key]._lock = g_node_id;
 	table[key].lower = 0;
 	table[key].upper = UINT64_MAX;
 	table[key].key = key;
 	table[key].state = MAAT_RUNNING;
-	table[key]._lock = 0;
+	//table[key]._lock = 0;
 }
 
 uint64_t RdmaTimeTable::local_get_lower(uint64_t thd_id, uint64_t key) {
 
-	table[key]._lock = g_node_id;
+	//table[key]._lock = g_node_id;
 	uint64_t value = table[key].lower;
-	table[key]._lock = 0;
+	//table[key]._lock = 0;
 	return value;
 }
 
 uint64_t RdmaTimeTable::local_get_upper(uint64_t thd_id, uint64_t key) {
-	table[key]._lock = g_node_id;
+	//table[key]._lock = g_node_id;
 	uint64_t value = table[key].upper;
-	table[key]._lock = 0;
+	//table[key]._lock = 0;
 	return value;
 }
 
 
 void RdmaTimeTable::local_set_lower(uint64_t thd_id, uint64_t key, uint64_t value) {
-	table[key]._lock = g_node_id;
+	//table[key]._lock = g_node_id;
 	table[key].lower = value;
-	table[key]._lock = 0;
+	//table[key]._lock = 0;
 }
 
 void RdmaTimeTable::local_set_upper(uint64_t thd_id, uint64_t key, uint64_t value) {
-	table[key]._lock = g_node_id;
+	//table[key]._lock = g_node_id;
 	table[key].upper = value;
-	table[key]._lock = 0;
+	//table[key]._lock = 0;
 }
 
 MAATState RdmaTimeTable::local_get_state(uint64_t thd_id, uint64_t key) {
-	table[key]._lock = g_node_id;
+	//table[key]._lock = g_node_id;
 	MAATState state = MAAT_ABORTED;
 	state = table[key].state;   
-	table[key]._lock = 0;
+	//table[key]._lock = 0;
 	return state;
 }
 
 void RdmaTimeTable::local_set_state(uint64_t thd_id, uint64_t key, MAATState value) {
-	table[key]._lock = g_node_id;
+	//table[key]._lock = g_node_id;
 	table[key].state = value;
-	table[key]._lock = 0;
+	//table[key]._lock = 0;
 }
 
 RdmaTimeTableNode * RdmaTimeTable::remote_get_timeNode(uint64_t thd_id, uint64_t key) {

@@ -71,11 +71,11 @@ def ycsb_scaling():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
-    nnodes = [2]
+    nnodes = [4]
 	# algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     # algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    algos=['RDMA_CICADA']
+    algos=['RDMA_SILO']
 
     base_table_size=1048576
     # base_table_size=1048576*8
@@ -826,8 +826,8 @@ experiment_map = {
 
 # Default values for variable configurations
 configs = {
-    "NODE_CNT" : 16,
-    "THREAD_CNT": 4,
+    "NODE_CNT" : 2,
+    "THREAD_CNT": 16,
     "REPLICA_CNT": 0,
     "REPLICA_TYPE": "AP",
     "REM_THREAD_CNT": 1,
@@ -847,8 +847,8 @@ configs = {
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '0UL',
     "NETWORK_DELAY_TEST": 'false',
-    "DONE_TIMER": "1 * 20 * BILLION // ~1 minutes",
-    "WARMUP_TIMER": "1 * 20 * BILLION // ~1 minutes",
+    "DONE_TIMER": "1 * 10 * BILLION // ~1 minutes",
+    "WARMUP_TIMER": "1 * 10 * BILLION // ~1 minutes",
     "SEQ_BATCH_TIMER": "5 * 1 * MILLION // ~5ms -- same as CALVIN paper",
     "BATCH_TIMER" : "0",
     "PROG_TIMER" : "10 * BILLION // in s",

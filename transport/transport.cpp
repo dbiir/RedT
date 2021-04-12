@@ -271,7 +271,7 @@ void Transport::create_server(uint64_t port, uint64_t dest_node_id) {
 	RDMA_LOG(4) << "Reg_mem_name is " << reg_mem_name;
 	ctrl.registered_mrs.reg(reg_mem_name, handler);
 	ctrl.start_daemon();
-	sleep(10);
+	sleep(15);
 	RDMA_LOG(4) << "Recv qp: " << "rdma_qp"+to_string(port);
 	auto recv_qp = ctrl.registered_qps.query("rdma_qp"+to_string(port)).value();
 	auto recv_rs = manager.reg_recv_entries.query("rdma_qp"+to_string(port)).value();
@@ -459,14 +459,14 @@ void Transport::init() {
 		if (node_id == g_node_id) continue;
 		// Listening ports
 		if(ISCLIENTN(node_id)) {
-		for (uint64_t client_thread_id = 0; client_thread_id < g_client_thread_cnt; client_thread_id++) {
+		for (uint64_t client_thread_id = 0; client_thread_id < g_thread_cnt; client_thread_id++) {
 				th_bind.push_back(std::thread([=](){
 					uint64_t port_id = get_thd_port_id(node_id, g_node_id, client_thread_id);
 					create_server(port_id, node_id);
 				}));
 			}
 		} else {
-		for (uint64_t server_thread_id = 0; server_thread_id < g_thread_cnt; server_thread_id++) {
+		for (uint64_t server_thread_id = 0; server_thread_id < g_client_thread_cnt; server_thread_id++) {
 				th_bind.push_back(std::thread([=](){
 					uint64_t port_id = get_thd_port_id(node_id,g_node_id,server_thread_id);
 					create_server(port_id, node_id);
@@ -767,7 +767,12 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 #elif USE_RDMA == CHANGE_MSG_QUEUE
     uint64_t send_thd_id;
 	starttime = get_sys_clock();
-	send_thd_id = starttime % (g_thread_cnt);
+	if(ISCLIENTN(g_node_id)) {
+		send_thd_id = starttime % (g_thread_cnt);
+	} else {
+		send_thd_id = starttime % (g_client_thread_cnt);
+	}
+	
 	port_id = get_thd_port_id(ctr, g_node_id, send_thd_id);
 #endif
 	//uint64_t start_ctr = ctr;
@@ -818,15 +823,28 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 			port_id = get_twoside_port_id(ctr, g_node_id, (g_thread_cnt + g_rem_thread_cnt) % g_send_thread_cnt);
 		}
 #elif USE_RDMA == CHANGE_MSG_QUEUE
-		if (send_thd_id == g_thread_cnt - 1) {
-			ctr = (ctr + g_this_rem_thread_cnt);
+        if(ISCLIENTN(g_node_id)) {
+			if (send_thd_id == g_thread_cnt - 1) {
+				ctr = (ctr + g_this_rem_thread_cnt);
 
-			if (ctr >= g_total_node_cnt) ctr = (thd_id % g_this_rem_thread_cnt) % g_total_node_cnt;
-			if(ctr == g_node_id) ctr = (ctr + 1) % g_total_node_cnt;
-			if (ctr == start_ctr) break;
-			send_thd_id = 0;
+				if (ctr >= g_total_node_cnt) ctr = (thd_id % g_this_rem_thread_cnt) % g_total_node_cnt;
+				if(ctr == g_node_id) ctr = (ctr + 1) % g_total_node_cnt;
+				if (ctr == start_ctr) break;
+				send_thd_id = 0;
+			} else {
+				send_thd_id += 1;
+			}
 		} else {
-			send_thd_id += 1;
+			if (send_thd_id == g_client_thread_cnt - 1) {
+				ctr = (ctr + g_this_rem_thread_cnt);
+
+				if (ctr >= g_total_node_cnt) ctr = (thd_id % g_this_rem_thread_cnt) % g_total_node_cnt;
+				if(ctr == g_node_id) ctr = (ctr + 1) % g_total_node_cnt;
+				if (ctr == start_ctr) break;
+				send_thd_id = 0;
+			} else {
+				send_thd_id += 1;
+			}
 		}
 		port_id = get_thd_port_id(ctr, g_node_id, send_thd_id);
 #endif

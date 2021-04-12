@@ -31,8 +31,7 @@ public:
   void write(row_t * data);
   void ucread_erase(uint64_t txn_id);
   void ucwrite_erase(uint64_t txn_id);
-
-
+  bool local_cas_lock(TxnManager * txnMng , uint64_t info, uint64_t new_info);
   volatile bool maat_avail;
 
 	row_t * _row;

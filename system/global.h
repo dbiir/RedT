@@ -264,6 +264,7 @@ extern uint64_t g_msg_size;
 extern uint64_t g_log_buf_max;
 extern uint64_t g_log_flush_timeout;
 extern uint64_t rdma_buffer_size;
+extern uint64_t client_rdma_buffer_size;
 extern uint64_t rdma_index_size;
 // MAAT
 extern uint64_t rdma_timetable_size;
