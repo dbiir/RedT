@@ -671,7 +671,7 @@ RC rdma_mvcc::finish(RC rc,TxnManager * txnMng){
                // if(lock!=-1)printf("[rdma_mvcc:499]lock = %ld\n",lock);
                 lock = lock_write_set(txnMng,txnMng->write_set[i]);
                 // INC_STATS(txnMng->get_thd_id(), cas_cnt, 1);
-           }while(lock == false);
+           }while(lock == false && !simulation->is_done());
 
            //解锁
            if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
@@ -693,7 +693,7 @@ RC rdma_mvcc::finish(RC rc,TxnManager * txnMng){
            do { 
                 lock = lock_write_set(txnMng,txnMng->write_set[i]);
                 INC_STATS(txnMng->get_thd_id(), cas_cnt, 1);
-           }while(lock == false);
+           }while(lock == false && !simulation->is_done());
 
            if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){//local
                 local_write_back(txnMng , txnMng->write_set[i]);
