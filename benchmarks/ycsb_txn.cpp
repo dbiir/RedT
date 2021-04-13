@@ -194,10 +194,8 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
 	uint64_t part_id = _wl->key_to_part( req->key );
     uint64_t loc = GET_NODE_ID(part_id);
 	assert(loc != g_node_id);
-	uint64_t thd_id = get_thd_id();
-	// uint64_t operate_size = sizeof(row_t);
-	// uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-	// char *tmp_buf = Rdma::get_row_client_memory(thd_id);
+
+	
 	//read request
 	if(req->acctype == RD || req->acctype == WR){
 
@@ -205,8 +203,7 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
 	    row_t * test_row = read_remote_content(loc,m_item->offset);
 
 		assert(test_row->get_primary_key() == req->key);
-    	// row_t *test_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-    	// memcpy(test_row, tmp_buf, operate_size);
+        
         RC rc = RCOK;
         access_t type = req->acctype;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
