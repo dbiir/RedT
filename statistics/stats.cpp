@@ -559,6 +559,7 @@ void Stats_thd::print_client(FILE * outf, bool prog) {
 
 void Stats_thd::print(FILE * outf, bool prog) {
   fprintf(outf, "total_runtime=%f", total_runtime / BILLION);
+
   // Execution
   double tput = 0;
   double txn_run_avg_time = 0;
@@ -576,6 +577,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
     single_part_txn_avg_time = single_part_txn_run_time / single_part_txn_cnt;
   fprintf(outf,
   ",tput=%f"
+  ",total_num_atomic_retry=%d"
+  ",max_num_atomic_retry=%d"
   ",txn_cnt=%ld"
   ",remote_txn_cnt=%ld"
   ",local_txn_cnt=%ld"
@@ -625,7 +628,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",record_write_cnt=%ld"
   ",parts_touched=%ld"
           ",avg_parts_touched=%f",
-          tput, txn_cnt, remote_txn_cnt, local_txn_cnt, local_txn_start_cnt, total_txn_commit_cnt,
+          tput, total_num_atomic_retry, max_num_atomic_retry, txn_cnt, remote_txn_cnt, local_txn_cnt, local_txn_start_cnt, total_txn_commit_cnt,
           local_txn_commit_cnt, remote_txn_commit_cnt,
           valid_abort_cnt,
           lock_row_fail,
@@ -1872,6 +1875,7 @@ void Stats::print_client(bool prog) {
 }
 
 void Stats::print(bool prog) {
+
   fflush(stdout);
   if (!STATS_ENABLE) return;
 

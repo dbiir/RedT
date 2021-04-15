@@ -64,6 +64,7 @@ class Row_silo;
 class Row_rdma_silo;
 class Row_rdma_mvcc;
 class rdma_mvcc;
+class Row_rdma_2pl;
 
 //struct RdmaMVHis;
 
@@ -76,7 +77,6 @@ struct RdmaMVHis {
     //RTS、start_ts、end_ts、txn-id：
 	char data[ROW_DEFAULT_SIZE];
 };
-
 
 class row_t {
 public:
@@ -133,10 +133,13 @@ public:
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
-  	#if CC_ALG == RDMA_SILO
-		volatile uint64_t	_tid_word;
-		ts_t 			timestamp;
-		Row_rdma_silo * manager;
+    #if CC_ALG == RDMA_SILO
+        volatile uint64_t	_tid_word;  //锁：txn_id
+        ts_t 			timestamp;
+        Row_rdma_silo * manager;
+	#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+		volatile uint64_t _lock_info; //RDMA_NO_WAIT2: only 0 or 1; RDMA_WAIT_DIE2: only 0 or ts
+		Row_rdma_2pl * manager;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
 		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP

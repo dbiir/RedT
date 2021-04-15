@@ -2,14 +2,16 @@
 #sleep 10
 
 
-python run_experiments.py -e -c vcloud tpcc_cstress
+python run_experiments.py -e -c vcloud ycsb_scaling
 sleep 10
-python run_experiments.py -e -c vcloud tpcc_cstress1
+python run_experiments.py -e -c vcloud ycsb_scaling1
 sleep 10
-python run_experiments.py -e -c vcloud tpcc_cstress2
+python run_experiments.py -e -c vcloud ycsb_scaling2
 sleep 10
-#python run_experiments.py -e -c vcloud tpcc_cstress3
-#sleep 10
+python run_experiments.py -e -c vcloud tpcc_scaling
+sleep 10
+# python run_experiments.py -e -c vcloud ycsb_skew
+# sleep 10
 #cd ../draw
 #./deneva-homepage.sh
 #exit 0

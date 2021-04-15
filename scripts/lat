@@ -1,7 +1,7 @@
-RDMA_MVCC 
+SILO 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
-352.888929
+118.264689
 0.0
-432.187603
-0.188958
-0.974794
+48.355542
+2.090735
+0.0

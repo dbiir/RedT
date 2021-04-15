@@ -51,7 +51,7 @@ private:
     UInt32 waiter_cnt;
 
 	// owners is a hash table
-	// waiters is a double linked list
+	// waiters is a double linked list（双向链表）
 	// [waiters] head is the oldest txn, tail is the youngest txn.
 	//   So new txns are inserted into the tail.
 	LockEntry ** owners;

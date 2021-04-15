@@ -288,6 +288,7 @@ void AccessPool::get(uint64_t thd_id, Access *& item) {
     DEBUG_M("access_pool alloc\n");
     item = (Access*)mem_allocator.alloc(sizeof(Access));
   }
+
   item->orig_row = NULL;
   item->data = NULL;
   item->orig_data = NULL;
@@ -303,7 +304,10 @@ void AccessPool::get(uint64_t thd_id, Access *& item) {
   item->test_row = NULL;
   item->offset = 0;
   #endif
-
+  #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+  item->location = g_node_id;
+  item->offset = 0;
+  #endif
 }
 
 void AccessPool::put(uint64_t thd_id, Access * item) {
@@ -425,7 +429,7 @@ void RowPool::get(uint64_t thd_id, row_t* & item) {
   bool r = pool[thd_id]->pop(item);
   if(!r) {
     DEBUG_M("msg_pool alloc\n");
-    item = (row_t*) mem_allocator.alloc(sizeof(struct row_t));
+    item = (row_t*) mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
   }
 }
 

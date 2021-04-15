@@ -86,6 +86,9 @@ class RDMA_silo;
 #elif CC_ALG == RDMA_MVCC
 class rdma_mvcc;
 #endif
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+class RDMA_2pl;
+#endif
 class Remote_query;
 class TxnManPool;
 class TxnPool;
@@ -146,6 +149,9 @@ extern Rdma rdma_man;
 extern RDMA_silo rsilo_man;
 #elif CC_ALG == RDMA_MVCC
 extern rdma_mvcc rmvcc_man;
+#endif
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+extern RDMA_2pl r2pl_man;
 #endif
 extern Workload * m_wl;
 extern TxnManPool txn_man_pool;
@@ -478,3 +484,6 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 #endif // UINT64_MAX
 
 #endif
+
+extern int total_num_atomic_retry;  
+extern int max_num_atomic_retry;

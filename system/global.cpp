@@ -55,6 +55,7 @@
 #include "tictoc.h"
 #include "rdma_silo.h"
 #include "rdma_mvcc.h"
+#include "rdma_2pl.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -95,6 +96,9 @@ Rdma rdma_man;
 RDMA_silo rsilo_man;
 #elif CC_ALG == RDMA_MVCC
 rdma_mvcc rmvcc_man;
+#endif
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+RDMA_2pl r2pl_man;
 #endif
 Workload * m_wl;
 TxnManPool txn_man_pool;
@@ -342,3 +346,6 @@ int rdma_server_port[NODE_CNT];
 //rdmaio::RCQP *qp[NODE_CNT][THREAD_CNT];
 bool g_init_done[50] = {false};
 int g_init_cnt = 0;
+
+int total_num_atomic_retry = 0;  
+int max_num_atomic_retry = 0;

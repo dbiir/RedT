@@ -259,7 +259,7 @@ void TPCCWorkload::init_tab_item(int id) {
 	//MakeAlphaString(26, 50, data);
 	if (RAND(10) == 0) strcpy(data, "original");
 		row->set_value(I_DATA, data);
-       if(i <= 1000)printf("【tpcc_wl.cpp:243】item_key = %ld\n",i);
+      // if(i <= 1000)printf("【tpcc_wl.cpp:243】item_key = %ld\n",i);
 		index_insert(i_item, i, row, 0);
 	}
 }

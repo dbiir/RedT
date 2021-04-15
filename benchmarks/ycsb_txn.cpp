@@ -36,6 +36,7 @@
 #include "row_mvcc.h"
 #include "rdma_mvcc.h"
 #include "row_rdma_mvcc.h"
+#include "row_rdma_2pl.h"
 #include "mem_alloc.h"
 #include "query.h"
 #include "msg_queue.h"
@@ -44,6 +45,8 @@
 #include "qps/op.hh"
 #include "src/sshed.hh"
 #include "transport.h"
+#include "qps/op.hh"
+
 
 void YCSBTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	TxnManager::init(thd_id, h_wl);
@@ -120,7 +123,7 @@ RC YCSBTxnManager::run_txn() {
 	txn_stats.process_time_short += curr_time - starttime;
 	txn_stats.wait_starttime = get_sys_clock();
 //RDMA_SILO:logic?
-	if(IS_LOCAL(get_txn_id())) {
+	if(IS_LOCAL(get_txn_id())) {  //对rdma单边，一定是local
 		if(is_done() && rc == RCOK)
 		rc = start_commit();
 		else if(rc == Abort)
@@ -190,29 +193,124 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
 	// get the index of row to be operated
 	itemid_t * m_item;
 	m_item = ycsb_read_remote_index(req);
-
+	
 	uint64_t part_id = _wl->key_to_part( req->key );
     uint64_t loc = GET_NODE_ID(part_id);
 	assert(loc != g_node_id);
 
-	
-	//read request
 	if(req->acctype == RD || req->acctype == WR){
+		uint64_t tts = get_timestamp();
 
-	//	get remote row
-	    row_t * test_row = read_remote_content(loc,m_item->offset);
+#if CC_ALG == RDMA_WAIT_DIE2
+		//直接RDMA CAS加锁
+retry_lock:
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,0,tts);
+
+		if(try_lock != 0){ //如果CAS失败
+			if(tts <= try_lock){  //wait
+
+				num_atomic_retry++;
+				total_num_atomic_retry++;
+				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+				//sleep(1);
+				goto retry_lock;			
+			}	
+			else{ //abort
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				row_local = NULL;
+				txn->rc = Abort;
+				mem_allocator.free(m_item, sizeof(itemid_t));
+
+				return Abort;
+			}
+		}
+#endif
+#if CC_ALG == RDMA_NO_WAIT2
+		//直接RDMA CAS加锁
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,0,1);
+
+		if(try_lock != 0){ //如果CAS失败
+			DEBUG_M("TxnManager::get_row(abort) access free\n");
+			row_local = NULL;
+			txn->rc = Abort;
+			mem_allocator.free(m_item, sizeof(itemid_t));
+
+			return Abort;
+		}
+
+#endif
+#if CC_ALG == RDMA_NO_WAIT 
+		uint64_t new_lock_info;
+		uint64_t lock_info;
+remote_atomic_retry_lock:
+		if(req->acctype == RD){ //读集元素
+			//第一次rdma read，得到数据项的锁信息
+            row_t * test_row = read_remote_content(loc,m_item->offset);
+
+			new_lock_info = 0;
+			lock_info = test_row->_lock_info;
+
+			bool conflict = Row_rdma_2pl::conflict_lock(lock_info, DLOCK_SH, new_lock_info);
+
+			if(conflict){
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				row_local = NULL;
+				txn->rc = Abort;
+				mem_allocator.free(m_item, sizeof(itemid_t));
+				return Abort;
+			}
+			if(new_lock_info == 0){
+				printf("---线程号：%lu, 远程加锁失败!!!!!!锁位置: %lu; %p, 事务号: %lu,原lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
+			} 
+			assert(new_lock_info!=0);
+		}
+		else{ //写集元素直接CAS即可，不需要RDMA READ
+			lock_info = 0; //只有lock_info==0时才可以CAS，否则加写锁失败，Abort
+			new_lock_info = 3; //二进制11，即1个写锁
+		}
+		//RDMA CAS加锁
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,lock_info,new_lock_info);
+
+		if(try_lock != lock_info && req->acctype == RD){ //如果CAS失败:对读集元素来说，即原子性被破坏
+
+			num_atomic_retry++;
+			total_num_atomic_retry++;
+			if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
+			goto remote_atomic_retry_lock;
+
+		}	
+		if(try_lock != lock_info && req->acctype == WR){ //如果CAS失败:对写集元素来说,即已经有锁;
+			DEBUG_M("TxnManager::get_row(abort) access free\n");
+			row_local = NULL;
+			txn->rc = Abort;
+			mem_allocator.free(m_item, sizeof(itemid_t));
+
+			return Abort; //原子性被破坏，CAS失败			
+		}	
+
+#endif
+        //读数据
+        row_t * test_row = read_remote_content(loc,m_item->offset);
 
 		assert(test_row->get_primary_key() == req->key);
         
         RC rc = RCOK;
+
+        //preserve the txn->access
         access_t type = req->acctype;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+       // mem_allocator.free(m_item, sizeof(itemid_t));
+
         return rc;
+		   		
 	}
 	RC rc = RCOK;
 	return rc;
 }
-//#endif
+
 
 #if CC_ALG == RDMA_MVCC
 RC YCSBTxnManager::mvcc_remote_one_side_request(ycsb_request * req,row_t *& row_local){
@@ -309,17 +407,17 @@ RC YCSBTxnManager::run_txn_state() {
 		}else {
 			rc = send_remote_request();
 		}
-
 	  break;
 	case YCSB_1 :
-		rc = run_ycsb_1(req->acctype,row);
+		//读写本地数据row，对于TCP/IP消息队列方式来说，在这个时候写集已经真实写入
+		//但是对于rdma，是在本地写入，对于远程数据commit时才真实写回
+		rc = run_ycsb_1(req->acctype,row);  
 		break;
 	case YCSB_FIN :
 		state = YCSB_FIN;
 		break;
 	default:
 		assert(false);
-
   }
 
   if (rc == RCOK) next_ycsb_state();
@@ -351,17 +449,18 @@ RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {
 	int fid = 0;
 	char * data = row_local->get_data();
 	uint64_t fval __attribute__ ((unused));
-	fval = *(uint64_t *)(&data[fid * 100]);
+	fval = *(uint64_t *)(&data[fid * 100]); //read fata and store to fval
 #if ISOLATION_LEVEL == READ_COMMITTED || ISOLATION_LEVEL == READ_UNCOMMITTED
 	// Release lock after read
 	release_last_row_lock();
 #endif
 
-  } else {
+  } 
+  else {
 	assert(acctype == WR);
 		int fid = 0;
 	  char * data = row_local->get_data();
-	  *(uint64_t *)(&data[fid * 100]) = 0;
+	  *(uint64_t *)(&data[fid * 100]) = 0; //write data, set data[0]=0
 #if YCSB_ABORT_MODE
 	if (data[0] == 'a') return RCOK;
 #endif
@@ -374,6 +473,7 @@ RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {
   INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
   return RCOK;
 }
+
 RC YCSBTxnManager::run_calvin_txn() {
   RC rc = RCOK;
   uint64_t starttime = get_sys_clock();

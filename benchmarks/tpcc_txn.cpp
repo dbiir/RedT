@@ -28,6 +28,7 @@
 #include "tpcc_const.h"
 #include "transport.h"
 #include "msg_queue.h"
+#include "row_rdma_2pl.h"
 #include "message.h"
 #include "rdma.h"
 #include "src/rdma/sop.hh"
@@ -485,7 +486,7 @@ RC TPCCTxnManager::send_remote_one_side_request(TPCCQuery * query,row_t *& row_l
 
 	//read request
 	if(type == RD || type == WR){
-
+        uint64_t tts = get_timestamp();
 #if CC_ALG == RDMA_MVCC
     uint64_t lock = get_txn_id()+1;
     uint64_t test_loc = -1;
@@ -496,6 +497,98 @@ RC TPCCTxnManager::send_remote_one_side_request(TPCCQuery * query,row_t *& row_l
        return rc;
     }
 #endif
+#if CC_ALG == RDMA_WAIT_DIE2
+		//直接RDMA CAS加锁
+retry_lock:
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,0,tts);
+
+		if(try_lock != 0){ //如果CAS失败
+			if(tts <= try_lock){  //wait
+
+				num_atomic_retry++;
+				total_num_atomic_retry++;
+				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+				//sleep(1);
+				goto retry_lock;			
+			}	
+			else{ //abort
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				row_local = NULL;
+				txn->rc = Abort;
+			//	mem_allocator.free(m_item, sizeof(itemid_t));
+
+				return Abort;
+			}
+		}
+#endif
+#if CC_ALG == RDMA_NO_WAIT2
+		//直接RDMA CAS加锁
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,0,1);
+
+		if(try_lock != 0){ //如果CAS失败
+			DEBUG_M("TxnManager::get_row(abort) access free\n");
+			row_local = NULL;
+			txn->rc = Abort;
+			mem_allocator.free(m_item, sizeof(itemid_t));
+
+			return Abort;
+		}
+
+#endif
+#if CC_ALG == RDMA_NO_WAIT 
+		uint64_t new_lock_info;
+		uint64_t lock_info;
+remote_atomic_retry_lock:
+		if(type == RD){ //读集元素
+			//第一次rdma read，得到数据项的锁信息
+            row_t * test_row = read_remote_content(loc,m_item->offset);
+
+			new_lock_info = 0;
+			lock_info = test_row->_lock_info;
+
+			bool conflict = Row_rdma_2pl::conflict_lock(lock_info, DLOCK_SH, new_lock_info);
+
+			if(conflict){
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				row_local = NULL;
+				txn->rc = Abort;
+				mem_allocator.free(m_item, sizeof(itemid_t));
+				return Abort;
+			}
+			if(new_lock_info == 0){
+				printf("---线程号：%lu, 远程加锁失败!!!!!!锁位置: %lu; %p, 事务号: %lu,原lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
+			} 
+			assert(new_lock_info!=0);
+		}
+		else{ //写集元素直接CAS即可，不需要RDMA READ
+			lock_info = 0; //只有lock_info==0时才可以CAS，否则加写锁失败，Abort
+			new_lock_info = 3; //二进制11，即1个写锁
+		}
+		//RDMA CAS加锁
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,lock_info,new_lock_info);
+
+		if(try_lock != lock_info && type == RD){ //如果CAS失败:对读集元素来说，即原子性被破坏
+
+			num_atomic_retry++;
+			total_num_atomic_retry++;
+			if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
+			goto remote_atomic_retry_lock;
+
+		}	
+		if(try_lock != lock_info && type == WR){ //如果CAS失败:对写集元素来说,即已经有锁;
+			DEBUG_M("TxnManager::get_row(abort) access free\n");
+			row_local = NULL;
+			txn->rc = Abort;
+			mem_allocator.free(m_item, sizeof(itemid_t));
+
+			return Abort; //原子性被破坏，CAS失败			
+		}	
+
+#endif
+
 
 	//	get remote row
 	    row_t * test_row = read_remote_content(loc,remote_offset);

@@ -31,6 +31,7 @@
 #include "src/rdma/sop.hh"
 
 #if CC_ALG == RDMA_SILO
+//即验证txn->txn->accesses[num]->orig_row->get_primary_key() == txn->txn->accesses[num]->key
 RC RDMA_silo::validate_key(TxnManager * txn , uint64_t num) {
   row_t * row = txn->txn->accesses[num]->orig_row;
   assert(row->get_primary_key() == txn->txn->accesses[num]->key);
@@ -79,7 +80,7 @@ row_t * RDMA_silo::read_remote_row(TxnManager * txn , uint64_t num){
 #if 1
 RC
 RDMA_silo::validate_rdma_silo(TxnManager * txnMng)
-{
+{   
 	Transaction *txn = txnMng->txn;
 	RC rc = RCOK;
 	// lock write tuples in the primary key order.
@@ -131,7 +132,6 @@ RDMA_silo::validate_rdma_silo(TxnManager * txnMng)
 			}
 		}
 	}
-
 	while (!done) {
 		txnMng->num_locks = 0;
 		for (uint64_t i = 0; i < wr_cnt; i++) {
@@ -165,7 +165,6 @@ RDMA_silo::validate_rdma_silo(TxnManager * txnMng)
 				if(assert_remote_lock(txnMng,txnMng->write_set[i])){//check whether the row was locked by current txn
 					txnMng->num_locks ++;
 				}else{
-					// RDMA_LOG(4) << "txn " << txn->txn_id << " lock "<<row->get_primary_key() <<" failed and abort";
 					INC_STATS(txnMng->get_thd_id(), remote_lock_fail_abort, 1); //12%
 					INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
 					rc = Abort;
@@ -185,7 +184,6 @@ RDMA_silo::validate_rdma_silo(TxnManager * txnMng)
 		}
 	}
 
-
 	COMPILER_BARRIER
 
 	// validate rows in the read set
@@ -200,7 +198,8 @@ RDMA_silo::validate_rdma_silo(TxnManager * txnMng)
 				 INC_STATS(txnMng->get_thd_id(), local_readset_validate_fail_abort, 1); //48%
 				 INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
 			}
-       	}else{//remote
+       	}
+		else{//remote
         	success = validate_rw_remote(txnMng , read_set[i]);
 			if(success)DEBUG("silo %ld validate read row %ld success \n",txnMng->get_txn_id(),access->key);
 			if(!success){
@@ -230,7 +229,8 @@ RDMA_silo::validate_rdma_silo(TxnManager * txnMng)
 				  INC_STATS(txnMng->get_thd_id(), local_writeset_validate_fail_abort, 1);
 				  INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
 			  }
-		}else{//remote
+		}
+		else{//remote
       		success = validate_rw_remote(txnMng,txnMng->write_set[i]);
 			// success = true;
 			if(success)DEBUG("silo %ld validate write row %ld success \n",txnMng->get_txn_id(),access->key);
@@ -324,7 +324,6 @@ bool RDMA_silo::remote_try_lock(TxnManager * txnMng , uint64_t num){
 	RDMA_ASSERT(res_s2 == IOCode::Ok);
 	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p2 == IOCode::Ok);
-
 	result = true;
 	return result;
 }

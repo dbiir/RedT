@@ -24,8 +24,8 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-//#define USE_RDMA CHANGE_MSG_QUEUE
-#define USE_RDMA CHANGE_TCP_ONLY
+#define USE_RDMA CHANGE_MSG_QUEUE
+//#define USE_RDMA CHANGE_TCP_ONLY
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
 #define RDMA_BUFFER_ITEM_SIZE (1<<12)
@@ -87,8 +87,8 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 4
-#define THREAD_CNT 10
+#define NODE_CNT 2
+#define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define CORE_CNT 2
@@ -121,7 +121,7 @@
 // # of transactions to run for warmup
 #define WARMUP            0
 // YCSB or TPCC or PPS or DA
-#define WORKLOAD YCSB
+#define WORKLOAD TPCC
 // print the transaction latency distribution
 #define PRT_LAT_DISTR false
 #define STATS_ENABLE        true
@@ -180,11 +180,16 @@
 // Concurrency Control
 /***********************************************/
 
-// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
+// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2
+//RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
-#define CC_ALG RDMA_MVCC
+
+#define CC_ALG RDMA_WAIT_DIE2
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
+
+#define DEBUG_PRINTF  false
+
 // all transactions acquire tuples according to the primary key order.
 #define KEY_ORDER         false
 // transaction roll back changes after abort
@@ -257,7 +262,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 4194304
+#define SYNTH_TABLE_SIZE 2097152
 #define ZIPF_THETA 0.001
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
@@ -283,7 +288,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH PART_CNT
+#define NUM_WH 8
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0
@@ -431,6 +436,9 @@ enum PPSTxnType {
 #define CNULL 28
 #define RDMA_SILO 29
 #define RDMA_MVCC 30
+#define RDMA_NO_WAIT 31
+#define RDMA_NO_WAIT2 32
+#define RDMA_WAIT_DIE2 33
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
