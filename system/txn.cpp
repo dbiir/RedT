@@ -1602,6 +1602,13 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
 	access->offset = m_item->offset;	
 #endif
 
+#if CC_ALG == RDMA_MAAT
+	access->orig_row = test_row;
+	access->key = key;
+	access->location = loc;
+	access->offset = m_item->offset;
+#endif
+
     row_local = access->data;
     ++txn->row_cnt;
 

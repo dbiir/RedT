@@ -198,7 +198,7 @@ itemid_t* YCSBTxnManager::ycsb_read_remote_index(ycsb_request * req) {
 RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
 
 	itemid_t * m_item;
-	m_item = read_remote_index(req);
+	m_item = ycsb_read_remote_index(req);
   // table_t * table = read_remote_table(m_item);
 
 	uint64_t part_id = _wl->key_to_part( req->key );
@@ -341,7 +341,7 @@ RC YCSBTxnManager::send_maat_remote_one_side_request(ycsb_request * req,row_t *&
 
 
 	RC rc = RCOK;
-	rc = row->remote_get_row(temp_row, this, access);
+	rc = row->remote_copy_row(temp_row, this, access);
 	assert(temp_row->get_primary_key() == access->data->get_primary_key());
 
 	access->type = req->acctype;
@@ -373,6 +373,8 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
     uint64_t loc = GET_NODE_ID(part_id);
 	assert(loc != g_node_id);
     RC rc = RCOK;
+    uint64_t lock = get_txn_id() + 1;
+    if(CC_ALG == RDMA_MAAT) lock = get_txn_id();
 
 #if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2
 	if(req->acctype == RD || req->acctype == WR){
@@ -505,7 +507,7 @@ remote_atomic_retry_lock:
     ts_t ts = get_timestamp();
 
     uint64_t try_lock = -1;
-    try_lock = cas_remote_content(loc,m_item->offset,0,get_txn_id()+1);
+    try_lock = cas_remote_content(loc,m_item->offset,0,lock);
 	if(try_lock != 0) {
 		rc = Abort;
         return rc;
@@ -515,27 +517,89 @@ remote_atomic_retry_lock:
 	assert(remote_row->get_primary_key() == req->key);
 
     if(req->acctype == RD) {
+#if CC_ALG == RDMA_TS1
 		if(ts < remote_row->wts || (ts > remote_row->tid && remote_row->tid != 0))rc = Abort;
 		else {
 			if (remote_row->rts < ts) remote_row->rts = ts;
 			rc = RCOK;
 		}
+#endif
+#if CC_ALG == RDMA_MAAT
+    for(uint64_t i = 0; i < row_set_length; i++) {
+			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
+				break;
+			}
+			uncommitted_writes.insert(remote_row->uncommitted_writes[i]);
+		}
+		if(greatest_write_timestamp < remote_row->timestamp_last_write) {
+			greatest_write_timestamp = remote_row->timestamp_last_write;
+		}
+		for(uint64_t i = 0; i < row_set_length; i++) {
+			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
+				remote_row->uncommitted_reads[i] = get_txn_id();
+				break;
+			}
+		}
+		remote_row->_tid_word = 0;
+
+        uint64_t operate_size = row_t::get_row_size(remote_row->tuple_size);
+        char *write_buf = Rdma::get_row_client_memory(get_thd_id());
+        memcpy(write_buf, (char*)remote_row, operate_size);
+
+        assert(write_remote_content(loc,operate_size,m_item->offset,write_buf) == true);
+#endif
 	} 
-	else if(req->acctype == WR) {	
+	else if(req->acctype == WR) {
+#if CC_ALG == RDMA_TS1
 		if (remote_row->tid != 0 || ts < remote_row->rts || ts < remote_row->wts) rc = Abort;	
 		else {
 			remote_row->tid = ts;
 			rc = RCOK;	
 		}
+#endif
+#if CC_ALG == RDMA_MAAT
+    for(uint64_t i = 0; i < row_set_length; i++) {
+			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
+				break;
+			}
+			uncommitted_reads.insert(remote_row->uncommitted_reads[i]);
+		}
+		if(greatest_write_timestamp < remote_row->timestamp_last_write) {
+			greatest_write_timestamp = remote_row->timestamp_last_write;
+		}
+		if(greatest_read_timestamp < remote_row->timestamp_last_read) {
+			greatest_read_timestamp = remote_row->timestamp_last_read;
+		}
+		for(uint64_t i = 0; i < row_set_length; i++) {
+			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
+				remote_row->uncommitted_writes[i] = get_txn_id();
+				break;
+			}
+			uncommitted_writes_y.insert(remote_row->uncommitted_writes[i]);
+		}
+		remote_row->_tid_word = 0;
+
+		uint64_t operate_size = row_t::get_row_size(remote_row->tuple_size);
+        char *write_buf = Rdma::get_row_client_memory(get_thd_id());
+        memcpy(write_buf, (char*)remote_row, operate_size);
+
+        assert(write_remote_content(loc,operate_size,m_item->offset,write_buf) == true);
+#endif
 	} else {
 		assert(false);
 	}
+
+#if CC_ALG == RDMA_TS1
     remote_row->mutx = 0;
 
     if (rc == Abort){
 		DEBUG_M("TxnManager::get_row(abort) access free\n");
 
-        try_lock = cas_remote_content(loc,m_item->offset,get_txn_id()+1 , 0);
+        try_lock = cas_remote_content(loc,m_item->offset,lock , 0);
 
 		//mem_allocator.free(m_item,sizeof(itemid_t));
 		mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
@@ -547,7 +611,7 @@ remote_atomic_retry_lock:
     memcpy(write_buf, (char*)remote_row, operate_size);
 
     assert(write_remote_content(loc,operate_size,m_item->offset,write_buf) == true);
-
+#endif
     rc = preserve_access(row_local,m_item,remote_row,req->acctype,remote_row->get_primary_key(),loc);
 	
 	return rc;

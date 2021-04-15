@@ -393,7 +393,7 @@ RC RDMA_Maat::remote_abort(TxnManager * txnMng, Access * data) {
 	uint64_t loc = data->location;
 	uint64_t thd_id = txnMng->get_thd_id();
 	uint64_t lock = txnMng->get_txn_id();
-	uint64_t operate_size = sizeof(row_t);
+	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
 	uint64_t starttime = get_sys_clock();
 	uint64_t endtime;
 	uint64_t *tmp_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
@@ -418,7 +418,7 @@ RC RDMA_Maat::remote_abort(TxnManager * txnMng, Access * data) {
 	RDMA_ASSERT(res_s2 == rdmaio::IOCode::Ok);
     auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
     RDMA_ASSERT(res_p2 == rdmaio::IOCode::Ok);
-	row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	row_t *temp_row = (row_t *)mem_allocator.alloc(operate_size);
 	memcpy(temp_row, tmp_buf2, operate_size);
 	assert(temp_row->get_primary_key() == data->data->get_primary_key());
 	if(data->type == RD) {
@@ -440,6 +440,7 @@ RC RDMA_Maat::remote_abort(TxnManager * txnMng, Access * data) {
 			}
 		}
 		temp_row->_tid_word = 0;
+        operate_size = row_t::get_row_size(temp_row->tuple_size);
 		memcpy(tmp_buf2, (char *)temp_row, operate_size);
 		auto res_s3 = rc_qp[loc][thd_id]->send_normal(
 			{.op = IBV_WR_RDMA_WRITE,
@@ -471,6 +472,7 @@ RC RDMA_Maat::remote_abort(TxnManager * txnMng, Access * data) {
 			}
 		}
 		temp_row->_tid_word = 0;
+        operate_size = row_t::get_row_size(temp_row->tuple_size);
 		memcpy(tmp_buf2, (char *)temp_row, operate_size);
 		auto res_s3 = rc_qp[loc][thd_id]->send_normal(
 			{.op = IBV_WR_RDMA_WRITE,
@@ -485,7 +487,7 @@ RC RDMA_Maat::remote_abort(TxnManager * txnMng, Access * data) {
 		RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
 		//uncommitted_writes->erase(txn->get_txn_id());
 	}
-	mem_allocator.free(temp_row, sizeof(row_t));
+	mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return Abort;
 }
 RC RDMA_Maat::remote_commit(TxnManager * txnMng, Access * data) {
@@ -498,7 +500,7 @@ RC RDMA_Maat::remote_commit(TxnManager * txnMng, Access * data) {
 	uint64_t loc = data->location;
 	uint64_t thd_id = txnMng->get_thd_id();
 	uint64_t lock = txnMng->get_txn_id();
-	uint64_t operate_size = sizeof(row_t);
+	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
 	uint64_t starttime = get_sys_clock();
 	uint64_t endtime;
 	uint64_t *tmp_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
@@ -523,7 +525,7 @@ RC RDMA_Maat::remote_commit(TxnManager * txnMng, Access * data) {
 	RDMA_ASSERT(res_s2 == rdmaio::IOCode::Ok);
     auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
     RDMA_ASSERT(res_p2 == rdmaio::IOCode::Ok);
-	row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 	memcpy(temp_row, tmp_buf2, operate_size);
 	assert(temp_row->get_primary_key() == data->data->get_primary_key());
 	uint64_t txn_commit_ts = txnMng->get_commit_timestamp();
@@ -572,6 +574,7 @@ RC RDMA_Maat::remote_commit(TxnManager * txnMng, Access * data) {
 			} 
 		}
 		temp_row->_tid_word = 0;
+        operate_size = row_t::get_row_size(temp_row->tuple_size);
 		memcpy(tmp_buf2, (char *)temp_row, operate_size);
 		auto res_s3 = rc_qp[loc][thd_id]->send_normal(
 			{.op = IBV_WR_RDMA_WRITE,
@@ -652,6 +655,7 @@ RC RDMA_Maat::remote_commit(TxnManager * txnMng, Access * data) {
 			} 
 		}
 		temp_row->_tid_word = 0;
+        operate_size = row_t::get_row_size(temp_row->tuple_size);
 		memcpy(tmp_buf2, (char *)temp_row, operate_size);
 		auto res_s3 = rc_qp[loc][thd_id]->send_normal(
 			{.op = IBV_WR_RDMA_WRITE,
@@ -666,7 +670,7 @@ RC RDMA_Maat::remote_commit(TxnManager * txnMng, Access * data) {
 		RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
 		//uncommitted_writes->erase(txn->get_txn_id());
 	}
-	mem_allocator.free(temp_row, sizeof(row_t));
+	mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return Abort;
 }
 
@@ -878,72 +882,5 @@ void RdmaTimeTable::remote_set_timeNode(uint64_t thd_id, uint64_t key, RdmaTimeT
 		return;
 	}
 }
-
-// RdmaTimeTableNode* RDMA_Maat::read_remote_timetable(TxnManager * txn, uint64_t node_id) {
-// 	assert(node_id != g_node_id);
-// 	uint64_t thd_id = txn->get_thd_id();
-
-// 	// todo: 这里需要获取对应的索引
-// 	// uint64_t index_key = 0;
-// 	uint64_t timenode_addr = (txn->get_txn_id()) * sizeof(RdmaTimeTableNode);
-// 	uint64_t timenode_size = sizeof(RdmaTimeTableNode);
-// 	// 每个线程只用自己的那一块客户端内存地址
-// 	uint64_t *tmp_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-// 	auto mr = client_rm_handler->get_reg_attr().value();
-
-// 	rdmaio::qp::Op<> op;
-// 	op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[node_id].buf + timenode_addr), remote_mr_attr[node_id].key).set_cas(0, txn->get_txn_id());
-// 	assert(op.set_payload(tmp_buf, sizeof(uint64_t), mr.key) == true);
-// 	auto res_s = op.execute(rc_qp[node_id][thd_id], IBV_SEND_SIGNALED);
-// 	RDMA_ASSERT(res_s == IOCode::Ok);
-// 	auto res_p = rc_qp[node_id][thd_id]->wait_one_comp();
-// 	RDMA_ASSERT(res_p == IOCode::Ok);
-
-// 	//timetable读取失败
-// 	if (*tmp_buf != 0) {
-	
-// 	}
-// 	char *test_buf = Rdma::get_index_client_memory(thd_id);
-// 	::memset(test_buf, 0, timenode_size);
-
-// 	uint64_t starttime;
-// 	uint64_t endtime;
-// 	starttime = get_sys_clock();
-// 	auto res_s2 = rc_qp[g_node_id][thd_id]->send_normal(
-// 	{.op = IBV_WR_RDMA_READ,
-// 	.flags = IBV_SEND_SIGNALED,
-// 	.len = timenode_size,
-// 	.wr_id = 0},
-// 	{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
-// 	.remote_addr = timenode_addr,
-// 	.imm_data = 0});
-// 	RDMA_ASSERT(res_s2 == rdmaio::IOCode::Ok);
-// 	auto res_p2 = rc_qp[node_id][thd_id]->wait_one_comp();
-// 	RDMA_ASSERT(res_p2 == rdmaio::IOCode::Ok);
-// 	endtime = get_sys_clock();
-
-// 	//INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
-// 	//INC_STATS(get_thd_id(), rdma_read_cnt, 1);
-// 	RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
-// 	::memcpy(item, test_buf, timenode_size);
-// 	assert(item->key == txn->get_txn_id());
-
-// 	uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-// 	auto mr = client_rm_handler->get_reg_attr().value();
-
-// 	rdmaio::qp::Op<> op;
-// 	op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[node_id].buf + timenode_addr), remote_mr_attr[node_id].key).set_cas(txn->get_txn_id(), 0);
-// 	assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
-// 	auto res_s3 = op.execute(rc_qp[node_id][thd_id], IBV_SEND_SIGNALED);
-// 	RDMA_ASSERT(res_s3 == IOCode::Ok);
-// 	auto res_p3 = rc_qp[node_id][thd_id]->wait_one_comp();
-// 	RDMA_ASSERT(res_p3 == IOCode::Ok);
-
-// 	//timetable读取失败
-// 	if (*tmp_buf != 0) {
-	
-// 	}
-// 	return item;
-// }
 #endif
 
