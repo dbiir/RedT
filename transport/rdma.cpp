@@ -86,6 +86,7 @@ uint64_t get_rm_id(uint64_t node_id,uint64_t thread_id){
 uint64_t Rdma::get_port(uint64_t node_id){
   uint64_t port_id = 0;
   port_id = 7144 + node_id;
+  //port_id = TPORT_PORT + 344 + node_id;
   return port_id ;
 }
 
@@ -161,7 +162,7 @@ void * Rdma::server_qp(void *){
 								->get_reg_attr()
 								.value()
 								.buf);
-
+	rdma_timetable_buffer = rdma_global_buffer + (rdma_buffer_size - rdma_timetable_size);
 	rm_ctrl->start_daemon();
 
 	return NULL;
@@ -231,6 +232,7 @@ void Rdma::init(){
 
 	//as client
 	client_rdma_rm = Arc<RMem>(new RMem(client_rdma_buffer_size));
+	// client_rdma_rm = Arc<RMem>(new RMem(RDMA_LOCAL_BUFFER_SIZE));
 	client_rm_handler = RegHandler::create(client_rdma_rm, nic).value();
 
 	uint64_t thread_num = 0;

@@ -472,7 +472,7 @@ RC rdma_mvcc::validate_local(TxnManager * txnMng){
                         char *test_buf = Rdma::get_row_client_memory(thd_id);
                         memcpy(test_buf, (char*)temp_row, operate_size);
 
-                        assert(txnMng->write_remote_content(loc,thd_id,operate_size,off,test_buf)==true);
+                        assert(txnMng->write_remote_content(loc,operate_size,off,test_buf)==true);
     
 /*
                         auto res_s4 = rc_qp[loc][thd_id]->send_normal(
@@ -509,7 +509,7 @@ RC rdma_mvcc::validate_local(TxnManager * txnMng){
                     char *test_buf = Rdma::get_row_client_memory(thd_id);
                     memcpy(test_buf, (char*)temp_row, operate_size);
 
-                    assert(txnMng->write_remote_content(loc,thd_id,operate_size,off,test_buf)==true);
+                    assert(txnMng->write_remote_content(loc,operate_size,off,test_buf)==true);
                     write_back = true;
                     /*
                     auto res_s4 = rc_qp[loc][thd_id]->send_normal(

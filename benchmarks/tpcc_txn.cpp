@@ -483,7 +483,7 @@ RC TPCCTxnManager::send_remote_one_side_request(TPCCQuery * query,row_t *& row_l
     access_t type;
     if(g_wh_update)type = WR;
     else type == RD;
-
+#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2
 	//read request
 	if(type == RD || type == WR){
         uint64_t tts = get_timestamp();
@@ -608,6 +608,58 @@ remote_atomic_retry_lock:
 	}
 
 	return rc;
+#endif
+#if CC_ALG == RDMA_TS1 || CC_ALG == RDMA_MAAT
+     ts_t ts = get_timestamp();
+
+    uint64_t try_lock = -1;
+    try_lock = cas_remote_content(loc,m_item->offset,0,get_txn_id()+1);
+	if(try_lock != 0) {
+		rc = Abort;
+        return rc;
+	}
+
+    row_t * remote_row = read_remote_content(loc,m_item->offset);
+	//assert(remote_row->get_primary_key() == req->key);
+
+    if(type == RD) {
+		if(ts < remote_row->wts || (ts > remote_row->tid && remote_row->tid != 0))rc = Abort;
+		else {
+			if (remote_row->rts < ts) remote_row->rts = ts;
+			rc = RCOK;
+		}
+	} 
+	else if(type == WR) {	
+		if (remote_row->tid != 0 || ts < remote_row->rts || ts < remote_row->wts) rc = Abort;	
+		else {
+			remote_row->tid = ts;
+			rc = RCOK;	
+		}
+	} else {
+		assert(false);
+	}
+    remote_row->mutx = 0;
+
+    if (rc == Abort){
+		DEBUG_M("TxnManager::get_row(abort) access free\n");
+
+        try_lock = cas_remote_content(loc,m_item->offset,get_txn_id()+1 , 0);
+
+		//mem_allocator.free(m_item,sizeof(itemid_t));
+		mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+		return rc;
+	}
+
+    uint64_t operate_size = row_t::get_row_size(remote_row->tuple_size);
+    char *write_buf = Rdma::get_row_client_memory(get_thd_id());
+    memcpy(write_buf, (char*)remote_row, operate_size);
+
+    assert(write_remote_content(loc,operate_size,m_item->offset,write_buf) == true);
+
+    rc = preserve_access(row_local,m_item,remote_row,type,remote_row->get_primary_key(),loc);
+	
+	return rc;
+#endif
 }
 
 

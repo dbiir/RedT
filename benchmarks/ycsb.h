@@ -71,8 +71,11 @@ private:
   RC run_txn_state();
   RC send_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC mvcc_remote_one_side_request(ycsb_request * req,row_t *& row_local);
+  RC send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local);
+  RC send_timestamp_remote_one_side_request(ycsb_request * req,row_t *& row_local);
 
   itemid_t* ycsb_read_remote_index(ycsb_request * req);
+//   itemid_t* read_remote_index(ycsb_request * req);
 
   RC run_ycsb_0(ycsb_request * req,row_t *& row_local);
   RC run_ycsb_1(access_t acctype, row_t * row_local);

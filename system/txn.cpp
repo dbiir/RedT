@@ -50,17 +50,20 @@
 #include "ssi.h"
 #include "wsi.h"
 #include "manager.h"
+#include "row_rdma_2pl.h"
 #include "rdma_silo.h"
 #include "rdma_mvcc.h"
 #include "rdma_2pl.h"
+#include "rdma_maat.h"
+#include "rdma_ts1.h"
 #include "transport.h"
-#include "row_rdma_2pl.h"
 
 #include "lib.hh"
 #include "qps/op.hh"
 #include "transport/rdma.h"
 #include "src/rdma/sop.hh"
 #include "src/sshed.hh"
+
 
 void TxnStats::init() {
 	starttime=0;
@@ -302,7 +305,7 @@ void Transaction::release_inserts(uint64_t thd_id) {
 #if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != WOOKONG && \
 		CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != DTA && CC_ALG != DLI_MVCC_OCC && \
 		CC_ALG != DLI_MVCC_BASE && CC_ALG != DLI_DTA && CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && \
-		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC && CC_ALG != RDMA_MVCC
+		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC && CC_ALG != RDMA_MVCC  && CC_ALG != RDMA_MAAT
 		DEBUG_M("TxnManager::cleanup row->manager free\n");
 		mem_allocator.free(row->manager, 0);
 #endif
@@ -352,6 +355,12 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	uncommitted_writes = new std::set<uint64_t>();
 	uncommitted_writes_y = new std::set<uint64_t>();
 	uncommitted_reads = new std::set<uint64_t>();
+#endif
+#if CC_ALG == RDMA_MAAT
+	// uncommitted_writes = new std::set<uint64_t>();
+	// uncommitted_writes_y = new std::set<uint64_t>();
+	// uncommitted_reads = new std::set<uint64_t>();
+	  memset(write_set, 0, 100);
 #endif
 #if CC_ALG == TICTOC
 	_is_sub_txn = true;
@@ -416,6 +425,11 @@ void TxnManager::reset() {
 	uncommitted_writes_y->clear();
 	uncommitted_reads->clear();
 #endif
+#if CC_ALG == RDMA_MAAT
+	uncommitted_writes.clear();
+	uncommitted_writes_y.clear();
+	uncommitted_reads.clear();
+#endif
 
 #if CC_ALG == CALVIN
 	phase = CALVIN_RW_ANALYSIS;
@@ -441,7 +455,7 @@ void TxnManager::release() {
 	INC_STATS(get_thd_id(),mtx[1],get_sys_clock()-prof_starttime);
 	txn = NULL;
 
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT 
 	delete uncommitted_writes;
 	delete uncommitted_writes_y;
 	delete uncommitted_reads;
@@ -473,6 +487,9 @@ RC TxnManager::commit() {
 	release_locks(RCOK);
 #if CC_ALG == MAAT
 	time_table.release(get_thd_id(),get_txn_id());
+#endif
+#if CC_ALG == RDMA_MAAT
+    rdma_time_table.release(get_thd_id(), get_txn_id());
 #endif
 #if CC_ALG == WOOKONG
 	wkdb_time_table.release(get_thd_id(),get_txn_id());
@@ -527,6 +544,9 @@ RC TxnManager::abort() {
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
 	time_table.release(get_thd_id(),get_txn_id());
 #endif
+#if CC_ALG == RDMA_MAAT
+    rdma_time_table.release(get_thd_id(), get_txn_id());
+#endif
 #if CC_ALG == WOOKONG
 	wkdb_time_table.release(get_thd_id(),get_txn_id());
 #endif
@@ -577,7 +597,7 @@ RC TxnManager::start_abort() {
 	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     INC_STATS(get_thd_id(), trans_prepare_count, 1);
 	//RDMA_SILO:keep message or not
-	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2) {
+	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2  && CC_ALG != RDMA_MAAT) {
 		send_finish_messages();
 		abort();
 		return Abort;
@@ -615,7 +635,7 @@ RC TxnManager::start_commit() {
   	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
-	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2) {
+	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT && CC_ALG !=RDMA_TS1) {
 		if(CC_ALG == TICTOC) {
 			rc = validate();
 			if (rc != Abort) {
@@ -643,6 +663,7 @@ RC TxnManager::start_commit() {
 	} 
 	else { // is not multi-part or use rdma
 		rc = validate();
+		rc = RCOK;
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
 
@@ -655,12 +676,13 @@ RC TxnManager::start_commit() {
 		if(CC_ALG == WSI) {
 			wsi_man.gene_finish_ts(this);
 		}
-		if(rc == RCOK)   //对NO_WAIT来说，在此处一定由rc==RCOK
+		if(rc == RCOK){   //for NO_WAIT , rc == RCOK
 			rc = commit();
+		}		
 		else {
 			txn->rc = Abort;
 			DEBUG("%ld start_abort\n",get_txn_id());
-			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO &&  CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2) {
+			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO &&  CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT) {
 				send_finish_messages();
 				abort();
 				rc = Abort;
@@ -847,12 +869,11 @@ void TxnManager::release_last_row_lock() {
 }
 
 void TxnManager::cleanup_row(RC rc, uint64_t rid) {
-	access_t type = txn->accesses[rid]->type;	
-	if (type == WR && rc == Abort && CC_ALG != MAAT) {
-		type = XP; 
-	}	
-	bool is_local = true;
-	
+	access_t type = txn->accesses[rid]->type;
+	if (type == WR && rc == Abort && CC_ALG != MAAT && CC_ALG != RDMA_MAAT) {
+		type = XP;
+	}
+    bool is_local = true;
 	uint64_t version = 0;
 	// Handle calvin elsewhere
 
@@ -889,6 +910,38 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 		}
 #endif
 	}
+#elif CC_ALG == RDMA_MAAT
+    if(txn->accesses[rid]->location == g_node_id) is_local = true;
+	else is_local = false;
+#if ISOLATION_LEVEL == READ_COMMITTED
+	if(type == WR) {
+		version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
+	}
+#else
+    version = orig_r->return_row(rc, type, this, txn->accesses[rid]->data);
+#endif
+#elif CC_ALG ==RDMA_TS1 
+	if (type == RD || type == SCAN) {
+		version = orig_r->return_row(type, this, txn->accesses[rid]);
+	} else if (type == WR || type == XP) { 
+		if(type == WR)
+			assert(txn->accesses[rid]->data != NULL);
+		
+		//1.不区分本地和远程写
+		// rdmats_man.commit_write(this, rid, type); //在这里提交
+
+		//2.区分本地和远程
+		if (txn->accesses[rid]->location != g_node_id)
+			is_local = false;
+		if (is_local) {
+			version = orig_r->return_row(type, this, txn->accesses[rid]);
+		} else {
+			rdmats_man.commit_write(this, rid, type);
+		}
+	} else {
+		assert(false);
+	}
+
 #else
   if (ROLL_BACK && type == XP &&
       (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
@@ -957,11 +1010,14 @@ void TxnManager::cleanup(RC rc) {
     rmvcc_man.finish(rc,this);
 #endif
 
+#if CC_ALG == RDMA_MAAT
+    rmaat_man.finish(rc, this);
+#endif
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
 	assert(txn->accesses.get_count() == txn->row_cnt);
-	// assert((WORKLOAD == YCSB && row_cnt <= g_req_per_query) || (WORKLOAD == TPCC && row_cnt <=
-	// g_max_items_per_txn*2 + 3));
+	assert((WORKLOAD == YCSB && row_cnt <= g_req_per_query) || (WORKLOAD == TPCC && row_cnt <=
+	g_max_items_per_txn*2 + 3));
 
 	DEBUG("Cleanup %ld %ld\n",get_txn_id(),row_cnt);
 	
@@ -1066,6 +1122,10 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 #endif
 	//uint64_t row_cnt = txn->row_cnt;
 	//assert(txn->accesses.get_count() - 1 == row_cnt);
+#if CC_ALG == RDMA_TS1
+	access->location = g_node_id;
+	access->offset = (char*)row - rdma_global_buffer;
+#endif
 #if CC_ALG != TICTOC
   // uint64_t start_time = get_sys_clock();
   //对NO_WAIT来说，即加锁并把相应数据读到access中
@@ -1076,7 +1136,7 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 #if CC_ALG == FOCC
 	focc_man.active_storage(type, this, access);
 #endif
-  uint64_t middle_time = get_sys_clock();
+  	uint64_t middle_time = get_sys_clock();
 	if (rc == Abort || rc == WAIT) {
 		row_rtn = NULL;
 		DEBUG_M("TxnManager::get_row(abort) access free\n");
@@ -1109,6 +1169,11 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 #if CC_ALG == RDMA_MVCC
    access->offset = (char*)row - rdma_global_buffer;
    access->old_version_num = row->version_num;
+#endif
+
+#if CC_ALG == RDMA_MAAT
+	access->location = g_node_id;
+	access->offset = (char*)row - rdma_global_buffer;
 #endif
 
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
@@ -1260,8 +1325,8 @@ RC TxnManager::validate() {
 			CC_ALG != SSI && CC_ALG != DLI_BASE && CC_ALG != DLI_OCC &&
 			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
 			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO &&
-			CC_ALG != RDMA_SILO && CC_ALG != RDMA_MVCC) {
-		return RCOK; //NO_WAIT不需要验证
+			CC_ALG != RDMA_SILO && CC_ALG != RDMA_MVCC && CC_ALG != RDMA_MAAT) {
+		return RCOK; //no validate in NO_WAIT
 	}
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
@@ -1277,6 +1342,15 @@ RC TxnManager::validate() {
 			rc = maat_man.find_bound(this);
 		}
 	}
+#if CC_ALG == RDMA_MAAT
+
+	if(CC_ALG == RDMA_MAAT && rc == RCOK) {
+		rc = rmaat_man.validate(this);
+		if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
+			rc = rmaat_man.find_bound(this);
+		}
+	}
+#endif
 	if(CC_ALG == TICTOC  && rc == RCOK) {
 		rc = tictoc_man.validate(this);
 		// Note: home node must be last to validate
@@ -1445,8 +1519,9 @@ row_t * TxnManager::read_remote_content(uint64_t target_server,uint64_t remote_o
     return item;
  }
 
- bool TxnManager::write_remote_content(uint64_t target_server,uint64_t thd_id,uint64_t operate_size,uint64_t remote_offset,char *local_buf){
-    
+ bool TxnManager::write_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf){
+    uint64_t thd_id = get_thd_id();
+
     auto res_s = rc_qp[target_server][thd_id]->send_normal(
 		{.op = IBV_WR_RDMA_WRITE,
 		.flags = IBV_SEND_SIGNALED,
@@ -1519,6 +1594,12 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
   	access->orig_row = access->data;
 	access->location = loc;
 	access->offset = m_item->offset;
+#endif
+
+#if CC_ALG == RDMA_TS1
+    access->orig_row = test_row;
+    access->location = loc;
+	access->offset = m_item->offset;	
 #endif
 
     row_local = access->data;

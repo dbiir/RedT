@@ -21,6 +21,7 @@
 #include "helper.h"
 #include "semaphore.h"
 #include "array.h"
+#include "row_rdma_maat.h"
 #include "transport/message.h"
 //#include "wl.h"
 
@@ -66,7 +67,15 @@ public:
 	uint64_t    location;   //数据所在的node id
 	uint64_t    offset;
 #endif
-
+#if CC_ALG == RDMA_MAAT
+	uint64_t 	key;
+    uint64_t	location;
+	uint64_t	offset;
+#endif
+#if CC_ALG ==RDMA_TS1
+    uint64_t	location;
+	uint64_t	offset;
+#endif
 	void cleanup();
 };
 
@@ -193,13 +202,13 @@ public:
 	void release_locks(RC rc);
 
 bool rdma_one_side() {
-  if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2) return true;
+  if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1) return true;
   else return false;
 }
 
     row_t * read_remote_content(uint64_t target_server,uint64_t remote_offset);
     itemid_t * read_remote_index(uint64_t target_server,uint64_t remote_offset,uint64_t key);
-    bool write_remote_content(uint64_t target_server,uint64_t thd_id,uint64_t operate_size,uint64_t remote_offset,char *local_buf);
+    bool write_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf);
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
 	bool isRecon() {
@@ -261,15 +270,19 @@ bool rdma_one_side() {
 	void            cleanup_row(RC rc,uint64_t rid);
 	void release_last_row_lock();
 	RC send_remote_reads();
+
 	void set_end_timestamp(uint64_t timestamp) {txn->end_timestamp = timestamp;}
+
 	uint64_t get_end_timestamp() {return txn->end_timestamp;}
 	uint64_t get_access_cnt() {return txn->row_cnt;}
 	uint64_t get_write_set_size() {return txn->write_cnt;}
 	uint64_t get_read_set_size() {return txn->row_cnt - txn->write_cnt;}
+	
 	access_t get_access_type(uint64_t access_id) {return txn->accesses[access_id]->type;}
 	uint64_t get_access_version(uint64_t access_id) { return txn->accesses[access_id]->version; }
 	row_t * get_access_original_row(uint64_t access_id) {return txn->accesses[access_id]->orig_row;}
 	void swap_accesses(uint64_t a, uint64_t b) { txn->accesses.swap(a, b); }
+
 	uint64_t get_batch_id() {return txn->batch_id;}
 	void set_batch_id(uint64_t batch_id) {txn->batch_id = batch_id;}
 
@@ -279,9 +292,17 @@ bool rdma_one_side() {
 	void set_commit_timestamp(uint64_t timestamp) {commit_timestamp = timestamp;}
 	uint64_t greatest_write_timestamp;
 	uint64_t greatest_read_timestamp;
+#if CC_ALG == RDMA_MAAT
+	std::set<uint64_t> uncommitted_reads;
+	std::set<uint64_t> uncommitted_writes;
+	std::set<uint64_t> uncommitted_writes_y;
+	int             write_set[100];
+    int*            read_set;
+#else
 	std::set<uint64_t> * uncommitted_reads;
 	std::set<uint64_t> * uncommitted_writes;
 	std::set<uint64_t> * uncommitted_writes_y;
+#endif
 
 	uint64_t twopl_wait_start;
 

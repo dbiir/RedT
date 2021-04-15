@@ -28,6 +28,7 @@
 //#define USE_RDMA CHANGE_TCP_ONLY
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
+#define RDMA_LOCAL_BUFFER_SIZE (10240)
 #define RDMA_BUFFER_ITEM_SIZE (1<<12)
 #define RDMA_USE_NIC_IDX 0
 #define RDMA_REG_MEM_NAME 73
@@ -180,11 +181,12 @@
 // Concurrency Control
 /***********************************************/
 
-// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2
+// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2,RDMA_TS1
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_WAIT_DIE2
+#define CC_ALG RDMA_TS1
+
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
 
@@ -235,6 +237,10 @@
 #define VALIDATION_LOCK				"no-wait" // no-wait or waiting
 #define PRE_ABORT2					"true"
 #define ATOMIC_WORD					false
+// [RDMA_MAAT]
+#define RDMA_TIMETABLE_MAX 10000000
+#define ROW_SET_LENGTH 30
+
 /***********************************************/
 // Logging
 /***********************************************/
@@ -270,7 +276,7 @@
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR
-#define REQ_PER_QUERY 10
+#define REQ_PER_QUERY 3
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 0
@@ -439,6 +445,9 @@ enum PPSTxnType {
 #define RDMA_NO_WAIT 31
 #define RDMA_NO_WAIT2 32
 #define RDMA_WAIT_DIE2 33
+#define RDMA_MAAT 34
+#define RDMA_TS1 35
+
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

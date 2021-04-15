@@ -89,6 +89,13 @@ class rdma_mvcc;
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 class RDMA_2pl;
 #endif
+#if CC_ALG == RDMA_MAAT
+class RDMA_Maat;
+class RdmaTimeTable;
+#endif
+#if CC_ALG == RDMA_TS1
+class RDMA_ts1;
+#endif
 class Remote_query;
 class TxnManPool;
 class TxnPool;
@@ -153,6 +160,13 @@ extern rdma_mvcc rmvcc_man;
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 extern RDMA_2pl r2pl_man;
 #endif
+#if CC_ALG == RDMA_MAAT
+extern RDMA_Maat rmaat_man;
+extern RdmaTimeTable rdma_time_table;
+#endif
+#if CC_ALG ==RDMA_TS1
+extern RDMA_ts1 rdmats_man;
+#endif
 extern Workload * m_wl;
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;
@@ -182,6 +196,7 @@ extern RtsCache wkdb_rts_cache;
 extern map<string, string> g_params;
 
 extern char *rdma_global_buffer;
+extern char *rdma_timetable_buffer;
 //extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
 extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
 extern rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
@@ -262,6 +277,10 @@ extern uint64_t g_log_flush_timeout;
 extern uint64_t rdma_buffer_size;
 extern uint64_t client_rdma_buffer_size;
 extern uint64_t rdma_index_size;
+// MAAT
+extern uint64_t rdma_timetable_size;
+extern uint64_t row_set_length;
+
 extern UInt32 g_max_txn_per_part;
 extern int32_t g_load_per_server;
 

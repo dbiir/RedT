@@ -56,6 +56,8 @@
 #include "rdma_silo.h"
 #include "rdma_mvcc.h"
 #include "rdma_2pl.h"
+#include "rdma_maat.h"
+#include "rdma_ts1.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -99,6 +101,13 @@ rdma_mvcc rmvcc_man;
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 RDMA_2pl r2pl_man;
+#endif
+#if CC_ALG == RDMA_MAAT
+RDMA_Maat rmaat_man;
+RdmaTimeTable rdma_time_table;
+#endif
+#if CC_ALG == RDMA_TS1
+RDMA_ts1 rdmats_man;
 #endif
 Workload * m_wl;
 TxnManPool txn_man_pool;
@@ -233,6 +242,10 @@ UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 3*(1024*1024L);
 UInt64 rdma_index_size = (300*1024*1024L);
 
+// MAAT
+UInt64 rdma_timetable_size = 400*1024*1024;
+UInt64 row_set_length = ROW_SET_LENGTH;
+
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;
 UInt64 g_max_pre_req = MAX_PRE_REQ;
@@ -308,6 +321,7 @@ uint64_t ol_index_size = (20 * 1024 *1024L);
 map<string, string> g_params;
 
 char *rdma_global_buffer;
+char *rdma_timetable_buffer;
 //rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
 rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
 // 每个线程只用自己的那一块客户端内存地址

@@ -20,13 +20,13 @@ digraph graphname {
             shape=box]
           init_row [label="init row \n 19.26\n 11.41%",
               shape=box]
-          rw_row [label="read and write row \n 0.00\n 0.00%",
+          rw_row [label="read and write row \n lat_l_loc_cc_time \n lat_l_loc_cc_time_percent %",
               shape=box]
           cur_row_copy [label="copy row \n 0.52\n 0.31%",
               shape=box]
         store_access [label="store row into rwset \n 1.05\n 0.63%",
               shape=box]
-    block [label="trans block time \n 0.00\n 0.00%",
+    block [label="trans block time \n trans_block_time \n trans_block_time_percent %",
         shape=box]
 	twopc [label="trans 2pc time \n 50.45\n 29.90%",
 		shape=box]
