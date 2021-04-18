@@ -308,7 +308,7 @@ void AccessPool::get(uint64_t thd_id, Access *& item) {
   item->location = g_node_id;
   item->offset = 0;
   #endif
-  #if CC_ALG == RDMA_MAAT
+  #if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
   item->location = g_node_id;
   item->offset = 0;
   item->key = 0;

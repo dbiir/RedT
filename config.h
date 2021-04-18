@@ -43,7 +43,7 @@
 #define CHANGE_MSG_QUEUE 1
 
 #define HIS_CHAIN_NUM 4
-
+#define USE_CAS
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -185,7 +185,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_MAAT
+#define CC_ALG RDMA_CICADA
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -238,7 +238,7 @@
 #define PRE_ABORT2					"true"
 #define ATOMIC_WORD					false
 // [RDMA_MAAT]
-#define RDMA_TIMETABLE_MAX 10000000
+#define RDMA_TIMETABLE_MAX 20000000
 #define ROW_SET_LENGTH 30
 
 /***********************************************/
@@ -445,9 +445,9 @@ enum PPSTxnType {
 #define RDMA_NO_WAIT 31
 #define RDMA_NO_WAIT2 32
 #define RDMA_WAIT_DIE2 33
-#define RDMA_MAAT 34
-#define RDMA_TS1 35
-
+#define RDMA_TS1 34
+#define RDMA_MAAT 35
+#define RDMA_CICADA 36
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

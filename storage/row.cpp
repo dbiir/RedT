@@ -113,6 +113,14 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 	}
 
 #endif
+#if CC_ALG == RDMA_CICADA
+	for (int i = 0; i < HIS_CHAIN_NUM; i++) {
+		cicada_version[i].init(i);
+	}
+	cicada_version[0].state = Cicada_COMMITTED;
+	version_cnt = 0;
+	_tid_word = 0;
+#endif
 	return RCOK;
 }
 
@@ -165,6 +173,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_rdma_maat *) mem_allocator.align_alloc(sizeof(Row_rdma_maat));
 #elif CC_ALG ==RDMA_TS1
   manager = (Row_rdma_ts1 *) mem_allocator.align_alloc(sizeof(Row_rdma_ts1));
+#elif CC_ALG == RDMA_CICADA
+  manager = (Row_rdma_cicada *) mem_allocator.align_alloc(sizeof(Row_rdma_cicada));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC && CC_ALG!=RDMA_MVCC
@@ -338,14 +348,7 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	access->data = this;
 		return rc;
 #endif
-	/*
-#if ISOLATION_LEVEL == READ_UNCOMMITTED
-	if(type == RD) {
-	access->data = this;
-		return rc;
-	}
-#endif
-*/
+
 #if CC_ALG == CNULL
   uint64_t init_time = get_sys_clock();
 	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
@@ -373,7 +376,24 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
   uint64_t copy_time = get_sys_clock();
   txn->cur_row->copy(this);
 	access->data = txn->cur_row;
-	assert(rc == RCOK);
+	//assert(rc == RCOK);
+  INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+	goto end;
+#endif
+
+#if CC_ALG == RDMA_CICADA
+  uint64_t init_time = get_sys_clock();
+  DEBUG_M("row_t::get_row MAAT alloc \n");
+	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
+	txn->cur_row->init(get_table(), get_part_id());
+  INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
+
+  rc = this->manager->access(type,txn, txn->cur_row);
+
+  uint64_t copy_time = get_sys_clock();
+  txn->cur_row->copy(this);
+  access->data = txn->cur_row;
+	//assert(rc == RCOK);
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #endif
@@ -757,13 +777,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 #if ISOLATION_LEVEL == NOLOCK
 	return 0;
 #endif
-	/*
-#if ISOLATION_LEVEL == READ_UNCOMMITTED
-	if(type == RD) {
-		return;
-	}
-#endif
-*/
+
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == CALVIN
 	assert (row == NULL || row == this || type == XP);
 	if (CC_ALG != CALVIN && ROLL_BACK &&
@@ -838,17 +852,12 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	DEBUG_M("row_t::return_row Maat free \n");
 		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return 0;
-#elif CC_ALG == MAAT || CC_ALG == RDMA_MAAT
-	// assert (row != NULL);
-	// if (rc == Abort) {
-	// 	manager->abort(type,txn);
-	// } else {
-	// 	manager->commit(type,txn,row);
-	// }
+#elif CC_ALG == MAAT || CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
 	if (row != NULL) {
 		row->free_row();
 	    DEBUG_M("row_t::return_row Maat free \n");
 		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+    }
 	return 0;
 #elif CC_ALG == TICTOC
 	assert (row != NULL);

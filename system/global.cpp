@@ -58,6 +58,7 @@
 #include "rdma_2pl.h"
 #include "rdma_maat.h"
 #include "rdma_ts1.h"
+#include "rdma_cicada.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -108,6 +109,9 @@ RdmaTimeTable rdma_time_table;
 #endif
 #if CC_ALG == RDMA_TS1
 RDMA_ts1 rdmats_man;
+#endif
+#if CC_ALG == RDMA_CICADA
+RDMA_Cicada rcicada_man;
 #endif
 Workload * m_wl;
 TxnManPool txn_man_pool;
@@ -243,7 +247,7 @@ UInt64 client_rdma_buffer_size = 3*(1024*1024L);
 UInt64 rdma_index_size = (300*1024*1024L);
 
 // MAAT
-UInt64 rdma_timetable_size = 400*1024*1024;
+UInt64 rdma_timetable_size = 3*400*1024*1024;
 UInt64 row_set_length = ROW_SET_LENGTH;
 
 // MVCC

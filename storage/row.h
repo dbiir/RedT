@@ -21,6 +21,7 @@
 #include "global.h"
 
 #define ROW_DEFAULT_SIZE 1000
+#include "row_rdma_cicada.h"
 
 
 #define DECL_SET_VALUE(type) void set_value(int col_id, type value);
@@ -67,6 +68,7 @@ class rdma_mvcc;
 class Row_rdma_2pl;
 class Row_rdma_maat;
 class Row_rdma_ts1;
+class Row_rdma_cicada;
 
 //struct RdmaMVHis;
 
@@ -153,6 +155,11 @@ public:
 		uint64_t uncommitted_writes[ROW_SET_LENGTH];
 		uint64_t timestamp_last_read;
 		uint64_t timestamp_last_write;
+	#elif CC_ALG == RDMA_CICADA
+		volatile uint64_t _tid_word;
+		RdmaCicadaVersion cicada_version[HIS_CHAIN_NUM];
+		Row_rdma_cicada * manager;
+		uint64_t version_cnt;
 
 	#elif CC_ALG == RDMA_TS1
 		volatile uint64_t	mutx;

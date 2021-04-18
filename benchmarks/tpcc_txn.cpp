@@ -481,6 +481,9 @@ RC TPCCTxnManager::send_remote_one_side_request(TPCCQuery * query,row_t *& row_l
     uint64_t remote_offset = m_item->offset;
 
     access_t type;
+    uint64_t version = 0;
+    uint64_t lock = get_txn_id() + 1;
+
     if(g_wh_update)type = WR;
     else type == RD;
 #if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2
@@ -609,7 +612,9 @@ remote_atomic_retry_lock:
 
 	return rc;
 #endif
-#if CC_ALG == RDMA_TS1 || CC_ALG == RDMA_MAAT
+#if CC_ALG == RDMA_TS1 || CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
+
+
      ts_t ts = get_timestamp();
 
     uint64_t try_lock = -1;
@@ -621,7 +626,7 @@ remote_atomic_retry_lock:
 
     row_t * remote_row = read_remote_content(loc,m_item->offset);
 	//assert(remote_row->get_primary_key() == req->key);
-
+#if CC_ALG == RDMA_TS1
     if(type == RD) {
 		if(ts < remote_row->wts || (ts > remote_row->tid && remote_row->tid != 0))rc = Abort;
 		else {
@@ -655,10 +660,154 @@ remote_atomic_retry_lock:
     memcpy(write_buf, (char*)remote_row, operate_size);
 
     assert(write_remote_content(loc,operate_size,m_item->offset,write_buf) == true);
+#elif CC_ALG == RDMA_MAAT
+    if(type == RD) {
+		for(uint64_t i = 0; i < row_set_length; i++) {
+			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
+				break;
+			}
+			uncommitted_writes.insert(remote_row->uncommitted_writes[i]);
+		}
+		if(greatest_write_timestamp < remote_row->timestamp_last_write) {
+			greatest_write_timestamp = remote_row->timestamp_last_write;
+		}
+		for(uint64_t i = 0; i < row_set_length; i++) {
+			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
+				remote_row->uncommitted_reads[i] = get_txn_id();
+				break;
+			}
+		}
+	}else if(type == WR) {
+		for(uint64_t i = 0; i < row_set_length; i++) {
+
+			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
+				break;
+			}
+			uncommitted_reads.insert(remote_row->uncommitted_reads[i]);
+		}
+		if(greatest_write_timestamp < remote_row->timestamp_last_write) {
+			greatest_write_timestamp = remote_row->timestamp_last_write;
+		}
+		if(greatest_read_timestamp < remote_row->timestamp_last_read) {
+			greatest_read_timestamp = remote_row->timestamp_last_read;
+		}
+		for(uint64_t i = 0; i < row_set_length; i++) {
+			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
+				remote_row->uncommitted_writes[i] = get_txn_id();
+				break;
+			}
+			uncommitted_writes_y.insert(remote_row->uncommitted_writes[i]);
+		}
+	}
+    remote_row->_tid_word = 0;
+
+    uint64_t operate_size = row_t::get_row_size(remote_row->tuple_size);
+    char *write_buf = Rdma::get_row_client_memory(get_thd_id());
+    memcpy(write_buf, (char*)remote_row, operate_size);
+
+    assert(write_remote_content(loc,operate_size,m_item->offset,write_buf) == true);
+#elif CC_ALG == RDMA_CICADA
+    if(type == RD) {
+		assert(remote_row->version_cnt >= 0);
+		for(int cnt = remote_row->version_cnt - 1; cnt >= remote_row->version_cnt - 5 && cnt >= 0; cnt--) {
+			int i = cnt % HIS_CHAIN_NUM;
+			if(remote_row->cicada_version[i].Wts > this->start_ts || remote_row->cicada_version[i].state == Cicada_ABORTED) {
+				continue;
+			}
+			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
+				rc = WAIT;
+				while(rc == WAIT) {
+                    //release lock
+                    try_lock = cas_remote_content(loc,m_item->offset,lock,0);
+                    //add lock
+                    try_lock = cas_remote_content(loc,m_item->offset,0,lock);
+				
+					if (try_lock != 0) {
+						row_local = NULL;
+						txn->rc = Abort;
+						mem_allocator.free(m_item, sizeof(itemid_t));
+						printf("RDMA_MAAT cas lock fault\n");
+						return Abort; //cas fail
+					}
+
+                    remote_row = read_remote_content(loc,m_item->offset);
+					//assert(remote_row->get_primary_key() == req->key);
+
+					if(remote_row->cicada_version[i].state == Cicada_PENDING) {
+						rc = WAIT;
+					} else {
+						rc = RCOK;
+						version = remote_row->cicada_version[i].key;
+					}
+				}				
+			} else {
+				rc = RCOK;
+				version = remote_row->cicada_version[i].key;
+			}	
+		}
+	}
+    	if(type == WR) {
+		assert(remote_row->version_cnt >= 0);
+		for(int cnt = remote_row->version_cnt - 1; cnt >= remote_row->version_cnt - 5 && cnt >= 0; cnt--) {
+			int i = cnt % HIS_CHAIN_NUM;
+			if(remote_row->cicada_version[i].Wts > this->start_ts || remote_row->cicada_version[i].Rts > this->start_ts || remote_row->cicada_version[i].state == Cicada_ABORTED) {
+				continue;
+			}
+			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
+				// --todo !---pendind need wait //
+				rc = WAIT;
+				while(rc == WAIT) {
+					//release lock
+                    try_lock = cas_remote_content(loc,m_item->offset,lock,0);
+                    //add lock
+                    try_lock = cas_remote_content(loc,m_item->offset,0,lock);
+
+					if (try_lock != 0) {
+						row_local = NULL;
+						txn->rc = Abort;
+						mem_allocator.free(m_item, sizeof(itemid_t));
+						printf("RDMA_MAAT cas lock fault\n");
+
+						return Abort; //cas fail
+					}
+				    remote_row = read_remote_content(loc,m_item->offset);
+					//assert(remote_row->get_primary_key() == req->key);
+
+					if(remote_row->cicada_version[i].state == Cicada_PENDING) {
+						rc = WAIT;
+					} else {
+						version = remote_row->cicada_version[i].key;
+						rc = RCOK;
+					}
+				}
+			} else {
+				if(remote_row->cicada_version[i].Wts > this->start_ts || remote_row->cicada_version[i].Rts > this->start_ts) {
+					rc = Abort;
+				} else {
+					rc = RCOK;
+					version = remote_row->cicada_version[i].key;
+				}	
+			}
+			
+		}
+	}
+    try_lock = cas_remote_content(loc,m_item->offset,lock ,0);
+
+    if(rc != Abort)this->version_num.push_back(version);
+#endif
+
+    if(rc == Abort) {
+		return rc;
+	}
 
     rc = preserve_access(row_local,m_item,remote_row,type,remote_row->get_primary_key(),loc);
 	
 	return rc;
+
 #endif
 }
 

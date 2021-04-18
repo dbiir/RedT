@@ -824,8 +824,8 @@ experiment_map = {
 
 # Default values for variable configurations
 configs = {
-    "NODE_CNT" : 16,
-    "THREAD_CNT": 4,
+    "NODE_CNT" : 2,
+    "THREAD_CNT": 16,
     "REPLICA_CNT": 0,
     "REPLICA_TYPE": "AP",
     "REM_THREAD_CNT": 1,

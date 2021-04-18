@@ -1,4 +1,5 @@
 digraph graphname {
+<<<<<<< HEAD
   total [label="trans total time \n 168.71\n 100 %",
 		shape=box]
 	process [label="trans process time \n 118.26\n 70.10%",
@@ -19,15 +20,43 @@ digraph graphname {
         get_row [label="get row \n 47.15\n 27.94%",
             shape=box]
           init_row [label="init row \n 19.26\n 11.41%",
+=======
+  total [label="trans total time \n 57390.39\n 100 %",
+		shape=box]
+	process [label="trans process time \n 57385.18\n 99.99%",
+			shape=box]
+    txn_process [label="run benchmark read and write \n 21.30\n 0.04%",
+			shape=box]
+      init [label="trans init time \n 0.57\n 0.00%",
+        shape=box]
+      index [label="trans index time \n 0.68\n 0.00%",
+          shape=box]
+      txn_compute [label="run benchmark compute \n 1.77\n 0.00%",
+			            shape=box]
+      access_rwset [label="access data and store in rwset \n 23.40\n 0.04%",
+            shape=box]
+        get_access [label="get rwset struct \n 2.97\n 0.01%",
+            shape=box]
+        get_row [label="get row \n 19.37\n 0.03%",
+            shape=box]
+          init_row [label="init row \n 9.52\n 0.02%",
+>>>>>>> d4a65385c65d2620e021ee4a453883e6329071d2
               shape=box]
-          rw_row [label="read and write row \n lat_l_loc_cc_time \n lat_l_loc_cc_time_percent %",
+          rw_row [label="read and write row \n 3.20\n 0.01%",
               shape=box]
+<<<<<<< HEAD
           cur_row_copy [label="copy row \n 0.52\n 0.31%",
               shape=box]
         store_access [label="store row into rwset \n 1.05\n 0.63%",
+=======
+          cur_row_copy [label="copy row \n 1.96\n 0.00%",
               shape=box]
-    block [label="trans block time \n trans_block_time \n trans_block_time_percent %",
+        store_access [label="store row into rwset \n 0.70\n 0.00%",
+>>>>>>> d4a65385c65d2620e021ee4a453883e6329071d2
+              shape=box]
+    block [label="trans block time \n 1.59\n 0.00%",
         shape=box]
+<<<<<<< HEAD
 	twopc [label="trans 2pc time \n 50.45\n 29.90%",
 		shape=box]
 		prepare [label="trans prepare time \n 48.36\n 28.66%",
@@ -40,6 +69,18 @@ digraph graphname {
 			commit [label="trans commit time \n 2.09\n 1.24%",
 				shape=box]
       commit_network [label="trans commit network time \n 0.00\n 0.00%", shape=box]
+=======
+	twopc [label="trans 2pc time \n 5.21\n 0.01%",
+		shape=box]
+		prepare [label="trans prepare time \n 8.08\n 0.01%",
+				shape=box]
+			validate [label="trans validate time \n 2.87\n 0.00%",
+					shape=box]
+		finish [label="trans finish time \n 0.08\n 0.00%",
+				shape=box]
+			commit [label="trans commit time \n 0.08\n 0.00%",
+				shape=box]
+>>>>>>> d4a65385c65d2620e021ee4a453883e6329071d2
 			abort [label="trans abort time \n 0.00\n 0.00%",
 				shape=box]
       abort_network [label="trans abort network time \n 0.00\n 0.00%", shape=box]

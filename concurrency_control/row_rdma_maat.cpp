@@ -21,7 +21,8 @@ limitations under the License.
 #include "manager.h"
 #include "helper.h"
 #include "rdma_maat.h"
-
+#include "qps/op.hh"
+#include "rdma.h"
 #if CC_ALG == RDMA_MAAT
 void Row_rdma_maat::init(row_t * row) {
 	_row = row;
@@ -34,6 +35,26 @@ void Row_rdma_maat::init(row_t * row) {
 	//assert(uncommitted_writes->begin() == uncommitted_writes->end());
 	//assert(uncommitted_writes->size() == 0);
 
+}
+
+bool Row_rdma_maat::local_cas_lock(TxnManager * txnMng , uint64_t info, uint64_t new_info){
+   // INC_STATS(txnMng->get_thd_id(), cas_cnt, 1);
+    uint64_t loc = g_node_id;
+        uint64_t thd_id = txnMng->get_thd_id();
+		uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+		auto mr = client_rm_handler->get_reg_attr().value();
+
+		rdmaio::qp::Op<> op;
+		op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)_row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(info,new_info);
+		assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
+		auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+
+		RDMA_ASSERT(res_s2 == IOCode::Ok);
+		auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+		RDMA_ASSERT(res_p2 == IOCode::Ok);
+    if(*tmp_buf2 != info) return false;
+    return true;
+  // return 0;
 }
 
 RC Row_rdma_maat::access(access_t type, TxnManager * txn) {
@@ -116,9 +137,12 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 	RC rc = RCOK;
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
-	while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
-
+#ifdef USE_CAS
+	//while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
+    if(!local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
+		return Abort;
 	}
+#endif
 	INC_STATS(txn->get_thd_id(),mtx[30],get_sys_clock() - mtx_wait_starttime);
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
 	DEBUG("READ %ld -- %ld: lw %ld\n", txn->get_txn_id(), _row->get_primary_key(),
@@ -152,9 +176,10 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 
 	}
 
-
-	ATOM_CAS(_row->_tid_word,1,0);
-
+#ifdef USE_CAS
+	//ATOM_CAS(_row->_tid_word,1,0);
+	local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+#endif
 	return rc;
 }
 
@@ -163,9 +188,12 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 	RC rc = RCOK;
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
-	while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
-
+#ifdef USE_CAS
+	//while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
+	if(!local_cas_lock(txn, 0, txn->get_txn_id()+1)){
+		return Abort;
 	}
+#endif
 	INC_STATS(txn->get_thd_id(),mtx[31],get_sys_clock() - mtx_wait_starttime);
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
 	DEBUG("PREWRITE %ld -- %ld: lw %ld, lr %ld\n", txn->get_txn_id(), _row->get_primary_key(),
@@ -203,9 +231,10 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 	if(txn->greatest_write_timestamp < _row->timestamp_last_write)
 		txn->greatest_write_timestamp = _row->timestamp_last_write;
 
-
-	ATOM_CAS(_row->_tid_word,1,0);
-
+#ifdef USE_CAS
+	//ATOM_CAS(_row->_tid_word,1,0);
+	local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+#endif
 	return rc;
 }
 
@@ -251,15 +280,15 @@ void Row_rdma_maat::ucwrite_erase(uint64_t txn_id) {
 }
 RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
-	while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
-
+#ifdef USE_CAS
+	//while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
+	if(!local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
+		return Abort;
 	}
+#endif
 	INC_STATS(txn->get_thd_id(),mtx[32],get_sys_clock() - mtx_wait_starttime);
 	DEBUG("Maat Abort %ld: %d -- %ld\n",txn->get_txn_id(),type,_row->get_primary_key());
-#if WORKLOAD == TPCC
-	uncommitted_reads->erase(txn->get_txn_id());
-	uncommitted_writes->erase(txn->get_txn_id());
-#else
+
 	if(type == RD) {
 		//uncommitted_reads->erase(txn->get_txn_id());
 		ucread_erase(txn->get_txn_id());
@@ -269,22 +298,29 @@ RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
 		ucwrite_erase(txn->get_txn_id());
 		//uncommitted_writes->erase(txn->get_txn_id());
 	}
-	#endif
 
-	ATOM_CAS(_row->_tid_word,1,0);
+#ifdef USE_CAS
+	//ATOM_CAS(_row->_tid_word,1,0);
+	local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+#endif
 	return Abort;
 }
 
 RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 	//printf("the first txn will commit %d\n", txn->get_txn_id());
 	uint64_t mtx_wait_starttime = get_sys_clock();
-	while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
+#ifdef USE_CAS
+	//while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
+	if(!local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
+		return Abort;
 	}
+#endif
 	INC_STATS(txn->get_thd_id(),mtx[33],get_sys_clock() - mtx_wait_starttime);
 	DEBUG("Maat Commit %ld: %d,%lu -- %ld\n", txn->get_txn_id(), type, txn->get_commit_timestamp(),
 			_row->get_primary_key());
 
 #if WORKLOAD == TPCC
+//#if 0
 	if(txn->get_commit_timestamp() >  timestamp_last_read)
 	timestamp_last_read = txn->get_commit_timestamp();
 	uncommitted_reads->erase(txn->get_txn_id());
@@ -348,25 +384,28 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 			}
 			//printf("row->uncommitted_writes has txn: %u\n", _row->uncommitted_writes[i]);
 			//exit(0);
-			if(txn->uncommitted_writes.count(_row->uncommitted_writes[i]) == 0) {
-				if(_row->uncommitted_writes[i] % g_node_cnt == g_node_id) {
-					uint64_t it_lower = rdma_time_table.local_get_lower(txn->get_thd_id(),_row->uncommitted_writes[i]);
-					if(it_lower <= txn_commit_ts) {
-						rdma_time_table.local_set_lower(txn->get_thd_id(),_row->uncommitted_writes[i],txn_commit_ts+1);
-						
+			else {
+				if(txn->uncommitted_writes.count(_row->uncommitted_writes[i]) == 0) {
+					if(_row->uncommitted_writes[i] % g_node_cnt == g_node_id) {
+						uint64_t it_lower = rdma_time_table.local_get_lower(txn->get_thd_id(),_row->uncommitted_writes[i]);
+						if(it_lower <= txn_commit_ts) {
+							rdma_time_table.local_set_lower(txn->get_thd_id(),_row->uncommitted_writes[i],txn_commit_ts+1);
+							
+						}
+					} else {
+						RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
+						item = rdma_time_table.remote_get_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i]);
+						uint64_t it_lower = item->lower;
+						if(it_lower <= txn_commit_ts) {
+							item->lower = txn_commit_ts+1;
+							if (_row->uncommitted_writes[i] != 0)
+							rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i], item);
+						}
+						mem_allocator.free(item, sizeof(RdmaTimeTableNode));
 					}
-				} else {
-					RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
-					item = rdma_time_table.remote_get_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i]);
-					uint64_t it_lower = item->lower;
-					if(it_lower <= txn_commit_ts) {
-						item->lower = txn_commit_ts+1;
-						rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i], item);
-					}
-					mem_allocator.free(item, sizeof(RdmaTimeTableNode));
-				}
-				DEBUG("MAAT forward val set lower %ld: %lu\n",_row->uncommitted_writes[i],txn_commit_ts+1);
-			} 
+					DEBUG("MAAT forward val set lower %ld: %lu\n",_row->uncommitted_writes[i],txn_commit_ts+1);
+				} 
+			}
 		}
 	}
 	/*
@@ -399,6 +438,7 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 					uint64_t it_upper = item->upper;
 					if(it_upper >= txn_commit_ts) {
 						item->upper = txn_commit_ts-1;
+						if(_row->uncommitted_writes[i] != 0)
 						rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i], item);
 					}
 					mem_allocator.free(item, sizeof(RdmaTimeTableNode));
@@ -409,32 +449,38 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			if (_row->uncommitted_reads[i] == 0) {
 				break;
+			} else {
+
+			
+				if(txn->uncommitted_reads.count(_row->uncommitted_reads[i]) == 0) {
+					if(_row->uncommitted_reads[i] % g_node_cnt == g_node_id) {
+						uint64_t it_upper = rdma_time_table.local_get_upper(txn->get_thd_id(),_row->uncommitted_reads[i]);
+						if(it_upper >= lower) {
+							rdma_time_table.local_set_upper(txn->get_thd_id(),_row->uncommitted_reads[i],lower-1);
+						}
+					} else {
+						RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
+						item = rdma_time_table.remote_get_timeNode(txn->get_thd_id(), _row->uncommitted_reads[i]);
+						uint64_t it_upper = item->upper;
+						if(it_upper >= lower) {
+							item->upper = lower-1;
+							if(_row->uncommitted_reads[i] != 0)
+							rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_reads[i], item);
+						}
+						mem_allocator.free(item, sizeof(RdmaTimeTableNode));
+					}
+					DEBUG("MAAT forward val set upper %ld: %lu\n",_row->uncommitted_reads[i],lower -1);
+				} 
 			}
-			if(txn->uncommitted_reads.count(_row->uncommitted_reads[i]) == 0) {
-				if(_row->uncommitted_reads[i] % g_node_cnt == g_node_id) {
-					uint64_t it_upper = rdma_time_table.local_get_upper(txn->get_thd_id(),_row->uncommitted_reads[i]);
-					if(it_upper >= lower) {
-						rdma_time_table.local_set_upper(txn->get_thd_id(),_row->uncommitted_reads[i],lower-1);
-					}
-				} else {
-					RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
-					item = rdma_time_table.remote_get_timeNode(txn->get_thd_id(), _row->uncommitted_reads[i]);
-					uint64_t it_upper = item->upper;
-					if(it_upper >= lower) {
-						item->upper = lower-1;
-						rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_reads[i], item);
-					}
-					mem_allocator.free(item, sizeof(RdmaTimeTableNode));
-				}
-				DEBUG("MAAT forward val set upper %ld: %lu\n",_row->uncommitted_reads[i],lower -1);
-			} 
 		}
 
 	}
 	#endif
-
-	ATOM_CAS(_row->_tid_word,1,0);
- 	return RCOK;
+#ifdef USE_CAS
+	//ATOM_CAS(_row->_tid_word,1,0);
+	local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+#endif
+	 return RCOK;
 }
 
 void Row_rdma_maat::write(row_t* data) { _row->copy(data); }
