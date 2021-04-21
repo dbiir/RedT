@@ -64,7 +64,7 @@ public:
     uint64_t    old_version_num;
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
-	uint64_t    location;   //数据所在的node id
+	uint64_t    location;   //node id of server the data location
 	uint64_t    offset;
 #endif
 #if CC_ALG == RDMA_MAAT
@@ -255,7 +255,7 @@ bool rdma_one_side() {
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
     int             write_set[100];
     int*            read_set;
-	int				num_atomic_retry; //事务的atomic_retry次数
+	int				num_atomic_retry; //num of txn atomic_retry
 #endif
 
 #if CC_ALG == SILO || CC_ALG == RDMA_SILO

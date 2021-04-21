@@ -99,7 +99,7 @@ RC YCSBWorkload::init_table() {
             row_t * new_row = NULL;
 			uint64_t row_id;
             rc = the_table->get_new_row(new_row, part_id, row_id);
-			//new_row中保存新创建的地址
+			//preserve the newly created address in new_row
             // insertion of last row may fail after the table_size
             // is updated. So never access the last record in a table
 			assert(rc == RCOK);

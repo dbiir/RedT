@@ -550,7 +550,7 @@ RC TxnManager::abort() {
 	//RDMA_SILO - ADD remote release lock by rdma
 	release_locks(Abort);
 #if DEBUG_PRINTF
-	printf("---线程%lu事务%lu，release_lock(Abort) end.\n",get_thd_id(), get_txn_id());
+	printf("---thd %lu txn %lu，release_lock(Abort) end.\n",get_thd_id(), get_txn_id());
 #endif
 #if CC_ALG == MAAT
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
@@ -939,10 +939,10 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 		if(type == WR)
 			assert(txn->accesses[rid]->data != NULL);
 		
-		//1.不区分本地和远程写
-		// rdmats_man.commit_write(this, rid, type); //在这里提交
+		//1.No distinction is made between local and remote
+		// rdmats_man.commit_write(this, rid, type); //COMMIT
 
-		//2.区分本地和远程
+		//2.Distinguish between local and remote
 		if (txn->accesses[rid]->location != g_node_id)
 			is_local = false;
 		if (is_local) {
@@ -1143,7 +1143,7 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 #endif
 #if CC_ALG != TICTOC
   // uint64_t start_time = get_sys_clock();
-  //对NO_WAIT来说，即加锁并把相应数据读到access中
+  //for NO_WAIT, lock and preserve access
 	rc = row->get_row(type, this, access);
 	INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
 	INC_STATS(get_thd_id(), trans_get_row_count, 1);
@@ -1610,14 +1610,14 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
 
 #if CC_ALG == RDMA_MVCC
     access->orig_row = test_row;
-    access->old_version_num = test_row->version_num;//记录写的时候通过txn_id加锁的版本
+    access->old_version_num = test_row->version_num;//record the locked version by txn_id when write
     access->key = test_row->get_primary_key();
     access->location =loc;
 	access->offset = m_item->offset;
 #endif
 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
-  	access->orig_row = access->data;
+  	access->orig_row = test_row;
 	access->location = loc;
 	access->offset = m_item->offset;
 #endif

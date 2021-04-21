@@ -36,7 +36,7 @@ RC Maat::validate(TxnManager * txn) {
   INC_STATS(txn->get_thd_id(),maat_cs_wait_time,timespan);
   start_time = get_sys_clock();
   RC rc = RCOK;
-  //本地time_table
+  //local time_table
   //printf("txn_id: %d,node_id: %d\n", txn->get_txn_id(), g_node_id);
   uint64_t lower = time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
   uint64_t upper = time_table.get_upper(txn->get_thd_id(),txn->get_txn_id());

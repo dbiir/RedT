@@ -7,3 +7,8 @@ runcl
 obj/*
 gnuplot-5.2.8/
 input.txt
+*.out
+0results*
+lat*
+scripts/lat-*
+scripts/tmp*

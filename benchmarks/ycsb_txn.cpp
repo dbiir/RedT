@@ -112,7 +112,7 @@ RC YCSBTxnManager::run_txn() {
 	if(IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
 		DEBUG("Running txn %ld\n",txn->txn_id);
 #if DEBUG_PRINTF
-		printf("[txn start]事务号：%d，ts：%lu\n",txn->txn_id,get_timestamp());
+		printf("[txn start]txn：%d，ts：%lu\n",txn->txn_id,get_timestamp());
 #endif
 		//query->print();
 		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
@@ -129,7 +129,7 @@ RC YCSBTxnManager::run_txn() {
 	txn_stats.process_time_short += curr_time - starttime;
 	txn_stats.wait_starttime = get_sys_clock();
 //RDMA_SILO:logic?
-	if(IS_LOCAL(get_txn_id())) {  //对rdma单边，一定是local
+	if(IS_LOCAL(get_txn_id())) {  //for one-side rdma, must be local
 		if(is_done() && rc == RCOK)
 		rc = start_commit();
 		else if(rc == Abort)
@@ -185,7 +185,7 @@ itemid_t* YCSBTxnManager::ycsb_read_remote_index(ycsb_request * req) {
 	assert(loc != g_node_id);
 	uint64_t thd_id = get_thd_id();
 
-	// todo: 这里需要获取对应的索引
+	//get corresponding index
   // uint64_t index_key = 0;
 	uint64_t index_key = req->key / g_node_cnt;
 	uint64_t index_addr = (index_key) * sizeof(IndexInfo);
@@ -283,19 +283,19 @@ remote_atomic_retry_lock:
 				return Abort;
 			}
 			if(new_lock_info == 0){
-				printf("---线程号：%lu, 远程加锁失败!!!!!!锁位置: %lu; %p, 事务号: %lu,原lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
+				printf("--thd：%lu,remote lock fail!!!!!!lock location: %lu; %p, txn: %lu,old lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
 			} 
 			assert(new_lock_info!=0);
 		}
-		else{ //写集元素直接CAS即可，不需要RDMA READ
-			lock_info = 0; //只有lock_info==0时才可以CAS，否则加写锁失败，Abort
-			new_lock_info = 3; //二进制11，即1个写锁
+		else{ //read set data directly to CAS , no need to RDMA READ
+			lock_info = 0; //if lock_info!=0, CAS fail , Abort
+			new_lock_info = 3; //binary 11, aka 1 read lock
 		}
-		//RDMA CAS加锁
+		//lock by RDMA CAS
         uint64_t try_lock = -1;
         try_lock = cas_remote_content(loc,m_item->offset,lock_info,new_lock_info);
 
-		if(try_lock != lock_info && req->acctype == RD){ //如果CAS失败:对读集元素来说，即原子性被破坏
+		if(try_lock != lock_info && req->acctype == RD){ //cas fail,for write set elements means The atomicity is destroyed
 
 			num_atomic_retry++;
 			total_num_atomic_retry++;
@@ -303,17 +303,17 @@ remote_atomic_retry_lock:
 			goto remote_atomic_retry_lock;
 
 		}	
-		if(try_lock != lock_info && req->acctype == WR){ //如果CAS失败:对写集元素来说,即已经有锁;
+		if(try_lock != lock_info && req->acctype == WR){ //cas fail,for read set elements means already locked
 			DEBUG_M("TxnManager::get_row(abort) access free\n");
 			row_local = NULL;
 			txn->rc = Abort;
 			mem_allocator.free(m_item, sizeof(itemid_t));
 
-			return Abort; //原子性被破坏，CAS失败			
+			return Abort; //CAS fail		
 		}	
 
 #endif
-        //读数据
+        //read remote data
         row_t * test_row = read_remote_content(loc,m_item->offset);
 
 		assert(test_row->get_primary_key() == req->key);
@@ -397,6 +397,9 @@ remote_atomic_retry_lock:
 		}
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_reads[i] == get_txn_id()) {
+				break;
+			}
 			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
 				remote_row->uncommitted_reads[i] = get_txn_id();
 				break;
@@ -417,9 +420,12 @@ remote_atomic_retry_lock:
 		if(greatest_read_timestamp < remote_row->timestamp_last_read) {
 			greatest_read_timestamp = remote_row->timestamp_last_read;
 		}
+		bool in_set = false;
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_writes[i] == get_txn_id()) in_set = true;
 			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
+				if(in_set == false)
 				remote_row->uncommitted_writes[i] = get_txn_id();
 				break;
 			}
@@ -454,7 +460,7 @@ remote_atomic_retry_lock:
 						txn->rc = Abort;
 						mem_allocator.free(m_item, sizeof(itemid_t));
 						printf("RDMA_MAAT cas lock fault\n");
-						return Abort; //原子性被破坏，CAS失败
+						return Abort; //CAS fail
 					}
 
                     remote_row = read_remote_content(loc,m_item->offset);
@@ -495,7 +501,7 @@ remote_atomic_retry_lock:
 						mem_allocator.free(m_item, sizeof(itemid_t));
 						printf("RDMA_MAAT cas lock fault\n");
 
-						return Abort; //原子性被破坏，CAS失败
+						return Abort; //CAS fail
 					}
 				    remote_row = read_remote_content(loc,m_item->offset);
 					assert(remote_row->get_primary_key() == req->key);
@@ -581,8 +587,8 @@ RC YCSBTxnManager::run_txn_state() {
 		}
 	  break;
 	case YCSB_1 :
-		//读写本地数据row，对于TCP/IP消息队列方式来说，在这个时候写集已经真实写入
-		//但是对于rdma，是在本地写入，对于远程数据commit时才真实写回
+		//read local row,for message queue by TCP/IP,write set has actually been written in this point,
+		//but for rdma, it was written in local, the remote data will actually be written when COMMIT
 		rc = run_ycsb_1(req->acctype,row);  
 		break;
 	case YCSB_FIN :

@@ -25,17 +25,17 @@ uint64_t Rdma::get_socket_count() {
 void Rdma::read_ifconfig(const char * ifaddr_file) {
   // ifaddr = new char *[g_total_node_cnt];
 	uint64_t cnt = 0;
-	//从ifconfig.txt中读取IP信息
+	//read IP from ifconfig.txt
 	printf("Reading ifconfig file: %s\n",ifaddr_file);
 	ifstream fin(ifaddr_file);
 	string line;
 	while (getline(fin, line)) {
 		//memcpy(ifaddr[cnt],&line[0],12);
-		//初始化
+		//init
 		ifaddr[cnt] = new char[line.length()+1];
-		//赋值
+		//assignment
 		strcpy(ifaddr[cnt],&line[0]);
-		//输出显示
+		//output
 		printf("%ld: %s\n",cnt,ifaddr[cnt]);
 		cnt++;
 	}
@@ -252,7 +252,7 @@ void Rdma::init(){
 
 	for(node_id = 0; node_id < g_total_node_cnt; node_id++) {
 
-		if(ISCLIENTN(node_id)) continue;  //对每个client
+		if(ISCLIENTN(node_id)) continue;  //for every client
 
 		rdma_server_add[node_id] = ifaddr[node_id] + std::string(":") + std::to_string(rdma_server_port[node_id]);
 		//rdma_server_add[node_id] = ifaddr[node_id] + std::string(":") + std::to_string(server_port);

@@ -142,7 +142,7 @@ public:
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
     #if CC_ALG == RDMA_SILO
-        volatile uint64_t	_tid_word;  //锁：txn_id
+        volatile uint64_t	_tid_word;  //lcok info ：txn_id
         ts_t 			timestamp;
         Row_rdma_silo * manager;
 	#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2

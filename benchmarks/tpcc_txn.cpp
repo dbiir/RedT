@@ -501,12 +501,12 @@ RC TPCCTxnManager::send_remote_one_side_request(TPCCQuery * query,row_t *& row_l
     }
 #endif
 #if CC_ALG == RDMA_WAIT_DIE2
-		//直接RDMA CAS加锁
+		//lock by RDMA CAS
 retry_lock:
         uint64_t try_lock = -1;
         try_lock = cas_remote_content(loc,m_item->offset,0,tts);
 
-		if(try_lock != 0){ //如果CAS失败
+		if(try_lock != 0){ //CAS fail
 			if(tts <= try_lock){  //wait
 
 				num_atomic_retry++;
@@ -526,11 +526,11 @@ retry_lock:
 		}
 #endif
 #if CC_ALG == RDMA_NO_WAIT2
-		//直接RDMA CAS加锁
+		//lock by RDMA CAS
         uint64_t try_lock = -1;
         try_lock = cas_remote_content(loc,m_item->offset,0,1);
 
-		if(try_lock != 0){ //如果CAS失败
+		if(try_lock != 0){ //CAS fail
 			DEBUG_M("TxnManager::get_row(abort) access free\n");
 			row_local = NULL;
 			txn->rc = Abort;
@@ -544,8 +544,8 @@ retry_lock:
 		uint64_t new_lock_info;
 		uint64_t lock_info;
 remote_atomic_retry_lock:
-		if(type == RD){ //读集元素
-			//第一次rdma read，得到数据项的锁信息
+		if(type == RD){ //read set
+			//first rdma read, get lock info of data
             row_t * test_row = read_remote_content(loc,m_item->offset);
 
 			new_lock_info = 0;
@@ -561,19 +561,19 @@ remote_atomic_retry_lock:
 				return Abort;
 			}
 			if(new_lock_info == 0){
-				printf("---线程号：%lu, 远程加锁失败!!!!!!锁位置: %lu; %p, 事务号: %lu,原lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
+				printf("---thd：%lu, remote lock fail!!!!!!lock location: %lu; %p, txn: %lu, old lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
 			} 
 			assert(new_lock_info!=0);
 		}
-		else{ //写集元素直接CAS即可，不需要RDMA READ
-			lock_info = 0; //只有lock_info==0时才可以CAS，否则加写锁失败，Abort
-			new_lock_info = 3; //二进制11，即1个写锁
+		else{ //read set data directly to CAS , no need to RDMA READ
+			lock_info = 0; //if lock_info!=0, CAS fail , Abort
+			new_lock_info = 3; //binary 11, aka 1 read lock
 		}
-		//RDMA CAS加锁
+		//lock by RDMA CAS
         uint64_t try_lock = -1;
         try_lock = cas_remote_content(loc,m_item->offset,lock_info,new_lock_info);
 
-		if(try_lock != lock_info && type == RD){ //如果CAS失败:对读集元素来说，即原子性被破坏
+		if(try_lock != lock_info && type == RD){ //cas fail,for write set elements means The atomicity is destroyed
 
 			num_atomic_retry++;
 			total_num_atomic_retry++;
@@ -581,13 +581,13 @@ remote_atomic_retry_lock:
 			goto remote_atomic_retry_lock;
 
 		}	
-		if(try_lock != lock_info && type == WR){ //如果CAS失败:对写集元素来说,即已经有锁;
+		if(try_lock != lock_info && type == WR){ //cas fail,for read set elements means already locked
 			DEBUG_M("TxnManager::get_row(abort) access free\n");
 			row_local = NULL;
 			txn->rc = Abort;
 			mem_allocator.free(m_item, sizeof(itemid_t));
 
-			return Abort; //原子性被破坏，CAS失败			
+			return Abort; //cas fail		
 		}	
 
 #endif
@@ -661,7 +661,7 @@ remote_atomic_retry_lock:
 
     assert(write_remote_content(loc,operate_size,m_item->offset,write_buf) == true);
 #elif CC_ALG == RDMA_MAAT
-    if(type == RD) {
+    //if(type == RD) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			assert(i < row_set_length - 1);
 			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
@@ -674,12 +674,15 @@ remote_atomic_retry_lock:
 		}
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_reads[i] == get_txn_id()) {
+				break;
+			}
 			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
 				remote_row->uncommitted_reads[i] = get_txn_id();
 				break;
 			}
 		}
-	}else if(type == WR) {
+	//}else if(type == WR) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
 
 			assert(i < row_set_length - 1);
@@ -694,15 +697,18 @@ remote_atomic_retry_lock:
 		if(greatest_read_timestamp < remote_row->timestamp_last_read) {
 			greatest_read_timestamp = remote_row->timestamp_last_read;
 		}
+		bool in_set = false;
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			assert(i < row_set_length - 1);
+			if(remote_row->uncommitted_writes[i] == get_txn_id()) in_set = true;
 			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
+				if(in_set == false)
 				remote_row->uncommitted_writes[i] = get_txn_id();
 				break;
 			}
 			uncommitted_writes_y.insert(remote_row->uncommitted_writes[i]);
 		}
-	}
+	//}
     remote_row->_tid_word = 0;
 
     uint64_t operate_size = row_t::get_row_size(remote_row->tuple_size);

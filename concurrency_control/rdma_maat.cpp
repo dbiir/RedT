@@ -386,6 +386,7 @@ RDMA_Maat::finish(RC rc , TxnManager * txnMng)
 	//memset(txnMng->write_set, 0, 100);
 	return rc;
 }
+
 RC RDMA_Maat::remote_abort(TxnManager * txnMng, Access * data) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	INC_STATS(txnMng->get_thd_id(),mtx[32],get_sys_clock() - mtx_wait_starttime);

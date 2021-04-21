@@ -789,7 +789,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 #elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 	assert (row == NULL || row == this || type == XP);
 	if (ROLL_BACK && type == XP) {  // recover from previous writes.
-		this->copy(row);  //对于"本地"Abort的写，把orig_data复制到orig_row里面去，注意对"远程"Abort的写无此操作
+		this->copy(row);  //for abort of local txn ABORT, copy orig_data to orig_row. remote ABORT dont need this operate
 	}
 	return 0;
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI

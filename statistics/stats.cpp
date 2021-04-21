@@ -585,8 +585,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
     single_part_txn_avg_time = single_part_txn_run_time / single_part_txn_cnt;
   fprintf(outf,
   ",tput=%f"
-  ",total_num_atomic_retry=%d"
-  ",max_num_atomic_retry=%d"
+  // ",total_num_atomic_retry=%d"
+  // ",max_num_atomic_retry=%d"
   ",txn_cnt=%ld"
   ",remote_txn_cnt=%ld"
   ",local_txn_cnt=%ld"

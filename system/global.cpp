@@ -301,7 +301,7 @@ UInt32 g_repl_cnt = REPLICA_CNT;
 
 uint64_t tpcc_idx_per_num = (700000 * NUM_WH)/PART_CNT ;
 
-uint64_t item_idx_num = 100000 * g_node_cnt;//item表在每个server上都存一份，*g_node_cnt便于计算
+uint64_t item_idx_num = 100000 * g_node_cnt;//A copy of the item table is stored on each server, *g_node_cnt easy to caculate
 uint64_t wh_idx_num = NUM_WH;
 uint64_t stock_idx_num = 100000 * NUM_WH;
 uint64_t dis_idx_num = 10 * NUM_WH;
@@ -328,16 +328,16 @@ char *rdma_global_buffer;
 char *rdma_timetable_buffer;
 //rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
 rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
-// 每个线程只用自己的那一块客户端内存地址
-/* client_rdma_rm 内存地址使用,假设有4个执行线程
- * size:IndexInfo //0号线程读index
- * size:IndexInfo //1号线程读index
- * size:IndexInfo //2号线程读index
- * size:IndexInfo //3号线程读index
- * size:Row //0号线程读row
- * size:Row //1号线程读row
- * size:Row //2号线程读row
- * size:Row //3号线程读row
+//Each thread uses only its own piece of client memory address
+/* client_rdma_rm suppose there are 4 work thd 
+ * size:IndexInfo //thd 0 read index
+ * size:IndexInfo //thd 1 read index
+ * size:IndexInfo //thd 2 read index
+ * size:IndexInfo //thd 3 read index
+ * size:Row //thd 0 read row
+ * size:Row //thd 1 read row
+ * size:Row //thd 2 read row
+ * size:Row //thd 3 read row
  */
 rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
 rdmaio::Arc<rdmaio::rmem::RegHandler> rm_handler;

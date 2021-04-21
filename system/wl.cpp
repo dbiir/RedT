@@ -51,8 +51,13 @@ RC Workload::init_schema(const char * schema_file) {
 			}
 			cout<<"Has "<<lines.size()<<" column"<<endl;
 
-			Catalog schema;
-			schema.init( tname.c_str(), id++, lines.size() );
+			void* tmp = new char[CL_SIZE * 2 + sizeof(table_t)];
+			table_t * cur_tab = (table_t *) ((UInt64)tmp + CL_SIZE);
+			// cur_tab->init(schema);
+			// table_t * cur_tab = (table_t*)r2::AllocatorMaster<>::get_thread_allocator()->alloc(sizeof(table_t));
+			Catalog *schema = &cur_tab->schema;
+			schema->init( tname.c_str(), id++, lines.size() );
+			cur_tab->init(tname.c_str(), schema->table_id);
 			for (UInt32 i = 0; i < lines.size(); i++) {
 				string line = lines[i];
 				vector<string> items;
@@ -63,11 +68,9 @@ RC Workload::init_schema(const char * schema_file) {
 				char * type = strtok(NULL,",");
 				char * name = strtok(NULL,",");
 
-				schema.add_col(name, size, type);
+				schema->add_col(name, size, type);
 				col_count ++;
 			}
-			table_t * cur_tab =  (table_t*)r2::AllocatorMaster<>::get_thread_allocator()->alloc(sizeof(table_t));
-			cur_tab->init(schema);
 			tables[tname] = cur_tab;
 		} else if (!line.compare(0, 6, "INDEX=")) {
 			string iname(&line[6]);
