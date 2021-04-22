@@ -215,7 +215,7 @@ public:
 
     struct ibv_sge sge {
       .addr = (u64)(payload.local_addr), .length = desc.len,
-      .lkey = local_mr.lkey
+      .lkey = local_mr.lkey   
     };
 
     struct ibv_send_wr sr, *bad_sr;
@@ -229,7 +229,7 @@ public:
     sr.imm_data = payload.imm_data;
 
     sr.wr.rdma.remote_addr = remote_mr.buf + payload.remote_addr;
-    sr.wr.rdma.rkey = remote_mr.key;
+    sr.wr.rdma.rkey = remote_mr.key;  
 
     if (desc.flags & IBV_SEND_SIGNALED)
       out_signaled += 1;

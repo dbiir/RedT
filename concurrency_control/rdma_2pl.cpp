@@ -30,7 +30,7 @@ void RDMA_2pl::remote_write_and_unlock(RC rc, TxnManager * txnMng , uint64_t num
 
     //Abort的时候，只用解锁，不写回数据
     uint64_t operate_size = 0;
-    if(rc != Abort) operate_size = sizeof(row_t);
+    if(rc != Abort) operate_size = row_t::get_row_size(data->tuple_size);
     else operate_size = sizeof(uint64_t);
 
     char *test_buf = Rdma::get_row_client_memory(thd_id);
@@ -146,7 +146,6 @@ retry_unlock:
 
 void RDMA_2pl::remote_unlock(TxnManager * txnMng , uint64_t num){
 #if CC_ALG == RDMA_NO_WAIT
-remote_retry_unlock:    
     Access *access = txnMng->txn->accesses[num];
 
     uint64_t off = access->offset;
@@ -174,13 +173,11 @@ remote_retry_unlock:
     uint64_t lock_type;
     uint64_t lock_num;
     uint64_t new_lock_num;
+remote_retry_unlock:    
     Row_rdma_2pl::info_decode(*lock_info,lock_type,lock_num);
     new_lock_num = lock_num-1;
     Row_rdma_2pl::info_encode(new_lock_info,lock_type,new_lock_num);
 
-    if(lock_type!=0 || lock_num<=0){
-        printf("---线程号：%lu, 远程解读锁失败！锁位置: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), *lock_info, new_lock_info);
-    }
     assert(lock_type == 0);  //一定是读锁
     assert(lock_num > 0); //一定有锁
 
@@ -203,6 +200,7 @@ remote_retry_unlock:
 #if DEBUG_PRINTF
         printf("---remote_retry_unlock读集元素\n");
 #endif
+        *lock_info = *tmp_loc;
         goto remote_retry_unlock;
     }
 #if DEBUG_PRINTF
@@ -284,7 +282,7 @@ void RDMA_2pl::finish(RC rc, TxnManager * txnMng){
     INC_STATS(txnMng->get_thd_id(),twopl_release_time,timespan);
     INC_STATS(txnMng->get_thd_id(),twopl_release_cnt,1);
     
-/*
+
     for (uint64_t i = 0; i < txn->row_cnt; i++) {
         if(txn->accesses[i]->location != g_node_id){
         //remote
@@ -301,6 +299,6 @@ void RDMA_2pl::finish(RC rc, TxnManager * txnMng){
         }
     }
 	memset(txnMng->write_set, 0, 100);
-*/
+
 }
 #endif

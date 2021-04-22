@@ -301,6 +301,7 @@ void OptCC::central_finish(RC rc, TxnManager * txn) {
 }
 
 RC OptCC::get_rw_set(TxnManager * txn, set_ent * &rset, set_ent *& wset) {
+	uint64_t start_time = get_sys_clock();
 	wset = (set_ent*) mem_allocator.alloc(sizeof(set_ent));
 	rset = (set_ent*) mem_allocator.alloc(sizeof(set_ent));
 	wset->set_size = txn->get_write_set_size();
@@ -320,6 +321,7 @@ RC OptCC::get_rw_set(TxnManager * txn, set_ent * &rset, set_ent *& wset) {
 
 	assert(n == wset->set_size);
 	assert(m == rset->set_size);
+	INC_STATS(txn->get_thd_id(),dli_get_rwset,get_sys_clock() - start_time);
 	return RCOK;
 }
 

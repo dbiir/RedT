@@ -19,6 +19,8 @@ class DAWorkload : public Workload {
  public:
   RC init();
   RC init_table();
+  table_t* get_table(const std::string& tbl_name);
+  table_t* get_table(int tbl_idx);
   RC init_schema(const char* schema_file);
   RC get_txn_man(TxnManager*& txn_manager);
   void reset_tab_idx();
@@ -59,7 +61,7 @@ class DATxnManager : public TxnManager {
 
   bool is_done();
   bool is_local_item(uint64_t idx);
-  RC send_remote_request();
+  RC send_remote_request() {return RCOK;}
   RC run_delivery(DAQuery* query);
 };
 #endif

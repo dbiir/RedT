@@ -25,20 +25,23 @@
 // USE RDMA
 /**********************************************/
 //#define USE_RDMA CHANGE_MSG_QUEUE
+#define USE_RDMA CHANGE_TCP_ONLY
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
 #define RDMA_BUFFER_ITEM_SIZE (1<<12)
 #define RDMA_USE_NIC_IDX 0
 #define RDMA_REG_MEM_NAME 73
 #define RDMA_CQ_NAME "rdma_channel"
-#define RDMA_ENTRY_NUM 2048U
-#define RDMA_SEND_COUNT (512)
+#define RDMA_ENTRY_NUM 8192U
+#define RDMA_SEND_COUNT (256)
 // #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
-//#define RDMA_COLOR_LOG
+// #define RDMA_COLOR_LOG
 
 /************RDMA TYPE**************/
 #define CHANGE_TCP_ONLY 0
 #define CHANGE_MSG_QUEUE 1
+
+#define HIS_CHAIN_NUM 4
 
 /***********************************************/
 // DA Trans Creator
@@ -61,29 +64,38 @@
 #define INPUT_FILE_PATH "./input.txt"
 
 // ! Parameters used to locate distributed performance bottlenecks.
+
 #define SECOND 200 // Set the queue monitoring time.
+// #define THD_ID_QUEUE
+#define ONE_NODE_RECIEVE 0 // only node 0 will receive the txn query
+#if 1
 // #define LESS_DIS // Reduce the number of yCSB remote data to 1
-// #define LESS_DIS_NUM 9 // Reduce the number of yCSB remote data to 1
-// // #define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
+// #define LESS_DIS_NUM 0 // Reduce the number of yCSB remote data to 1
+// #define NEW_WORK_QUEUE  // The workQueue data structure has been modified to perform 10,000 better than the original implementation.
 // #define NO_2PC  // Removing 2PC, of course, would be problematic in distributed transactions.
 // #define FAKE_PROCESS  // Io_thread returns as soon as it gets the request from the remote. Avoid waiting in the WORK_queue.
 // #define NO_REMOTE // remove all remote txn
+#endif 
 #define TXN_QUEUE_PERCENT 0.0 // The proportion of the transaction to take from txn_queue firstly.
 #define MALLOC_TYPE 0 // 0 represent normal malloc. 1 represent je-malloc
 // ! end of these parameters
-
+// ! Parameters used to locate distributed performance bottlenecks.
+#define SEND_TO_SELF_PAHSE 0 // 0 means do not send to self, 1 will execute the phase1, 2 will execute phase2, 3 will exeute phase1 and phase 2
+// msg send can be split into three stage, stage1 encapsulates msg; stage2 send msg; stgae3 parse msg;
+#define SEND_STAGE 1 // 1 will execute the stage1, 2 will execute stage1 and 3, 3 will exeute all
+// ! end of these parameters
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
-#define THREAD_CNT 8
+#define NODE_CNT 4
+#define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
 #define CLIENT_NODE_CNT NODE_CNT
-#define CLIENT_THREAD_CNT 8
+#define CLIENT_THREAD_CNT 4
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
@@ -146,7 +158,7 @@
 /***********************************************/
 #define TPORT_TYPE tcp
 #define TPORT_PORT 7000
-#define TPORT_TWOSIDE_PORT 17000
+#define TPORT_TWOSIDE_PORT 13000
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -168,14 +180,17 @@
 // Concurrency Control
 /***********************************************/
 
-// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, TICTOC, SI
-#define ISOLATION_LEVEL SERIALIZABLE
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
-#define CC_ALG NO_WAIT
-#define DEBUG_PRINTF  false
+#define ISOLATION_LEVEL SERIALIZABLE
+
+#define CC_ALG RDMA_NO_WAIT
 #define YCSB_ABORT_MODE false
-#define QUEUE_CAPACITY_NEW 1000000
+#define QUEUE_C  APACITY_NEW 1000000
+
+#define DEBUG_PRINTF  false
+#define ENABLE_DBPA  true
+
 // all transactions acquire tuples according to the primary key order.
 #define KEY_ORDER         false
 // transaction roll back changes after abort
@@ -190,7 +205,7 @@
 #define ENABLE_LATCH        false
 #define CENTRAL_INDEX       false
 #define CENTRAL_MANAGER       false
-#define INDEX_STRUCT        IDX_HASH
+#define INDEX_STRUCT        IDX_RDMA
 #define BTREE_ORDER         16
 
 // [TIMESTAMP]
@@ -248,10 +263,10 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 2097152
-#define ZIPF_THETA 0.95
-#define TXN_WRITE_PERC 0.0
-#define TUP_WRITE_PERC 0.0
+#define SYNTH_TABLE_SIZE 4194304
+#define ZIPF_THETA 0.001
+#define TXN_WRITE_PERC 0.2
+#define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
@@ -275,6 +290,7 @@
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
 #define NUM_WH PART_CNT
+#define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0
 #define MPIR 0.01
@@ -420,9 +436,13 @@ enum PPSTxnType {
 #define SILO 27
 #define CNULL 28
 #define RDMA_SILO 29
-#define RDMA_NO_WAIT 30
-#define RDMA_NO_WAIT2 31
-#define RDMA_WAIT_DIE2 32
+#define RDMA_MVCC 30
+#define RDMA_NO_WAIT 31
+#define RDMA_NO_WAIT2 32
+#define RDMA_WAIT_DIE2 33
+#define RDMA_TS1 34
+#define RDMA_MAAT 35
+#define RDMA_CICADA 36
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
@@ -469,8 +489,8 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 60 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 60 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false

@@ -254,17 +254,17 @@ void Transport::create_server(uint64_t port, uint64_t dest_node_id) {
 	RDMA_ASSERT(ctrl.opened_nics.reg(0, tport_man.nic));
 	RDMA_LOG(4) << g_node_id << " RDMA listens " << dest_node_id << " at " << port;
 
-	//1、create receive cq
+	//1銆乧reate receive cq
 	auto recv_cq_res = ::rdmaio::qp::Impl::create_cq(tport_man.nic, RDMA_ENTRY_NUM);
 	RDMA_ASSERT(recv_cq_res == IOCode::Ok);
 	auto recv_cq = std::get<0>(recv_cq_res.desc);
 
-	//2、prepare the message buffer with allocator
+	//2銆乸repare the message buffer with allocator
 	auto mem = Arc<RMem>(new RMem(RDMA_BUFFER_SIZE)); // a memory with 4M bytes
 	auto handler = RegHandler::create(mem, tport_man.nic).value();
 	auto alloc = std::make_shared<SimpleAllocator>(mem, handler->get_reg_attr().value().key);
 
-	//3、register receive cq
+	//3銆乺egister receive cq
 	manager.reg_recv_cqs.create_then_reg(RDMA_CQ_NAME+to_string(port), recv_cq, alloc);
 	RDMA_LOG(4) << "Register " << RDMA_CQ_NAME+to_string(port);
 	int64_t reg_mem_name = RDMA_REG_MEM_NAME + int64_t(port) - TPORT_TWOSIDE_PORT;
@@ -301,7 +301,7 @@ void Transport::create_server(uint64_t port, uint64_t dest_node_id) {
 	}
 }
 void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
-	//1、create the local QP to send
+	//1銆乧reate the local QP to send
 	auto qp = RDMARC::create(tport_man.nic, QPConfig()).value();
 	string ifaddr_temp = ifaddr[dest_node_id];
 	string addr = ifaddr_temp + ":" + std::to_string(port);
@@ -312,7 +312,7 @@ void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
 	if (cm.wait_ready(1000000, 4) == IOCode::Timeout)
 		RDMA_LOG(4) << "connect to the " << ifaddr[dest_node_id] << " timeout!";
 	sleep(1);
-	//2、create the remote QP and connect
+	//2銆乧reate the remote QP and connect
 	auto qp_res = cm.cc_rc_msg("rdma_qp"+to_string(port),
 		RDMA_CQ_NAME+to_string(port), 4096, qp, RDMA_USE_NIC_IDX, QPConfig());
 	cout << "rdma_qp"+to_string(port) << "  " << RDMA_CQ_NAME+to_string(port);
@@ -626,7 +626,7 @@ void Transport::rdma_thd_send_msg(uint64_t send_thread_id, uint64_t dest_node_id
 	DEBUG("Send batch of %ld msgs to %ld\n",sbuf->cnt,dest_node_id);
     fflush(stdout);
     sbuf->set_send_time(get_sys_clock());
-	// TODO: 发送
+	// TODO: 鍙戦€?
 	//sleep(1);
 	// printf("node %ld thread %ld send to remote node %ld\n", g_node_id, send_thread_id, dest_node_id);
     rdma_send_msg(send_thread_id, dest_node_id, sbuf->buffer, sbuf->ptr);
@@ -953,4 +953,3 @@ uint64_t Transport::simple_recv_msg() {
 	return bytes;
 }
 */
-

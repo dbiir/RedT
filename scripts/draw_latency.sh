@@ -19,6 +19,11 @@ LatencyName="trans_total_run_time \
           txn_process_time txn_process_time_percent \
           trans_benchmark_compute_time trans_benchmark_compute_time_percent"
 
+LatencyName+=" trans_process_network trans_process_network_percent \
+              trans_validation_network trans_validation_network_percent \
+              trans_commit_network trans_commit_network_percent \
+              trans_abort_network trans_abort_network_percent"
+
 cc=$1
 LatencyNum=$2
 

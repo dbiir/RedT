@@ -20,7 +20,7 @@
 #include <cassert>
 #include "global.h"
 
-#define ROW_DEFAULT_SIZE 1100
+#define ROW_DEFAULT_SIZE 1000
 
 
 #define DECL_SET_VALUE(type) void set_value(int col_id, type value);
@@ -62,15 +62,30 @@ class Row_si;
 class Row_null;
 class Row_silo;
 class Row_rdma_silo;
+class Row_rdma_mvcc;
+class rdma_mvcc;
 class Row_rdma_2pl;
+
+//struct RdmaMVHis;
+
+struct RdmaMVHis {
+    uint64_t mutex;//lock
+    uint64_t rts;
+    uint64_t start_ts;
+    uint64_t end_ts;
+    uint64_t txn_id;
+    //RTS、start_ts、end_ts、txn-id：
+	char data[ROW_DEFAULT_SIZE];
+};
 
 class row_t {
 public:
+	static int get_row_size(int tuple_size);
 	RC init(table_t * host_table, uint64_t part_id, uint64_t row_id = 0);
 	RC switch_schema(table_t * host_table);
 	// not every row has a manager
 	void init_manager(row_t * row);
-  	RC remote_get_row(row_t* remote_row, TxnManager * txn, Access *access);
+  	RC remote_copy_row(row_t* remote_row, TxnManager * txn, Access *access);
 
 	table_t * get_table();
 	Catalog * get_schema();
@@ -118,10 +133,10 @@ public:
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
-  #if CC_ALG == RDMA_SILO
-    volatile uint64_t	_tid_word;  //锁：txn_id
-	ts_t 			timestamp;
-	Row_rdma_silo * manager;
+    #if CC_ALG == RDMA_SILO
+        volatile uint64_t	_tid_word;  //锁：txn_id
+        ts_t 			timestamp;
+        Row_rdma_silo * manager;
 	#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 		volatile uint64_t _lock_info; //RDMA_NO_WAIT2: only 0 or 1; RDMA_WAIT_DIE2: only 0 or ts
 		Row_rdma_2pl * manager;
@@ -131,6 +146,16 @@ public:
 	 	Row_ts * manager;
 	#elif CC_ALG == MVCC
 		Row_mvcc * manager;
+	#elif CC_ALG == RDMA_MVCC
+        volatile uint64_t	_tid_word;
+        uint64_t version_num;
+        //RdmaMVHis historyVer[HIS_CHAIN_NUM];
+        //char datas[HIS_CHAIN_NUM][ROW_DEFAULT_SIZE];
+        uint64_t rts[HIS_CHAIN_NUM];
+        uint64_t start_ts[HIS_CHAIN_NUM];
+        uint64_t end_ts[HIS_CHAIN_NUM];
+        uint64_t txn_id[HIS_CHAIN_NUM];
+		//Row_rdma_mvcc *manager;
 	#elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
 		Row_occ * manager;
 
@@ -156,23 +181,28 @@ public:
 		Row_wsi * manager;
 	#elif CC_ALG == CNULL
 		Row_null * manager;
-  #elif CC_ALG == SILO
-  	Row_silo * manager;
+	#elif CC_ALG == SILO
+		Row_silo * manager;
 	#endif
-#ifdef USE_RDMA// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
-	char data[ROW_DEFAULT_SIZE];
-#else
-	char * data;
-#endif
-
 	int tuple_size;
 	table_t * table;
+	char table_name[15];
+    int table_idx;
 private:
 	// primary key should be calculated from the data stored in the row.
 	uint64_t 		_primary_key;
 	uint64_t		_part_id;
 	bool part_info;
 	uint64_t _row_id;
+public:
+#ifdef USE_RDMA// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
+	//#if CC_ALG != RDMA_MVCC
+    char data[1];
+	// char data[HIS_CHAIN_NUM * sizeof(get_row_size)]
+    //#endif
+#else
+	char * data;
+#endif
 };
 
 #endif

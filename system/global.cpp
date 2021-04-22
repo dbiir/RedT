@@ -54,6 +54,7 @@
 #include "wkdb.h"
 #include "tictoc.h"
 #include "rdma_silo.h"
+#include "rdma_mvcc.h"
 #include "rdma_2pl.h"
 #include "key_xid.h"
 #include "rts_cache.h"
@@ -62,6 +63,7 @@
 #include "lib.hh"
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
+#include "wl.h"
 #ifdef USE_RDMA
   #include "qps/rc_recv_manager.hh"
   #include "qps/recv_iter.hh"
@@ -92,10 +94,13 @@ Transport tport_man;
 Rdma rdma_man;
 #if CC_ALG == RDMA_SILO
 RDMA_silo rsilo_man;
+#elif CC_ALG == RDMA_MVCC
+rdma_mvcc rmvcc_man;
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 RDMA_2pl r2pl_man;
 #endif
+Workload * m_wl;
 TxnManPool txn_man_pool;
 TxnPool txn_pool;
 AccessPool access_pool;
@@ -224,8 +229,10 @@ UInt64 g_msg_time_limit = MSG_TIME_LIMIT;
 UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
-UInt64 rdma_buffer_size = 12*(1024*1024*1024L);
-UInt64 rdma_index_size = 300*1024*1024;
+UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
+UInt64 client_rdma_buffer_size = 3*(1024*1024L);
+UInt64 rdma_index_size = (300*1024*1024L);
+
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;
 UInt64 g_max_pre_req = MAX_PRE_REQ;
@@ -274,6 +281,29 @@ UInt32 g_dist_per_wh = DIST_PER_WH;
 
 UInt32 g_repl_type = REPL_TYPE;
 UInt32 g_repl_cnt = REPLICA_CNT;
+
+uint64_t tpcc_idx_per_num = (700000 * NUM_WH)/PART_CNT ;
+
+uint64_t item_idx_num = 100000 * g_node_cnt;//item表在每个server上都存一份，*g_node_cnt便于计算
+uint64_t wh_idx_num = NUM_WH;
+uint64_t stock_idx_num = 100000 * NUM_WH;
+uint64_t dis_idx_num = 10 * NUM_WH;
+uint64_t cust_idx_num = 30000 * NUM_WH;
+// uint64_t his_idx_num = ;
+// uint64_t new_o_idx_num = ;
+uint64_t order_idx_num = 30000 * NUM_WH;
+uint64_t ol_idx_num = 300000 * NUM_WH;
+
+uint64_t item_index_size = (10 * 1024 *1024L) ;
+uint64_t wh_index_size = (1024 * 1024L);
+uint64_t stock_index_size = (10 * 1024 *1024L);
+uint64_t dis_index_size = (1024 *1024L);
+uint64_t cust_index_size = (2 * 1024 *1024L);
+uint64_t cl_index_size = (2 * 1024 *1024L);
+uint64_t order_index_size = (2 * 1024 *1024L);
+uint64_t ol_index_size = (20 * 1024 *1024L);
+
+
 
 map<string, string> g_params;
 

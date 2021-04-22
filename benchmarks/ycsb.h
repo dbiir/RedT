@@ -37,6 +37,8 @@ class YCSBWorkload : public Workload {
 public :
 	RC init();
 	RC init_table();
+  table_t* get_table(const std::string& tbl_name);
+  table_t* get_table(int tbl_idx);
 	RC init_schema(const char * schema_file);
 	RC get_txn_man(TxnManager *& txn_manager);
 	int key_to_part(uint64_t key);
@@ -67,10 +69,10 @@ public:
 private:
   void next_ycsb_state();
   RC run_txn_state();
-  bool rdma_one_side();
   RC send_remote_one_side_request(ycsb_request * req,row_t *& row_local);
+  RC mvcc_remote_one_side_request(ycsb_request * req,row_t *& row_local);
 
-  itemid_t* read_remote_index(ycsb_request * req);
+  itemid_t* ycsb_read_remote_index(ycsb_request * req);
 
   RC run_ycsb_0(ycsb_request * req,row_t *& row_local);
   RC run_ycsb_1(access_t acctype, row_t * row_local);

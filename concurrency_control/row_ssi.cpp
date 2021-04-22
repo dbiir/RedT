@@ -58,7 +58,7 @@ row_t * Row_ssi::clear_history(TsType type, ts_t ts) {
 		assert(prev->ts >= his->ts);
 		if (row != NULL) {
 			row->free_row();
-			mem_allocator.free(row, sizeof(row_t));
+			mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 		}
 		row = his->row;
 		his->row = NULL;
@@ -90,7 +90,7 @@ SSIHisEntry * Row_ssi::get_his_entry() {
 void Row_ssi::return_his_entry(SSIHisEntry * entry) {
 	if (entry->row != NULL) {
 		entry->row->free_row();
-		mem_allocator.free(entry->row, sizeof(row_t));
+		mem_allocator.free(entry->row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	mem_allocator.free(entry, sizeof(SSIHisEntry));
 }

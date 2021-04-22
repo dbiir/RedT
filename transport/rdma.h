@@ -26,6 +26,8 @@ class Rdma {
   static char *get_index_client_memory(uint64_t thd_id);
   static char *get_row_client_memory(uint64_t thd_id);
   static char *get_table_client_memory(uint64_t thd_id);
+  static char *get_row_client_memory2(uint64_t thd_id);
+
 
  private:
   uint64_t _sock_cnt;

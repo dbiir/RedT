@@ -64,12 +64,14 @@ RC ClientThread::run() {
 		//uint32_t next_node = iters++ % g_node_cnt;
 		progress_stats();
 		int32_t inf_cnt;
-	#if CC_ALG == BOCC || CC_ALG == FOCC
+	#if CC_ALG == BOCC || CC_ALG == FOCC || ONE_NODE_RECIEVE == 1
 		uint32_t next_node = 0;
+		uint32_t next_node_id = next_node;
 	#else
 		uint32_t next_node = (((iters++) * g_client_thread_cnt) + _thd_id )% g_servers_per_client;
-	#endif
 		uint32_t next_node_id = next_node + g_server_start_node;
+	#endif
+		// uint32_t next_node_id = next_node + g_server_start_node;
 		// Just in case...
 		if (iters == UINT64_MAX)
 			iters = 0;
@@ -101,8 +103,11 @@ RC ClientThread::run() {
 
 		DEBUG("Client: thread %lu sending query to node: %u, %d, %f\n",
 				_thd_id, next_node_id,inf_cnt,simulation->seconds_from_start(get_sys_clock()));
-
+#if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
+		Message * msg = Message::create_message((BaseQuery*)m_query,CL_QRY_O);
+#else
 		Message * msg = Message::create_message((BaseQuery*)m_query,CL_QRY);
+#endif
 		((ClientQueryMessage*)msg)->client_startts = get_sys_clock();
 #if USE_RDMA == CHANGE_MSG_QUEUE
         tport_man.rdma_thd_send_msg(get_thd_id(), next_node_id, msg);

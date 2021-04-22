@@ -118,9 +118,9 @@ static RC validate_main(TxnManager* txn, Dli* dli, const bool final_validate) {
   uint64_t start_time = get_sys_clock();
   uint64_t expect = 0;
   Dli::RWSet rset, wset;
-  std::unordered_set<ts_t> cur_trans;
+  // std::unordered_set<ts_t> cur_trans;
   Dli::get_rw_set(txn, rset, wset);
-  Dli::RWSet rset_bak = rset, wset_bak = wset;
+  // Dli::RWSet rset_bak = rset, wset_bak = wset;
   ts_t ts = txn->get_start_timestamp();
 
 #if CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
@@ -137,7 +137,7 @@ static RC validate_main(TxnManager* txn, Dli* dli, const bool final_validate) {
   // start_time += timespan;
 
   uint64_t timespan = get_sys_clock() - start_time;
-  INC_STATS(txn->get_thd_id(),dli_init_time,get_sys_clock() - start_time);
+  INC_STATS(txn->get_thd_id(),dli_init_time,timespan);
   start_time += timespan;
   if (rc == RCOK) {
     for (auto& i : wset) {
@@ -155,7 +155,7 @@ static RC validate_main(TxnManager* txn, Dli* dli, const bool final_validate) {
     }
   }
   timespan = get_sys_clock() - start_time;
-  INC_STATS(txn->get_thd_id(),dli_lock_time,get_sys_clock() - start_time);
+  INC_STATS(txn->get_thd_id(),dli_lock_time,timespan);
   start_time += timespan;
   if (rc == RCOK && !wset.empty()) {
     for (auto& i : wset) {
@@ -186,16 +186,21 @@ static RC validate_main(TxnManager* txn, Dli* dli, const bool final_validate) {
     }
   }
   timespan = get_sys_clock() - start_time;
-  INC_STATS(txn->get_thd_id(),dli_check_conflict_time,get_sys_clock() - start_time);
+  INC_STATS(txn->get_thd_id(),dli_check_conflict_time,timespan);
   start_time += timespan;
 #if CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
   if (lower >= upper) rc = Abort;
 #endif
   if (rc == RCOK && final_validate) {
+    
 #if CC_ALG != DLI_DTA && CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3
+    uint64_t push_front_start_time = get_sys_clock();
     txn->is_abort = &TSNode<Dli::ValidatedTxn>::push_front(dli->validated_txns_, std::move(rset), std::move(wset), ts)->is_abort_;
+    INC_STATS(txn->get_thd_id(),dli_push_front_time,get_sys_clock() - push_front_start_time);
 #else
+    uint64_t push_front_start_time = get_sys_clock();
     txn->is_abort = &TSNode<Dli::ValidatedTxn>::push_front(dli->validated_txns_, std::move(rset), std::move(wset), ts, lower, upper)->is_abort_;
+    INC_STATS(txn->get_thd_id(),dli_push_front_time,get_sys_clock() - push_front_start_time);
     dta_time_table.set_state(tid, txnid, DTA_VALIDATED);
     dta_time_table.set_lower(tid, txnid, lower);
     dta_time_table.set_upper(tid, txnid, upper);
@@ -204,7 +209,7 @@ static RC validate_main(TxnManager* txn, Dli* dli, const bool final_validate) {
 #endif
   }
   timespan = get_sys_clock() - start_time;
-  INC_STATS(txn->get_thd_id(),dli_final_validate,get_sys_clock() - start_time);
+  INC_STATS(txn->get_thd_id(),dli_final_validate,timespan);
   // timespan = get_sys_clock() - start_time;
   // txn->txn_stats.cc_time += timespan;
   // txn->txn_stats.cc_time_short += timespan;
@@ -216,6 +221,7 @@ static RC validate_main(TxnManager* txn, Dli* dli, const bool final_validate) {
 
 void Dli::get_rw_set(TxnManager* txn, Dli::RWSet& rset,
                      Dli::RWSet& wset) {
+  uint64_t start_time = get_sys_clock();
   uint64_t len = txn->get_access_cnt();
   for (uint64_t i = 0; i < len; i++) {
     if (txn->get_access_type(i) == WR)
@@ -226,6 +232,7 @@ void Dli::get_rw_set(TxnManager* txn, Dli::RWSet& rset,
 #if WORKLOAD == TPCC
   for (const auto& i : wset) rset[i.first] = i.second;
 #endif
+  INC_STATS(txn->get_thd_id(),dli_get_rwset,get_sys_clock() - start_time);
 }
 
 void Dli::init() {

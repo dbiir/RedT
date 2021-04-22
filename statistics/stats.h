@@ -61,6 +61,13 @@ public:
 
   //count abort
   uint64_t  valid_abort_cnt;
+  uint64_t  lock_row_fail;
+  uint64_t  lock_num_unequal;
+  uint64_t lock_fail ;
+  uint64_t ts_error;
+  uint64_t result_false;
+  uint64_t cas_cnt;
+
   double  local_lock_fail_abort;
   double  remote_lock_fail_abort;
   double  local_readset_validate_fail_abort;
@@ -71,6 +78,13 @@ public:
   double  local_try_lock_fail_abort;
   double  remote_try_lock_fail_abort;
   double  cnt_unequal_abort;
+
+  uint64_t tpcc_fin_abort ;
+  uint64_t silo_lock_write_abort;
+  uint64_t silo_lock_read_abort;
+  uint64_t silo_127_abort;
+  uint64_t silo_155_abort;
+  uint64_t cnt_un_abort;
 
   uint64_t total_txn_abort_cnt;
   uint64_t positive_txn_abort_cnt;
@@ -154,6 +168,8 @@ public:
   double dli_lock_time=0;
   double dli_check_conflict_time=0;
   double dli_final_validate=0;
+  double dli_get_rwset=0;
+  double dli_push_front_time=0;
   // trans queue
   double trans_local_process=0;
   double trans_remote_process=0;
@@ -164,6 +180,11 @@ public:
   double trans_network_wait=0;
   double trans_network_recv=0;
   double trans_network_send=0;
+  double trans_msgsend_stage_one=0;
+  double trans_msgsend_stage_three=0;
+  double trans_return_client_wait=0;
+  double trans_get_client_wait=0;
+  double trans_process_client=0;
   // trans work queue count
   uint64_t trans_work_queue_item_total=0;
   uint64_t trans_msg_queue_item_total=0;

@@ -1,4 +1,4 @@
-//size,type,name
+//size,type,name w 105
 TABLE=WAREHOUSE
 	8,int64_t,W_ID
 	10,string,W_NAME
@@ -10,6 +10,7 @@ TABLE=WAREHOUSE
 	8,double,W_TAX
 	8,double,W_YTD
 
+//w*10  121
 TABLE=DISTRICT
 	8,int64_t,D_ID
 	8,int64_t,D_W_ID
@@ -23,6 +24,7 @@ TABLE=DISTRICT
 	8,double,D_YTD
 	8,int64_t,D_NEXT_O_ID
 
+//w*30k 653
 TABLE=CUSTOMER
 	8,int64_t,C_ID
 	8,int64_t,C_D_ID
@@ -46,6 +48,7 @@ TABLE=CUSTOMER
 	8,uint64_t,C_DELIVERY_CNT
 	500,string,C_DATA
 
+//w*30k 80
 TABLE=HISTORY
 	8,int64_t,H_C_ID
 	8,int64_t,H_C_D_ID
@@ -56,11 +59,13 @@ TABLE=HISTORY
 	8,double,H_AMOUNT
 	24,string,H_DATA
 
+//w*9k+ 24
 TABLE=NEW-ORDER
 	8,int64_t,NO_O_ID
 	8,int64_t,NO_D_ID
 	8,int64_t,NO_W_ID
 
+//w*30k 64
 TABLE=ORDER
 	8,int64_t,O_ID
 	8,int64_t,O_C_ID
@@ -71,6 +76,7 @@ TABLE=ORDER
 	8,int64_t,O_OL_CNT
 	8,int64_t,O_ALL_LOCAL
 
+//w*300k 80
 TABLE=ORDER-LINE
 	8,int64_t,OL_O_ID
 	8,int64_t,OL_D_ID
@@ -83,6 +89,7 @@ TABLE=ORDER-LINE
 	8,double,OL_AMOUNT
 	8,int64_t,OL_DIST_INFO
 
+//100k 98
 TABLE=ITEM
 	8,int64_t,I_ID
 	8,int64_t,I_IM_ID
@@ -90,6 +97,7 @@ TABLE=ITEM
 	8,int64_t,I_PRICE
 	50,string,I_DATA
 
+//w*100k 340
 TABLE=STOCK
 	8,int64_t,S_I_ID
 	8,int64_t,S_W_ID

@@ -68,6 +68,15 @@ RC YCSBWorkload::init_schema(const char * schema_file) {
 	return RCOK;
 }
 
+table_t* YCSBWorkload::get_table(const std::string& tbl_name) {
+	// return tables[tbl_name];
+	return the_table;
+}
+
+table_t* YCSBWorkload::get_table(int tbl_idx) {
+	return the_table;
+}
+
 int
 YCSBWorkload::key_to_part(uint64_t key) {
 	//uint64_t rows_per_part = g_synth_table_size / g_part_cnt;

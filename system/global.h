@@ -83,6 +83,8 @@ class Transport;
 class Rdma;
 #if CC_ALG == RDMA_SILO
 class RDMA_silo;
+#elif CC_ALG == RDMA_MVCC
+class rdma_mvcc;
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 class RDMA_2pl;
@@ -111,6 +113,7 @@ class DABlockQueue;
 class DtaTimeTable;
 class KeyXidCache;
 class RtsCache;
+class Workload;
 // class QTcpQueue;
 // class TcpTimestamp;
 
@@ -144,10 +147,13 @@ extern Transport tport_man;
 extern Rdma rdma_man;
 #if CC_ALG == RDMA_SILO
 extern RDMA_silo rsilo_man;
+#elif CC_ALG == RDMA_MVCC
+extern rdma_mvcc rmvcc_man;
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 extern RDMA_2pl r2pl_man;
 #endif
+extern Workload * m_wl;
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;
 extern AccessPool access_pool;
@@ -196,7 +202,6 @@ extern string qp_name[NODE_CNT][THREAD_CNT];
 //extern r2::Allocator *r2_allocator;
 
 extern int rdma_server_port[NODE_CNT];
-
 
 extern bool volatile warmup_done;
 extern bool volatile enable_thread_mem_pool;
@@ -255,6 +260,7 @@ extern uint64_t g_msg_size;
 extern uint64_t g_log_buf_max;
 extern uint64_t g_log_flush_timeout;
 extern uint64_t rdma_buffer_size;
+extern uint64_t client_rdma_buffer_size;
 extern uint64_t rdma_index_size;
 extern UInt32 g_max_txn_per_part;
 extern int32_t g_load_per_server;
@@ -305,6 +311,24 @@ extern UInt32 g_dist_per_wh;
 extern UInt32 g_cust_per_dist;
 extern UInt32 g_max_items_per_txn;
 
+extern uint64_t tpcc_idx_per_num;
+extern uint64_t item_idx_num;
+extern uint64_t wh_idx_num;
+extern uint64_t stock_idx_num;
+extern uint64_t dis_idx_num;
+extern uint64_t cust_idx_num;
+extern uint64_t order_idx_num ;
+extern uint64_t ol_idx_num ;
+
+extern uint64_t item_index_size ;
+extern uint64_t wh_index_size ;
+extern uint64_t stock_index_size ;
+extern uint64_t dis_index_size ;
+extern uint64_t cust_index_size ;
+extern uint64_t cl_index_size ;
+extern uint64_t order_index_size ;
+extern uint64_t ol_index_size ;
+
 // PPS (Product-Part-Supplier)
 extern UInt32 g_max_parts_per;
 extern UInt32 g_max_part_key;
@@ -346,6 +370,7 @@ enum RemReqType {
     RLK,
     RULK,
     CL_QRY,
+    CL_QRY_O,//one server but use the msg queue
     RQRY,
     RQRY_CONT,
     RFIN,
@@ -445,6 +470,8 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 #define INDEX		index_btree
 #elif (INDEX_STRUCT == IDX_HASH)
 #define  INDEX		IndexHash
+// #elif (INDEX_STRUCT == IDX_RDMA_TPCC)
+// #define INDEX       IndexRdmaTpcc
 #else
 #define INDEX		IndexRdma
 #endif

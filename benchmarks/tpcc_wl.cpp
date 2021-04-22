@@ -86,6 +86,33 @@ RC TPCCWorkload::init_schema(const char * schema_file) {
 	return RCOK;
 }
 
+table_t* TPCCWorkload::get_table(const std::string& tbl_name) {
+	if (tbl_name == "WAREHOUSE") return t_warehouse;
+	if (tbl_name == "DISTRICT") return t_district;
+	if (tbl_name == "CUSTOMER") return t_customer;
+	if (tbl_name == "ITEM") return t_item;
+	if (tbl_name == "STOCK") return t_stock;
+	if (tbl_name == "HISTORY") return t_history;
+	if (tbl_name == "NEW-ORDER") return t_neworder;
+	if (tbl_name == "ORDER") return t_order;
+	if (tbl_name == "ORDER-LINE") return t_orderline;
+	return NULL;
+}
+
+table_t* TPCCWorkload::get_table(int tbl_idx) {
+	switch (tbl_idx) {
+		case 0: return t_warehouse;
+		case 1: return t_district;
+		case 2: return t_customer;
+		case 3: return t_history;
+		case 4: return t_neworder;
+		case 5: return t_order;
+		case 6: return t_orderline;
+		case 7: return t_item;
+		case 8: return t_stock;
+	}
+}
+
 RC TPCCWorkload::init_table() {
 	num_wh = g_num_wh;
 
@@ -103,7 +130,7 @@ RC TPCCWorkload::init_table() {
 /**********************************/
 
 	pthread_t * p_thds = new pthread_t[g_init_parallelism - 1];
-  thr_args * tt = new thr_args[g_init_parallelism];
+    thr_args * tt = new thr_args[g_init_parallelism];
 	for (UInt32 i = 0; i < g_init_parallelism ; i++) {
 	tt[i].wl = this;
 	tt[i].id = i;
@@ -126,7 +153,7 @@ RC TPCCWorkload::init_table() {
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
 	pthread_create(&p_thds[i], NULL, threadInitItem, &tt[i]);
 	}
-  threadInitItem(&tt[g_init_parallelism-1]);
+    threadInitItem(&tt[g_init_parallelism-1]);
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
 		int rc = pthread_join(p_thds[i], NULL);
 		if (rc) {
@@ -148,7 +175,7 @@ RC TPCCWorkload::init_table() {
 			exit(-1);
 		}
   }
-  printf("ITEM Done\n");
+  printf("CUSTOMER Done\n");
   fflush(stdout);
 
   // Order Table
@@ -167,7 +194,7 @@ RC TPCCWorkload::init_table() {
   printf("ORDER Done\n");
   fflush(stdout);
   */
-	threadInitWh(this);
+  threadInitWh(this);
   printf("WAREHOUSE Done\n");
   fflush(stdout);
 	threadInitDist(this);
@@ -232,7 +259,7 @@ void TPCCWorkload::init_tab_item(int id) {
 	//MakeAlphaString(26, 50, data);
 	if (RAND(10) == 0) strcpy(data, "original");
 		row->set_value(I_DATA, data);
-
+      // if(i <= 1000)printf("【tpcc_wl.cpp:243】item_key = %ld\n",i);
 		index_insert(i_item, i, row, 0);
 	}
 }
@@ -267,8 +294,8 @@ void TPCCWorkload::init_tab_wh() {
 		double w_ytd=300000.00;
 		row->set_value(W_TAX, tax);
 		row->set_value(W_YTD, w_ytd);
-
-		index_insert(i_warehouse, wid, row, wh_to_part(wid));
+        if(wid<=1000)printf("【tpcc_wl.cpp:270】wh_key = %ld\n",wid);
+		index_insert(i_warehouse, wid , row, wh_to_part(wid));
 	}
 
 	return;
@@ -304,7 +331,7 @@ void TPCCWorkload::init_tab_dist(uint64_t wid) {
 		row->set_value(D_TAX, tax);
 		row->set_value(D_YTD, w_ytd);
 		row->set_value(D_NEXT_O_ID, 3001);
-
+        if(distKey(did, wid) <= 1000)printf("【tpcc_wl.cpp:307】dis_key = %ld\n",distKey(did, wid));
 		index_insert(i_district, distKey(did, wid), row, wh_to_part(wid));
 	}
 }
@@ -347,6 +374,9 @@ void TPCCWorkload::init_tab_stock(int id, uint64_t wid) {
 	*/
 		row->set_value(S_DATA, s_data);
 #endif
+        // if(stockKey(sid, wid) <= 1000){
+        //     printf("【tpcc_wl.cpp:350】stock_key = %ld\n",stockKey(sid, wid));
+        // }
 		index_insert(i_stock, stockKey(sid, wid), row, wh_to_part(wid));
 	}
 }
@@ -414,7 +444,9 @@ void TPCCWorkload::init_tab_cust(int id, uint64_t did, uint64_t wid) {
 		row->set_value(C_YTD_PAYMENT, 10.0);
 		row->set_value(C_PAYMENT_CNT, 1);
 		uint64_t key;
-		key = custNPKey(c_last, did, wid);
+		//key = custNPKey(c_last, did, wid);
+        key = custKey(cid, did, wid);
+       // if(key <=1000)printf("【tpcc_wl.cpp:419】customer_key = %ld\n",key);
 		index_insert(i_customer_last, key, row, wh_to_part(wid));
 		key = custKey(cid, did, wid);
 		index_insert(i_customer_id, key, row, wh_to_part(wid));
@@ -602,7 +634,7 @@ void * TPCCWorkload::threadInitHist(void * This) {
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
 	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
 		for (uint64_t did = 1; did <= g_dist_per_wh; did++)
-	  for (uint64_t cid = 1; cid <= g_cust_per_dist; cid++) wl->init_tab_hist(cid, did, wid);
+	        for (uint64_t cid = 1; cid <= g_cust_per_dist; cid++) wl->init_tab_hist(cid, did, wid);
   }
 	printf("HISTORY Done\n");
 	return NULL;

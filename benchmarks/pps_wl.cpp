@@ -68,6 +68,16 @@ RC PPSWorkload::init_schema(const char * schema_file) {
 	return RCOK;
 }
 
+table_t* PPSWorkload::get_table(const std::string& tbl_name) {
+	return tables[tbl_name];
+	// return the_table;
+}
+
+table_t* PPSWorkload::get_table(int tbl_idx) {
+	return NULL;
+}
+
+
 RC PPSWorkload::init_table() {
 
 /******** fill in data ************/

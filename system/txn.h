@@ -53,13 +53,14 @@ public:
 	ts_t 		tid;
 	// ts_t 		epoch;
 #endif
-#if CC_ALG == RDMA_SILO
+#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC
     uint64_t 	key;
 	ts_t 		tid;
 	ts_t		timestamp;
     row_t * 	test_row;
 	uint64_t    location;
 	uint64_t    offset;
+    uint64_t    old_version_num;
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 	uint64_t    location;   //数据所在的node id
@@ -162,6 +163,7 @@ public:
 	virtual RC      run_txn_post_wait() = 0;
 	virtual RC      run_calvin_txn() = 0;
 	virtual RC      acquire_locks() = 0;
+	virtual RC 		send_remote_request() = 0;
 	void            register_thread(Thread * h_thd);
 	uint64_t        get_thd_id();
 	Workload *      get_wl();
@@ -189,6 +191,19 @@ public:
 	RC abort();
 
 	void release_locks(RC rc);
+
+bool rdma_one_side() {
+  if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2) return true;
+  else return false;
+}
+
+    row_t * read_remote_content(uint64_t target_server,uint64_t remote_offset);
+    itemid_t * read_remote_index(uint64_t target_server,uint64_t remote_offset,uint64_t key);
+    bool write_remote_content(uint64_t target_server,uint64_t thd_id,uint64_t operate_size,uint64_t remote_offset,char *local_buf);
+    uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
+    RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
+	row_t * cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap);
+
 	bool isRecon() {
 		assert(CC_ALG == CALVIN || !recon);
 		return recon;
@@ -214,6 +229,13 @@ public:
     RC              find_tid_silo(ts_t max_tid);
     RC              finish(RC rc);
 #endif
+#if CC_ALG == RDMA_MVCC 
+    int             write_set[100];
+    int*            read_set;
+    uint64_t        num_locks;
+#endif
+	bool send_RQRY_RSP;
+
 
 #if CC_ALG == RDMA_SILO
 	ts_t 			last_tid;

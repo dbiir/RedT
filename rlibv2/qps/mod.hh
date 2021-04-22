@@ -28,9 +28,13 @@ struct Progress {
     return high_watermark;
   }
 
-  void done(int num) { low_watermark = num; }
+  void done(int num) { 
+    //printf("---done()\n");
+    low_watermark = num; 
+  }
 
   ProgressMark_t pending_reqs() const {
+    //printf("---pending_reqs\n");
     if (high_watermark >= low_watermark)
       return high_watermark - low_watermark;
     return std::numeric_limits<ProgressMark_t>::max() -
@@ -121,8 +125,10 @@ public:
       res = poll_send_comp();
     } while (res.first == 0 && // poll result is 0
              t.passed_msec() <= timeout);
-    if(res.first == 0)
-      return Timeout(res.second);
+    if(res.first == 0){
+      printf("---timeout! no CQE get!\n");
+      return Timeout(res.second);    
+    }  
     if(unlikely(res.first < 0 || res.second.status != IBV_WC_SUCCESS))
       return Err(res.second);
     return Ok(res.second);

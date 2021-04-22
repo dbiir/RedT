@@ -71,24 +71,24 @@ def ycsb_scaling():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
-    nnodes = [2]
-	# algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    nnodes = [4]
+	  # algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
     # algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    algos=['RDMA_SILO']
-
-    base_table_size=1048576
-    # base_table_size=1048576*8
+    algos=['MVCC']
+    base_table_size=1048576*4
     #base_table_size=2097152*8
-    txn_write_perc = [0.5]
-    tup_write_perc = [0.5]
+    txn_write_perc = [0.2]
+    tup_write_perc = [0.2]
     load = [10000]
-    tcnt = [4]  #THREAD_CNT
-    ctcnt = [4]  #CLIENT_THREAD_CNT
-    skew = [0.0]
-    #skew = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,cthr] for thr,cthr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,ctcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
+    tcnt = [10]
+    ctcnt = [4]
+    scnt = [1]
+    rcnt = [1]
+    skew = [0.001]
+    #skew = [0.0,0.5,0.9]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT","SEND_THREAD_CNT","REM_THREAD_CNT","CLIENT_SEND_THREAD_CNT","CLIENT_REM_THREAD_CNT"]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,cthr,sthr,rthr,sthr,rthr] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
     #txn_write_perc = [0.0]
     #skew = [0.0]
     #exp = exp + [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
@@ -99,7 +99,7 @@ def ycsb_scaling1():
     #nnodes = [1,2,4,8,16,32,64]
     nnodes = [1,2]
     algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    base_table_size=2097152*8
+    base_table_size=1048576*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
     load = [10000]
@@ -143,19 +143,22 @@ def ycsb_scaling_abort():
 
 def ycsb_skew():
     wl = 'YCSB'
-    nnodes = [2]
-    algos=['NO_WAIT']
+    nnodes = [4]
+    algos=['RDMA_NO_WAIT']
     base_table_size=1048576
-    txn_write_perc = [0.0]
-    tup_write_perc = [0.0]
+    #base_table_size=1048576*4    
+    #base_table_size=2097152*8
+
+    txn_write_perc = [0.2]
+    tup_write_perc = [0.2]
     load = [10000]
 
-    tcnt = [8]  #THREAD_CNT
+    tcnt = [10]  #THREAD_CNT
 
     #skew = [0.0,0.4,0.6,0.8,0.9]
     #skew = [0.2,0.6,0.85,0.95]
-    skew = [0.0,0.2,0.4,0.6,0.8,0.85,0.9,0.95]
-    #skew = [0.0]
+    #skew = [0.0,0.2,0.4,0.6,0.8,0.85,0.9,0.95]
+    skew = [0.001]
 
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
@@ -515,12 +518,12 @@ def tpcc_cstress1():
 
 def tpcc_cstress2():
     wl = 'TPCC'
-    nnodes = [2]
+    nnodes = [1]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
-    nalgos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
+    # nalgos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
     # nalgos=['WOOKONG']
-    #nalgos=['NO_WAIT']
+    nalgos=['DLI_DTA3','DLI_OCC']
     npercpay=[0.0]
     # npercpay=[0.0]
     wh=128
@@ -836,7 +839,7 @@ configs = {
     "REM_THREAD_CNT": 1,
     "SEND_THREAD_CNT": 1,
     "CLIENT_NODE_CNT" : "NODE_CNT",
-    "CLIENT_THREAD_CNT" : 8,
+    "CLIENT_THREAD_CNT" : 4,
     "CLIENT_REM_THREAD_CNT" : 1,
     "CLIENT_SEND_THREAD_CNT" : 1,
     "MAX_TXN_PER_PART" : 500000,
@@ -850,8 +853,8 @@ configs = {
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '0UL',
     "NETWORK_DELAY_TEST": 'false',
-    "DONE_TIMER": "1 * 20 * BILLION // ~1 minutes",
-    "WARMUP_TIMER": "1 * 20 * BILLION // ~1 minutes",
+    "DONE_TIMER": "1 * 60 * BILLION // ~1 minutes",
+    "WARMUP_TIMER": "1 * 60 * BILLION // ~1 minutes",
     "SEQ_BATCH_TIMER": "5 * 1 * MILLION // ~5ms -- same as CALVIN paper",
     "BATCH_TIMER" : "0",
     "PROG_TIMER" : "10 * BILLION // in s",

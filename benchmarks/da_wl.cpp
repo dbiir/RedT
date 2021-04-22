@@ -48,6 +48,15 @@ RC DAWorkload::init_schema(const char *schema_file) {
   return RCOK;
 }
 
+table_t* DAWorkload::get_table(const std::string& tbl_name) {
+	// return tables[tbl_name];
+	return t_datab;
+}
+
+table_t* DAWorkload::get_table(int tbl_idx) {
+	return t_datab;
+}
+
 RC DAWorkload::init_table() {
   //pthread_t *p_thds = new pthread_t[g_init_parallelism - 1];
   DA_thr_args *tt = new DA_thr_args[g_init_parallelism];

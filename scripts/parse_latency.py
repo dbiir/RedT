@@ -46,6 +46,10 @@ s = sum(summary['trans_cur_row_init_time'])
 t = sum(summary['txn_process_time'])
 u = sum(summary['trans_benchmark_compute_time'])
 
-#trans_total_run_time trans_process_time trans_process_time% trans_2pc_time trans_2pc_time% trans_prepare_time trans_prepare_time% trans_validate_time trans_validate_time% trans_finish_time trans_finish_time% trans_commit_time trans_commit_time% trans_abort_time trans_abort_time% trans_block_time trans_block_time% txn_index_time txn_index_time% txn_manager_time txn_manager_time% lat_l_loc_cc_time lat_l_loc_cc_time%
-print "%.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f" % (a,b,(b*100/a),c,(c*100/a),d,(d*100/a),e,(e*100/a),f,(f*100/a),g,(g*100/a),h,(h*100/a),(i+j),((i+j)*100/a),k,(k*100/a),l,(l*100/a),m,(m*100/a),n,(n*100/a),o,(o*100/a),p,(p*100/a),q,(q*100/a),r,(r*100/a),s,(s*100/a),t,(t*100/a),u,(u*100/a))
+v = sum(summary['trans_process_network'])
+w = sum(summary['trans_validation_network'])
+x = sum(summary['trans_commit_network'])
+y = sum(summary['trans_abort_network'])
 
+#trans_total_run_time trans_process_time trans_process_time% trans_2pc_time trans_2pc_time% trans_prepare_time trans_prepare_time% trans_validate_time trans_validate_time% trans_finish_time trans_finish_time% trans_commit_time trans_commit_time% trans_abort_time trans_abort_time% trans_block_time trans_block_time% txn_index_time txn_index_time% txn_manager_time txn_manager_time% lat_l_loc_cc_time lat_l_loc_cc_time%
+print "%.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f" % (a,b,(b*100/a),c,(c*100/a),d,(d*100/a),e,(e*100/a),f,(f*100/a),g,(g*100/a),h,(h*100/a),(i+j),((i+j)*100/a),k,(k*100/a),l,(l*100/a),m,(m*100/a),n,(n*100/a),o,(o*100/a),p,(p*100/a),q,(q*100/a),r,(r*100/a),s,(s*100/a),t,(t*100/a),u,(u*100/a),v,(v*100/a),w,(w*100/a),x,(x*100/a),y,(y*100/a))

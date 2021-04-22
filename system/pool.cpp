@@ -297,7 +297,7 @@ void AccessPool::get(uint64_t thd_id, Access *& item) {
   item->orig_wts = 0;
   item->locked = false;
   #endif
-  #if CC_ALG == RDMA_SILO
+  #if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC
   item->location = g_node_id;
   item->key = 0;
   item->tid = 0;
@@ -429,7 +429,7 @@ void RowPool::get(uint64_t thd_id, row_t* & item) {
   bool r = pool[thd_id]->pop(item);
   if(!r) {
     DEBUG_M("msg_pool alloc\n");
-    item = (row_t*) mem_allocator.alloc(sizeof(struct row_t));
+    item = (row_t*) mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
   }
 }
 
@@ -438,7 +438,7 @@ void RowPool::put(uint64_t thd_id, row_t* item) {
   while (!pool[thd_id]->push(item) && tries++ < TRY_LIMIT) {
   }
   if(tries >= TRY_LIMIT) {
-    mem_allocator.free(item,sizeof(row_t));
+    mem_allocator.free(item,row_t::get_row_size(ROW_DEFAULT_SIZE));
   }
 }
 
@@ -447,7 +447,7 @@ void RowPool::free_all() {
   for(uint64_t thd_id = 0; thd_id < g_total_thread_cnt; thd_id++) {
   while(pool[thd_id]->pop(item)) {
     DEBUG_M("row_pool free\n");
-    mem_allocator.free(item,sizeof(row_t));
+    mem_allocator.free(item,row_t::get_row_size(ROW_DEFAULT_SIZE));
   }
   }
 }

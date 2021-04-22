@@ -51,9 +51,17 @@
 #include "wsi.h"
 #include "manager.h"
 #include "rdma_silo.h"
+#include "rdma_mvcc.h"
 #include "rdma_2pl.h"
 #include "transport.h"
 #include "row_rdma_2pl.h"
+#include "dbpa.hpp"
+
+#include "lib.hh"
+#include "qps/op.hh"
+#include "transport/rdma.h"
+#include "src/rdma/sop.hh"
+#include "src/sshed.hh"
 
 void TxnStats::init() {
 	starttime=0;
@@ -295,13 +303,18 @@ void Transaction::release_inserts(uint64_t thd_id) {
 #if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != WOOKONG && \
 		CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != DTA && CC_ALG != DLI_MVCC_OCC && \
 		CC_ALG != DLI_MVCC_BASE && CC_ALG != DLI_DTA && CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && \
-		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC
+		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC && CC_ALG != RDMA_MVCC
 		DEBUG_M("TxnManager::cleanup row->manager free\n");
 		mem_allocator.free(row->manager, 0);
 #endif
+
 		row->free_row();
+#ifdef USE_RDMA
+		r2::AllocatorMaster<>::get_thread_allocator()->free(row);
+#else
 		DEBUG_M("Transaction::release insert_rows free\n")
 		row_pool.put(thd_id,row);
+#endif
 	}
 }
 
@@ -500,10 +513,10 @@ RC TxnManager::abort() {
 	INC_STATS(get_thd_id(),total_txn_abort_cnt,1);
 	txn_stats.abort_cnt++;
 	if(IS_LOCAL(get_txn_id())) {
-	INC_STATS(get_thd_id(), local_txn_abort_cnt, 1);
+	    INC_STATS(get_thd_id(), local_txn_abort_cnt, 1);
 	} else {
-	INC_STATS(get_thd_id(), remote_txn_abort_cnt, 1);
-	txn_stats.abort_stats(get_thd_id());
+        INC_STATS(get_thd_id(), remote_txn_abort_cnt, 1);
+        txn_stats.abort_stats(get_thd_id());
 	}
 	aborted = true;
 	//RDMA_SILO - ADD remote release lock by rdma
@@ -633,6 +646,7 @@ RC TxnManager::start_commit() {
 		rc = validate();
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
+
 		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
 		INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     	INC_STATS(get_thd_id(), trans_prepare_count, 1);
@@ -654,7 +668,6 @@ RC TxnManager::start_commit() {
 			}
 			rc = abort();
 		}
-			// start_abort();
 	}
 	return rc;
 }
@@ -869,7 +882,7 @@ void TxnManager::cleanup_row(RC rc, uint64_t rid) {
 
 	//no wait abort write
   	if (ROLL_BACK && type == XP && is_local){
-    orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data); 
+       orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data); 
 	} else {
 #if ISOLATION_LEVEL == READ_COMMITTED
 		if(type == WR) {
@@ -940,6 +953,11 @@ void TxnManager::cleanup(RC rc) {
 #if CC_ALG == RDMA_SILO
     rsilo_man.finish(rc,this);
 #endif
+
+#if CC_ALG == RDMA_MVCC
+    rmvcc_man.finish(rc,this);
+#endif
+
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
 	assert(txn->accesses.get_count() == txn->row_cnt);
@@ -1089,8 +1107,12 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
 
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || \
-									CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
+#if CC_ALG == RDMA_MVCC
+   access->offset = (char*)row - rdma_global_buffer;
+   access->old_version_num = row->version_num;
+#endif
+
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC)
 	if (type == WR) {
 	//printf("alloc 10 %ld\n",get_txn_id());
 	uint64_t part_id = row->get_part_id();
@@ -1098,6 +1120,11 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	row_pool.get(get_thd_id(),access->orig_data);
 	access->orig_data->init(row->get_table(), part_id, 0);
 	access->orig_data->copy(row);
+    //  for(int i = 0;i < this->txn->row_cnt; i++){
+    //      if(txn->accesses[i]->type == WR)
+    //             printf("txn %ld o_d[%ld] table_idx = %ld \n",this->get_txn_id(),i,txn->accesses[i]->orig_data->table_idx);
+    // }
+    //printf("\n");
 	assert(access->orig_data->get_schema() == row->get_schema());
 
 	// ARIES-style physiological logging
@@ -1131,7 +1158,7 @@ RC TxnManager::get_row(row_t * row, access_t type, row_t *& row_rtn) {
 	if (type == WR) ++txn->write_cnt;
 	txn->accesses.add(access);
 #endif
-
+   
 	timespan = get_sys_clock() - starttime;
     INC_STATS(get_thd_id(), trans_store_access_time, timespan + starttime - middle_time);
   	INC_STATS(get_thd_id(), trans_store_access_count, 1);
@@ -1166,6 +1193,10 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 	row_pool.get(get_thd_id(),access->orig_data);
 		access->orig_data->init(row->get_table(), part_id, 0);
 		access->orig_data->copy(row);
+         for(int i = 0;i < this->txn->row_cnt;i++){
+             if(txn->accesses[i]->type == WR)
+            printf("txn %ld orgin_d[%ld] table %ld",this->get_txn_id(),i,this->txn->accesses[i]->orig_data->table_idx);
+        }
 	}
 #endif
 
@@ -1174,6 +1205,12 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 #if CC_ALG == RDMA_SILO
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
+
+#if CC_ALG == RDMA_MVCC
+   access->offset = (char*)row - rdma_global_buffer;
+   access->old_version_num = row->version_num;
+#endif
+
 	txn->accesses.add(access);
 	uint64_t timespan = get_sys_clock() - starttime;
 	INC_STATS(get_thd_id(), txn_manager_time, timespan);
@@ -1224,9 +1261,9 @@ RC TxnManager::validate() {
 			CC_ALG != SSI && CC_ALG != DLI_BASE && CC_ALG != DLI_OCC &&
 			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
 			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO &&
-			CC_ALG != RDMA_SILO) {
-		return RCOK;  //NO_WAIT不需要验证
-	}  
+			CC_ALG != RDMA_SILO && CC_ALG != RDMA_MVCC) {
+		return RCOK; //NO_WAIT不需要验证
+	}
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
 	if (CC_ALG == OCC && rc == RCOK) rc = occ_man.validate(this);
@@ -1296,6 +1333,14 @@ RC TxnManager::validate() {
     }
   }
 #endif
+
+#if CC_ALG == RDMA_MVCC
+    //rc = rmvcc_man.lock_row(this);
+    if(CC_ALG == RDMA_MVCC && rc == RCOK){
+         rc = rmvcc_man.validate_local(this);
+    }
+#endif
+
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);
     INC_STATS(get_thd_id(),trans_validate_count, 1);
@@ -1346,4 +1391,169 @@ void TxnManager::release_locks(RC rc) {
 
 	uint64_t timespan = (get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(), txn_cleanup_time,  timespan);
+}
+#if ENABLE_DBPA
+row_t * TxnManager::cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap){
+	uint64_t thd_id = get_thd_id();
+	uint64_t *local_buf1 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+	char *local_buf2 = Rdma::get_row_client_memory2(thd_id);
+	uint64_t read_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
+
+	RDMACASRead dbreq;
+	dbreq.set_cas_meta(compare,swap,local_buf1);
+	dbreq.set_read_meta(local_buf2,read_size);
+	auto dbres = dbreq.post_reqs(rc_qp[target_server][thd_id],(uint64_t)(remote_mr_attr[target_server].buf + remote_offset));
+
+	//only one signaled request need to be polled
+	RDMA_ASSERT(dbres == IOCode::Ok);
+	auto dbres1 = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(dbres1 == IOCode::Ok);
+	
+	try_lock = *local_buf1;
+	row_t *test_row = (row_t *)mem_allocator.alloc(read_size);
+    memcpy(test_row, local_buf2, read_size);
+    return test_row;
+}
+#endif
+
+row_t * TxnManager::read_remote_content(uint64_t target_server,uint64_t remote_offset){
+    uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
+    uint64_t thd_id = get_thd_id();
+    char *local_buf = Rdma::get_row_client_memory(thd_id);
+   
+    auto res_s = rc_qp[target_server][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_READ,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(local_buf),
+		.remote_addr = remote_offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+    row_t *test_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+    memcpy(test_row, local_buf, operate_size);
+
+    return test_row;
+ }
+
+ itemid_t * TxnManager::read_remote_index(uint64_t target_server,uint64_t remote_offset,uint64_t key){
+    uint64_t operate_size = sizeof(IndexInfo);
+    uint64_t thd_id = get_thd_id();
+    char *test_buf = Rdma::get_index_client_memory(thd_id);
+    memset(test_buf, 0, operate_size);
+   
+    auto res_s = rc_qp[target_server][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_READ,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+		.remote_addr = remote_offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+    itemid_t* item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
+	assert(((IndexInfo*)test_buf)->key == key);
+
+	item->location = ((IndexInfo*)test_buf)->address;
+	item->type = ((IndexInfo*)test_buf)->type;
+	item->valid = ((IndexInfo*)test_buf)->valid;
+	item->offset = ((IndexInfo*)test_buf)->offset;
+  	item->table_offset = ((IndexInfo*)test_buf)->table_offset;
+
+    return item;
+ }
+
+ bool TxnManager::write_remote_content(uint64_t target_server,uint64_t thd_id,uint64_t operate_size,uint64_t remote_offset,char *local_buf){
+    
+    auto res_s = rc_qp[target_server][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_WRITE,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(local_buf),
+		.remote_addr = remote_offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+    return true;
+ }
+
+ uint64_t TxnManager::cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value ){
+    
+    rdmaio::qp::Op<> op;
+    uint64_t thd_id = get_thd_id();
+    uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+    auto mr = client_rm_handler->get_reg_attr().value();
+    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[target_server].buf + remote_offset), remote_mr_attr[target_server].key).set_cas(old_value, new_value);
+    assert(op.set_payload(local_buf, sizeof(uint64_t), mr.key) == true);
+    //auto res_s2 = op.execute(rc_qp[target_server][thd_id], 0);
+    auto res_s2 = op.execute(rc_qp[target_server][thd_id], IBV_SEND_SIGNALED);
+
+    RDMA_ASSERT(res_s2 == IOCode::Ok);
+    //auto res_p2 = rc_qp[target_server][thd_id]->wait_one_comp(10000000);
+    auto res_p2 = rc_qp[target_server][thd_id]->wait_one_comp();
+    RDMA_ASSERT(res_p2 == IOCode::Ok);
+
+    return *local_buf;
+ }
+
+RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc){
+    Access * access = NULL;
+	access_pool.get(get_thd_id(),access);
+
+	this->last_row = test_row;
+    this->last_type = type;
+
+    RC rc = RCOK;
+	rc = test_row->remote_copy_row(test_row, this, access);
+    assert(test_row->get_primary_key() == access->data->get_primary_key());
+	// printf("preserve_access %s %s\n", test_row->table_name, access->data->table_name);
+    if (rc == Abort || rc == WAIT) {
+        DEBUG_M("TxnManager::get_row(abort) access free\n");
+        access_pool.put(get_thd_id(),access);
+        return rc;
+    }
+
+    access->type = type;
+
+#if CC_ALG == RDMA_SILO
+    access->orig_row = test_row;
+	access->tid = last_tid;
+	access->timestamp = test_row->timestamp;
+    access->key = test_row->get_primary_key();
+    access->location = loc;
+	access->offset = m_item->offset;	
+#endif
+
+#if CC_ALG == RDMA_MVCC
+    access->orig_row = test_row;
+    access->old_version_num = test_row->version_num;//记录写的时候通过txn_id加锁的版本
+    access->key = test_row->get_primary_key();
+    access->location =loc;
+	access->offset = m_item->offset;
+#endif
+
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+  	access->orig_row = test_row;
+	access->location = loc;
+	access->offset = m_item->offset;
+#endif
+
+    row_local = access->data;
+    ++txn->row_cnt;
+
+    mem_allocator.free(m_item,0);
+
+    if (type == WR) ++txn->write_cnt;//this->last_type = WR
+    txn->accesses.add(access);
+
+    return rc;
 }

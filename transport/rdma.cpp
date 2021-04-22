@@ -11,7 +11,7 @@
 #include "storage/row.h"
 #include "storage/table.h"
 char *Rdma::rdma_buffer; //= new char[RDMA_BUFFER_SIZE];
-char ** Rdma::ifaddr = new char *[g_total_node_cnt+10];
+char ** Rdma::ifaddr = new char *[g_total_node_cnt+20];
 
 uint64_t Rdma::get_socket_count() {
   uint64_t sock_cnt = 0;
@@ -85,7 +85,7 @@ uint64_t get_rm_id(uint64_t node_id,uint64_t thread_id){
 
 uint64_t Rdma::get_port(uint64_t node_id){
   uint64_t port_id = 0;
-  port_id = 7344 + node_id;
+  port_id = 7144 + node_id;
   return port_id ;
 }
 
@@ -174,16 +174,26 @@ char* Rdma::get_index_client_memory(uint64_t thd_id) {
 
 char* Rdma::get_row_client_memory(uint64_t thd_id) {
 	char* temp = (char *)(client_rdma_rm->raw_ptr + sizeof(IndexInfo) * g_thread_cnt);
-    temp += sizeof(row_t) * thd_id;
+    temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * thd_id;
     return temp;
 }
 
 char* Rdma::get_table_client_memory(uint64_t thd_id) {
 	char* temp = (char *)(client_rdma_rm->raw_ptr + sizeof(IndexInfo) * g_thread_cnt);
- 	temp += sizeof(row_t) * g_thread_cnt;
+ 	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * g_thread_cnt;
   	temp += sizeof(table_t) * thd_id;
   	return temp;
 }
+
+//get extra row for doorbell batched RDMA requests
+char* Rdma::get_row_client_memory2(uint64_t thd_id) {
+	char* temp = (char *)(client_rdma_rm->raw_ptr + sizeof(IndexInfo) * g_thread_cnt);
+ 	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * g_thread_cnt;
+  	temp += sizeof(table_t) * g_thread_cnt;
+	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * thd_id;
+  	return temp;
+}
+
 #if 0
 void *malloc_huge_pages(size_t size,uint64_t huge_page_sz,bool flag)
 {
@@ -230,7 +240,7 @@ void Rdma::init(){
 	rm_handler = RegHandler::create(rdma_rm, nic).value();
 
 	//as client
-	client_rdma_rm = Arc<RMem>(new RMem(10240));
+	client_rdma_rm = Arc<RMem>(new RMem(client_rdma_buffer_size));
 	client_rm_handler = RegHandler::create(client_rdma_rm, nic).value();
 
 	uint64_t thread_num = 0;

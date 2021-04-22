@@ -669,6 +669,7 @@ m_create_cq_and_qp_by_id (struct m_ibv_res *ibv_res, int max_dep, enum ibv_qp_ty
 	qp_init_attr.cap.max_recv_sge = MAX_RECV_SGE;
 	qp_init_attr.cap.max_inline_data = MAX_INLINE_DATA; //TODO add support of inline
 	qp_init_attr.qp_type = qp_type;
+	//make sure sq_sig_all == 0 so that passive ack can be enabled 
 	qp_init_attr.sq_sig_all = 0; // TODO to complete the sig function
 
 	ibv_res->qp[qp_index] = ibv_create_qp(ibv_res->pd, &qp_init_attr);
@@ -716,6 +717,7 @@ m_create_cq_and_qp (struct m_ibv_res *ibv_res, int max_dep, enum ibv_qp_type qp_
 		qp_init_attr.cap.max_recv_sge = MAX_RECV_SGE;
 		qp_init_attr.cap.max_inline_data = MAX_INLINE_DATA; //TODO add support of inline
 		qp_init_attr.qp_type = qp_type;
+		//make sure sq_sig_all == 0 so that passive ack can be enabled 
 		qp_init_attr.sq_sig_all = 0; // TODO to complete the sig function
 
 		ibv_res->qp[i] = ibv_create_qp(ibv_res->pd, &qp_init_attr);

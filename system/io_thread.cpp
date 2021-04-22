@@ -55,12 +55,13 @@ void InputThread::setup() {
 				assert(ISSERVER || ISREPLICA);
 				//printf("Received Msg %d from node %ld\n",msg->rtype,msg->return_node_id);
 #if CC_ALG == CALVIN
-			if(msg->rtype == CALVIN_ACK ||(msg->rtype == CL_QRY && ISCLIENTN(msg->get_return_id()))) {
+			if(msg->rtype == CALVIN_ACK ||(msg->rtype == CL_QRY && ISCLIENTN(msg->get_return_id())) ||
+				(msg->rtype == CL_QRY_O && ISCLIENTN(msg->get_return_id()))) {
 				work_queue.sequencer_enqueue(get_thd_id(),msg);
 				msgs->erase(msgs->begin());
 				continue;
 			}
-			if( msg->rtype == RDONE || msg->rtype == CL_QRY) {
+			if( msg->rtype == RDONE || msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 				assert(ISSERVERN(msg->get_return_id()));
 				work_queue.sched_enqueue(get_thd_id(),msg);
 				msgs->erase(msgs->begin());
@@ -123,7 +124,11 @@ RC InputThread::client_recv_loop() {
 		while(!msgs->empty()) {
 			Message * msg = msgs->front();
 			assert(msg->rtype == CL_RSP);
+		#if CC_ALG == BOCC || CC_ALG == FOCC || ONE_NODE_RECIEVE == 1
+			return_node_offset = msg->return_node_id;
+		#else
 			return_node_offset = msg->return_node_id - g_server_start_node;
+		#endif
 			assert(return_node_offset < g_servers_per_client);
 			rsp_cnts[return_node_offset]++;
 			INC_STATS(get_thd_id(),txn_cnt,1);
@@ -256,12 +261,13 @@ RC InputThread::server_recv_loop() {
 				continue;
 			}
 #if CC_ALG == CALVIN
-			if(msg->rtype == CALVIN_ACK ||(msg->rtype == CL_QRY && ISCLIENTN(msg->get_return_id()))) {
+			if(msg->rtype == CALVIN_ACK ||(msg->rtype == CL_QRY && ISCLIENTN(msg->get_return_id())) ||
+			(msg->rtype == CL_QRY_O && ISCLIENTN(msg->get_return_id()))) {
 				work_queue.sequencer_enqueue(get_thd_id(),msg);
 				msgs->erase(msgs->begin());
 				continue;
 			}
-			if( msg->rtype == RDONE || msg->rtype == CL_QRY) {
+			if( msg->rtype == RDONE || msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 				assert(ISSERVERN(msg->get_return_id()));
 				work_queue.sched_enqueue(get_thd_id(),msg);
 				msgs->erase(msgs->begin());

@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
 	tport_man.init();
   printf("Done\n");
   printf("Initializing client manager... ");
-	Workload * m_wl;
+	// Workload * m_wl;
 	switch (WORKLOAD) {
 		case YCSB :
 			m_wl = new YCSBWorkload; break;

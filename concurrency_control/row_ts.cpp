@@ -45,7 +45,7 @@ TsReqEntry * Row_ts::get_req_entry() {
 void Row_ts::return_req_entry(TsReqEntry * entry) {
 	if (entry->row != NULL) {
 		entry->row->free_row();
-		mem_allocator.free(entry->row, sizeof(row_t));
+		mem_allocator.free(entry->row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	mem_allocator.free(entry, sizeof(TsReqEntry));
 }
@@ -202,7 +202,7 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 		return_req_entry(req);
 		// the "row" is freed after hard copy to "_row"
 		row->free_row();
-		mem_allocator.free(row, sizeof(row_t));
+		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 
 	} else if (type == XP_REQ) {
 		TsReqEntry * req = debuffer_req(P_REQ, txn);
@@ -275,7 +275,7 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 			update_buffer(txn->get_thd_id());
 			return_req_entry(req);
 			row->free_row();
-			mem_allocator.free(row, sizeof(row_t));
+			mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 			goto final;
 		}
 #else
@@ -301,7 +301,7 @@ RC Row_ts::access(TxnManager * txn, TsType type, row_t * row) {
 			return_req_entry(req);
 			// the "row" is freed after hard copy to "_row"
 			row->free_row();
-			mem_allocator.free(row, sizeof(row_t));
+			mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 		}
 	} else if (type == XP_REQ) {
 		TsReqEntry * req = debuffer_req(P_REQ, txn);

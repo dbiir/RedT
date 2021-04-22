@@ -23,7 +23,6 @@
 #include "txn.h"
 #include "row.h"
 #include "rdma_silo.h"
-#include "manager.h"
 #include "mem_alloc.h"
 #include "lib.hh"
 #include "qps/op.hh"
@@ -46,27 +45,11 @@ row_t * RDMA_silo::read_remote_row(TxnManager * txn , uint64_t num){
  	uint64_t loc = txn->txn->accesses[num]->location;
 	uint64_t thd_id = txn->get_thd_id();
 
-	uint64_t operate_size = sizeof(row_t);
+	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
 
 	char *test_buf = Rdma::get_row_client_memory(thd_id);
     memset(test_buf, 0, operate_size);
 
-	// r2::rdma::SROp op;
-  //   op.set_payload(test_buf,operate_size).set_remote_addr(off).set_read();
-
-	// bool runned = false;
-  //   r2::SScheduler ssched;
-
-	// ssched.spawn([&op, &runned,&loc,&thd_id](R2_ASYNC) {
-	// 	auto ret = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED, R2_ASYNC_WAIT);
-	// 	R2_YIELD;
-	// 	ASSERT(ret == IOCode::Ok);
-	// 	runned = true;
-	// 	R2_STOP();
-	// 	R2_RET;
-	// });
-	// ssched.run();
-	// ASSERT(runned == true);
 	uint64_t starttime;
 	uint64_t endtime;
 	starttime = get_sys_clock();
@@ -88,7 +71,7 @@ row_t * RDMA_silo::read_remote_row(TxnManager * txn , uint64_t num){
 	INC_STATS(txn->get_thd_id(), rdma_read_time, endtime-starttime);
 	INC_STATS(txn->get_thd_id(), rdma_read_cnt, 1);
 
-	row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 	memcpy(temp_row, test_buf, operate_size);
 	assert(temp_row->get_primary_key() == row->get_primary_key());
 
@@ -316,7 +299,7 @@ bool RDMA_silo::validate_rw_remote(TxnManager * txn , uint64_t num){
 		succ = false;
 	}
 
-	mem_allocator.free(temp_row,sizeof(row_t));
+	mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 
 	return succ;
 }
@@ -360,7 +343,7 @@ bool RDMA_silo::assert_remote_lock(TxnManager * txn , uint64_t num){
 	}
 
 	DEBUG("silo %ld asser lock row %ld \n",lock,txn->txn->accesses[num]->key);
-	mem_allocator.free(temp_row,sizeof(row_t));
+	mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return succ;
 
 }
@@ -375,8 +358,8 @@ bool RDMA_silo::remote_commit_write(TxnManager * txnMng , uint64_t num , row_t *
 	uint64_t lock = txnMng->get_txn_id();
 	data->_tid_word = lock;
 	data->timestamp = time;
-    uint64_t operate_size = sizeof(row_t) - sizeof(data->_tid_word);
-
+    uint64_t operate_size = row_t::get_row_size(data->tuple_size) - sizeof(data->_tid_word);
+    // printf("【rdma_silo.cpp:364】table_name = %s, loc = %ld , thd_id = %ld, off = %ld, lock = %ld,operate_size = %ld tuple_size = %ld , sizeof(row_t)=%d\n",data->table_name,loc,thd_id,off,lock,operate_size,data->tuple_size,sizeof(row_t));
     char *test_buf = Rdma::get_row_client_memory(thd_id);
     memcpy(test_buf, (char*)data + sizeof(data->_tid_word), operate_size);
 
@@ -446,7 +429,7 @@ RDMA_silo::release_remote_lock(TxnManager * txnMng , uint64_t num){
 	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p2 == IOCode::Ok);
 
-	uint64_t operate_size = sizeof(row_t);
+	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
 	auto res_s = rc_qp[loc][thd_id]->send_normal(
 		{.op = IBV_WR_RDMA_READ,
 		.flags = IBV_SEND_SIGNALED,
@@ -459,7 +442,7 @@ RDMA_silo::release_remote_lock(TxnManager * txnMng , uint64_t num){
   	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 
-	row_t *temp_row = (row_t *)mem_allocator.alloc(sizeof(row_t));
+	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 	memcpy(temp_row, test_loc, operate_size);
 	DEBUG("tx %ld release lock row %ld, reread lock as %ld \n",lock,txn->accesses[num]->key,temp_row->_tid_word);
 	//assert(temp_row->_tid_word != loc);

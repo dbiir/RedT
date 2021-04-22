@@ -24,6 +24,7 @@ class table_t;
 class IndexHash;
 class index_btree;
 class IndexRdma;
+//class IndexRdmaTpcc;
 class Catalog;
 class lock_man;
 class TxnManager;
@@ -48,6 +49,9 @@ public:
 	virtual RC init_schema(const char * schema_file);
 	virtual RC init_table()=0;
 	virtual RC get_txn_man(TxnManager *& txn_manager)=0;
+
+  virtual table_t* get_table(const std::string& tbl_name)=0;
+  virtual table_t* get_table(int tbl_idx)=0;
 	// get the global timestamp.
 //	uint64_t get_ts(uint64_t thread_id);
 	//uint64_t cur_txn_id;

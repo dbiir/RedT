@@ -24,10 +24,17 @@
 #include "row.h"
 #include "index_hash.h"
 #include "index_btree.h"
+#include "index_rdma.h"
 #include "tpcc_const.h"
 #include "transport.h"
 #include "msg_queue.h"
+#include "row_rdma_2pl.h"
 #include "message.h"
+#include "rdma.h"
+#include "src/rdma/sop.hh"
+#include "qps/op.hh"
+#include "src/sshed.hh"
+#include "transport.h"
 
 void TPCCTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	TxnManager::init(thd_id, h_wl);
@@ -41,9 +48,14 @@ void TPCCTxnManager::reset() {
 	state = TPCC_PAYMENT0;
 	if(tpcc_query->txn_type == TPCC_PAYMENT) {
 		state = TPCC_PAYMENT0;
-	} else if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
+	}else if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
 		state = TPCC_NEWORDER0;
 	}
+    // if(((TPCCQuery*) query)->txn_type == TPCC_PAYMENT) {
+	// 	state = TPCC_PAYMENT0;
+	// }else if (((TPCCQuery*) query)->txn_type == TPCC_NEW_ORDER) {
+	// 	state = TPCC_NEWORDER0;
+	// }
 	next_item_id = 0;
 	TxnManager::reset();
 }
@@ -163,7 +175,8 @@ RC TPCCTxnManager::acquire_locks() {
 			// Cust
 				if (tpcc_query->by_last_name) {
 
-					key = custNPKey(c_last, c_d_id, c_w_id);
+					//key = custNPKey(c_last, c_d_id, c_w_id);
+                    key = custKey(c_id, c_d_id, c_w_id);
 					index = _wl->i_customer_last;
 					item = index_read(index, key, part_id_c_w);
 					int cnt = 0;
@@ -376,6 +389,226 @@ void TPCCTxnManager::copy_remote_items(TPCCQueryMessage * msg) {
 		msg->items.add(req);
 	}
 }
+itemid_t* TPCCTxnManager::tpcc_read_remote_index(TPCCQuery * query) {
+    TPCCQuery* tpcc_query = (TPCCQuery*) query;
+	uint64_t w_id = tpcc_query->w_id;
+	uint64_t d_id = tpcc_query->d_id;
+	uint64_t c_id = tpcc_query->c_id;
+	uint64_t d_w_id = tpcc_query->d_w_id;
+	uint64_t c_w_id = tpcc_query->c_w_id;
+	uint64_t c_d_id = tpcc_query->c_d_id;
+    uint64_t ol_i_id = 0;
+	uint64_t ol_supply_w_id = 0;
+	uint64_t ol_quantity = 0;
+	if(tpcc_query->txn_type == TPCC_NEW_ORDER) {
+			ol_i_id = tpcc_query->items[next_item_id]->ol_i_id;
+			ol_supply_w_id = tpcc_query->items[next_item_id]->ol_supply_w_id;
+			ol_quantity = tpcc_query->items[next_item_id]->ol_quantity;
+	}
+
+    uint64_t part_id_w = wh_to_part(w_id);
+	uint64_t part_id_c_w = wh_to_part(c_w_id);
+	uint64_t part_id_ol_supply_w = wh_to_part(ol_supply_w_id);
+	uint64_t w_loc = GET_NODE_ID(part_id_w);
+    uint64_t remote_offset = 0;
+    int key = 0;
+    uint64_t loc = w_loc; 
+    switch(state){
+        	case TPCC_PAYMENT0 ://operate table WH
+                key = w_id/w_loc;
+                loc = GET_NODE_ID(wh_to_part(w_id));
+                remote_offset = item_index_size + (w_id/w_loc)*sizeof(IndexInfo);
+                break;
+            case TPCC_PAYMENT4 ://operate table CUSTOMER
+                if(query->by_last_name){
+                    key = custKey(c_id, c_d_id, c_w_id);
+                                                               // return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id );
+                    remote_offset = item_index_size + wh_index_size + dis_index_size + cust_index_size 
+                                    + (key ) * sizeof(IndexInfo);
+                }else{
+                    key = custKey(c_id, c_d_id, c_w_id);
+                                                               // return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id );
+                    remote_offset = item_index_size + wh_index_size + dis_index_size 
+                                    + (key ) * sizeof(IndexInfo);
+                }
+                loc = GET_NODE_ID(wh_to_part(c_w_id));
+                break;
+            case TPCC_NEWORDER0 ://operate table WH
+                key = w_id/w_loc;
+                loc = GET_NODE_ID(wh_to_part(w_id));
+                remote_offset = item_index_size + (w_id/w_loc )*sizeof(IndexInfo);
+                break;
+            case TPCC_NEWORDER8 ://operate table STOCK
+                key = stockKey(ol_i_id, ol_supply_w_id);
+                loc = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
+                //loc = GET_NODE_ID(part_id_ol_supply_w);
+                remote_offset = item_index_size + wh_index_size + dis_index_size + cust_index_size + cl_index_size
+                                + (key ) * sizeof(IndexInfo);
+                break;
+    }
+    
+	assert(loc != g_node_id);
+
+    itemid_t *item = read_remote_index(loc,remote_offset,key);
+
+	return item;
+}
+
+RC TPCCTxnManager::send_remote_one_side_request(TPCCQuery * query,row_t *& row_local){
+    RC rc = RCOK;
+	// get the index of row to be operated
+	itemid_t * m_item;
+	m_item = tpcc_read_remote_index(query);
+
+    TPCCQuery* tpcc_query = (TPCCQuery*) query;
+	uint64_t w_id = tpcc_query->w_id;
+    uint64_t part_id_w = wh_to_part(w_id);
+    uint64_t w_loc = GET_NODE_ID(part_id_w);
+    uint64_t c_w_id = tpcc_query->c_w_id;
+
+    uint64_t loc = w_loc;
+    if(state == TPCC_PAYMENT0) {
+		loc = GET_NODE_ID(wh_to_part(w_id));
+	} else if(state == TPCC_PAYMENT4) {
+		loc = GET_NODE_ID(wh_to_part(c_w_id));
+	} else if(state == TPCC_NEWORDER0) {
+		loc = GET_NODE_ID(wh_to_part(w_id));
+	} else if(state == TPCC_NEWORDER8) {
+		loc = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
+    }
+	assert(loc != g_node_id);
+
+    uint64_t remote_offset = m_item->offset;
+
+    access_t type;
+    if(g_wh_update)type = WR;
+    else type == RD;
+
+	//read request
+	if(type == RD || type == WR){
+        uint64_t tts = get_timestamp();
+#if CC_ALG == RDMA_MVCC
+    uint64_t lock = get_txn_id()+1;
+    uint64_t test_loc = -1;
+    test_loc = cas_remote_content(loc,remote_offset,0,lock);
+    if(test_loc != 0){
+       INC_STATS(get_thd_id(), lock_fail, 1);
+       rc = Abort;
+       return rc;
+    }
+#endif
+#if CC_ALG == RDMA_WAIT_DIE2
+		//直接RDMA CAS加锁
+retry_lock:
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,0,tts);
+
+		if(try_lock != 0){ //如果CAS失败
+			if(tts <= try_lock){  //wait
+
+				num_atomic_retry++;
+				total_num_atomic_retry++;
+				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+				//sleep(1);
+				goto retry_lock;			
+			}	
+			else{ //abort
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				row_local = NULL;
+				txn->rc = Abort;
+			//	mem_allocator.free(m_item, sizeof(itemid_t));
+
+				return Abort;
+			}
+		}
+#endif
+#if CC_ALG == RDMA_NO_WAIT2
+		//直接RDMA CAS加锁
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,0,1);
+
+		if(try_lock != 0){ //如果CAS失败
+			DEBUG_M("TxnManager::get_row(abort) access free\n");
+			row_local = NULL;
+			txn->rc = Abort;
+			mem_allocator.free(m_item, sizeof(itemid_t));
+
+			return Abort;
+		}
+
+#endif
+#if CC_ALG == RDMA_NO_WAIT 
+		uint64_t new_lock_info;
+		uint64_t lock_info;
+remote_atomic_retry_lock:
+		if(type == RD){ //读集元素
+			//第一次rdma read，得到数据项的锁信息
+            row_t * test_row = read_remote_content(loc,m_item->offset);
+
+			new_lock_info = 0;
+			lock_info = test_row->_lock_info;
+
+			bool conflict = Row_rdma_2pl::conflict_lock(lock_info, DLOCK_SH, new_lock_info);
+
+			if(conflict){
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				row_local = NULL;
+				txn->rc = Abort;
+				mem_allocator.free(m_item, sizeof(itemid_t));
+				return Abort;
+			}
+			if(new_lock_info == 0){
+				printf("---线程号：%lu, 远程加锁失败!!!!!!锁位置: %lu; %p, 事务号: %lu,原lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
+			} 
+			assert(new_lock_info!=0);
+		}
+		else{ //写集元素直接CAS即可，不需要RDMA READ
+			lock_info = 0; //只有lock_info==0时才可以CAS，否则加写锁失败，Abort
+			new_lock_info = 3; //二进制11，即1个写锁
+		}
+		//RDMA CAS加锁
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,lock_info,new_lock_info);
+
+		if(try_lock != lock_info && type == RD){ //如果CAS失败:对读集元素来说，即原子性被破坏
+
+			num_atomic_retry++;
+			total_num_atomic_retry++;
+			if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
+			goto remote_atomic_retry_lock;
+
+		}	
+		if(try_lock != lock_info && type == WR){ //如果CAS失败:对写集元素来说,即已经有锁;
+			DEBUG_M("TxnManager::get_row(abort) access free\n");
+			row_local = NULL;
+			txn->rc = Abort;
+			mem_allocator.free(m_item, sizeof(itemid_t));
+
+			return Abort; //原子性被破坏，CAS失败			
+		}	
+
+#endif
+
+
+	//	get remote row
+	    row_t * test_row = read_remote_content(loc,remote_offset);
+#if CC_ALG == RDMA_MVCC
+        test_loc = cas_remote_content(loc,remote_offset,lock,0);
+#endif
+        if(g_wh_update)this->last_type = WR;
+        else this->last_type == RD;
+
+        //preserve the txn->access
+        RC rc = RCOK;
+        rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+		
+        return rc;
+    } else {
+		assert(false);
+	}
+
+	return rc;
+}
 
 
 RC TPCCTxnManager::run_txn_state() {
@@ -418,6 +651,9 @@ RC TPCCTxnManager::run_txn_state() {
 		case TPCC_PAYMENT0 :
 						if(w_loc)
 										rc = run_payment_0(w_id, d_id, d_w_id, h_amount, row);
+                        else if(rdma_one_side()){//rdma_silo
+                            rc = send_remote_one_side_request(tpcc_query,row);
+                        }
 						else {
 							rc = send_remote_request();
 						}
@@ -434,7 +670,9 @@ RC TPCCTxnManager::run_txn_state() {
 		case TPCC_PAYMENT4 :
 						if(c_w_loc)
 								rc = run_payment_4( w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row);
-						else {
+						else if(rdma_one_side()){//rdma_silo
+                            rc = send_remote_one_side_request(tpcc_query,row);
+                        }else {
 								rc = send_remote_request();
 						}
 						break;
@@ -444,7 +682,9 @@ RC TPCCTxnManager::run_txn_state() {
 		case TPCC_NEWORDER0 :
 						if(w_loc)
 								rc = new_order_0( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
-						else {
+						else if(rdma_one_side()){//rdma_silo
+                            rc = send_remote_one_side_request(tpcc_query,row);
+                        }else {
 								rc = send_remote_request();
 						}
 			break;
@@ -471,19 +711,22 @@ RC TPCCTxnManager::run_txn_state() {
 			break;
 		case TPCC_NEWORDER8 :
 					if(ol_supply_w_loc) {
-				rc = new_order_8(w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,
-												 row);
-			} else {
-									rc = send_remote_request();
+				rc = new_order_8(w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,row);
+			        }else if(rdma_one_side()){//rdma_silo
+                            rc = send_remote_one_side_request(tpcc_query,row);
+                    } else {
+							rc = send_remote_request();
 					}
-							break;
+					break;
 		case TPCC_NEWORDER9 :
 			rc = new_order_9(w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number,
 											 ol_amount, o_id, row);
 						break;
 		case TPCC_FIN :
 				state = TPCC_FIN;
-			if (tpcc_query->rbk) return Abort;
+			if (tpcc_query->rbk) 
+	            INC_STATS(get_thd_id(),tpcc_fin_abort,get_sys_clock() - starttime);
+                return Abort;
 						//return finish(tpcc_query,false);
 				break;
 		default:
@@ -619,7 +862,8 @@ inline RC TPCCTxnManager::run_payment_4(uint64_t w_id, uint64_t d_id, uint64_t c
 			EXEC SQL OPEN c_byname;
 		+===========================================================================*/
 
-		key = custNPKey(c_last, c_d_id, c_w_id);
+		//key = custNPKey(c_last, c_d_id, c_w_id);
+        key = custKey(c_id, c_d_id, c_w_id);
 		// XXX: the list is not sorted. But let's assume it's sorted...
 		// The performance won't be much different.
 		INDEX * index = _wl->i_customer_last;
@@ -733,6 +977,8 @@ inline RC TPCCTxnManager::new_order_0(uint64_t w_id, uint64_t d_id, uint64_t c_i
 	key = w_id;
 	INDEX * index = _wl->i_warehouse;
 	INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
+        // key = w_id/w_loc;
+        // remote_offset = (90 * 1024 *1024L) + (w_id/w_loc)*sizeof(IndexInfo);
 	item = index_read(index, key, wh_to_part(w_id));
 	starttime = get_sys_clock();
 	assert(item != NULL);

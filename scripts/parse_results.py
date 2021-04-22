@@ -4,7 +4,6 @@ summary = {}
 
 
 def get_summary(sfile):
-    #print sfile 
     with open(sfile, 'r') as f:
         for line in f:
             if 'summary' in line:
@@ -22,7 +21,7 @@ for arg in sys.argv[1:]:
     get_summary(arg)
 names = summary.keys()
 
-a, b, c, d, e = 0, 0, 0, 0, 0
+a, b, c = 0, 0, 0
 if 'tput' in summary:
     a = sum(summary['tput'])
 if 'total_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
@@ -30,9 +29,5 @@ if 'total_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and su
 if 'remote_txn_commit_cnt' in summary and 'remote_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and 'total_txn_abort_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
     c = (summary['remote_txn_commit_cnt'][0] + summary['remote_txn_abort_cnt'][0]) / (
             summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0])
-if 'total_txn_commit_cnt' in summary and 'total_txn_abort_cnt' in summary and 'total_num_atomic_retry' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
-    d = summary['total_num_atomic_retry'][0]/(summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0]) #average num of retry per transaction
-if 'max_num_atomic_retry' in summary:
-    e = summary['max_num_atomic_retry'][0] 
 
-print a, b, c, d, e
+print a, b, c

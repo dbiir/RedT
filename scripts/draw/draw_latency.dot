@@ -3,6 +3,7 @@ digraph graphname {
 		shape=box]
 	process [label="trans process time \n trans_process_time \n trans_process_time_percent %",
 			shape=box]
+    process_network [label="trans process network time \n trans_process_network \n trans_process_network_percent %", shape=box]
     txn_process [label="run benchmark read and write \n txn_process_time \n txn_process_time_percent %",
 			shape=box]
       init [label="trans init time \n trans_init_time \n trans_init_time_percent %",
@@ -33,12 +34,15 @@ digraph graphname {
 				shape=box]
 			validate [label="trans validate time \n trans_validate_time \n trans_validate_time_percent %",
 					shape=box]
+      validate_network [label="trans validate network time \n trans_validation_network \n trans_validation_network_percent %", shape=box]
 		finish [label="trans finish time \n trans_finish_time \n trans_finish_time_percent %",
 				shape=box]
 			commit [label="trans commit time \n trans_commit_time \n trans_commit_time_percent %",
 				shape=box]
+      commit_network [label="trans commit network time \n trans_commit_network \n trans_commit_network_percent %", shape=box]
 			abort [label="trans abort time \n trans_abort_time \n trans_abort_time_percent %",
 				shape=box]
+      abort_network [label="trans abort network time \n trans_abort_network \n trans_abort_network_percent %", shape=box]
 
   total->process
     process->txn_process
@@ -53,10 +57,14 @@ digraph graphname {
           get_row->cur_row_copy
         access_rwset->store_access
     process->block
+    process->process_network
   total->twopc
     twopc->prepare
       prepare->validate
+      prepare->validate_network
     twopc->finish
       finish->commit
+        commit->commit_network
       finish->abort
+        abort->abort_network
 };
