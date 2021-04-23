@@ -252,27 +252,27 @@ void Transport::create_server(uint64_t port, uint64_t dest_node_id) {
 	RecvManager<RDMA_ENTRY_NUM, RDMA_BUFFER_ITEM_SIZE> manager(ctrl);
 	//auto tport_man.nic = RNic::create(RNicInfo::query_dev_names().at(RDMA_USE_NIC_IDX)).value();
 	RDMA_ASSERT(ctrl.opened_nics.reg(0, tport_man.nic));
-	RDMA_LOG(4) << g_node_id << " RDMA listens " << dest_node_id << " at " << port;
+	// RDMA_LOG(4) << g_node_id << " RDMA listens " << dest_node_id << " at " << port;
 
-	//1銆乧reate receive cq
+	//1,create receive cq
 	auto recv_cq_res = ::rdmaio::qp::Impl::create_cq(tport_man.nic, RDMA_ENTRY_NUM);
 	RDMA_ASSERT(recv_cq_res == IOCode::Ok);
 	auto recv_cq = std::get<0>(recv_cq_res.desc);
 
-	//2銆乸repare the message buffer with allocator
+	//2,prepare the message buffer with allocator
 	auto mem = Arc<RMem>(new RMem(RDMA_BUFFER_SIZE)); // a memory with 4M bytes
 	auto handler = RegHandler::create(mem, tport_man.nic).value();
 	auto alloc = std::make_shared<SimpleAllocator>(mem, handler->get_reg_attr().value().key);
 
-	//3銆乺egister receive cq
+	//3,register receive cq
 	manager.reg_recv_cqs.create_then_reg(RDMA_CQ_NAME+to_string(port), recv_cq, alloc);
-	RDMA_LOG(4) << "Register " << RDMA_CQ_NAME+to_string(port);
+	// RDMA_LOG(4) << "Register " << RDMA_CQ_NAME+to_string(port);
 	int64_t reg_mem_name = RDMA_REG_MEM_NAME + int64_t(port) - TPORT_TWOSIDE_PORT;
-	RDMA_LOG(4) << "Reg_mem_name is " << reg_mem_name;
+	// RDMA_LOG(4) << "Reg_mem_name is " << reg_mem_name;
 	ctrl.registered_mrs.reg(reg_mem_name, handler);
 	ctrl.start_daemon();
-	sleep(10);
-	RDMA_LOG(4) << "Recv qp: " << "rdma_qp"+to_string(port);
+	sleep(15);
+	// RDMA_LOG(4) << "Recv qp: " << "rdma_qp"+to_string(port);
 	auto recv_qp = ctrl.registered_qps.query("rdma_qp"+to_string(port)).value();
 	auto recv_rs = manager.reg_recv_entries.query("rdma_qp"+to_string(port)).value();
 	pthread_mutex_lock( tport_man.latch );
@@ -283,7 +283,7 @@ void Transport::create_server(uint64_t port, uint64_t dest_node_id) {
 	pthread_mutex_unlock( tport_man.latch );
 	u64 recv_cnt = 0;
 
-	RDMA_LOG(2) << "a new recv";
+	// RDMA_LOG(2) << "a new recv";
 	pthread_mutex_lock( tport_man.latch );
 	auto recv_qpi = tport_man.recv_qps[port-TPORT_TWOSIDE_PORT];
 	auto recv_rsi = tport_man.recv_rss[port-TPORT_TWOSIDE_PORT];
@@ -297,25 +297,25 @@ void Transport::create_server(uint64_t port, uint64_t dest_node_id) {
 
 		u64 seq = std::atoi(msg.c_str());
 		recv_cnt++;
-		RDMA_LOG(2) << "the message content is" << buf;
+		// RDMA_LOG(2) << "the message content is" << buf;
 	}
 }
 void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
-	//1銆乧reate the local QP to send
+	//1 create the local QP to send
 	auto qp = RDMARC::create(tport_man.nic, QPConfig()).value();
 	string ifaddr_temp = ifaddr[dest_node_id];
 	string addr = ifaddr_temp + ":" + std::to_string(port);
-	cout << addr << endl;
+	// cout << addr << endl;
 
 	ConnectManager cm(addr);
 
 	if (cm.wait_ready(1000000, 4) == IOCode::Timeout)
 		RDMA_LOG(4) << "connect to the " << ifaddr[dest_node_id] << " timeout!";
 	sleep(1);
-	//2銆乧reate the remote QP and connect
+	//2 create the remote QP and connect
 	auto qp_res = cm.cc_rc_msg("rdma_qp"+to_string(port),
 		RDMA_CQ_NAME+to_string(port), 4096, qp, RDMA_USE_NIC_IDX, QPConfig());
-	cout << "rdma_qp"+to_string(port) << "  " << RDMA_CQ_NAME+to_string(port);
+	// cout << "rdma_qp"+to_string(port) << "  " << RDMA_CQ_NAME+to_string(port);
 	RDMA_ASSERT(qp_res == IOCode::Ok) << std::get<0>(qp_res.desc);
 	auto fetch_res = cm.fetch_remote_mr(RDMA_REG_MEM_NAME + int64_t(port) - TPORT_TWOSIDE_PORT);
 	rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);
@@ -330,7 +330,7 @@ void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
     rdma_send_qps sqp(qp);
 	tport_man.send_qps[port-TPORT_TWOSIDE_PORT] = sqp;
 	pthread_mutex_unlock( tport_man.latch_send );
-	RDMA_LOG(2) << "rc client ready to send message to the server!";
+	// RDMA_LOG(2) << "rc client ready to send message to the server!";
 	pthread_mutex_lock( tport_man.latch_send );
 
 	auto send_qpi = &tport_man.send_qps[port-TPORT_TWOSIDE_PORT];
@@ -341,7 +341,7 @@ void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
 		std::string msg = std::to_string(i);
 		memset(buf2, 0, msg.size() + 1);
 		memcpy(buf2, msg.data(), msg.size());
-		RDMA_LOG(2) << "the message content is" << buf2;
+		// RDMA_LOG(2) << "the message content is" << buf2;
 		printf("qp buf ptr:%p\n", buf2);
 		auto res_s = send_qpi->send_qps->send_normal(
 			{.op = IBV_WR_SEND_WITH_IMM,
@@ -404,7 +404,7 @@ void Transport::init() {
 				client_thread_id++) {
 				th_connect.push_back(std::thread([=](){
 				sleep(1);
-				cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
+				// cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
 					uint64_t port_id =
 					get_twoside_port_id(g_node_id, node_id, client_thread_id % g_client_send_thread_cnt);
 					create_client(port_id, node_id);
@@ -416,7 +416,7 @@ void Transport::init() {
 				server_thread_id++) {
 				th_connect.push_back(std::thread([=](){
 					sleep(1);
-					cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
+					// cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
 					uint64_t port_id = get_twoside_port_id(g_node_id,node_id,server_thread_id % g_send_thread_cnt);
 					create_client(port_id, node_id);
 				}));
@@ -459,14 +459,14 @@ void Transport::init() {
 		if (node_id == g_node_id) continue;
 		// Listening ports
 		if(ISCLIENTN(node_id)) {
-		for (uint64_t client_thread_id = 0; client_thread_id < g_client_thread_cnt; client_thread_id++) {
+		for (uint64_t client_thread_id = 0; client_thread_id < g_thread_cnt; client_thread_id++) {
 				th_bind.push_back(std::thread([=](){
 					uint64_t port_id = get_thd_port_id(node_id, g_node_id, client_thread_id);
 					create_server(port_id, node_id);
 				}));
 			}
 		} else {
-		for (uint64_t server_thread_id = 0; server_thread_id < g_thread_cnt; server_thread_id++) {
+		for (uint64_t server_thread_id = 0; server_thread_id < g_client_thread_cnt; server_thread_id++) {
 				th_bind.push_back(std::thread([=](){
 					uint64_t port_id = get_thd_port_id(node_id,g_node_id,server_thread_id);
 					create_server(port_id, node_id);
@@ -478,7 +478,7 @@ void Transport::init() {
 			for (uint64_t client_thread_id = 0; client_thread_id < g_client_thread_cnt; client_thread_id++) {
 				th_connect.push_back(std::thread([=](){
 				sleep(1);
-				cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
+				// cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
 					uint64_t port_id =
 					get_thd_port_id(g_node_id, node_id, client_thread_id);
 					create_client(port_id, node_id);
@@ -488,7 +488,7 @@ void Transport::init() {
 			for (uint64_t server_thread_id = 0; server_thread_id < g_thread_cnt; server_thread_id++) {
 				th_connect.push_back(std::thread([=](){
 					sleep(1);
-					cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
+					// cout << g_node_id << node_id << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
 					uint64_t port_id = get_thd_port_id(g_node_id,node_id,server_thread_id);
 					create_client(port_id, node_id);
 				}));
@@ -626,7 +626,6 @@ void Transport::rdma_thd_send_msg(uint64_t send_thread_id, uint64_t dest_node_id
 	DEBUG("Send batch of %ld msgs to %ld\n",sbuf->cnt,dest_node_id);
     fflush(stdout);
     sbuf->set_send_time(get_sys_clock());
-	// TODO: 鍙戦€?
 	//sleep(1);
 	// printf("node %ld thread %ld send to remote node %ld\n", g_node_id, send_thread_id, dest_node_id);
     rdma_send_msg(send_thread_id, dest_node_id, sbuf->buffer, sbuf->ptr);
@@ -767,7 +766,12 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 #elif USE_RDMA == CHANGE_MSG_QUEUE
     uint64_t send_thd_id;
 	starttime = get_sys_clock();
-	send_thd_id = starttime % (g_thread_cnt);
+	if(ISCLIENTN(g_node_id)) {
+		send_thd_id = starttime % (g_thread_cnt);
+	} else {
+		send_thd_id = starttime % (g_client_thread_cnt);
+	}
+	
 	port_id = get_thd_port_id(ctr, g_node_id, send_thd_id);
 #endif
 	//uint64_t start_ctr = ctr;

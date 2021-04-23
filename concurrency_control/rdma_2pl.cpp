@@ -10,25 +10,25 @@
 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 void RDMA_2pl::write_and_unlock(row_t * row, row_t * data, TxnManager * txnMng) {
-	//row->copy(data);  //复制access->data到access->orig_row
-    //上一步不需要：如果是本地：data和orig_row相同
+	//row->copy(data);  //copy access->data to access->orig_row
+    //no need for last step:data = orig_row in local situation
     uint64_t lock_info = row->_lock_info;
     row->_lock_info = 0;
 #if DEBUG_PRINTF
-    printf("---线程号：%lu, 本地解写锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), g_node_id, &row->_lock_info, txnMng->get_txn_id(), lock_info);
+    printf("---thd：%lu, local lock succ,lock location: %u; %p, txn: %lu, old lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), g_node_id, &row->_lock_info, txnMng->get_txn_id(), lock_info);
 #endif
 }
 
 void RDMA_2pl::remote_write_and_unlock(RC rc, TxnManager * txnMng , uint64_t num){
     Access *access = txnMng->txn->accesses[num];
     row_t *data = access->data;
-    data->_lock_info = 0; //直接把unlock的结果一起写回
+    data->_lock_info = 0; //write data and unlock
 
     uint64_t off = access->offset;
     uint64_t loc = access->location;
 	uint64_t thd_id = txnMng->get_thd_id();
 
-    //Abort的时候，只用解锁，不写回数据
+    //just unlock, not write back when ABORT 
     uint64_t operate_size = 0;
     if(rc != Abort) operate_size = row_t::get_row_size(data->tuple_size);
     else operate_size = sizeof(uint64_t);
@@ -124,16 +124,6 @@ retry_unlock:
 #if DEBUG_PRINTF
     printf("---线程号：%lu, 本地解读锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_lock_info, txnMng->get_txn_id(), lock_info, new_lock_info);
 #endif     
-/*
-    //本地CAS，成功返回1，失败返回0
-    if(!__sync_bool_compare_and_swap(&row->_lock_info, lock_info, new_lock_info)){
-    //原子性被破坏
-#if DEBUG_PRINTF
-        printf("---retry_unlock读集元素\n");
-#endif
-        goto retry_unlock;
-    }
-*/
 
 #elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
     assert(row->_lock_info != 0);

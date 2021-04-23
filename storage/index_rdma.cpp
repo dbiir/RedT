@@ -83,7 +83,7 @@ RC IndexRdma::init(uint64_t bucket_cnt) {
 
 	index_info = (IndexInfo*)rdma_global_buffer;
 
-	printf("%d",index_info[0].key);
+	// printf("%d",index_info[0].key);
 
 	uint64_t i = 0;
 	for (i = 0; i < g_synth_table_size/g_node_cnt; i ++) {

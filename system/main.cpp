@@ -44,6 +44,8 @@
 #include "ycsb_query.h"
 #include "da.h"
 #include "maat.h"
+#include "rdma_maat.h"
+#include "rdma_cicada.h"
 #include "ssi.h"
 #include "wsi.h"
 #include "focc.h"
@@ -81,12 +83,6 @@ void parser(int argc, char * argv[]);
 int main(int argc, char *argv[]) {
 	
 
-#ifdef USE_RDMA
-  if(g_node_id == 0) {
-    // printf("[Memcached Begin Listen]\n");
-    // system("memcached -l 0.0.0.0 -p 10086 &");  
-  }
-#endif
     // 0. initialize global data structure
     parser(argc, argv);
 #if SEED != 0
@@ -234,6 +230,22 @@ int main(int argc, char *argv[]) {
 	printf("Initializing MaaT manager... ");
 	fflush(stdout);
 	maat_man.init();
+	printf("Done\n");
+#endif
+#if CC_ALG == RDMA_MAAT
+	printf("Initializing Time Table... ");
+	fflush(stdout);
+	rdma_time_table.init();
+	printf("Done\n");
+	printf("Initializing MaaT manager... ");
+	fflush(stdout);
+	rmaat_man.init();
+	printf("Done\n");
+#endif
+#if CC_ALG == RDMA_CICADA
+	printf("Initializing CICADA manager... ");
+	fflush(stdout);
+	rcicada_man.init();
 	printf("Done\n");
 #endif
 #if CC_ALG == SSI
@@ -405,12 +417,12 @@ int main(int argc, char *argv[]) {
 
 	uint64_t id = 0;
 	for (uint64_t i = 0; i < wthd_cnt; i++) {
-#if SET_AFFINITY
-		CPU_ZERO(&cpus);
-		CPU_SET(cpu_cnt, &cpus);
-		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-		cpu_cnt++;
-#endif
+// #if SET_AFFINITY
+// 		CPU_ZERO(&cpus);
+// 		CPU_SET(cpu_cnt, &cpus);
+// 		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+// 		cpu_cnt++;
+// #endif
 		assert(id >= 0 && id < wthd_cnt);
 		worker_thds[i].init(id,g_node_id,m_wl);
 		pthread_create(&p_thds[id++], &attr, run_thread, (void *)&worker_thds[i]);
@@ -420,12 +432,13 @@ int main(int argc, char *argv[]) {
 		input_thds[j].init(id,g_node_id,m_wl);
 		pthread_create(&p_thds[id++], NULL, run_thread, (void *)&input_thds[j]);
 	}
-
+//#if USE_RDMA != CHANGE_MSG_QUEUE
 	for (uint64_t j = 0; j < sthd_cnt; j++) {
 		assert(id >= wthd_cnt + rthd_cnt && id < wthd_cnt + rthd_cnt + sthd_cnt);
 		output_thds[j].init(id,g_node_id,m_wl);
 		pthread_create(&p_thds[id++], NULL, run_thread, (void *)&output_thds[j]);
 	}
+//#endif
 #if LOGGING
 	log_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&log_thds[0]);

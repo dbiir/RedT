@@ -294,7 +294,7 @@ void TPCCWorkload::init_tab_wh() {
 		double w_ytd=300000.00;
 		row->set_value(W_TAX, tax);
 		row->set_value(W_YTD, w_ytd);
-        if(wid<=1000)printf("【tpcc_wl.cpp:270】wh_key = %ld\n",wid);
+        // if(wid<=1000)printf("【tpcc_wl.cpp:270】wh_key = %ld\n",wid);
 		index_insert(i_warehouse, wid , row, wh_to_part(wid));
 	}
 
@@ -331,7 +331,7 @@ void TPCCWorkload::init_tab_dist(uint64_t wid) {
 		row->set_value(D_TAX, tax);
 		row->set_value(D_YTD, w_ytd);
 		row->set_value(D_NEXT_O_ID, 3001);
-        if(distKey(did, wid) <= 1000)printf("【tpcc_wl.cpp:307】dis_key = %ld\n",distKey(did, wid));
+        // if(distKey(did, wid) <= 1000)printf("【tpcc_wl.cpp:307】dis_key = %ld\n",distKey(did, wid));
 		index_insert(i_district, distKey(did, wid), row, wh_to_part(wid));
 	}
 }

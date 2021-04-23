@@ -85,7 +85,7 @@ class Socket {
 		~Socket () { delete &sock;}
         char _pad1[CL_SIZE];
 		nn::socket sock;
-        //char _pad[CL_SIZE - sizeof(nn::socket)];//?_pad的用处
+        //char _pad[CL_SIZE - sizeof(nn::socket)];//?usage of _pad
 };
 #ifdef USE_RDMA
 class rdma_send_qps{

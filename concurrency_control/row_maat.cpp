@@ -22,6 +22,7 @@
 #include "helper.h"
 #include "maat.h"
 
+#if CC_ALG == MAAT
 void Row_maat::init(row_t * row) {
 	_row = row;
 
@@ -107,11 +108,14 @@ RC Row_maat::read(TxnManager * txn) {
   INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
   DEBUG("READ %ld -- %ld: lw %ld\n", txn->get_txn_id(), _row->get_primary_key(),
         timestamp_last_write);
+  //printf("READ %ld -- %ld: lw %ld\n", txn->get_txn_id(), _row->get_primary_key(),
+  //      timestamp_last_write);
 
   // Copy uncommitted writes
   for(auto it = uncommitted_writes->begin(); it != uncommitted_writes->end(); it++) {
     uint64_t txn_id = *it;
     txn->uncommitted_writes->insert(txn_id);
+    //printf("    UW %ld -- %ld: %ld\n",txn->get_txn_id(),_row->get_primary_key(),txn_id);
     DEBUG("    UW %ld -- %ld: %ld\n",txn->get_txn_id(),_row->get_primary_key(),txn_id);
   }
 
@@ -316,3 +320,5 @@ RC Row_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 }
 
 void Row_maat::write(row_t* data) { _row->copy(data); }
+
+#endif

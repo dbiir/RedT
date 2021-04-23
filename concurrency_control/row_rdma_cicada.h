@@ -14,29 +14,39 @@
    limitations under the License.
 */
 
-#ifndef ROW_MAAT_H
-#define ROW_MAAT_H
-#if CC_ALG == MAAT
-class Row_maat {
+#ifndef ROW_RDMA_CICADA_H
+#define ROW_RDMA_CICADA_H
+
+#if CC_ALG == RDMA_CICADA
+enum CicadaState {
+  Cicada_PENDING = 0,
+  Cicada_COMMITTED,
+  Cicada_ABORTED
+};
+struct RdmaCicadaVersion{
+	uint64_t key;
+	uint64_t Rts;
+	uint64_t Wts;
+	CicadaState state;
+  // char data[ROW_DEFAULT_SIZE];
+
+	void init(uint64_t key) {
+		this->key = key;
+		Rts = 0;
+		Wts = get_sys_clock();
+		state = Cicada_PENDING;
+	}
+};
+
+class Row_rdma_cicada {
 public:
 	void init(row_t * row);
-  RC access(access_t type, TxnManager * txn);
-  RC read_and_prewrite(TxnManager * txn);
-  RC read(TxnManager * txn);
-  RC prewrite(TxnManager * txn);
-  RC abort(access_t type, TxnManager * txn);
-  RC commit(access_t type, TxnManager * txn, row_t * data);
+  RC access(access_t type, TxnManager * txn, row_t * local_row);
+  RC abort(uint64_t num, TxnManager * txn);
+  RC commit(uint64_t num, TxnManager * txn, row_t * data);
   void write(row_t * data);
-
-private:
-  volatile bool maat_avail;
-
+  bool local_cas_lock(TxnManager * txnMng , uint64_t info, uint64_t new_info);
 	row_t * _row;
-
-  std::set<uint64_t> * uncommitted_reads;
-  std::set<uint64_t> * uncommitted_writes;
-  uint64_t timestamp_last_read;
-  uint64_t timestamp_last_write;
 };
 
 #endif

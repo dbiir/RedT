@@ -21,6 +21,7 @@
 #include "global.h"
 
 #define ROW_DEFAULT_SIZE 1000
+#include "row_rdma_cicada.h"
 
 
 #define DECL_SET_VALUE(type) void set_value(int col_id, type value);
@@ -65,6 +66,9 @@ class Row_rdma_silo;
 class Row_rdma_mvcc;
 class rdma_mvcc;
 class Row_rdma_2pl;
+class Row_rdma_maat;
+class Row_rdma_ts1;
+class Row_rdma_cicada;
 
 //struct RdmaMVHis;
 
@@ -131,15 +135,37 @@ public:
 	RC get_row(access_t type, TxnManager *txn, Access *access);
 	RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row);
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
+#if CC_ALG == RDMA_TS1
+	uint64_t return_row(access_t type, TxnManager *txn, Access *access);
+#endif
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
     #if CC_ALG == RDMA_SILO
-        volatile uint64_t	_tid_word;  //锁：txn_id
+        volatile uint64_t	_tid_word;  //lcok info ：txn_id
         ts_t 			timestamp;
         Row_rdma_silo * manager;
 	#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 		volatile uint64_t _lock_info; //RDMA_NO_WAIT2: only 0 or 1; RDMA_WAIT_DIE2: only 0 or ts
 		Row_rdma_2pl * manager;
+	#elif CC_ALG == RDMA_MAAT
+	    volatile uint64_t _tid_word;
+		Row_rdma_maat * manager;
+		uint64_t uncommitted_reads[ROW_SET_LENGTH];
+		uint64_t uncommitted_writes[ROW_SET_LENGTH];
+		uint64_t timestamp_last_read;
+		uint64_t timestamp_last_write;
+	#elif CC_ALG == RDMA_CICADA
+		volatile uint64_t _tid_word;
+		RdmaCicadaVersion cicada_version[HIS_CHAIN_NUM];
+		Row_rdma_cicada * manager;
+		uint64_t version_cnt;
+
+	#elif CC_ALG == RDMA_TS1
+		volatile uint64_t	mutx;
+		volatile uint64_t	tid;
+		ts_t wts;
+    	ts_t rts;
+		Row_rdma_ts1 * manager;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
 		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP

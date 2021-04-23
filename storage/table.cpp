@@ -59,6 +59,11 @@ void table_t::init(Catalog schema) {
 	this->schema = schema;
 	//test_read();
 }
+
+void table_t::init(const char * table_name, int table_id) {
+	strcpy(this->table_name, table_name);
+	this->table_id = table_id;
+}
 #else
 
 void table_t::init(Catalog * schema) {
@@ -105,6 +110,9 @@ RC table_t::get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
 #ifdef USE_RDMA
 	RC rc = RCOK;
   	DEBUG_M("table_t::get_new_row alloc\n");
+
+    // printf("[table.cpp:114]tuple_size = %ld \n",get_schema()->get_tuple_size());
+    // printf("[table.cpp:115]tuple_size = %ld \n",row_t::get_row_size(get_schema()->get_tuple_size()));
 
     row_t *ptr = (row_t*)r2::AllocatorMaster<>::get_thread_allocator()->alloc(row_t::get_row_size(get_schema()->get_tuple_size()));
 	assert (ptr != NULL);

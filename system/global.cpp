@@ -56,6 +56,9 @@
 #include "rdma_silo.h"
 #include "rdma_mvcc.h"
 #include "rdma_2pl.h"
+#include "rdma_maat.h"
+#include "rdma_ts1.h"
+#include "rdma_cicada.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -99,6 +102,16 @@ rdma_mvcc rmvcc_man;
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 RDMA_2pl r2pl_man;
+#endif
+#if CC_ALG == RDMA_MAAT
+RDMA_Maat rmaat_man;
+RdmaTimeTable rdma_time_table;
+#endif
+#if CC_ALG == RDMA_TS1
+RDMA_ts1 rdmats_man;
+#endif
+#if CC_ALG == RDMA_CICADA
+RDMA_Cicada rcicada_man;
 #endif
 Workload * m_wl;
 TxnManPool txn_man_pool;
@@ -233,6 +246,10 @@ UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 3*(1024*1024L);
 UInt64 rdma_index_size = (300*1024*1024L);
 
+// MAAT
+UInt64 rdma_timetable_size = 3*400*1024*1024;
+UInt64 row_set_length = ROW_SET_LENGTH;
+
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;
 UInt64 g_max_pre_req = MAX_PRE_REQ;
@@ -284,7 +301,7 @@ UInt32 g_repl_cnt = REPLICA_CNT;
 
 uint64_t tpcc_idx_per_num = (700000 * NUM_WH)/PART_CNT ;
 
-uint64_t item_idx_num = 100000 * g_node_cnt;//item表在每个server上都存一份，*g_node_cnt便于计算
+uint64_t item_idx_num = 100000 * g_node_cnt;//A copy of the item table is stored on each server, *g_node_cnt easy to caculate
 uint64_t wh_idx_num = NUM_WH;
 uint64_t stock_idx_num = 100000 * NUM_WH;
 uint64_t dis_idx_num = 10 * NUM_WH;
@@ -308,18 +325,19 @@ uint64_t ol_index_size = (20 * 1024 *1024L);
 map<string, string> g_params;
 
 char *rdma_global_buffer;
+char *rdma_timetable_buffer;
 //rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
 rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
-// 每个线程只用自己的那一块客户端内存地址
-/* client_rdma_rm 内存地址使用,假设有4个执行线程
- * size:IndexInfo //0号线程读index
- * size:IndexInfo //1号线程读index
- * size:IndexInfo //2号线程读index
- * size:IndexInfo //3号线程读index
- * size:Row //0号线程读row
- * size:Row //1号线程读row
- * size:Row //2号线程读row
- * size:Row //3号线程读row
+//Each thread uses only its own piece of client memory address
+/* client_rdma_rm suppose there are 4 work thd 
+ * size:IndexInfo //thd 0 read index
+ * size:IndexInfo //thd 1 read index
+ * size:IndexInfo //thd 2 read index
+ * size:IndexInfo //thd 3 read index
+ * size:Row //thd 0 read row
+ * size:Row //thd 1 read row
+ * size:Row //thd 2 read row
+ * size:Row //thd 3 read row
  */
 rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
 rdmaio::Arc<rdmaio::rmem::RegHandler> rm_handler;

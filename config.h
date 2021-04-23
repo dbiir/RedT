@@ -28,6 +28,7 @@
 #define USE_RDMA CHANGE_TCP_ONLY
 #define RDMA_BUFFER_SIZE (1<<25)
 #define RDMA_CYC_QP_NUM (1<<10)
+#define RDMA_LOCAL_BUFFER_SIZE (10240)
 #define RDMA_BUFFER_ITEM_SIZE (1<<12)
 #define RDMA_USE_NIC_IDX 0
 #define RDMA_REG_MEM_NAME 73
@@ -42,7 +43,7 @@
 #define CHANGE_MSG_QUEUE 1
 
 #define HIS_CHAIN_NUM 4
-
+#define USE_CAS
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -180,11 +181,12 @@
 // Concurrency Control
 /***********************************************/
 
-// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2
+// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2,RDMA_TS1
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_NO_WAIT
+#define CC_ALG RDMA_NO_WAIT2
+
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
 
@@ -236,6 +238,10 @@
 #define VALIDATION_LOCK				"no-wait" // no-wait or waiting
 #define PRE_ABORT2					"true"
 #define ATOMIC_WORD					false
+// [RDMA_MAAT]
+#define RDMA_TIMETABLE_MAX 20000000
+#define ROW_SET_LENGTH 30
+
 /***********************************************/
 // Logging
 /***********************************************/
@@ -289,7 +295,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH PART_CNT
+#define NUM_WH 32
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0

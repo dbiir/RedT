@@ -72,11 +72,11 @@ def ycsb_scaling():
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
     nnodes = [4]
-	  # algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
-    # algos=['MVCC','MAAT','TIMESTAMP','WOOKONG','OCC']
-    # algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    algos=['MVCC']
-    base_table_size=1048576*4
+    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
+    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
+    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
+    algos=['RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
+    base_table_size=1048576
     #base_table_size=2097152*8
     txn_write_perc = [0.2]
     tup_write_perc = [0.2]
@@ -144,7 +144,7 @@ def ycsb_scaling_abort():
 def ycsb_skew():
     wl = 'YCSB'
     nnodes = [4]
-    algos=['RDMA_NO_WAIT']
+    algos=['RDMA_NO_WAIT2']
     base_table_size=1048576
     #base_table_size=1048576*4    
     #base_table_size=2097152*8
@@ -163,7 +163,6 @@ def ycsb_skew():
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
     return fmt,exp
-
 
 def ycsb_skew1():
     wl = 'YCSB'
@@ -451,17 +450,20 @@ def ycsb_partitions_distr():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [1]
+    nnodes = [4]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
+    #nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
+    # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
+    nalgos=['RDMA_TS1']
+    # nalgos=['RDMA_WAIT_DIE2']
     # nalgos=['WOOKONG']
     # nalgos=['NO_WAIT']
     npercpay=[0.0]
     # npercpay=[0.0]
-    wh=128
+    wh=32
     # wh=64
-    load = [10000,20000,30000,40000,50000]
-    tcnt = [100]
+    load = [10000]
+    tcnt = [10]
     ctcnt = [100]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
@@ -832,8 +834,8 @@ experiment_map = {
 
 # Default values for variable configurations
 configs = {
-    "NODE_CNT" : 16,
-    "THREAD_CNT": 4,
+    "NODE_CNT" : 2,
+    "THREAD_CNT": 16,
     "REPLICA_CNT": 0,
     "REPLICA_TYPE": "AP",
     "REM_THREAD_CNT": 1,
@@ -863,7 +865,7 @@ configs = {
     "ABORT_PENALTY_MAX": "5 * 100 * 1000000UL   // in ns.",
     "MSG_TIME_LIMIT": "0",
     "MSG_SIZE_MAX": 4096,
-    "TXN_WRITE_PERC":0.0,
+    "TXN_WRITE_PERC":0.2,
     "PRIORITY":"PRIORITY_ACTIVE",
     "TWOPL_LITE":"false",
 #YCSB
@@ -875,7 +877,7 @@ configs = {
     "REQ_PER_QUERY": 10,
     "SYNTH_TABLE_SIZE":"65536",
 #TPCC
-    "NUM_WH": 'PART_CNT',
+    "NUM_WH": 32,
     "PERC_PAYMENT":0.0,
     "DEBUG_DISTR":"false",
     "DEBUG_ALLOC":"false",

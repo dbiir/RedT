@@ -142,12 +142,12 @@ NROFF = nroff
 MANS = $(man_MANS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing aclocal-1.14
+ACLOCAL = ${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing aclocal-1.14
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
-AUTOCONF = ${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing autoconf
-AUTOHEADER = ${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing autoheader
-AUTOMAKE = ${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing automake-1.14
+AUTOCONF = ${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing autoconf
+AUTOHEADER = ${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing autoheader
+AUTOMAKE = ${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing automake-1.14
 AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -175,7 +175,7 @@ LDFLAGS =
 LIBOBJS = 
 LIBS = -levent 
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing makeinfo
+MAKEINFO = ${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing makeinfo
 MKDIR_P = /usr/bin/mkdir -p
 OBJEXT = o
 PACKAGE = memcached
@@ -195,10 +195,10 @@ STRIP =
 VERSION = 1.4.21
 XML2RFC = no
 XSLTPROC = /usr/bin/xsltproc
-abs_builddir = /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/doc
-abs_srcdir = /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/doc
-abs_top_builddir = /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21
-abs_top_srcdir = /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21
+abs_builddir = /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/doc
+abs_srcdir = /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/doc
+abs_top_builddir = /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21
+abs_top_srcdir = /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21
 ac_ct_CC = gcc
 am__include = include
 am__leading_dot = .
@@ -225,7 +225,7 @@ host_vendor = unknown
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/install-sh
+install_sh = ${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -492,10 +492,10 @@ uninstall-man: uninstall-man1
 
 
 protocol-binary.txt: $(.TARGET:R).full
-	no -c /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/doc $(.TARGET:R).full $@
+	no -c /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/doc $(.TARGET:R).full $@
 
 protocol-binary-range.txt: $(.TARGET:R).full
-	no -c /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/doc $(.TARGET:R).full $@
+	no -c /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/doc $(.TARGET:R).full $@
 
 protocol-binary.full: $(.TARGET:R).xml xml2rfc/rfc2629-noinc.xsl
 	/usr/bin/xsltproc --nonet xml2rfc/rfc2629-noinc.xsl $(.TARGET:R).xml > $@

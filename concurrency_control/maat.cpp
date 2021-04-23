@@ -22,6 +22,7 @@
 #include "mem_alloc.h"
 #include "row_maat.h"
 
+#if CC_ALG == MAAT
 void Maat::init() { sem_init(&_semaphore, 0, 1); }
 
 RC Maat::validate(TxnManager * txn) {
@@ -35,6 +36,8 @@ RC Maat::validate(TxnManager * txn) {
   INC_STATS(txn->get_thd_id(),maat_cs_wait_time,timespan);
   start_time = get_sys_clock();
   RC rc = RCOK;
+  //local time_table
+  //printf("txn_id: %d,node_id: %d\n", txn->get_txn_id(), g_node_id);
   uint64_t lower = time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
   uint64_t upper = time_table.get_upper(txn->get_thd_id(),txn->get_txn_id());
   DEBUG("MAAT Validate Start %ld: [%lu,%lu]\n",txn->get_txn_id(),lower,upper);
@@ -166,6 +169,7 @@ RC Maat::validate(TxnManager * txn) {
   txn->txn_stats.cc_time += timespan;
   txn->txn_stats.cc_time_short += timespan;
   DEBUG("MAAT Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
+  //  printf("MAAT Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
   sem_post(&_semaphore);
   return rc;
 
@@ -317,3 +321,5 @@ void TimeTable::set_state(uint64_t thd_id, uint64_t key, MAATState value) {
   }
   pthread_mutex_unlock(&table[idx].mtx);
 }
+
+#endif

@@ -25,17 +25,17 @@ uint64_t Rdma::get_socket_count() {
 void Rdma::read_ifconfig(const char * ifaddr_file) {
   // ifaddr = new char *[g_total_node_cnt];
 	uint64_t cnt = 0;
-	//从ifconfig.txt中读取IP信息
+	//read IP from ifconfig.txt
 	printf("Reading ifconfig file: %s\n",ifaddr_file);
 	ifstream fin(ifaddr_file);
 	string line;
 	while (getline(fin, line)) {
 		//memcpy(ifaddr[cnt],&line[0],12);
-		//初始化
+		//init
 		ifaddr[cnt] = new char[line.length()+1];
-		//赋值
+		//assignment
 		strcpy(ifaddr[cnt],&line[0]);
-		//输出显示
+		//output
 		printf("%ld: %s\n",cnt,ifaddr[cnt]);
 		cnt++;
 	}
@@ -86,6 +86,7 @@ uint64_t get_rm_id(uint64_t node_id,uint64_t thread_id){
 uint64_t Rdma::get_port(uint64_t node_id){
   uint64_t port_id = 0;
   port_id = 7144 + node_id;
+  //port_id = TPORT_PORT + 344 + node_id;
   return port_id ;
 }
 
@@ -161,7 +162,7 @@ void * Rdma::server_qp(void *){
 								->get_reg_attr()
 								.value()
 								.buf);
-
+	rdma_timetable_buffer = rdma_global_buffer + (rdma_buffer_size - rdma_timetable_size);
 	rm_ctrl->start_daemon();
 
 	return NULL;
@@ -241,6 +242,7 @@ void Rdma::init(){
 
 	//as client
 	client_rdma_rm = Arc<RMem>(new RMem(client_rdma_buffer_size));
+	// client_rdma_rm = Arc<RMem>(new RMem(RDMA_LOCAL_BUFFER_SIZE));
 	client_rm_handler = RegHandler::create(client_rdma_rm, nic).value();
 
 	uint64_t thread_num = 0;
@@ -260,7 +262,7 @@ void Rdma::init(){
 
 	for(node_id = 0; node_id < g_total_node_cnt; node_id++) {
 
-		if(ISCLIENTN(node_id)) continue;  //对每个client
+		if(ISCLIENTN(node_id)) continue;  //for every client
 
 		rdma_server_add[node_id] = ifaddr[node_id] + std::string(":") + std::to_string(rdma_server_port[node_id]);
 		//rdma_server_add[node_id] = ifaddr[node_id] + std::string(":") + std::to_string(server_port);
