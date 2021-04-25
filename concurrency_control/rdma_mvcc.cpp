@@ -324,6 +324,8 @@ void * rdma_mvcc::remote_write_back(TxnManager * txnMng , uint64_t num){
   	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 
+     mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+
 }
 
 bool rdma_mvcc::get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn){
@@ -704,6 +706,15 @@ RC rdma_mvcc::finish(RC rc,TxnManager * txnMng){
             remote_release_lock(txnMng,txnMng->write_set[i]);//解锁
        }
        
+    }
+
+    for (uint64_t i = 0; i < txn->row_cnt; i++) {
+        if(txn->accesses[i]->location != g_node_id){
+        //remote
+        mem_allocator.free(txn->accesses[i]->orig_row,0);
+       
+        txn->accesses[i]->orig_row = NULL;
+        }
     }
     
     return rc;

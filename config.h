@@ -21,23 +21,6 @@
 #define COMPILER_BARRIER asm volatile("" ::: "memory");
 */
 
-/***********************************************/
-// USE RDMA
-/**********************************************/
-//#define USE_RDMA CHANGE_MSG_QUEUE
-#define USE_RDMA CHANGE_TCP_ONLY
-#define RDMA_BUFFER_SIZE (1<<25)
-#define RDMA_CYC_QP_NUM (1<<10)
-#define RDMA_LOCAL_BUFFER_SIZE (10240)
-#define RDMA_BUFFER_ITEM_SIZE (1<<12)
-#define RDMA_USE_NIC_IDX 0
-#define RDMA_REG_MEM_NAME 73
-#define RDMA_CQ_NAME "rdma_channel"
-#define RDMA_ENTRY_NUM 8192U
-#define RDMA_SEND_COUNT (256)
-// #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
-// #define RDMA_COLOR_LOG
-
 /************RDMA TYPE**************/
 #define CHANGE_TCP_ONLY 0
 #define CHANGE_MSG_QUEUE 1
@@ -181,16 +164,35 @@
 // Concurrency Control
 /***********************************************/
 
-// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2,RDMA_TS1
+// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2,RDMA_TS1,RDMA_SILO,RDMA_MVCC,RDMA_MAAT,RDMA_CICADA
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_MAAT
+#define CC_ALG RDMA_MVCC
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
 
 #define DEBUG_PRINTF  false
+
+/***********************************************/
+// USE RDMA
+/**********************************************/
+#if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_CICADA
+//#define USE_RDMA CHANGE_MSG_QUEUE
+#define USE_RDMA CHANGE_TCP_ONLY
+#endif
+#define RDMA_BUFFER_SIZE (1<<25)
+#define RDMA_CYC_QP_NUM (1<<10)
+#define RDMA_LOCAL_BUFFER_SIZE (10240)
+#define RDMA_BUFFER_ITEM_SIZE (1<<12)
+#define RDMA_USE_NIC_IDX 0
+#define RDMA_REG_MEM_NAME 73
+#define RDMA_CQ_NAME "rdma_channel"
+#define RDMA_ENTRY_NUM 8192U
+#define RDMA_SEND_COUNT (256)
+// #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
+// #define RDMA_COLOR_LOG
 
 // all transactions acquire tuples according to the primary key order.
 #define KEY_ORDER         false
@@ -206,7 +208,11 @@
 #define ENABLE_LATCH        false
 #define CENTRAL_INDEX       false
 #define CENTRAL_MANAGER       false
+#ifdef USE_RDMA
 #define INDEX_STRUCT        IDX_RDMA
+#else
+#define INDEX_STRUCT        IDX_HASH
+#endif
 #define BTREE_ORDER         16
 
 // [TIMESTAMP]
@@ -294,7 +300,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH 128
+#define NUM_WH 32
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0

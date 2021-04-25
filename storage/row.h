@@ -151,6 +151,8 @@ public:
 	#elif CC_ALG == RDMA_MAAT
 	    volatile uint64_t _tid_word;
 		Row_rdma_maat * manager;
+        uint64_t ucreads_len;
+        uint64_t ucwrites_len;
 		uint64_t uncommitted_reads[ROW_SET_LENGTH];
 		uint64_t uncommitted_writes[ROW_SET_LENGTH];
 		uint64_t timestamp_last_read;

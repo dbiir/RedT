@@ -88,7 +88,8 @@ RC Row_maat::read_and_prewrite(TxnManager * txn) {
 
   //Add to uncommitted reads (soft lock)
   uncommitted_reads->insert(txn->get_txn_id());
-
+  if (uncommitted_reads->size() > 2000)
+    printf("row %p 's read size %d \n", _row, uncommitted_reads->size());
   //Add to uncommitted writes (soft lock)
   uncommitted_writes->insert(txn->get_txn_id());
 

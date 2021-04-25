@@ -75,7 +75,8 @@ def ycsb_scaling():
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
     # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
-    algos=['RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
+    #algos=['RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
+    algos = ['RDMA_MVCC']
     base_table_size=1048576
     #base_table_size=2097152*8
     txn_write_perc = [0.2]

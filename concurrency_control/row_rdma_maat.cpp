@@ -86,7 +86,9 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
 	DEBUG("READ + PREWRITE %ld -- %ld: lw %ld\n", txn->get_txn_id(), _row->get_primary_key(),
 			_row->timestamp_last_write);
-
+    if(WORKLOAD == TPCC &&(_row->ucreads_len >= row_set_length - 1 || _row->ucwrites_len >= row_set_length - 1)) {
+        return Abort;
+    }
 	// Copy uncommitted writes
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last_write = _row->uncommitted_writes[i];
@@ -129,7 +131,7 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 			break;
 		}
 		if(last_read == 0) {
-
+            _row->ucreads_len += 1;
 			_row->uncommitted_reads[i] = txn->get_txn_id();
 			break;
 		}
@@ -144,8 +146,10 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 			in_set = true;
 		}
 		if(last_write == 0) {
-			if(in_set == false)
-			_row->uncommitted_writes[i] = txn->get_txn_id();
+			if(in_set == false) {
+                _row->ucwrites_len += 1;
+                _row->uncommitted_writes[i] = txn->get_txn_id();
+            }
 			break;
 		}
 
@@ -170,6 +174,9 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 		return Abort;
 	}
 #endif
+    if(_row->ucreads_len >= row_set_length - 1 && WORKLOAD == TPCC) {
+        return Abort;
+    }
 	INC_STATS(txn->get_thd_id(),mtx[30],get_sys_clock() - mtx_wait_starttime);
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
 	DEBUG("READ %ld -- %ld: lw %ld\n", txn->get_txn_id(), _row->get_primary_key(),
@@ -199,7 +206,7 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 			break;
 		}
 		if(last_read == 0) {
-
+            _row->ucreads_len += 1;
 			_row->uncommitted_reads[i] = txn->get_txn_id();
 			break;
 		}
@@ -224,6 +231,9 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 		return Abort;
 	}
 #endif
+    if(_row->ucwrites_len >= row_set_length - 1 && WORKLOAD == TPCC) {
+        return Abort;
+    }
 	INC_STATS(txn->get_thd_id(),mtx[31],get_sys_clock() - mtx_wait_starttime);
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
 	DEBUG("PREWRITE %ld -- %ld: lw %ld, lr %ld\n", txn->get_txn_id(), _row->get_primary_key(),
@@ -250,8 +260,11 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 			in_set = true;
 		}
 		if(last_write == 0) {
-			if(in_set == false)
-			_row->uncommitted_writes[i] = txn->get_txn_id();
+			if(in_set == false){
+                _row->ucwrites_len += 1;
+                _row->uncommitted_writes[i] = txn->get_txn_id();
+            }
+			
 			break;
 		}
 		txn->uncommitted_writes_y.insert(last_write);
@@ -266,22 +279,6 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 	if(txn->greatest_write_timestamp < _row->timestamp_last_write)
 		txn->greatest_write_timestamp = _row->timestamp_last_write;
 
-    
-    // for(uint64_t i = 0; i < row_set_length; i++) {
-	// 	uint64_t last_write = _row->uncommitted_writes[i];
-	// 	assert(i <= row_set_length - 1);
-	// 	if(last_write == txn->get_txn_id()) {
-	// 		break;
-	// 	}
-	// 	if(last_write == 0) {
-
-	// 		_row->uncommitted_writes[i] = txn->get_txn_id();
-	// 		break;
-	// 	}
-
-	// }
-
-
 #ifdef USE_CAS
 	//ATOM_CAS(_row->_tid_word,1,0);
 	local_cas_lock(txn, txn->get_txn_id() + 1, 0);
@@ -290,33 +287,34 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 }
 
 void Row_rdma_maat::ucread_erase(uint64_t txn_id) {
-	// while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
-	// }
+	
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last = _row->uncommitted_reads[i];
-		assert(i < row_set_length - 1);
+		assert(i <= row_set_length - 1);
 		if(last == 0 || txn_id == 0) break;
 		if(last == txn_id) {
+            _row->ucreads_len -= 1;
 			if(_row->uncommitted_reads[i+1] == 0) {
 				_row->uncommitted_reads[i] = 0;
 				break;
 			}
 			for(uint64_t j = i; j < row_set_length; j++) {
-				if(_row->uncommitted_reads[j+1] == 0) break;
 				_row->uncommitted_reads[j] = _row->uncommitted_reads[j+1];
+				if(_row->uncommitted_reads[j+1] == 0) break;
 			}
 		}
 	}
-	// ATOM_CAS(_row->_tid_word,1,0);
+    // printf("row %p clean txn %ld\n", _row, txn_id);
+	
 }
 void Row_rdma_maat::ucwrite_erase(uint64_t txn_id) {
-	// while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
-	// }
+	
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last = _row->uncommitted_writes[i];
-		assert(i < row_set_length - 1);
+		assert(i <= row_set_length - 1);
 		if(last == 0) break;
 		if(last == txn_id) {
+            _row->ucwrites_len -= 1;
 			if(_row->uncommitted_writes[i+1] == 0) {
 				_row->uncommitted_writes[i] = 0;
 				break;
@@ -327,7 +325,6 @@ void Row_rdma_maat::ucwrite_erase(uint64_t txn_id) {
 			}
 		}
 	}
-	//ATOM_CAS(_row->_tid_word,1,0);
 }
 RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
@@ -339,8 +336,11 @@ RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
 #endif
 	INC_STATS(txn->get_thd_id(),mtx[32],get_sys_clock() - mtx_wait_starttime);
 	DEBUG("Maat Abort %ld: %d -- %ld\n",txn->get_txn_id(),type,_row->get_primary_key());
-
-	if(type == RD) {
+#if WORKLOAD == TPCC
+		ucread_erase(txn->get_txn_id());
+		ucwrite_erase(txn->get_txn_id());
+#else
+    if(type == RD) {
 		//uncommitted_reads->erase(txn->get_txn_id());
 		ucread_erase(txn->get_txn_id());
 	}
@@ -349,7 +349,7 @@ RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
 		ucwrite_erase(txn->get_txn_id());
 		//uncommitted_writes->erase(txn->get_txn_id());
 	}
-
+#endif
 #ifdef USE_CAS
 	//ATOM_CAS(_row->_tid_word,1,0);
 	local_cas_lock(txn, txn->get_txn_id() + 1, 0);

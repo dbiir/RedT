@@ -286,6 +286,7 @@ remote_atomic_retry_lock:
 				printf("--thd：%lu,remote lock fail!!!!!!lock location: %lu; %p, txn: %lu,old lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
 			} 
 			assert(new_lock_info!=0);
+            mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 		}
 		else{ //read set data directly to CAS , no need to RDMA READ
 			lock_info = 0; //if lock_info!=0, CAS fail , Abort

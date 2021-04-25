@@ -46,7 +46,7 @@ void * mem_alloc::alloc(uint64_t size) {
 #endif
   DEBUG_M("alloc %ld 0x%lx\n",size,(uint64_t)ptr);
   assert(ptr != NULL);
-	return ptr;
+  return ptr;
 }
 
 void * mem_alloc::align_alloc(uint64_t size) {

@@ -448,7 +448,7 @@ itemid_t* TPCCTxnManager::tpcc_read_remote_index(TPCCQuery * query) {
     }
     
 	assert(loc != g_node_id);
-
+   // printf("【tpcc.cpp:451】read index key = %ld \n",key);
     itemid_t *item = read_remote_index(loc,remote_offset,key);
 
 	return item;
@@ -615,7 +615,7 @@ remote_atomic_retry_lock:
 #if CC_ALG == RDMA_TS1 || CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
 
 
-     ts_t ts = get_timestamp();
+    ts_t ts = get_timestamp();
 
     uint64_t try_lock = -1;
     try_lock = cas_remote_content(loc,m_item->offset,0,get_txn_id()+1);
@@ -661,7 +661,13 @@ remote_atomic_retry_lock:
 
     assert(write_remote_content(loc,operate_size,m_item->offset,write_buf) == true);
 #elif CC_ALG == RDMA_MAAT
-    //if(type == RD) {
+    // if(type == RD) {
+        if(remote_row->ucreads_len >= row_set_length - 1 || remote_row->ucwrites_len >= row_set_length - 1) {
+            try_lock = cas_remote_content(loc,m_item->offset,get_txn_id()+1,0);
+            mem_allocator.free(m_item, sizeof(itemid_t));
+            return Abort;
+
+        }
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			assert(i < row_set_length - 1);
 			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
@@ -678,11 +684,13 @@ remote_atomic_retry_lock:
 				break;
 			}
 			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
+                remote_row->ucreads_len += 1;
 				remote_row->uncommitted_reads[i] = get_txn_id();
 				break;
 			}
 		}
-	//}else if(type == WR) {
+       
+	// }else if(type == WR) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
 
 			assert(i < row_set_length - 1);
@@ -702,13 +710,15 @@ remote_atomic_retry_lock:
 			assert(i < row_set_length - 1);
 			if(remote_row->uncommitted_writes[i] == get_txn_id()) in_set = true;
 			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
-				if(in_set == false)
-				remote_row->uncommitted_writes[i] = get_txn_id();
+				if(in_set == false) {
+                    remote_row->ucwrites_len += 1;
+                    remote_row->uncommitted_writes[i] = get_txn_id();
+                }
 				break;
 			}
 			uncommitted_writes_y.insert(remote_row->uncommitted_writes[i]);
 		}
-	//}
+	// }
     remote_row->_tid_word = 0;
 
     uint64_t operate_size = row_t::get_row_size(remote_row->tuple_size);
@@ -756,7 +766,7 @@ remote_atomic_retry_lock:
 			}	
 		}
 	}
-    	if(type == WR) {
+    if(type == WR) {
 		assert(remote_row->version_cnt >= 0);
 		for(int cnt = remote_row->version_cnt - 1; cnt >= remote_row->version_cnt - 5 && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
@@ -1249,7 +1259,7 @@ inline RC TPCCTxnManager::new_order_4(uint64_t w_id, uint64_t d_id, uint64_t c_i
 	EXEC SQL SELECT d_next_o_id, d_tax
 		INTO :d_next_o_id, :d_tax
 		FROM district WHERE d_id = :d_id AND d_w_id = :w_id;
-	EXEC SQL UPDATE d istrict SET d _next_o_id = :d _next_o_id + 1
+	EXEC SQL UPDATE district SET d _next_o_id = :d _next_o_id + 1
 		WH ERE d _id = :d_id AN D d _w _id = :w _id ;
 	+===================================================*/
 	key = distKey(d_id, w_id);
