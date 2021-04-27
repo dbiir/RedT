@@ -10,7 +10,7 @@ public:
 	void read_remote_row(TxnManager * txn, row_t * remote_row, uint64_t loc, uint64_t off);
 	void write_remote(RC rc, TxnManager * txn, Access *access);
 	void commit_write(TxnManager * txn , uint64_t num ,access_t type);
-
+    void finish(RC rc, TxnManager * txnMng);
 };
 
 #endif

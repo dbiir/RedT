@@ -185,6 +185,16 @@ char* Rdma::get_table_client_memory(uint64_t thd_id) {
   	temp += sizeof(table_t) * thd_id;
   	return temp;
 }
+
+//get extra row for doorbell batched RDMA requests
+char* Rdma::get_row_client_memory2(uint64_t thd_id) {
+	char* temp = (char *)(client_rdma_rm->raw_ptr + sizeof(IndexInfo) * g_thread_cnt);
+ 	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * g_thread_cnt;
+  	temp += sizeof(table_t) * g_thread_cnt;
+	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * thd_id;
+  	return temp;
+}
+
 #if 0
 void *malloc_huge_pages(size_t size,uint64_t huge_page_sz,bool flag)
 {

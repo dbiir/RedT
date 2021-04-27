@@ -18,7 +18,7 @@
 
 uint64_t distKey(uint64_t d_id, uint64_t d_w_id) { //d_id - distrct num in g_node;d_w_id - warehouse ahead
     uint64_t index_ahead = wh_idx_num + item_idx_num + stock_idx_num;
-#ifdef USE_RDMA
+#ifdef INDEX_STRUCT == IDX_RDMA
     //return (d_w_id - 1)  * g_dist_per_wh + d_id;
     d_w_id = (d_w_id - 1)/g_node_cnt;
     return d_w_id  * g_dist_per_wh + d_id;
@@ -30,7 +30,7 @@ uint64_t distKey(uint64_t d_id, uint64_t d_w_id) { //d_id - distrct num in g_nod
 
 uint64_t custKey(uint64_t c_id, uint64_t c_d_id, uint64_t c_w_id) {
     uint64_t index_ahead = wh_idx_num + item_idx_num + stock_idx_num + dis_idx_num;
-#ifdef USE_RDMA
+#ifdef INDEX_STRUCT == IDX_RDMA
     return (distKey(c_d_id, c_w_id) - 1) * g_cust_per_dist + c_id ;
 #else
 	return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id );
@@ -56,7 +56,7 @@ uint64_t custNPKey(char * c_last, uint64_t c_d_id, uint64_t c_w_id) {
 
 uint64_t stockKey(uint64_t s_i_id, uint64_t s_w_id) { 
     uint64_t index_ahead = wh_idx_num + item_idx_num ;
-#ifdef USE_RDMA
+#ifdef INDEX_STRUCT == IDX_RDMA
     // return (s_w_id - 1)  * g_max_items + s_i_id ;//+ index_ahead; 
     s_w_id = (s_w_id-1)  / g_node_cnt;
     return s_w_id  * g_max_items + s_i_id ;//+ index_ahead; 

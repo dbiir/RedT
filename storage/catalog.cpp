@@ -18,7 +18,7 @@
 #include "global.h"
 #include "helper.h"
 
-#ifdef USE_RDMA
+#if RDMA_ONE_SIDE == true
 void Catalog::init(const char* table_name, uint32_t table_id, int field_cnt) {
 	strcpy(this->table_name,table_name);
 	// this->table_name = table_name;

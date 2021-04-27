@@ -51,7 +51,7 @@ void table_t::test_read(){
 }
 
 
-#ifdef USE_RDMA
+#if RDMA_ONE_SIDE == true
 void table_t::init(Catalog schema) {
 	//this->table_name = schema->table_name;
 	strcpy(this->table_name,schema.table_name);
@@ -107,7 +107,7 @@ RC table_t::general_get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id
 // the row is not stored locally. the pointer must be maintained by index structure.
 RC table_t::get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
 
-#ifdef USE_RDMA
+#if RDMA_ONE_SIDE == true
 	RC rc = RCOK;
   	DEBUG_M("table_t::get_new_row alloc\n");
 

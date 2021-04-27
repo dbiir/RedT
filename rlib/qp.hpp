@@ -298,6 +298,7 @@ class RRCQP : public QP {
   }
 
   ConnStatus poll_till_completion(ibv_wc &wc,struct timeval timeout = default_timeout) {
+    //printf("---poll_till_completion\n");
     auto ret = QP::poll_till_completion(wc,timeout);
     if(ret == SUCC) {
       low_watermark_ = high_watermark_;
@@ -311,6 +312,7 @@ class RRCQP : public QP {
    * which is related to how the QP's send to are created, etc
    */
   bool need_poll(int threshold = (RCQPImpl::RC_MAX_SEND_SIZE / 2)) {
+    //printf("---need_poll\n");
     return (high_watermark_ - low_watermark_) >= threshold;
   }
 

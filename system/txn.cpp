@@ -57,14 +57,15 @@
 #include "rdma_maat.h"
 #include "rdma_ts1.h"
 #include "rdma_cicada.h"
+#include "rdma_null.h"
 #include "transport.h"
+#include "dbpa.hpp"
 
 #include "lib.hh"
 #include "qps/op.hh"
 #include "transport/rdma.h"
 #include "src/rdma/sop.hh"
 #include "src/sshed.hh"
-
 
 void TxnStats::init() {
 	starttime=0;
@@ -306,13 +307,13 @@ void Transaction::release_inserts(uint64_t thd_id) {
 #if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != WOOKONG && \
 		CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != DTA && CC_ALG != DLI_MVCC_OCC && \
 		CC_ALG != DLI_MVCC_BASE && CC_ALG != DLI_DTA && CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && \
-		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC && CC_ALG != RDMA_MVCC  && CC_ALG != RDMA_MAAT  && CC_ALG != RDMA_CICADA
+		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC && CC_ALG != RDMA_MVCC  && CC_ALG != RDMA_MAAT  && CC_ALG != RDMA_CICADA && CC_ALG != RDMA_CNULL
 		DEBUG_M("TxnManager::cleanup row->manager free\n");
 		mem_allocator.free(row->manager, 0);
 #endif
 
 		row->free_row();
-#ifdef USE_RDMA
+#if RDMA_ONE_SIDE == true
 		r2::AllocatorMaster<>::get_thread_allocator()->free(row);
 #else
 		DEBUG_M("Transaction::release insert_rows free\n")
@@ -1018,6 +1019,10 @@ void TxnManager::cleanup(RC rc) {
     rsilo_man.finish(rc,this);
 #endif
 
+#if CC_ALG == RDMA_CNULL
+    rcnull_man.finish(rc,this);
+#endif
+
 #if CC_ALG == RDMA_MVCC
     rmvcc_man.finish(rc,this);
 #endif
@@ -1027,6 +1032,9 @@ void TxnManager::cleanup(RC rc) {
 #endif
 #if CC_ALG == RDMA_CICADA
 	rcicada_man.finish(rc, this);
+#endif
+#if CC_ALG == RDMA_TS1
+    rdmats_man.finish(rc,this);
 #endif
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
@@ -1491,6 +1499,29 @@ void TxnManager::release_locks(RC rc) {
 	uint64_t timespan = (get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(), txn_cleanup_time,  timespan);
 }
+#if ENABLE_DBPA
+row_t * TxnManager::cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap){
+	uint64_t thd_id = get_thd_id();
+	uint64_t *local_buf1 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+	char *local_buf2 = Rdma::get_row_client_memory2(thd_id);
+	uint64_t read_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
+
+	RDMACASRead dbreq;
+	dbreq.set_cas_meta(compare,swap,local_buf1);
+	dbreq.set_read_meta(local_buf2,read_size);
+	auto dbres = dbreq.post_reqs(rc_qp[target_server][thd_id],(uint64_t)(remote_mr_attr[target_server].buf + remote_offset));
+
+	//only one signaled request need to be polled
+	RDMA_ASSERT(dbres == IOCode::Ok);
+	auto dbres1 = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(dbres1 == IOCode::Ok);
+	
+	try_lock = *local_buf1;
+	row_t *test_row = (row_t *)mem_allocator.alloc(read_size);
+    memcpy(test_row, local_buf2, read_size);
+    return test_row;
+}
+#endif
 
 row_t * TxnManager::read_remote_content(uint64_t target_server,uint64_t remote_offset){
     uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
@@ -1578,7 +1609,7 @@ row_t * TxnManager::read_remote_content(uint64_t target_server,uint64_t remote_o
     RDMA_ASSERT(res_p2 == IOCode::Ok);
 
     return *local_buf;
- }
+}
 
 RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc){
     Access * access = NULL;
@@ -1616,17 +1647,12 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
 	access->offset = m_item->offset;
 #endif
 
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_CNULL
   	access->orig_row = test_row;
 	access->location = loc;
 	access->offset = m_item->offset;
 #endif
 
-#if CC_ALG == RDMA_TS1
-    access->orig_row = test_row;
-    access->location = loc;
-	access->offset = m_item->offset;	
-#endif
 
 #if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
 	access->orig_row = test_row;

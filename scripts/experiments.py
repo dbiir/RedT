@@ -72,11 +72,11 @@ def ycsb_scaling():
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
     nnodes = [4]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
+    algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
     # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     #algos=['RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    algos = ['RDMA_MVCC']
+    # algos = ['NO_WAIT']
     base_table_size=1048576
     #base_table_size=2097152*8
     txn_write_perc = [0.2]
@@ -144,16 +144,23 @@ def ycsb_scaling_abort():
 
 def ycsb_skew():
     wl = 'YCSB'
-    nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
-    algos=dta_target_algos
-    base_table_size=2097152*8
-    txn_write_perc = [0.5]
-    tup_write_perc = [0.5]
+    nnodes = [4]
+    algos=['RDMA_NO_WAIT2']
+    base_table_size=1048576
+    #base_table_size=1048576*4    
+    #base_table_size=2097152*8
+
+    txn_write_perc = [0.2]
+    tup_write_perc = [0.2]
     load = [10000]
-    tcnt = [4]
-    #skew = [0.0,0.25,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.9]
-    skew = [0.0,0.6,0.9]
+
+    tcnt = [10]  #THREAD_CNT
+
+    #skew = [0.0,0.4,0.6,0.8,0.9]
+    #skew = [0.2,0.6,0.85,0.95]
+    #skew = [0.0,0.2,0.4,0.6,0.8,0.85,0.9,0.95]
+    skew = [0.001]
+
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
     return fmt,exp
@@ -446,19 +453,18 @@ def tpcc_scaling():
     wl = 'TPCC'
     nnodes = [4]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    #nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    nalgos=['RDMA_TS1']
+    # nalgos=['MAAT','MVCC','NO_WAIT','WAIT_DIE']
     # nalgos=['RDMA_WAIT_DIE2']
     # nalgos=['WOOKONG']
-    # nalgos=['NO_WAIT']
+    nalgos=['RDMA_WAIT_DIE2']
     npercpay=[0.0]
     # npercpay=[0.0]
     wh=32
     # wh=64
     load = [10000]
     tcnt = [10]
-    ctcnt = [100]
+    ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
 
@@ -871,7 +877,7 @@ configs = {
     "REQ_PER_QUERY": 10,
     "SYNTH_TABLE_SIZE":"65536",
 #TPCC
-    "NUM_WH": 'PART_CNT',
+    "NUM_WH": 32,
     "PERC_PAYMENT":0.0,
     "DEBUG_DISTR":"false",
     "DEBUG_ALLOC":"false",

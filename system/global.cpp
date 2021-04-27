@@ -59,6 +59,7 @@
 #include "rdma_maat.h"
 #include "rdma_ts1.h"
 #include "rdma_cicada.h"
+#include "rdma_null.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -112,6 +113,9 @@ RDMA_ts1 rdmats_man;
 #endif
 #if CC_ALG == RDMA_CICADA
 RDMA_Cicada rcicada_man;
+#endif
+#if CC_ALG == RDMA_CNULL
+RDMA_Null rcnull_man;
 #endif
 Workload * m_wl;
 TxnManPool txn_man_pool;
@@ -242,7 +246,7 @@ UInt64 g_msg_time_limit = MSG_TIME_LIMIT;
 UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
-UInt64 rdma_buffer_size = 20*(1024*1024*1024L);
+UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 3*(1024*1024L);
 UInt64 rdma_index_size = (300*1024*1024L);
 

@@ -22,7 +22,7 @@
 #include "global.h"
 #include "helper.h"
 
-#ifdef USE_RDMA
+#if RDMA_ONE_SIDE == true
 class Column {
 public:
 	Column() {	}

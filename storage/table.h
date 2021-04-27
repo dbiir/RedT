@@ -24,7 +24,7 @@
 
 class row_t;
 
-#ifdef USE_RDMA
+#if RDMA_ONE_SIDE == true
 #include "catalog.h"
 class table_t
 {

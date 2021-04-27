@@ -587,7 +587,7 @@ remote_atomic_retry_lock:
 			txn->rc = Abort;
 			mem_allocator.free(m_item, sizeof(itemid_t));
 
-			return Abort; //cas fail		
+			return Abort; //cas fail	
 		}	
 
 #endif

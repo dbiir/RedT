@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
     
 	//register memeory
 	//prepare QP connection with rdma_global_buffer(as registry memory)
-	#ifdef USE_RDMA //== CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
+	#if RDMA_ONE_SIDE == true//== CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
     //#if CC_ALG == RDMA_SILO
         rdma_man.init();
     #endif

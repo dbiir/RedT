@@ -236,5 +236,19 @@ void  RDMA_ts1::commit_write(TxnManager * txn , uint64_t num , access_t type){
 	mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 }
 
+void RDMA_ts1::finish(RC rc, TxnManager * txnMng){
+    Transaction *txn = txnMng->txn;
+    for (uint64_t i = 0; i < txn->row_cnt; i++) {
+        if(txn->accesses[i]->location != g_node_id){
+        //remote
+        // mem_allocator.free(txn->accesses[i]->data,0);
+        mem_allocator.free(txn->accesses[i]->orig_row,0);
+        // txn->accesses[i]->data = NULL;
+        txn->accesses[i]->orig_row = NULL;
+       
+        }
+    }
+}
+
 #endif
 

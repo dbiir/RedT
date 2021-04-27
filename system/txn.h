@@ -67,12 +67,7 @@ public:
 	uint64_t    location;   //node id of server the data location
 	uint64_t    offset;
 #endif
-#if CC_ALG == RDMA_MAAT
-	uint64_t 	key;
-    uint64_t	location;
-	uint64_t	offset;
-#endif
-#if CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA
+#if CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL
 	uint64_t 	key;
     uint64_t	location;
 	uint64_t	offset;
@@ -203,7 +198,7 @@ public:
 	void release_locks(RC rc);
 
 bool rdma_one_side() {
-  if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1) return true;
+  if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CNULL) return true;
   else return false;
 }
 
@@ -212,6 +207,8 @@ bool rdma_one_side() {
     bool write_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf);
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
+	row_t * cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap);
+
 	bool isRecon() {
 		assert(CC_ALG == CALVIN || !recon);
 		return recon;

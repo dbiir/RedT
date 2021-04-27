@@ -27,7 +27,7 @@
 #include "table.h"
 
 RC Workload::init() { return RCOK; }
-#ifdef USE_RDMA
+#if RDMA_ONE_SIDE == true
 RC Workload::init_schema(const char * schema_file) {
 	assert(sizeof(uint64_t) == 8);
 	assert(sizeof(double) == 8);

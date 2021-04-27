@@ -71,7 +71,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
+#define NODE_CNT 4
 #define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -163,23 +163,26 @@
 /***********************************************/
 // Concurrency Control
 /***********************************************/
+#define RDMA_ONE_SIDE false
+#define RDMA_TWO_SIDE true
 
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2,RDMA_TS1,RDMA_SILO,RDMA_MVCC,RDMA_MAAT,RDMA_CICADA
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_MVCC
+#define CC_ALG WAIT_DIE
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
 
 #define DEBUG_PRINTF  false
+#define ENABLE_DBPA  false
 
 /***********************************************/
 // USE RDMA
 /**********************************************/
-#if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_CICADA
-//#define USE_RDMA CHANGE_MSG_QUEUE
+#if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || RDMA_TWO_SIDE == true
+// #define USE_RDMA CHANGE_MSG_QUEUE
 #define USE_RDMA CHANGE_TCP_ONLY
 #endif
 #define RDMA_BUFFER_SIZE (1<<25)
@@ -208,7 +211,8 @@
 #define ENABLE_LATCH        false
 #define CENTRAL_INDEX       false
 #define CENTRAL_MANAGER       false
-#ifdef USE_RDMA
+//#ifdef USE_RDMA
+#if RDMA_ONE_SIDE == true
 #define INDEX_STRUCT        IDX_RDMA
 #else
 #define INDEX_STRUCT        IDX_HASH
@@ -274,7 +278,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 65536
+#define SYNTH_TABLE_SIZE 4194304
 #define ZIPF_THETA 0.001
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
@@ -454,6 +458,7 @@ enum PPSTxnType {
 #define RDMA_TS1 34
 #define RDMA_MAAT 35
 #define RDMA_CICADA 36
+#define RDMA_CNULL 37
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

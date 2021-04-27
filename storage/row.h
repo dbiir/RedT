@@ -82,7 +82,6 @@ struct RdmaMVHis {
 	char data[ROW_DEFAULT_SIZE];
 };
 
-
 class row_t {
 public:
 	static int get_row_size(int tuple_size);
@@ -224,7 +223,7 @@ private:
 	bool part_info;
 	uint64_t _row_id;
 public:
-#ifdef USE_RDMA// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
+#if RDMA_ONE_SIDE == true// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
 	//#if CC_ALG != RDMA_MVCC
     char data[1];
 	// char data[HIS_CHAIN_NUM * sizeof(get_row_size)]

@@ -34,8 +34,8 @@ PATH: /usr/bin
 PATH: /usr/local/git/bin
 PATH: /usr/local/git/bin
 PATH: /usr/local/server/git/bin
-PATH: /home/ywq/.local/bin
-PATH: /home/ywq/bin
+PATH: /home/ljy/.local/bin
+PATH: /home/ljy/bin
 
 
 ## ----------- ##
@@ -458,7 +458,7 @@ configure:5474: result: (system)
 configure:5493: checking for library containing umem_cache_create
 configure:5524: gcc -o conftest -g -O2 -pthread -pthread   conftest.c -levent  >&5
 /tmp/ccgELwjY.o: In function `main':
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:32: undefined reference to `umem_cache_create'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:32: undefined reference to `umem_cache_create'
 collect2: error: ld returned 1 exit status
 configure:5524: $? = 1
 configure: failed program was:
@@ -541,7 +541,7 @@ configure:5541: result: no
 configure:5549: checking for library containing gethugepagesizes
 configure:5580: gcc -o conftest -g -O2 -pthread -pthread   conftest.c -levent  >&5
 /tmp/ccK9UInb.o: In function `main':
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:32: undefined reference to `gethugepagesizes'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:32: undefined reference to `gethugepagesizes'
 collect2: error: ld returned 1 exit status
 configure:5580: $? = 1
 configure: failed program was:
@@ -817,7 +817,7 @@ conftest.c:36:18: warning: implicit declaration of function 'htonll' [-Wimplicit
            return htonll(0);
                   ^~~~~~
 /tmp/ccYFr0RP.o: In function `main':
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:36: undefined reference to `htonll'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:36: undefined reference to `htonll'
 collect2: error: ld returned 1 exit status
 configure:6024: $? = 1
 configure: failed program was:
@@ -873,7 +873,7 @@ configure:6105: result: yes
 configure:6116: checking for getpagesizes
 configure:6116: gcc -o conftest -g -O2 -pthread -pthread   conftest.c -levent  >&5
 /tmp/ccbEhxb3.o: In function `main':
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:60: undefined reference to `getpagesizes'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:60: undefined reference to `getpagesizes'
 collect2: error: ld returned 1 exit status
 configure:6116: $? = 1
 configure: failed program was:
@@ -944,7 +944,7 @@ configure:6116: result: no
 configure:6127: checking for memcntl
 configure:6127: gcc -o conftest -g -O2 -pthread -pthread   conftest.c -levent  >&5
 /tmp/ccredbnb.o: In function `main':
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:60: undefined reference to `memcntl'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:60: undefined reference to `memcntl'
 collect2: error: ld returned 1 exit status
 configure:6127: $? = 1
 configure: failed program was:
@@ -1037,7 +1037,7 @@ configure:6271: result: yes
 configure:6276: checking for setppriv
 configure:6276: gcc -o conftest -g -O2 -pthread -pthread   conftest.c -levent  >&5
 /tmp/cc5t7eDX.o: In function `main':
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:65: undefined reference to `setppriv'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/conftest.c:65: undefined reference to `setppriv'
 collect2: error: ld returned 1 exit status
 configure:6276: $? = 1
 configure: failed program was:
@@ -1339,7 +1339,7 @@ am_cv_prog_cc_c_o=yes
 ## Output variables. ##
 ## ----------------- ##
 
-ACLOCAL='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing aclocal-1.14'
+ACLOCAL='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing aclocal-1.14'
 AMDEPBACKSLASH='\'
 AMDEP_FALSE='#'
 AMDEP_TRUE=''
@@ -1348,9 +1348,9 @@ AM_BACKSLASH='\'
 AM_DEFAULT_V='$(AM_DEFAULT_VERBOSITY)'
 AM_DEFAULT_VERBOSITY='1'
 AM_V='$(V)'
-AUTOCONF='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing autoconf'
-AUTOHEADER='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing autoheader'
-AUTOMAKE='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing automake-1.14'
+AUTOCONF='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing autoconf'
+AUTOHEADER='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing autoheader'
+AUTOMAKE='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing automake-1.14'
 AWK='gawk'
 BUILD_CACHE_FALSE='#'
 BUILD_CACHE_TRUE=''
@@ -1389,7 +1389,7 @@ LDFLAGS=''
 LIBOBJS=''
 LIBS='-levent '
 LTLIBOBJS=''
-MAKEINFO='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing makeinfo'
+MAKEINFO='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/missing makeinfo'
 MKDIR_P='/usr/bin/mkdir -p'
 OBJEXT='o'
 PACKAGE='memcached'
@@ -1440,7 +1440,7 @@ host_vendor='unknown'
 htmldir='${docdir}'
 includedir='${prefix}/include'
 infodir='${datarootdir}/info'
-install_sh='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/install-sh'
+install_sh='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/memcached-1.4.21/install-sh'
 libdir='${exec_prefix}/lib'
 libexecdir='${exec_prefix}/libexec'
 localedir='${datarootdir}/locale'

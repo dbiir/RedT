@@ -585,8 +585,6 @@ void Stats_thd::print(FILE * outf, bool prog) {
     single_part_txn_avg_time = single_part_txn_run_time / single_part_txn_cnt;
   fprintf(outf,
   ",tput=%f"
-  // ",total_num_atomic_retry=%d"
-  // ",max_num_atomic_retry=%d"
   ",txn_cnt=%ld"
   ",remote_txn_cnt=%ld"
   ",local_txn_cnt=%ld"
@@ -594,32 +592,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",total_txn_commit_cnt=%ld"
   ",local_txn_commit_cnt=%ld"
   ",remote_txn_commit_cnt=%ld"
-  ",valid_abort_cnt = %ld"
-  ",lock_row_fail = %ld"
-  ",lock_num_unequal = %ld"
-  " ,lock_fail = %ld"
-  ",ts_error = %ld"
-  ",result_false = %ld"
-  ",cas_cnt = %ld "
-
-  ",tpcc_fin_abort = %ld "
-  ",silo_lock_write_abort = %ld "
-  ",silo_lock_read_abort = %ld"
-  ",silo_127_abort = %ld "
-  ",silo_155_abort =%ld"
-  ",cnt_un_abort=%ld"
-//   ",local_lock_fail_abort = %f"
-//   ",remote_lock_fail_abort = %f"
-//   ",local_readset_validate_fail_abort = %f"
-//   ",remote_readset_validate_fail_abort = %f"
-//   ",local_writeset_validate_fail_abort = %f"
-//   ",remote_writeset_validate_fail_abort = %f"
-//   ",validate_lock_abort = %f"
-//   ",local_try_lock_fail_abort = %f"
-//   ",remote_try_lock_fail_abort = %f"
-//   ",cnt_unequal_abort = %f"
   ",total_txn_abort_cnt=%ld"
-
           ",positive_txn_abort_cnt=%ld"
   ",unique_txn_abort_cnt=%ld"
   ",local_txn_abort_cnt=%ld"
@@ -635,47 +608,34 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",txn_write_cnt=%ld"
   ",record_write_cnt=%ld"
   ",parts_touched=%ld"
-          ",avg_parts_touched=%f"
-  ",preqlen_over_cnt=%ld"
-          ",avg_preqlen_over_cnt=%f"
-  ",lock_retry_cnt=%ld"
-  ",read_retry_cnt=%ld"
-  ",write_retry_cnt=%ld",
+          ",avg_parts_touched=%f",
           tput, txn_cnt, remote_txn_cnt, local_txn_cnt, local_txn_start_cnt, total_txn_commit_cnt,
-          local_txn_commit_cnt, remote_txn_commit_cnt,
-          valid_abort_cnt,
-          lock_row_fail,
-          lock_num_unequal,
-          lock_fail ,
-          ts_error ,
-          result_false ,
-          cas_cnt , 
-
-          tpcc_fin_abort,
-          silo_lock_write_abort,
-          silo_lock_read_abort ,
-          silo_127_abort ,
-          silo_155_abort ,
-          cnt_un_abort,
-        //   local_lock_fail_abort/valid_abort_cnt,
-        //   remote_lock_fail_abort/valid_abort_cnt,
-        //   local_readset_validate_fail_abort/valid_abort_cnt,
-        //   remote_readset_validate_fail_abort/valid_abort_cnt,
-        //   local_writeset_validate_fail_abort/valid_abort_cnt,
-        //   remote_writeset_validate_fail_abort/valid_abort_cnt,
-        //   validate_lock_abort/valid_abort_cnt,
-        //   local_try_lock_fail_abort/valid_abort_cnt,
-        //   remote_try_lock_fail_abort/valid_abort_cnt,
-        //   cnt_unequal_abort/valid_abort_cnt,
-
-          total_txn_abort_cnt,positive_txn_abort_cnt, unique_txn_abort_cnt,
-
+          local_txn_commit_cnt, remote_txn_commit_cnt, total_txn_abort_cnt,positive_txn_abort_cnt, unique_txn_abort_cnt,
           local_txn_abort_cnt, remote_txn_abort_cnt, txn_run_time / BILLION,
           txn_run_avg_time / BILLION, multi_part_txn_cnt, multi_part_txn_run_time / BILLION,
           multi_part_txn_avg_time / BILLION, single_part_txn_cnt,
           single_part_txn_run_time / BILLION, single_part_txn_avg_time / BILLION, txn_write_cnt,
-          record_write_cnt, parts_touched, avg_parts_touched, preqlen_over_cnt, avg_preqlen_over_cnt,
-          lock_retry_cnt, read_retry_cnt, write_retry_cnt);
+          record_write_cnt, parts_touched, avg_parts_touched);
+
+  fprintf(outf, //ywq
+  ",valid_abort_cnt = %ld"
+  ",lock_row_fail = %ld"
+  ",lock_num_unequal = %ld"
+  ",lock_fail = %ld"
+  ",ts_error = %ld"
+  ",result_false = %ld"
+  ",cas_cnt = %ld "
+
+  ",tpcc_fin_abort = %ld "
+  ",silo_lock_write_abort = %ld "
+  ",silo_lock_read_abort = %ld"
+  ",silo_127_abort = %ld "
+  ",silo_155_abort =%ld"
+  ",cnt_un_abort=%ld",
+          valid_abort_cnt,lock_row_fail,lock_num_unequal,lock_fail ,ts_error ,result_false ,
+          cas_cnt , 
+          tpcc_fin_abort,silo_lock_write_abort,silo_lock_read_abort ,silo_127_abort ,silo_155_abort ,cnt_un_abort
+);
 
   // Breakdown
   fprintf(outf,

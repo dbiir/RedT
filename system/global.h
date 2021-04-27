@@ -99,6 +99,9 @@ class RDMA_ts1;
 #if CC_ALG == RDMA_CICADA
 class RDMA_Cicada;
 #endif
+#if CC_ALG == RDMA_CNULL
+class RDMA_Null;
+#endif
 class Remote_query;
 class TxnManPool;
 class TxnPool;
@@ -172,6 +175,9 @@ extern RDMA_ts1 rdmats_man;
 #endif
 #if CC_ALG == RDMA_CICADA
 extern RDMA_Cicada rcicada_man;
+#endif
+#if CC_ALG == RDMA_CNULL
+extern RDMA_Null rcnull_man;
 #endif
 extern Workload * m_wl;
 extern TxnManPool txn_man_pool;

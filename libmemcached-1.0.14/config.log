@@ -34,8 +34,8 @@ PATH: /usr/bin
 PATH: /usr/local/git/bin
 PATH: /usr/local/git/bin
 PATH: /usr/local/server/git/bin
-PATH: /home/ywq/.local/bin
-PATH: /home/ywq/bin
+PATH: /home/ljy/.local/bin
+PATH: /home/ljy/bin
 
 
 ## ----------- ##
@@ -710,10 +710,10 @@ configure:16123: checking for mysql_config5
 configure:16156: result: no
 configure:16255: checking for mysqld
 configure:16286: result: nocommand
-configure:16295: WARNING: mysqld not found in /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/usr/local/git/bin:/usr/local/git/bin:/usr/local/server/git/bin:/home/ywq/.local/bin:/home/ywq/bin
+configure:16295: WARNING: mysqld not found in /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/usr/local/git/bin:/usr/local/git/bin:/usr/local/server/git/bin:/home/ljy/.local/bin:/home/ljy/bin
 configure:16324: checking for mysqld
 configure:16355: result: nocommand
-configure:16364: WARNING: mysqld not found in /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/usr/local/git/bin:/usr/local/git/bin:/usr/local/server/git/bin:/home/ywq/.local/bin:/home/ywq/bin
+configure:16364: WARNING: mysqld not found in /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/usr/local/git/bin:/usr/local/git/bin:/usr/local/server/git/bin:/home/ljy/.local/bin:/home/ljy/bin
 configure:16379: checking whether memcached executable path has been provided
 configure:16445: result: no
 configure:16449: checking for memcached
@@ -1833,7 +1833,7 @@ conftest.c:109:6: warning: conflicting types for built-in function 'floor'
  char floor ();
       ^~~~~
 /tmp/cc7vqj01.o: In function `main':
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:120: undefined reference to `floor'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:120: undefined reference to `floor'
 collect2: error: ld returned 1 exit status
 configure:18306: $? = 1
 configure: failed program was:
@@ -2024,7 +2024,7 @@ conftest.c:121:6: warning: conflicting types for built-in function 'sqrt'
  char sqrt ();
       ^~~~
 /tmp/cceRq7Kr.o: In function `main':
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:132: undefined reference to `sqrt'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:132: undefined reference to `sqrt'
 collect2: error: ld returned 1 exit status
 configure:18449: $? = 1
 configure: failed program was:
@@ -5399,7 +5399,7 @@ configure:20153: result: no
 configure:20220: checking for setppriv
 configure:20220: gcc -o conftest -g -O2   conftest.c -lm  >&5
 /tmp/cck7R9pZ.o: In function `main':
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:165: undefined reference to `setppriv'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:165: undefined reference to `setppriv'
 collect2: error: ld returned 1 exit status
 configure:20220: $? = 1
 configure: failed program was:
@@ -6221,10 +6221,10 @@ configure:20914: result: no
 configure:20812: checking whether pthreads work without any flags
 configure:20905: gcc -o conftest -g -O2    conftest.c  -lm  >&5
 /tmp/cc9qZ40h.o: In function `main':
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:143: undefined reference to `pthread_create'
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:144: undefined reference to `pthread_join'
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:146: undefined reference to `__pthread_register_cancel'
-/home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:147: undefined reference to `__pthread_unregister_cancel'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:143: undefined reference to `pthread_create'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:144: undefined reference to `pthread_join'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:146: undefined reference to `__pthread_register_cancel'
+/home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/conftest.c:147: undefined reference to `__pthread_unregister_cancel'
 collect2: error: ld returned 1 exit status
 configure:20905: $? = 1
 configure: failed program was:
@@ -10155,7 +10155,7 @@ lt_cv_to_tool_file_cmd=func_convert_file_noop
 ## Output variables. ##
 ## ----------------- ##
 
-ACLOCAL='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/missing --run aclocal-1.11'
+ACLOCAL='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/missing --run aclocal-1.11'
 ALLOCA=''
 AMDEPBACKSLASH='\'
 AMDEP_FALSE='#'
@@ -10167,9 +10167,9 @@ AM_DEFAULT_V='$(AM_DEFAULT_VERBOSITY)'
 AM_DEFAULT_VERBOSITY='0'
 AM_V='$(V)'
 AR='ar'
-AUTOCONF='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/missing --run autoconf'
-AUTOHEADER='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/missing --run autoheader'
-AUTOMAKE='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/missing --run automake-1.11'
+AUTOCONF='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/missing --run autoconf'
+AUTOHEADER='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/missing --run autoheader'
+AUTOMAKE='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/missing --run automake-1.11'
 AWK='gawk'
 BUILDING_GEARMAN_FALSE=''
 BUILDING_GEARMAN_TRUE='#'
@@ -10282,7 +10282,7 @@ LIBUUID_LDFLAGS=''
 LIPO=''
 LN_S='ln -s'
 LTLIBOBJS=''
-MAKEINFO='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/missing --run makeinfo'
+MAKEINFO='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/missing --run makeinfo'
 MANIFEST_TOOL=':'
 MEMCACHED_BINARY=''
 MEMCACHED_LIBRARY_VERSION='11:0:0'
@@ -10363,7 +10363,7 @@ host_vendor='unknown'
 htmldir='${docdir}'
 includedir='${prefix}/include'
 infodir='${datarootdir}/info'
-install_sh='${SHELL} /home/ywq/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/install-sh'
+install_sh='${SHELL} /home/ljy/sigmod21-deneva-zhangq/libmemcached-1.0.14/build-aux/install-sh'
 libdir='${exec_prefix}/lib'
 libexecdir='${exec_prefix}/libexec'
 localedir='${datarootdir}/locale'

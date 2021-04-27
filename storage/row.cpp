@@ -50,7 +50,7 @@
 #define SIM_FULL_ROW true
 
 int row_t::get_row_size(int tuple_size){
-#ifdef USE_RDMA
+#if RDMA_ONE_SIDE == true
 	// int tuple_size = schema->get_tuple_size();
 	int size = sizeof(row_t) + tuple_size;
 #else
@@ -71,7 +71,8 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
     
 	memset(table_name, 0, 15);
 	memcpy(table_name, host_table->get_table_name(), strlen(host_table->get_table_name()));
-#ifndef USE_RDMA// == false
+// #ifndef USE_RDMA// == false
+#if RDMA_ONE_SIDE == false
 	#if SIM_FULL_ROW
 		data = (char *) mem_allocator.alloc(sizeof(char) * tuple_size);
 	#else
@@ -178,14 +179,14 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_rdma_cicada *) mem_allocator.align_alloc(sizeof(Row_rdma_cicada));
 #endif
 
-#if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC && CC_ALG!=RDMA_MVCC
+#if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC && CC_ALG!=RDMA_MVCC && CC_ALG != RDMA_CNULL
 	manager->init(this);
 #endif
 }
 
 
 
-#ifdef USE_RDMA
+#if RDMA_ONE_SIDE == true
 table_t *row_t::get_table() { 
 	// std::string tbl_name(table_name);
 
@@ -301,9 +302,10 @@ void row_t::copy(row_t * src) {
 void row_t::free_row() {
 	DEBUG_M("row_t::free_row free\n");
 
-#ifndef USE_RDMA // == false
+// #ifndef USE_RDMA // == false
+#if RDMA_ONE_SIDE == false
 
-#if SIM_FULL
+#if SIM_FULL_ROW
 	mem_allocator.free(data, sizeof(char) * get_tuple_size());
 #else
 	mem_allocator.free(data, sizeof(uint64_t) * 1);
@@ -364,6 +366,12 @@ RC row_t::get_row(access_t type, TxnManager *txn, Access *access) {
 	assert(rc == RCOK);
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
+#endif
+#if CC_ALG == RDMA_CNULL
+   txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
+   txn->cur_row->init(get_table(), get_part_id());
+   access->data = txn->cur_row;
+   goto end;
 #endif
 #if CC_ALG == MAAT || CC_ALG == RDMA_MAAT
   uint64_t init_time = get_sys_clock();
@@ -852,6 +860,12 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		row->free_row();
 	DEBUG_M("row_t::return_row Maat free \n");
 		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+	return 0;
+#elif CC_ALG == RDMA_CNULL
+    assert (row != NULL);
+    row->free_row();
+	DEBUG_M("row_t::return_row Maat free \n");
+	mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return 0;
 #elif CC_ALG == MAAT || CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
 	if (row != NULL) {
