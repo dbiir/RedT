@@ -72,11 +72,11 @@ def ycsb_scaling():
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
     nnodes = [4]
-    algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
+    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
     # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     #algos=['RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    # algos = ['NO_WAIT']
+    algos = ['RDMA_CICADA']
     base_table_size=1048576
     #base_table_size=2097152*8
     txn_write_perc = [0.2]
@@ -457,7 +457,7 @@ def tpcc_scaling():
     # nalgos=['MAAT','MVCC','NO_WAIT','WAIT_DIE']
     # nalgos=['RDMA_WAIT_DIE2']
     # nalgos=['WOOKONG']
-    nalgos=['RDMA_WAIT_DIE2']
+    nalgos=['RDMA_CICADA']
     npercpay=[0.0]
     # npercpay=[0.0]
     wh=32

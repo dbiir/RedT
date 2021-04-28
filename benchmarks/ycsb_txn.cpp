@@ -525,7 +525,7 @@ remote_atomic_retry_lock:
 #elif CC_ALG == RDMA_CICADA
     if(req->acctype == RD) {
 		assert(remote_row->version_cnt >= 0);
-		for(int cnt = remote_row->version_cnt - 1; cnt >= remote_row->version_cnt - 5 && cnt >= 0; cnt--) {
+		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(remote_row->cicada_version[i].Wts > this->start_ts || remote_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
@@ -613,6 +613,7 @@ remote_atomic_retry_lock:
 #endif
 
     if(rc == Abort) {
+        mem_allocator.free(m_item, sizeof(itemid_t));
 		return rc;
 	}
 

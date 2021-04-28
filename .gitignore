@@ -12,3 +12,4 @@ input.txt
 lat*
 scripts/lat-*
 scripts/tmp*
+.cache/*

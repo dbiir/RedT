@@ -171,6 +171,9 @@ void REDLOG(const char *format, ...);
 #define INC_STATS(tid, name, value) \
   if (STATS_ENABLE && simulation->is_warmup_done()) stats._stats[tid]->name += value;
 
+#define DEL_STATS(tid, name, value) \
+  if (STATS_ENABLE && simulation->is_warmup_done()) stats._stats[tid]->name -= value;
+
 #define INC_STATS_ARR(tid, name, value) \
   if (STATS_ENABLE && simulation->is_warmup_done()) stats._stats[tid]->name.insert(value);
 
