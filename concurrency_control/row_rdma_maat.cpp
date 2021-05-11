@@ -400,12 +400,12 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
                     }
                 } else {
                     RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
-                    item = rdma_time_table.remote_get_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i]);
+                    item = rdma_time_table.remote_get_timeNode(txn, _row->uncommitted_writes[i]);
                     uint64_t it_lower = item->lower;
                     if(it_lower <= txn_commit_ts) {
                         item->lower = txn_commit_ts+1;
                         if (_row->uncommitted_writes[i] != 0)
-                        rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i], item);
+                        rdma_time_table.remote_set_timeNode(txn, _row->uncommitted_writes[i], item);
                     }
                     mem_allocator.free(item, sizeof(RdmaTimeTableNode));
                 }
@@ -427,12 +427,12 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
                 }
             } else {
                 RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
-                item = rdma_time_table.remote_get_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i]);
+                item = rdma_time_table.remote_get_timeNode(txn, _row->uncommitted_writes[i]);
                 uint64_t it_upper = item->upper;
                 if(it_upper >= txn_commit_ts) {
                     item->upper = txn_commit_ts-1;
                     if(_row->uncommitted_writes[i] != 0)
-                    rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i], item);
+                    rdma_time_table.remote_set_timeNode(txn, _row->uncommitted_writes[i], item);
                 }
                 mem_allocator.free(item, sizeof(RdmaTimeTableNode));
             }
@@ -454,12 +454,12 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
                     }
                 } else {
                     RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
-                    item = rdma_time_table.remote_get_timeNode(txn->get_thd_id(), _row->uncommitted_reads[i]);
+                    item = rdma_time_table.remote_get_timeNode(txn, _row->uncommitted_reads[i]);
                     uint64_t it_upper = item->upper;
                     if(it_upper >= lower) {
                         item->upper = lower-1;
                         if(_row->uncommitted_reads[i] != 0)
-                        rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_reads[i], item);
+                        rdma_time_table.remote_set_timeNode(txn, _row->uncommitted_reads[i], item);
                     }
                     mem_allocator.free(item, sizeof(RdmaTimeTableNode));
                 }
@@ -492,12 +492,12 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 						}
 					} else {
 						RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
-						item = rdma_time_table.remote_get_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i]);
+						item = rdma_time_table.remote_get_timeNode(txn, _row->uncommitted_writes[i]);
 						uint64_t it_lower = item->lower;
 						if(it_lower <= txn_commit_ts) {
 							item->lower = txn_commit_ts+1;
 							if (_row->uncommitted_writes[i] != 0)
-							rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i], item);
+							rdma_time_table.remote_set_timeNode(txn, _row->uncommitted_writes[i], item);
 						}
 						mem_allocator.free(item, sizeof(RdmaTimeTableNode));
 					}
@@ -532,12 +532,12 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 					}
 				} else {
 					RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
-					item = rdma_time_table.remote_get_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i]);
+					item = rdma_time_table.remote_get_timeNode(txn, _row->uncommitted_writes[i]);
 					uint64_t it_upper = item->upper;
 					if(it_upper >= txn_commit_ts) {
 						item->upper = txn_commit_ts-1;
 						if(_row->uncommitted_writes[i] != 0)
-						rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_writes[i], item);
+						rdma_time_table.remote_set_timeNode(txn, _row->uncommitted_writes[i], item);
 					}
 					mem_allocator.free(item, sizeof(RdmaTimeTableNode));
 				}
@@ -558,12 +558,12 @@ RC Row_rdma_maat::commit(access_t type, TxnManager * txn, row_t * data) {
 						}
 					} else {
 						RdmaTimeTableNode* item = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
-						item = rdma_time_table.remote_get_timeNode(txn->get_thd_id(), _row->uncommitted_reads[i]);
+						item = rdma_time_table.remote_get_timeNode(txn, _row->uncommitted_reads[i]);
 						uint64_t it_upper = item->upper;
 						if(it_upper >= lower) {
 							item->upper = lower-1;
 							if(_row->uncommitted_reads[i] != 0)
-							rdma_time_table.remote_set_timeNode(txn->get_thd_id(), _row->uncommitted_reads[i], item);
+							rdma_time_table.remote_set_timeNode(txn, _row->uncommitted_reads[i], item);
 						}
 						mem_allocator.free(item, sizeof(RdmaTimeTableNode));
 					}

@@ -22,6 +22,7 @@
 #include "semaphore.h"
 #include "array.h"
 #include "row_rdma_maat.h"
+#include "rdma_maat.h"
 #include "transport/message.h"
 //#include "wl.h"
 
@@ -202,10 +203,18 @@ bool rdma_one_side() {
   else return false;
 }
 
-    row_t * read_remote_content(uint64_t target_server,uint64_t remote_offset);
+    row_t * read_remote_row(uint64_t target_server,uint64_t remote_offset);
     itemid_t * read_remote_index(uint64_t target_server,uint64_t remote_offset,uint64_t key);
-    bool write_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf);
+#if CC_ALG == RDMA_MAAT
+    RdmaTimeTableNode * read_remote_timetable(uint64_t target_server,uint64_t remote_offset);
+#endif
+    bool write_remote_row(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content);
+    bool write_remote_index(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content);
+    bool write_unlock_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf);
+
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
+    bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
+
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
 	row_t * cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap);
 

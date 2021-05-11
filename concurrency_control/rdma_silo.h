@@ -45,12 +45,9 @@ public:
   static bool     _pre_abort;
 private:
   bool remote_try_lock(TxnManager * txnMng , uint64_t num);
-  bool assert_remote_lock(TxnManager * txnMng , uint64_t num);
   bool remote_commit_write(TxnManager * txnMng , uint64_t num , row_t * data , ts_t time);
-  void release_remote_lock(TxnManager * txn , uint64_t num);
   bool validate_rw_remote(TxnManager * txnMng , uint64_t num);
-  row_t *read_remote_row(TxnManager * txn , uint64_t num);
-  RC validate_key(TxnManager * txn , uint64_t num);
+//   void release_remote_lock(TxnManager * txn , uint64_t num);
   // RC get_rw_set(TxnManager * txni, silo_set_ent * &rset, silo_set_ent *& wset);
   // RC validate_coor(TxnManager * txn);
   // RC validate_part(TxnManager * txn);

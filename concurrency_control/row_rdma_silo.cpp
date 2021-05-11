@@ -59,22 +59,13 @@ Row_rdma_silo::release(TxnManager * txnMng , uint64_t num) {
   	bool result = false;
 	Transaction *txn = txnMng->txn;
 
-  	uint64_t off = txn->accesses[num]->offset;
+  	uint64_t remote_offset = txn->accesses[num]->offset;
   	uint64_t loc = g_node_id;
 	uint64_t thd_id = txnMng->get_thd_id();
 	uint64_t lock = txnMng->get_txn_id();
 
-	uint64_t *test_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-	auto mr = client_rm_handler->get_reg_attr().value();
-
-	rdmaio::qp::Op<> op;
-  	op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(lock, 0);
-  	assert(op.set_payload(test_loc, sizeof(uint64_t), mr.key) == true);
-  	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
-
-	RDMA_ASSERT(res_s2 == IOCode::Ok);
-	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p2 == IOCode::Ok);
+    uint64_t try_lock = txnMng->cas_remote_content(loc,remote_offset,lock,0);
+    // assert(try_lock == lock);
 
 	result = true;
   	DEBUG("silo %ld try to acquire lock %ld row %ld \n", txnMng->get_txn_id(), _row->_tid_word, _row->get_primary_key());
@@ -92,22 +83,12 @@ Row_rdma_silo::try_lock(TxnManager * txnMng , uint64_t num)
   	bool result = false;
 	Transaction *txn = txnMng->txn;
 
-  	uint64_t off = txn->accesses[num]->offset;
+  	uint64_t remote_offset = txn->accesses[num]->offset;
   	uint64_t loc = g_node_id;
 	uint64_t thd_id = txnMng->get_thd_id();
 	uint64_t lock = txnMng->get_txn_id();
 
-	uint64_t *test_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-	auto mr = client_rm_handler->get_reg_attr().value();
-
-	rdmaio::qp::Op<> op;
-	op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
-	assert(op.set_payload(test_loc, sizeof(uint64_t), mr.key) == true);
-	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
-
-	RDMA_ASSERT(res_s2 == IOCode::Ok);
-	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p2 == IOCode::Ok);
+    uint64_t try_lock = txnMng->cas_remote_content(loc,remote_offset,0,lock);
 
 	result = true;
     DEBUG("silo %ld try to acquire lock %ld row %ld \n", txnMng->get_txn_id(), _row->_tid_word, _row->get_primary_key());

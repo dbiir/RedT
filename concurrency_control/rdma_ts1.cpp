@@ -140,46 +140,15 @@ void  RDMA_ts1::write_remote(RC rc, TxnManager * txn, Access * access) {
 	printf("[远程写的传入数据]rc:%d,事务号：%d，主键：%d，锁：%lu，tid：%lu,rts：%lu,wts：%lu\n",rc,txn->get_txn_id(),access->data->get_primary_key(),access->data->mutx,access->data->tid,access->data->rts,access->data->wts);
 #endif
 
-    char *local_loc = Rdma::get_row_client_memory(thd_id);
-    memcpy(local_loc, (char*)access->data, operate_size);
-
-    uint64_t starttime = get_sys_clock();
-	uint64_t endtime;
-
-	auto res_s = rc_qp[loc][thd_id]->send_normal(
-		{.op = IBV_WR_RDMA_WRITE,
-		.flags = IBV_SEND_SIGNALED,
-		.len = operate_size,
-		.wr_id = 0},
-		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(local_loc),
-		.remote_addr = off,
-		.imm_data = 0});
-	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
-  	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-
-	endtime = get_sys_clock();
-	INC_STATS(txn->get_thd_id(), rdma_write_time, endtime-starttime);
-	INC_STATS(txn->get_thd_id(), rdma_write_cnt, 1);
+    txn->write_remote_row(loc,operate_size,off,(char*)access->data);
+    INC_STATS(txn->get_thd_id(), rdma_write_cnt, 1);
+    // char *local_loc = Rdma::get_row_client_memory(thd_id);
+    // memcpy(local_loc, (char*)access->data, operate_size);
 
 #if DEBUG_PRINTF
 if(access->type == WR){
-	operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-	char *test_buf = Rdma::get_row_client_memory(thd_id);
-    memset(test_buf, 0, operate_size);
-	res_s = rc_qp[loc][thd_id]->send_normal(
-		{.op = IBV_WR_RDMA_READ,
-		.flags = IBV_SEND_SIGNALED,
-		.len = operate_size,
-		.wr_id = 0},
-		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
-		.remote_addr = off,
-		.imm_data = 0});
-	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
-  	res_p = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-	memcpy(temp_row, test_buf, operate_size);
+	
+    row_t *temp_row = txn->read_remote_row(loc,off);
 	printf("[远程写入后再次读]事务号：%d，主键：%d，锁：%lu，tid：%lu,rts：%lu,wts：%lu\n",txn->get_txn_id(),temp_row->get_primary_key(),temp_row->mutx,temp_row->tid,temp_row->rts,temp_row->wts);
 	mem_allocator.free(temp_row,sizeof(ROW_DEFAULT_SIZE));
 }
@@ -190,28 +159,34 @@ if(access->type == WR){
 void  RDMA_ts1::commit_write(TxnManager * txn , uint64_t num , access_t type){
 	Access * access = txn->txn->accesses[num];
 	uint64_t loc = access->location;
+    uint64_t offset = access->offset;
+    uint64_t lock_num = txn->get_txn_id() + 1;
 	assert(loc != g_node_id);
-	uint64_t offset = access->offset;
+
 	row_t * row = access->data;
 	assert(row != NULL);
-	row_t *remote_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+    // row_t *remote_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
     // row_t *remote_row = Rdma::get_row_client_memory(txn->get_thd_id());
 	ts_t ts = txn->get_timestamp();
 	//validate lock suc
 	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 
-	bool suc = false;
-	//lock row
-	suc = remote_try_lock(txn, temp_row, loc, offset);
-	while(suc == false){
-		INC_STATS(txn->get_thd_id(),lock_retry_cnt,1);
-#if DEBUG_PRINTF
-		printf("远程提交 lock retry！事务号：%ld,主键：%ld\n",txn->get_txn_id(),row->get_primary_key());
-#endif
-		suc = remote_try_lock(txn, temp_row, loc, offset);
-	}
-	
-	read_remote_row(txn, remote_row, loc, offset);
+// 	bool suc = false;
+// 	//lock row
+// 	suc = remote_try_lock(txn, temp_row, loc, offset);
+
+// 	while(suc == false){
+// 		INC_STATS(txn->get_thd_id(),lock_retry_cnt,1);
+// #if DEBUG_PRINTF
+// 		printf("远程提交 lock retry！事务号：%ld,主键：%ld\n",txn->get_txn_id(),row->get_primary_key());
+// #endif
+// 		suc = remote_try_lock(txn, temp_row, loc, offset);
+// 	}
+
+// read_remote_row(txn, remote_row, loc, offset);
+
+    assert(txn->loop_cas_remote(loc,offset,0,lock_num) == true);//lock in loop
+	row_t *remote_row = txn->read_remote_row(loc,offset);
 
 	if (type == XP) {
 		remote_row->tid = 0;

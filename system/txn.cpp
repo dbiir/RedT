@@ -1531,7 +1531,7 @@ row_t * TxnManager::cas_and_read_remote(uint64_t& try_lock, uint64_t target_serv
 }
 #endif
 
-row_t * TxnManager::read_remote_content(uint64_t target_server,uint64_t remote_offset){
+row_t * TxnManager::read_remote_row(uint64_t target_server,uint64_t remote_offset){
     uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
     uint64_t thd_id = get_thd_id();
     char *local_buf = Rdma::get_row_client_memory(thd_id);
@@ -1562,6 +1562,41 @@ row_t * TxnManager::read_remote_content(uint64_t target_server,uint64_t remote_o
 
     return test_row;
 }
+
+#if CC_ALG == RDMA_MAAT
+RdmaTimeTableNode * TxnManager::read_remote_timetable(uint64_t target_server,uint64_t remote_offset){
+	uint64_t operate_size = sizeof(RdmaTimeTableNode);
+
+    uint64_t thd_id = get_thd_id();
+    char *local_buf = Rdma::get_row_client_memory(thd_id);
+
+	uint64_t starttime;
+	uint64_t endtime;
+	starttime = get_sys_clock();
+    auto res_s = rc_qp[target_server][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_READ,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(local_buf),
+		.remote_addr = remote_offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+
+	endtime = get_sys_clock();
+	INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
+	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
+	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+
+    RdmaTimeTableNode *test_row = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
+    memcpy(test_row, local_buf, operate_size);
+
+    return test_row;
+}
+#endif
 
 itemid_t * TxnManager::read_remote_index(uint64_t target_server,uint64_t remote_offset,uint64_t key){
     uint64_t operate_size = sizeof(IndexInfo);
@@ -1601,8 +1636,11 @@ itemid_t * TxnManager::read_remote_index(uint64_t target_server,uint64_t remote_
     return item;
 }
 
-bool TxnManager::write_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf){
+bool TxnManager::write_remote_row(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content){
     uint64_t thd_id = get_thd_id();
+
+    char *local_buf = Rdma::get_row_client_memory(thd_id);
+    memcpy(local_buf, write_content , operate_size);
 
 	uint64_t starttime;
 	uint64_t endtime;
@@ -1629,6 +1667,42 @@ bool TxnManager::write_remote_content(uint64_t target_server,uint64_t operate_si
     return true;
 }
 
+bool TxnManager::write_remote_index(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content){
+    uint64_t thd_id = get_thd_id();
+
+    char *local_buf = Rdma::get_index_client_memory(thd_id);
+    ::memset(local_buf, 0, operate_size);
+    memcpy(local_buf, write_content , operate_size);
+
+	uint64_t starttime;
+	uint64_t endtime;
+	starttime = get_sys_clock();
+
+    auto res_s = rc_qp[target_server][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_WRITE,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(local_buf),
+		.remote_addr = remote_offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+	endtime = get_sys_clock();
+
+	INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
+	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
+	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+
+    return true;
+}
+
+bool TxnManager::write_unlock_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf){
+    
+}
+
 uint64_t TxnManager::cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value ){
     
     rdmaio::qp::Op<> op;
@@ -1653,6 +1727,16 @@ uint64_t TxnManager::cas_remote_content(uint64_t target_server,uint64_t remote_o
     RDMA_ASSERT(res_p2 == IOCode::Ok);
 
     return *local_buf;
+}
+
+bool TxnManager::loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value){
+    uint64_t cas_result = -1;
+    do{
+        cas_result = cas_remote_content(target_server,remote_offset,old_value,new_value);
+    }
+    while(cas_result != old_value && !simulation->is_done());
+
+    return true;
 }
 
 RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc){

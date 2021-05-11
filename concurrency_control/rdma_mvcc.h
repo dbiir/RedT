@@ -34,38 +34,21 @@ public:
 	RC access(TxnManager * txn, TsType type, row_t * row);
     RC finish(RC rc,TxnManager * txnMng); 
     RC validate_local(TxnManager * txnMng);
-    RC lock_row(TxnManager * txnMng);
 private:
  	pthread_mutex_t * latch;
 	bool blatch;
 
 	row_t * _row;
-	MVReqEntry * get_req_entry();
-	void return_req_entry(MVReqEntry * entry);
-	MVHisEntry * get_his_entry();
-	void return_his_entry(MVHisEntry * entry);
 
-	bool conflict(TsType type, ts_t ts);
-	void buffer_req(TsType type, TxnManager * txn);
-	MVReqEntry * debuffer_req( TsType type, TxnManager * txn = NULL);
-	void update_buffer(TxnManager * txn);
-	void insert_history( ts_t ts, row_t * row);
 
     bool get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn);
     uint64_t remote_lock(TxnManager * txnMng , uint64_t num);
     uint64_t local_lock(TxnManager * txnMng , uint64_t num);
-    bool lock_write_set(TxnManager * txnMng , uint64_t num);
-    row_t * read_remote_row(TxnManager * txnMng , uint64_t num);
     void * local_write_back(TxnManager * txnMng , uint64_t num);
     void * remote_write_back(TxnManager * txnMng , uint64_t num);
-    void * remote_release_lock(TxnManager * txnMng , uint64_t num);
     void * abort_release_local_lock(TxnManager * txnMng , uint64_t num);
     void * abort_release_remote_lock(TxnManager * txnMng , uint64_t num);
-
-    row_t * read_again(TxnManager * txnMng,uint64_t num);
   
-
-	row_t * clear_history(TsType type, ts_t ts);
 
 	MVReqEntry * readreq_mvcc;
     MVReqEntry * prereq_mvcc;

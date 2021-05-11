@@ -77,8 +77,8 @@ public:
 	void local_set_upper(uint64_t thd_id, uint64_t key, uint64_t value);
 	void local_set_state(uint64_t thd_id, uint64_t key, MAATState value);
 
-	RdmaTimeTableNode * remote_get_timeNode(uint64_t thd_id, uint64_t key);
-	void remote_set_timeNode(uint64_t thd_id, uint64_t key, RdmaTimeTableNode * value);
+	RdmaTimeTableNode * remote_get_timeNode(TxnManager *txnMng, uint64_t key);
+	void remote_set_timeNode(TxnManager *txnMng, uint64_t key, RdmaTimeTableNode * value);
 private:
 	// hash table
 	uint64_t hash(uint64_t key);

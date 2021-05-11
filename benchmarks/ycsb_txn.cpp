@@ -209,114 +209,63 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
     uint64_t lock = get_txn_id() + 1;
 
 #if CC_ALG == RDMA_CNULL
-     row_t * test_row = read_remote_content(loc,m_item->offset);
-     assert(test_row->get_primary_key() == req->key);
-	 mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-
-     mem_allocator.free(m_item, sizeof(itemid_t));
-     return RCOK;
+    row_t * test_row = read_remote_row(loc,m_item->offset);
+    assert(test_row->get_primary_key() == req->key);
+	mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+    mem_allocator.free(m_item, sizeof(itemid_t));
+    return RCOK;
 #endif
 
-#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2
-	if(req->acctype == RD || req->acctype == WR){
+#if CC_ALG == RDMA_SILO
+    if(req->acctype == RD || req->acctype == WR){
 		uint64_t tts = get_timestamp();
 
+		//read remote data
+        row_t * test_row = read_remote_row(loc,m_item->offset);
+		assert(test_row->get_primary_key() == req->key);
+
+        //preserve the txn->access
+        access_t type = req->acctype;
+        rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+
+        return rc;	   		
+	}
+	rc = RCOK;
+	return rc;
+#endif
+
 #if CC_ALG == RDMA_MVCC
+if(req->acctype == RD || req->acctype == WR){
+	uint64_t tts = get_timestamp();
     uint64_t lock = get_txn_id()+1;
-    uint64_t test_loc = -1;
-    test_loc = cas_remote_content(loc,m_item->offset,0,lock);
-    if(test_loc != 0){
+    uint64_t try_lock = -1;
+    try_lock = cas_remote_content(loc,m_item->offset,0,lock);//lock
+    if(try_lock != 0){
        INC_STATS(get_thd_id(), lock_fail, 1);
        rc = Abort;
        return rc;
     }
+
+	//read remote data
+    row_t * test_row = read_remote_row(loc,m_item->offset);
+    assert(test_row->get_primary_key() == req->key);
+
+    try_lock = cas_remote_content(loc,m_item->offset,lock,0);//release lock
+    assert(try_lock == lock);
+
+    //preserve the txn->access
+    access_t type = req->acctype;
+    rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+    return rc;	   		
+	}
+	rc = RCOK;
+	return rc;
 #endif
 
-#if CC_ALG == RDMA_WAIT_DIE2
-#if ENABLE_DBPA
-retry_lock:
-		uint64_t try_lock;
-		row_t* test_row = cas_and_read_remote(try_lock,loc,m_item->offset,0,tts);
-		if(try_lock != 0){// CAS fail
-			if(tts <= try_lock){ //wait
-				num_atomic_retry++;
-				total_num_atomic_retry++;
-				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
-				//sleep(1);
-				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-				goto retry_lock;			
-			}
-			else{ //abort
-				DEBUG_M("TxnManager::get_row(abort) access free\n");
-				row_local = NULL;
-				txn->rc = Abort;
-				mem_allocator.free(m_item, sizeof(itemid_t));
-				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-				return Abort;			
-			}
-		}
-#else		
-retry_lock:
-        uint64_t try_lock = -1;
-        try_lock = cas_remote_content(loc,m_item->offset,0,tts);
+#if CC_ALG == RDMA_NO_WAIT
+if(req->acctype == RD || req->acctype == WR){
+		uint64_t tts = get_timestamp();
 
-		if(try_lock != 0){ // cas fail
-			if(tts <= try_lock){  //wait
-
-				num_atomic_retry++;
-				total_num_atomic_retry++;
-				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
-				//sleep(1);
-				goto retry_lock;			
-			}	
-			else{ //abort
-				DEBUG_M("TxnManager::get_row(abort) access free\n");
-				row_local = NULL;
-				txn->rc = Abort;
-				mem_allocator.free(m_item, sizeof(itemid_t));
-
-				return Abort;
-			}
-		}
-#endif
-#endif
-#if CC_ALG == RDMA_NO_WAIT2
-#if ENABLE_DBPA
-		//cas result
-		uint64_t try_lock;
-		//read result
-		row_t * test_row = cas_and_read_remote(try_lock,loc,m_item->offset,0,1);
-		
-		if(try_lock != 0){ //if CAS failed, ignore read content
-			DEBUG_M("TxnManager::get_row(abort) access free\n");
-			row_local = NULL;
-			txn->rc = Abort;
-			mem_allocator.free(m_item, sizeof(itemid_t));
-			mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-			return Abort;
-		}
-		//CAS success, now get read content
-		assert(test_row->_lock_info == 1);		
-#if DEBUG_PRINTF
-		printf("---thread id：%lu, remote lock success，lock location: %lu; %p, txn id: %lu,original lock_info: 0, new_lock_info: 1\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id());
-#endif
-#else
-        uint64_t try_lock = -1;
-        try_lock = cas_remote_content(loc,m_item->offset,0,1);
-
-		if(try_lock != 0){ //CAS fail
-			DEBUG_M("TxnManager::get_row(abort) access free\n");
-			row_local = NULL;
-			txn->rc = Abort;
-			mem_allocator.free(m_item, sizeof(itemid_t));
-
-			return Abort;
-		}
-
-#endif
-
-#endif
-#if CC_ALG == RDMA_NO_WAIT 
 		uint64_t new_lock_info;
 		uint64_t lock_info;
 #if ENABLE_DBPA
@@ -324,10 +273,10 @@ retry_lock:
 #endif
 		if(req->acctype == RD){ //读集元素
 			//第一次rdma read，得到数据项的锁信息
-            row_t * lock_read = read_remote_content(loc,m_item->offset);
+            row_t * lock_read = read_remote_row(loc,m_item->offset);
 
 			new_lock_info = 0;
-			lock_info = lock_read->_lock_info;
+			lock_info = lock_read->_tid_word;
 			mem_allocator.free(lock_read, row_t::get_row_size(ROW_DEFAULT_SIZE));
 remote_atomic_retry_lock:
 			bool conflict = Row_rdma_2pl::conflict_lock(lock_info, DLOCK_SH, new_lock_info);
@@ -393,21 +342,15 @@ remote_atomic_retry_lock:
            
 #endif
 		}
-#endif
-#if !ENABLE_DBPA || (CC_ALG!=RDMA_NO_WAIT&&CC_ALG!=RDMA_NO_WAIT2&&CC_ALG!=RDMA_WAIT_DIE2)
+
+#if !ENABLE_DBPA
 		//read remote data
-        row_t * test_row = read_remote_content(loc,m_item->offset);
+        row_t * test_row = read_remote_row(loc,m_item->offset);
+        assert(test_row->get_primary_key() == req->key);
 #endif
-		assert(test_row->get_primary_key() == req->key);
-
-#if CC_ALG == RDMA_MVCC
-        test_loc = cas_remote_content(loc,m_item->offset,lock,0);
-#endif
-
         //preserve the txn->access
         access_t type = req->acctype;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
-        //mem_allocator.free(m_item, sizeof(itemid_t));
 
         return rc;
 		   		
@@ -416,8 +359,119 @@ remote_atomic_retry_lock:
 	return rc;
 #endif
 
-#if CC_ALG == RDMA_TS1 || CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
+#if CC_ALG == RDMA_NO_WAIT2
+if(req->acctype == RD || req->acctype == WR){
+		uint64_t tts = get_timestamp();
+#if ENABLE_DBPA
+		//cas result
+		uint64_t try_lock;
+		//read result
+		row_t * test_row = cas_and_read_remote(try_lock,loc,m_item->offset,0,1);
+		
+		if(try_lock != 0){ //if CAS failed, ignore read content
+			DEBUG_M("TxnManager::get_row(abort) access free\n");
+			row_local = NULL;
+			txn->rc = Abort;
+			mem_allocator.free(m_item, sizeof(itemid_t));
+			mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+			return Abort;
+		}
+		//CAS success, now get read content
+		assert(test_row->_tid_word == 1);		
+#if DEBUG_PRINTF
+		printf("---thread id：%lu, remote lock success，lock location: %lu; %p, txn id: %lu,original lock_info: 0, new_lock_info: 1\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id());
+#endif
+#else
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,0,1);
 
+		if(try_lock != 0){ //CAS fail
+			DEBUG_M("TxnManager::get_row(abort) access free\n");
+			row_local = NULL;
+			txn->rc = Abort;
+			mem_allocator.free(m_item, sizeof(itemid_t));
+
+			return Abort;
+		}
+
+#endif
+
+#if !ENABLE_DBPA 
+        row_t * test_row = read_remote_row(loc,m_item->offset);
+        assert(test_row->get_primary_key() == req->key);
+#endif
+        access_t type = req->acctype;
+        rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+        return rc;   		
+	}
+	rc = RCOK;
+	return rc;
+#endif
+
+#if CC_ALG == RDMA_WAIT_DIE2
+if(req->acctype == RD || req->acctype == WR){
+		uint64_t tts = get_timestamp();
+
+#if ENABLE_DBPA
+retry_lock:
+		uint64_t try_lock;
+		row_t* test_row = cas_and_read_remote(try_lock,loc,m_item->offset,0,tts);
+		if(try_lock != 0){// CAS fail
+			if(tts <= try_lock){ //wait
+				num_atomic_retry++;
+				total_num_atomic_retry++;
+				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+				//sleep(1);
+				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				goto retry_lock;			
+			}
+			else{ //abort
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				row_local = NULL;
+				txn->rc = Abort;
+				mem_allocator.free(m_item, sizeof(itemid_t));
+				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				return Abort;			
+			}
+		}
+#else		
+retry_lock:
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(loc,m_item->offset,0,tts);
+
+		if(try_lock != 0){ // cas fail
+			if(tts <= try_lock){  //wait
+
+				num_atomic_retry++;
+				total_num_atomic_retry++;
+				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+				//sleep(1);
+				goto retry_lock;			
+			}	
+			else{ //abort
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				row_local = NULL;
+				txn->rc = Abort;
+				mem_allocator.free(m_item, sizeof(itemid_t));
+
+				return Abort;
+			}
+		}
+#endif
+#if !ENABLE_DBPA 
+        row_t * test_row = read_remote_row(loc,m_item->offset);
+        assert(test_row->get_primary_key() == req->key);
+#endif
+        access_t type = req->acctype;
+        rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+        return rc;	
+	}
+	rc = RCOK;
+	return rc;
+#endif
+
+#if CC_ALG == RDMA_TS1
+    
     ts_t ts = get_timestamp();
 
     uint64_t try_lock = -1;
@@ -427,21 +481,17 @@ remote_atomic_retry_lock:
         return rc;
 	}
 
-    row_t * remote_row = read_remote_content(loc,m_item->offset);
+    row_t * remote_row = read_remote_row(loc,m_item->offset);
 	assert(remote_row->get_primary_key() == req->key);
 
-#if CC_ALG == RDMA_TS1
     if(req->acctype == RD) {
-
 		if(ts < remote_row->wts || (ts > remote_row->tid && remote_row->tid != 0))rc = Abort;
 		else {
 			if (remote_row->rts < ts) remote_row->rts = ts;
 			rc = RCOK;
 		}
-	} 
-	else if(req->acctype == WR) {
-		if (remote_row->tid != 0 || ts < remote_row->rts || ts < remote_row->wts) rc = Abort;	
-		else {
+	}else if(req->acctype == WR) {
+		if (remote_row->tid != 0 || ts < remote_row->rts || ts < remote_row->wts) rc = Abort;else {
 			remote_row->tid = ts;
 			rc = RCOK;	
 		}
@@ -461,12 +511,35 @@ remote_atomic_retry_lock:
 	}
 
     uint64_t operate_size = row_t::get_row_size(remote_row->tuple_size);
-    char *write_buf = Rdma::get_row_client_memory(get_thd_id());
-    memcpy(write_buf, (char*)remote_row, operate_size);
+    // char *write_buf = Rdma::get_row_client_memory(get_thd_id());
+    // memcpy(write_buf, (char*)remote_row, operate_size);
 
-    assert(write_remote_content(loc,operate_size,m_item->offset,write_buf) == true);
+    assert(write_remote_row(loc,operate_size,m_item->offset,(char*)remote_row) == true);
 
-#elif CC_ALG == RDMA_MAAT
+    if(rc == Abort) {
+        mem_allocator.free(m_item, sizeof(itemid_t));
+		return rc;
+	}
+
+    rc = preserve_access(row_local,m_item,remote_row,req->acctype,remote_row->get_primary_key(),loc);
+	
+	return rc;
+#endif
+
+#if CC_ALG == RDMA_MAAT
+
+    ts_t ts = get_timestamp();
+
+    uint64_t try_lock = -1;
+    try_lock = cas_remote_content(loc,m_item->offset,0,lock);
+	if(try_lock != 0) {
+		rc = Abort;
+        return rc;
+	}
+
+    row_t * remote_row = read_remote_row(loc,m_item->offset);
+	assert(remote_row->get_primary_key() == req->key);
+
     if(req->acctype == RD) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			assert(i < row_set_length - 1);
@@ -518,11 +591,35 @@ remote_atomic_retry_lock:
     remote_row->_tid_word = 0;
 
     uint64_t operate_size = row_t::get_row_size(remote_row->tuple_size);
-    char *write_buf = Rdma::get_row_client_memory(get_thd_id());
-    memcpy(write_buf, (char*)remote_row, operate_size);
+    // char *write_buf = Rdma::get_row_client_memory(get_thd_id());
+    // memcpy(write_buf, (char*)remote_row, operate_size);
 
-    assert(write_remote_content(loc,operate_size,m_item->offset,write_buf) == true);
-#elif CC_ALG == RDMA_CICADA
+    assert(write_remote_row(loc,operate_size,m_item->offset,(char*)remote_row) == true);
+
+    if(rc == Abort) {
+        mem_allocator.free(m_item, sizeof(itemid_t));
+		return rc;
+	}
+
+    rc = preserve_access(row_local,m_item,remote_row,req->acctype,remote_row->get_primary_key(),loc);
+	
+	return rc;
+#endif
+
+#if CC_ALG == RDMA_CICADA
+
+    ts_t ts = get_timestamp();
+
+    uint64_t try_lock = -1;
+    try_lock = cas_remote_content(loc,m_item->offset,0,lock);
+	if(try_lock != 0) {
+		rc = Abort;
+        return rc;
+	}
+
+    row_t * remote_row = read_remote_row(loc,m_item->offset);
+	assert(remote_row->get_primary_key() == req->key);
+
     if(req->acctype == RD) {
 		assert(remote_row->version_cnt >= 0);
 		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
@@ -546,7 +643,7 @@ remote_atomic_retry_lock:
 						return Abort; //CAS fail
 					}
 
-                    remote_row = read_remote_content(loc,m_item->offset);
+                    remote_row = read_remote_row(loc,m_item->offset);
 					assert(remote_row->get_primary_key() == req->key);
 
 					if(remote_row->cicada_version[i].state == Cicada_PENDING) {
@@ -564,7 +661,7 @@ remote_atomic_retry_lock:
 	}
     	if(req->acctype == WR) {
 		assert(remote_row->version_cnt >= 0);
-		for(int cnt = remote_row->version_cnt - 1; cnt >= remote_row->version_cnt - 5 && cnt >= 0; cnt--) {
+		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(remote_row->cicada_version[i].Wts > this->start_ts || remote_row->cicada_version[i].Rts > this->start_ts || remote_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
@@ -586,7 +683,7 @@ remote_atomic_retry_lock:
 
 						return Abort; //CAS fail
 					}
-				    remote_row = read_remote_content(loc,m_item->offset);
+				    remote_row = read_remote_row(loc,m_item->offset);
 					assert(remote_row->get_primary_key() == req->key);
 
 					if(remote_row->cicada_version[i].state == Cicada_PENDING) {
@@ -609,14 +706,12 @@ remote_atomic_retry_lock:
 	}
     try_lock = cas_remote_content(loc,m_item->offset,lock ,0);
 
-    if(rc != Abort)this->version_num.push_back(version);
-#endif
-
+    // if(rc != Abort)this->version_num.push_back(version);
     if(rc == Abort) {
         mem_allocator.free(m_item, sizeof(itemid_t));
 		return rc;
 	}
-
+    this->version_num.push_back(version);
     rc = preserve_access(row_local,m_item,remote_row,req->acctype,remote_row->get_primary_key(),loc);
 	
 	return rc;

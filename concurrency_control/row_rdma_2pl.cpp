@@ -50,7 +50,7 @@ RC Row_rdma_2pl::lock_get(lock_t type, TxnManager * txn, row_t * row) {  //本�
     RC rc;
 #if CC_ALG == RDMA_NO_WAIT
 atomic_retry_lock:
-    uint64_t lock_info = row->_lock_info;
+    uint64_t lock_info = row->_tid_word;
     uint64_t new_lock_info = 0;
 
     //检测是否有冲突，在conflict=false的情况下得到new_lock_info
@@ -60,7 +60,7 @@ atomic_retry_lock:
 	    return rc;
     }
     if(new_lock_info == 0){
-        printf("---线程号：%lu, 本地加锁失败!!!!!!锁位置: %u; %p , 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, &row->_lock_info, txn->get_txn_id(), lock_info, new_lock_info);    
+        printf("---线程号：%lu, 本地加锁失败!!!!!!锁位置: %u; %p , 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id(), lock_info, new_lock_info);    
     }
     assert(new_lock_info != 0);
     //RDMA CAS，不用本地CAS
@@ -90,18 +90,18 @@ atomic_retry_lock:
         }         
         else{   //加锁成功
 #if DEBUG_PRINTF
-        printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, &row->_lock_info, txn->get_txn_id(), lock_info, new_lock_info);
+        printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id(), lock_info, new_lock_info);
 #endif
         rc = RCOK;
         } 
 /*
     //本地CAS，成功返回1，失败返回0
-    auto res = __sync_bool_compare_and_swap(&row->_lock_info, lock_info, new_lock_info);
+    auto res = __sync_bool_compare_and_swap(&row->_tid_word, lock_info, new_lock_info);
     //if(res != 0 && res != 1) printf(res);
     assert(res == 0 || res == 1);
     if(res){
 #if DEBUG_PRINTF
-        printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, &row->_lock_info, txn->get_txn_id(), lock_info, new_lock_info);
+        printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id(), lock_info, new_lock_info);
 #endif
         rc = RCOK;
     }
@@ -127,14 +127,14 @@ atomic_retry_lock:
 		if(*tmp_buf2 != 0) rc = Abort; //加锁冲突，Abort	
         else{   //加锁成功
 #if DEBUG_PRINTF
-        printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: 0, new_lock_info: 1\n", txn->get_thd_id(), g_node_id, &row->_lock_info, txn->get_txn_id());
+        printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: 0, new_lock_info: 1\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id());
 #endif
         rc = RCOK;
         } 
 /*
     //本地CAS，成功返回1，失败返回0
-    if(__sync_bool_compare_and_swap(&row->_lock_info, 0, 1)){
-        //printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, &row->_lock_info, txn->get_txn_id(), lock_info, new_lock_info);
+    if(__sync_bool_compare_and_swap(&row->_tid_word, 0, 1)){
+        //printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id(), lock_info, new_lock_info);
         rc = RCOK;
     }
     else    rc = Abort;  //加锁冲突

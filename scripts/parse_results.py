@@ -41,4 +41,6 @@ if 'lock_retry_cnt' in summary:
     c = sum(summary['lock_retry_cnt'])
 if 'read_retry_cnt' in summary:
     d = sum(summary['read_retry_cnt'])
-print a, b, c, d
+if 'avg_trans_total_run_time' in summary:
+    e = sum(summary['avg_trans_total_run_time']) 
+print a, b, c, d, e

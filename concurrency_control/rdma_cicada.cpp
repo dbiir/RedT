@@ -39,7 +39,7 @@ RC RDMA_Cicada::validate(TxnManager * txnMng) {
 	int cur_rd_idx = 0;
     int cur_wr_idx = 0;
 	uint64_t wr_cnt = txn->write_cnt;
-	//对写集按照wts降序排序
+	//Sort the write set in WTS descending order
 	for (uint64_t rid = 0; rid < txn->row_cnt; rid ++) {
 		if (txn->accesses[rid]->type == WR)
 			txnMng->write_set[cur_wr_idx ++] = rid;
@@ -67,7 +67,7 @@ RC RDMA_Cicada::validate(TxnManager * txnMng) {
 	start_time = get_sys_clock();
 	RC rc = RCOK;
 
-	//2.	预检查版本一致性，对写集中的每一项Xi
+	//2.Precheck version consistency for each entry in the write set
 	for (uint64_t i = 0; i < txn->write_cnt; i++) {
         //local
         if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
@@ -91,7 +91,7 @@ RC RDMA_Cicada::validate(TxnManager * txnMng) {
 			rc = remote_read_or_write(access, txnMng, txnMng->write_set[i], true);
         }
     }
-	//3.	对读集中的每一项
+	//3. for each entry in the read set
 	for (uint64_t i = 0; i < txn->row_cnt-txn->write_cnt; i++) {
         //local
         if(txn->accesses[read_set[i]]->location == g_node_id){
@@ -154,34 +154,13 @@ RC RDMA_Cicada::remote_read_or_write(Access * data, TxnManager * txnMng, uint64_
 	uint64_t thd_id = txnMng->get_thd_id();
 	uint64_t lock = txnMng->get_txn_id() + 1;
 	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-	uint64_t starttime = get_sys_clock();
-	uint64_t endtime;
-	uint64_t *tmp_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-	auto mr = client_rm_handler->get_reg_attr().value();
+
     RC rc = RCOK;
-	rdmaio::qp::Op<> op;
-	op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
-	assert(op.set_payload(tmp_buf, sizeof(uint64_t), mr.key) == true);
-	auto res_s = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
-	RDMA_ASSERT(res_s == IOCode::Ok);
-	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == IOCode::Ok);
 
-	char *tmp_buf2 = Rdma::get_row_client_memory(thd_id);
-	auto res_s2 = rc_qp[loc][thd_id]->send_normal(
-		{.op = IBV_WR_RDMA_READ,
-		.flags = IBV_SEND_SIGNALED,
-		.len = operate_size,
-		.wr_id = 0},
-		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
-		.remote_addr = off,
-		.imm_data = 0});
-	RDMA_ASSERT(res_s2 == rdmaio::IOCode::Ok);
-    auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-    RDMA_ASSERT(res_p2 == rdmaio::IOCode::Ok);
+    uint64_t try_lock = txnMng->cas_remote_content(loc,off,0,lock);
+    // assert(try_lock == 0);
 
-	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-	memcpy(temp_row, tmp_buf2, operate_size);
+    row_t *temp_row = txnMng->read_remote_row(loc,off);
 	assert(temp_row->get_primary_key() == data->data->get_primary_key());
 
 	if(data->type == RD) {
@@ -199,18 +178,10 @@ RC RDMA_Cicada::remote_read_or_write(Access * data, TxnManager * txnMng, uint64_
 		temp_row->_tid_word = 0;
 
         operate_size = row_t::get_row_size(temp_row->tuple_size);
-		memcpy(tmp_buf2, (char *)temp_row, operate_size);
-		auto res_s3 = rc_qp[loc][thd_id]->send_normal(
-			{.op = IBV_WR_RDMA_WRITE,
-			.flags = IBV_SEND_SIGNALED,
-			.len = operate_size,
-			.wr_id = 0},
-			{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
-			.remote_addr = off,
-			.imm_data = 0});
-		RDMA_ASSERT(res_s3 == rdmaio::IOCode::Ok);
-		auto res_p3 = rc_qp[loc][thd_id]->wait_one_comp();
-		RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
+        // char *tmp_buf2 = Rdma::get_row_client_memory(thd_id);
+		// memcpy(tmp_buf2, (char *)temp_row, operate_size);
+
+        assert(txnMng->write_remote_row(loc,operate_size,off,(char *)temp_row) == true);
 	}
 
 	if(data->type == WR) {
@@ -232,18 +203,9 @@ RC RDMA_Cicada::remote_read_or_write(Access * data, TxnManager * txnMng, uint64_
 		temp_row->_tid_word = 0;
 
         operate_size = row_t::get_row_size(temp_row->tuple_size);
-		memcpy(tmp_buf2, (char *)temp_row, operate_size);
-		auto res_s3 = rc_qp[loc][thd_id]->send_normal(
-			{.op = IBV_WR_RDMA_WRITE,
-			.flags = IBV_SEND_SIGNALED,
-			.len = operate_size,
-			.wr_id = 0},
-			{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
-			.remote_addr = off,
-			.imm_data = 0});
-		RDMA_ASSERT(res_s3 == rdmaio::IOCode::Ok);
-		auto res_p3 = rc_qp[loc][thd_id]->wait_one_comp();
-		RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
+        // char *tmp_buf2 = Rdma::get_row_client_memory(thd_id);
+		// memcpy(tmp_buf2, (char *)temp_row, operate_size);
+        assert(txnMng->write_remote_row(loc,operate_size,off, (char *)temp_row) == true);
 		//uncommitted_writes->erase(txn->get_txn_id());
 	}
 	mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
@@ -312,55 +274,26 @@ RC RDMA_Cicada::remote_abort(TxnManager * txnMng, Access * data, uint64_t num) {
 	uint64_t thd_id = txnMng->get_thd_id();
 	uint64_t lock = txnMng->get_txn_id() + 1;
 	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-	uint64_t starttime = get_sys_clock();
-	uint64_t endtime;
-	uint64_t *tmp_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-	auto mr = client_rm_handler->get_reg_attr().value();
 
-	rdmaio::qp::Op<> op;
-	op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
-	assert(op.set_payload(tmp_buf, sizeof(uint64_t), mr.key) == true);
-	auto res_s = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
-	RDMA_ASSERT(res_s == IOCode::Ok);
-	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == IOCode::Ok);
+    uint64_t try_lock = txnMng->cas_remote_content(loc,off,0,lock);
+    // assert(try_lock == 0);
 
-	char *tmp_buf2 = Rdma::get_row_client_memory(thd_id);
-	auto res_s2 = rc_qp[loc][thd_id]->send_normal(
-		{.op = IBV_WR_RDMA_READ,
-		.flags = IBV_SEND_SIGNALED,
-		.len = operate_size,
-		.wr_id = 0},
-		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
-		.remote_addr = off,
-		.imm_data = 0});
-	RDMA_ASSERT(res_s2 == rdmaio::IOCode::Ok);
-    auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-    RDMA_ASSERT(res_p2 == rdmaio::IOCode::Ok);
-
-	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-	std::memcpy(temp_row, tmp_buf2, operate_size);
+    row_t *temp_row = txnMng->read_remote_row(loc,off);
 	assert(temp_row->get_primary_key() == data->data->get_primary_key());
+
 	temp_row->cicada_version[num % HIS_CHAIN_NUM].state = Cicada_ABORTED;
-	
 	temp_row->_tid_word = 0;
+
     operate_size = row_t::get_row_size(temp_row->tuple_size);
-	std::memcpy(tmp_buf2, (char *)temp_row, operate_size);
-	auto res_s3 = rc_qp[loc][thd_id]->send_normal(
-		{.op = IBV_WR_RDMA_WRITE,
-		.flags = IBV_SEND_SIGNALED,
-		.len = operate_size,
-		.wr_id = 0},
-		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
-		.remote_addr = off,
-		.imm_data = 0});
-	RDMA_ASSERT(res_s3 == rdmaio::IOCode::Ok);
-	auto res_p3 = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
+    // char *tmp_buf2 = Rdma::get_row_client_memory(thd_id);
+	// std::memcpy(tmp_buf2, (char *)temp_row, operate_size);
+    assert(txnMng->write_remote_row(loc,operate_size,off,(char *)temp_row) == true);
+    
 		//uncommitted_writes->erase(txn->get_txn_id());
 	mem_allocator.free(temp_row, sizeof(row_t::get_row_size(ROW_DEFAULT_SIZE)));
 	return Abort;
 }
+
 RC RDMA_Cicada::remote_commit(TxnManager * txnMng, Access * data, uint64_t num) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	INC_STATS(txnMng->get_thd_id(),mtx[33],get_sys_clock() - mtx_wait_starttime);
@@ -372,52 +305,20 @@ RC RDMA_Cicada::remote_commit(TxnManager * txnMng, Access * data, uint64_t num) 
 	uint64_t thd_id = txnMng->get_thd_id();
 	uint64_t lock = txnMng->get_txn_id() + 1;
 	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-	uint64_t starttime = get_sys_clock();
-	uint64_t endtime;
-	uint64_t *tmp_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-	auto mr = client_rm_handler->get_reg_attr().value();
+	
+    uint64_t try_lock = txnMng->cas_remote_content(loc,off,0,lock);
+    // assert(try_lock == 0);
 
-	rdmaio::qp::Op<> op;
-	op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
-	assert(op.set_payload(tmp_buf, sizeof(uint64_t), mr.key) == true);
-	auto res_s = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
-	RDMA_ASSERT(res_s == IOCode::Ok);
-	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == IOCode::Ok);
-
-	char *tmp_buf2 = Rdma::get_row_client_memory(thd_id);
-	auto res_s2 = rc_qp[loc][thd_id]->send_normal(
-		{.op = IBV_WR_RDMA_READ,
-		.flags = IBV_SEND_SIGNALED,
-		.len = operate_size,
-		.wr_id = 0},
-		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
-		.remote_addr = off,
-		.imm_data = 0});
-	RDMA_ASSERT(res_s2 == rdmaio::IOCode::Ok);
-    auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-    RDMA_ASSERT(res_p2 == rdmaio::IOCode::Ok);
-
-	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-	std::memcpy(temp_row, tmp_buf2, operate_size);
+    row_t *temp_row = txnMng->read_remote_row(loc,off);
 	assert(temp_row->get_primary_key() == data->data->get_primary_key());
-	uint64_t txn_commit_ts = txnMng->get_commit_timestamp();
 	
 	temp_row->cicada_version[num % HIS_CHAIN_NUM].state = Cicada_COMMITTED;
 	temp_row->_tid_word = 0;
+
     operate_size = row_t::get_row_size(temp_row->tuple_size);
-	std::memcpy(tmp_buf2, (char *)temp_row, operate_size);
-	auto res_s3 = rc_qp[loc][thd_id]->send_normal(
-		{.op = IBV_WR_RDMA_WRITE,
-		.flags = IBV_SEND_SIGNALED,
-		.len = operate_size,
-		.wr_id = 0},
-		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(tmp_buf2),
-		.remote_addr = off,
-		.imm_data = 0});
-	RDMA_ASSERT(res_s3 == rdmaio::IOCode::Ok);
-	auto res_p3 = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p3 == rdmaio::IOCode::Ok);
+    // char *tmp_buf2 = Rdma::get_row_client_memory(thd_id);
+	// std::memcpy(tmp_buf2, (char *)temp_row, operate_size);
+    assert(txnMng->write_remote_row(loc,operate_size,off,(char *)temp_row) == true);
 	
 	mem_allocator.free(temp_row, sizeof(row_t::get_row_size(ROW_DEFAULT_SIZE)));
 	return Abort;
