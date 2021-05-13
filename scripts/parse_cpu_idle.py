@@ -26,7 +26,7 @@ wb = sum(summary['worker_activate_txn_time'])
 wc = sum(summary['worker_deactivate_txn_time'])
 wd = sum(summary['worker_release_msg_time'])
 we = sum(summary['worker_process_time'])
-
+wf = sum(summary['worker_yield_time'])
 #trans_total_run_time trans_process_time trans_process_time% trans_2pc_time trans_2pc_time% trans_prepare_time trans_prepare_time% trans_validate_time trans_validate_time% trans_finish_time trans_finish_time% trans_commit_time trans_commit_time% trans_abort_time trans_abort_time% trans_block_time trans_block_time% txn_index_time txn_index_time% txn_manager_time txn_manager_time% lat_l_loc_cc_time lat_l_loc_cc_time%
-print (wa*100)/(wa+wb+wc+wd+we)
+print (wa*100)/(wa+wb+wc+wd+we),(wf*100)/(wa+wb+wc+wd+we)
 

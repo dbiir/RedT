@@ -82,7 +82,7 @@ def ycsb_thread():
     txn_write_perc = [0.2]
     tup_write_perc = [0.2]
     load = [10000]
-    tcnt = [24,28,32,36]
+    tcnt = [24]
     ctcnt = [4]
     scnt = [1]
     rcnt = [1]
