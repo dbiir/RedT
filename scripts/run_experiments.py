@@ -203,9 +203,13 @@ for exp in exps:
 
     tcnt = []
     for e in experiments:
-        tcnt.append(e[-6])
+        tcnt.append(e[-7])
     tcnt = sorted(list(set(tcnt)))
 
+    cocnt = []
+    for e in experiments:
+        cocnt.append(e[-1])
+    cocnt = sorted(list(set(cocnt)))
     sk = []
     for e in experiments:
         sk.append(e[-2])
@@ -254,6 +258,8 @@ for exp in exps:
         cmd='./result.sh -a tpcc_stress_ctx -n {} -c {} -l {} -C {} -t {} --ft {} --tt {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in ld]), ','.join([str(x) for x in ccnt]), strnow, ','.join(fromtimelist), ','.join(totimelist))
     elif 'ycsb_thread' in exp:
         cmd='./result.sh -a ycsb_thread -n {} -c {} -t {} -T {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in tcnt]))
+    elif 'ycsb_coroutine' in exp:
+        cmd='./result.sh -a ycsb_coroutine -n {} -c {} -t {} -CO {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in cocnt]))
     print cmd
     os.system(cmd)
     print cmd

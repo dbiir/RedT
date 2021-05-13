@@ -52,6 +52,11 @@ do
             shift
             shift
             ;;
+        -CO)
+            COROUTINE=($(echo $2 | tr ',' ' '))
+            shift
+            shift
+            ;;
         -p)
             PHASE=$2
             shift
@@ -169,6 +174,9 @@ ArgsType() {
     elif [[ "${TEST_TYPE}" == 'ycsb_thread' ]]
     then
         args=("${THREAD[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_coroutine' ]]
+    then
+        args=("${COROUTINE[@]}")
     fi   
 }
 
@@ -197,6 +205,9 @@ FileName() {
     elif [[ "${TEST_TYPE}" == 'ycsb_thread' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _T-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_coroutine' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _CO-${arg}_ | grep ^${i}_)
     fi
 }
 

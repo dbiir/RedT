@@ -9,6 +9,7 @@ SHORTNAMES = {
     "CLIENT_SEND_THREAD_CNT" : "CST",
     "NODE_CNT" : "N",
     "THREAD_CNT" : "T",
+    "COROUTINE_CNT" : "CO",
     "REM_THREAD_CNT" : "RT",
     "SEND_THREAD_CNT" : "ST",
     "CC_ALG" : "",
@@ -41,7 +42,7 @@ SHORTNAMES = {
     "NUM_WH":"WH",
 }
 
-fmt_title=["NODE_CNT","CC_ALG","ACCESS_PERC","TXN_WRITE_PERC","PERC_PAYMENT","MPR","MODE","MAX_TXN_IN_FLIGHT","SEND_THREAD_CNT","REM_THREAD_CNT","THREAD_CNT","TXN_WRITE_PERC","TUP_WRITE_PERC","ZIPF_THETA","NUM_WH"]
+fmt_title=["NODE_CNT","CC_ALG","ACCESS_PERC","TXN_WRITE_PERC","PERC_PAYMENT","MPR","MODE","MAX_TXN_IN_FLIGHT","SEND_THREAD_CNT","REM_THREAD_CNT","THREAD_CNT","COROUTINE_CNT","TXN_WRITE_PERC","TUP_WRITE_PERC","ZIPF_THETA","NUM_WH"]
 
 ##############################
 # PLOTS
@@ -95,6 +96,35 @@ def ycsb_thread():
     #exp = exp + [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
     return fmt,exp
 
+def ycsb_coroutine():
+    wl = 'YCSB'
+    #nnodes = [1,2,4,8,16,32,64]
+    #nnodes = [1,2,4,8,16,32]
+    nnodes = [4]
+    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
+    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
+    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
+    #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
+    algos = ['RDMA_NO_WAIT']
+    base_table_size=1048576
+    # base_table_size=1048576*8
+    #base_table_size=2097152*8
+    txn_write_perc = [0.2]
+    tup_write_perc = [0.2]
+    load = [10000]
+    tcnt = [24]
+    ctcnt = [4]
+    cocnt = [1,2,4,8,12,16,20,24,28,32]
+    scnt = [1]
+    rcnt = [1]
+    skew = [0.001]
+    #skew = [0.0,0.5,0.9]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT","SEND_THREAD_CNT","REM_THREAD_CNT","CLIENT_SEND_THREAD_CNT","CLIENT_REM_THREAD_CNT","COROUTINE_CNT"]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,cthr,sthr,rthr,sthr,rthr,cothr] for cothr,thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(cocnt,tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
+    #txn_write_perc = [0.0]
+    #skew = [0.0]
+    #exp = exp + [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
+    return fmt,exp
 
 def ycsb_scaling():
     wl = 'YCSB'
@@ -803,6 +833,7 @@ def network_sweep():
 experiment_map = {
     'pps_scaling': pps_scaling,
     'ycsb_thread': ycsb_thread,
+    'ycsb_coroutine':ycsb_coroutine,
     'ycsb_scaling': ycsb_scaling,
     'ycsb_scaling1': ycsb_scaling1,
     'ycsb_scaling_abort': ycsb_scaling_abort,
