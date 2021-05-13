@@ -63,6 +63,9 @@ void WorkerThread::fakeprocess(yield_func_t &yield, Message * msg, uint64_t cor_
   DEBUG("%ld Processing %ld %d\n",get_thd_id(),msg->get_txn_id(),msg->get_rtype());
   assert(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O || msg->get_txn_id() != UINT64_MAX);
   uint64_t starttime = get_sys_clock();
+#if USE_COROUTINE
+  cor_process_starttime[cor_id] = get_sys_clock();
+#endif
 		switch(msg->get_rtype()) {
 			case RPASS:
         //rc = process_rpass(msg);
@@ -145,7 +148,11 @@ void WorkerThread::fakeprocess(yield_func_t &yield, Message * msg, uint64_t cor_
 				assert(false);
 				break;
 		}
+#if USE_COROUTINE
+  uint64_t timespan = get_sys_clock() - cor_process_starttime[cor_id];
+#else
   uint64_t timespan = get_sys_clock() - starttime;
+#endif
   INC_STATS(get_thd_id(),worker_process_cnt,1);
   INC_STATS(get_thd_id(),worker_process_time,timespan);
   INC_STATS(get_thd_id(),worker_process_cnt_by_type[msg->rtype],1);
@@ -177,6 +184,9 @@ void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) 
   DEBUG("%ld Processing %ld %d\n",get_thd_id(),msg->get_txn_id(),msg->get_rtype());
   assert(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O || msg->get_txn_id() != UINT64_MAX);
   uint64_t starttime = get_sys_clock();
+#if USE_COROUTINE
+  cor_process_starttime[cor_id] = get_sys_clock();
+#endif
 		switch(msg->get_rtype()) {
 			case RPASS:
         //rc = process_rpass(msg);
@@ -212,7 +222,7 @@ void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) 
       case CL_QRY_O:
 			case RTXN:
 #if CC_ALG == CALVIN
-        rc = process_calvin_rtxn(msg);
+        rc = process_calvin_rtxn(yield, msg, cor_id);
 #else
         rc = process_rtxn(yield, msg, cor_id);
 #endif
@@ -233,8 +243,13 @@ void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) 
 				break;
 		}
   statqueue(get_thd_id(), msg, starttime);
+#if USE_COROUTINE
+  uint64_t timespan = get_sys_clock() - cor_process_starttime[cor_id];
+#else
   uint64_t timespan = get_sys_clock() - starttime;
+#endif
   INC_STATS(get_thd_id(),worker_process_cnt,1);
+
   INC_STATS(get_thd_id(),worker_process_time,timespan);
   INC_STATS(get_thd_id(),worker_process_cnt_by_type[msg->rtype],1);
   INC_STATS(get_thd_id(),worker_process_time_by_type[msg->rtype],timespan);
@@ -628,27 +643,30 @@ void WorkerThread::master_routine(yield_func_t &yield, int cor_id) {
         last_yield_time = get_sys_clock();
         yield(_routines[1]);
         uint64_t yield_endtime = get_sys_clock();
+        INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - last_yield_time);
         INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - last_yield_time);
-        DEL_STATS(get_thd_id(), worker_process_time, yield_endtime - last_yield_time);
+        uint64_t starttime;
+        uint64_t endtime;
+        starttime = get_sys_clock();
         for(uint64_t i = 1; i <= COROUTINE_CNT; i++)
         {
             // yield(_routines[i]);
-            uint64_t starttime;
-            uint64_t endtime;
-            starttime = get_sys_clock();
+            
+            
             uint64_t target_server = un_res_p.front().first;
             uint64_t thd_id = un_res_p.front().second;
             // printf("sever:%ld thd_id:%ld", target_server, thd_id);
             un_res_p.pop();
             auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
             RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-            endtime = get_sys_clock();
+            
 
-            INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-            DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+            
         // auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
             // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
         }
+        endtime = get_sys_clock();
+        INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
     }
     printf("FINISH %ld:%ld:%ld\n",_node_id,_thd_id, cor_id);
     fflush(stdout);
