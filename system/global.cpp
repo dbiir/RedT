@@ -247,7 +247,7 @@ UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
 UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
-UInt64 client_rdma_buffer_size = 3*(1024*1024L);
+UInt64 client_rdma_buffer_size = 300*(1024*1024L);
 UInt64 rdma_index_size = (300*1024*1024L);
 
 // MAAT
@@ -350,12 +350,12 @@ rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
 std::vector<rdmaio::ConnectManager> cm;
 rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
 rdmaio::Arc<rdmaio::RNic> nic;
-rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT];
+rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
 
 rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
 
 string rdma_server_add[NODE_CNT];
-string qp_name[NODE_CNT][THREAD_CNT];
+string qp_name[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
 //rdmaio::ConnectManager cm[NODE_CNT];
 
 int rdma_server_port[NODE_CNT];

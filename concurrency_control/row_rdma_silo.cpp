@@ -4,6 +4,7 @@
 #include "mem_alloc.h"
 #include "transport/rdma.h"
 #include "qps/op.hh"
+#include "routine.h"
 
 #if CC_ALG==RDMA_SILO
 
@@ -54,17 +55,17 @@ Row_rdma_silo::lock() {
 }
 
 void
-Row_rdma_silo::release(TxnManager * txnMng , uint64_t num) {
+Row_rdma_silo::release(yield_func_t &yield, TxnManager * txnMng , uint64_t num, uint64_t cor_id) {
 #if CC_ALG == RDMA_SILO
   	bool result = false;
 	Transaction *txn = txnMng->txn;
 
   	uint64_t remote_offset = txn->accesses[num]->offset;
   	uint64_t loc = g_node_id;
-	uint64_t thd_id = txnMng->get_thd_id();
+	uint64_t thd_id = txnMng->get_thd_id() + cor_id * g_thread_cnt;
 	uint64_t lock = txnMng->get_txn_id();
 
-    uint64_t try_lock = txnMng->cas_remote_content(loc,remote_offset,lock,0);
+    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,remote_offset,lock,0,cor_id);
     // assert(try_lock == lock);
 
 	result = true;
@@ -77,7 +78,7 @@ Row_rdma_silo::release(TxnManager * txnMng , uint64_t num) {
 }
 
 bool
-Row_rdma_silo::try_lock(TxnManager * txnMng , uint64_t num)
+Row_rdma_silo::try_lock(yield_func_t &yield, TxnManager * txnMng , uint64_t num, uint64_t cor_id)
 {
 #if CC_ALG == RDMA_SILO
   	bool result = false;
@@ -85,10 +86,10 @@ Row_rdma_silo::try_lock(TxnManager * txnMng , uint64_t num)
 
   	uint64_t remote_offset = txn->accesses[num]->offset;
   	uint64_t loc = g_node_id;
-	uint64_t thd_id = txnMng->get_thd_id();
+	uint64_t thd_id = txnMng->get_thd_id() + cor_id * g_thread_cnt;
 	uint64_t lock = txnMng->get_txn_id();
 
-    uint64_t try_lock = txnMng->cas_remote_content(loc,remote_offset,0,lock);
+    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,remote_offset,0,lock,cor_id);
 
 	result = true;
     DEBUG("silo %ld try to acquire lock %ld row %ld \n", txnMng->get_txn_id(), _row->_tid_word, _row->get_primary_key());

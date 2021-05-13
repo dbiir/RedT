@@ -19,6 +19,7 @@
 
 #include <cassert>
 #include "global.h"
+#include "routine.h"
 
 #define ROW_DEFAULT_SIZE 1000
 #include "row_rdma_cicada.h"
@@ -133,6 +134,7 @@ public:
 	RC get_ts(uint64_t &orig_wts, uint64_t &orig_rts);
 	RC get_row(access_t type, TxnManager * txn, row_t *& row, uint64_t &orig_wts, uint64_t &orig_rts);
 	RC get_row(access_t type, TxnManager *txn, Access *access);
+	RC get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *access,uint64_t cor_id);
 	RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row);
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
 #if CC_ALG == RDMA_TS1

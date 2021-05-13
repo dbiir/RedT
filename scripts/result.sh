@@ -47,6 +47,11 @@ do
             shift
             shift
             ;;
+        -T)
+            THREAD=($(echo $2 | tr ',' ' '))
+            shift
+            shift
+            ;;
         -p)
             PHASE=$2
             shift
@@ -161,6 +166,9 @@ ArgsType() {
     elif [[ "${TEST_TYPE}" == 'tpcc_stress_ctx' ]]
     then
         args=("${LOAD[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_thread' ]]
+    then
+        args=("${THREAD[@]}")
     fi   
 }
 
@@ -186,6 +194,9 @@ FileName() {
     elif [[ "${TEST_TYPE}" == 'tpcc_stress_ctx' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _CT-${CT}_TIF-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_thread' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _T-${arg}_ | grep ^${i}_)
     fi
 }
 

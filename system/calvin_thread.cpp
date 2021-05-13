@@ -73,7 +73,10 @@ RC CalvinLockThread::run() {
 		txn_man->txn_stats.lat_other_time_start = msg->lat_other_time;
 
 		msg->copy_to_txn(txn_man);
+#if !USE_COROUTINE
 		txn_man->register_thread(this);
+#else
+#endif
 		assert(ISSERVERN(txn_man->return_id));
 
 		INC_STATS(get_thd_id(),sched_txn_table_time,get_sys_clock() - prof_starttime);

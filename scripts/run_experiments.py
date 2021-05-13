@@ -32,6 +32,7 @@ merge_mode = False
 perfTime = 60
 fromtimelist=[]
 totimelist=[]
+cpu_usage_index=0
 
 if len(sys.argv) < 2:
      sys.exit("Usage: %s [-exec/-e/-noexec/-ne] [-c cluster] experiments\n \
@@ -150,16 +151,19 @@ for exp in exps:
                 os.system(cmd)
                 totimelist.append(str(int(time.time())) + "000")
                 perfip = machines[0]
-                cmd = "scp getFlame.sh {}:/{}/".format(perfip, uname2)
+                cmd = "scp getFlame.sh {}:/{}/".format(perfip, uname)
                 print cmd
                 os.system(cmd)
-                cmd = 'ssh {}@{} "bash /{}/getFlame.sh"'.format(uname2, perfip, vcloud_uname)
+                cmd = 'ssh {} "bash /{}/getFlame.sh"'.format(perfip, uname)
                 print cmd
                 os.system(cmd)
-                cmd = "scp {}:/{}/perf.svg {}{}.svg".format(perfip, uname2, perf_dir, output_f)
+                cmd = "scp {}:/{}/perf.svg {}{}.svg".format(perfip, uname, perf_dir, output_f)
                 print cmd
                 os.system(cmd)
                 os.chdir('..')
+                cpu_usage_path=PATH + "/results/" + strnow + '/cpu_usage_' + str(cpu_usage_index)
+                os.mkdir(cpu_usage_path)
+                cpu_usage_index+=1
                 for m, n in zip(machines, range(len(machines))):
                     if cluster == 'istc':
                         cmd = 'scp {}.csail.mit.edu:/{}/results.out {}{}_{}.out'.format(m,uname,result_dir,n,output_f)
@@ -167,6 +171,9 @@ for exp in exps:
                         os.system(cmd)
                     elif cluster == 'vcloud':
                         cmd = 'scp {}:/{}/dbresults.out results/{}/{}_{}.out'.format(m,uname,strnow,n,output_f)
+                        print cmd
+                        os.system(cmd)
+                        cmd = 'scp {}:/tmp/{}* {}/'.format(m,uname2,cpu_usage_path)
                         print cmd
                         os.system(cmd)
 
@@ -193,6 +200,11 @@ for exp in exps:
     for e in experiments:
         al.append(e[2])
     al = sorted(list(set(al)))
+
+    tcnt = []
+    for e in experiments:
+        tcnt.append(e[-5])
+    tcnt = sorted(list(set(tcnt)))
 
     sk = []
     for e in experiments:
@@ -240,6 +252,8 @@ for exp in exps:
         cmd='./result.sh -a tpcc_stress -n {} -c {} -l {} -t {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in tpcc_ld]), strnow)
     elif 'tpcc_cstress' in exp:
         cmd='./result.sh -a tpcc_stress_ctx -n {} -c {} -l {} -C {} -t {} --ft {} --tt {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in ld]), ','.join([str(x) for x in ccnt]), strnow, ','.join(fromtimelist), ','.join(totimelist))
+    elif 'ycsb_thread' in exp:
+        cmd='./result.sh -a ycsb_thread -n {} -c {} -t {} -T {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in tcnt]))
     print cmd
     os.system(cmd)
     print cmd

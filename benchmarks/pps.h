@@ -115,11 +115,11 @@ public:
 	void init(uint64_t thd_id, Workload * h_wl);
   void reset();
   RC acquire_locks();
-	RC run_txn();
+  RC run_txn(yield_func_t &yield, uint64_t cor_id);
 	RC run_txn_post_wait();
-	RC run_calvin_txn();
-  RC run_pps_phase2();
-  RC run_pps_phase5();
+	RC run_calvin_txn(yield_func_t &yield, uint64_t cor_id);
+  RC run_pps_phase2(yield_func_t &yield, uint64_t cor_id);
+  RC run_pps_phase5(yield_func_t &yield, uint64_t cor_id);
 	PPSRemTxnType state;
   void copy_remote_items(PPSQueryMessage * msg);
 private:
@@ -130,41 +130,42 @@ private:
   uint64_t parts_processed_count;
 
   void next_pps_state();
-  RC run_txn_state();
+  RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
   bool is_done();
   bool is_local_item(uint64_t idx);
   RC send_remote_request();
 
 inline void getThreeFields(row_t *& r_local);
 inline void getAllFields(row_t *& r_local);
-inline RC run_getpart_0(uint64_t part_key, row_t *& r_local);
-inline RC run_getpart_1(row_t *& r_local);
-inline RC run_getproduct_0(uint64_t product_key, row_t *& r_local);
-inline RC run_getproduct_1(row_t *& r_local);
-inline RC run_getsupplier_0(uint64_t supplier_key, row_t *& r_local);
-inline RC run_getsupplier_1(row_t *& r_local);
-inline RC run_getpartsbyproduct_0(uint64_t product_key, row_t *& r_local);
-inline RC run_getpartsbyproduct_1(row_t *& r_local);
-inline RC run_getpartsbyproduct_2(uint64_t product_key, row_t *& r_local);
-inline RC run_getpartsbyproduct_3(uint64_t &part_key, row_t *& r_local);
-inline RC run_getpartsbyproduct_4(uint64_t part_key, row_t *& r_local);
-inline RC run_getpartsbyproduct_5(row_t *& r_local);
-inline RC run_getpartsbysupplier_0(uint64_t supplier_key, row_t *& r_local);
-inline RC run_getpartsbysupplier_1(row_t *& r_local);
-inline RC run_getpartsbysupplier_2(uint64_t supplier_key, row_t *& r_local);
-inline RC run_getpartsbysupplier_3(uint64_t &part_key, row_t *& r_local);
-inline RC run_getpartsbysupplier_4(uint64_t part_key, row_t *& r_local);
-inline RC run_getpartsbysupplier_5(row_t *& r_local);
-inline RC run_orderproduct_0(uint64_t product_key, row_t *& r_local);
-inline RC run_orderproduct_1(row_t *& r_local);
-inline RC run_orderproduct_2(uint64_t product_key, row_t *& r_local);
-inline RC run_orderproduct_3(uint64_t &part_key, row_t *& r_local);
-inline RC run_orderproduct_4(uint64_t part_key, row_t *& r_local);
-inline RC run_orderproduct_5(row_t *& r_local);
-inline RC run_updateproductpart_0(uint64_t product_key, row_t *& r_local);
-inline RC run_updateproductpart_1(uint64_t part_key, row_t *& r_local);
-inline RC run_updatepart_0(uint64_t part_key, row_t *& r_local);
-inline RC run_updatepart_1(row_t *& r_local);
+
+inline RC run_getpart_0(yield_func_t &yield, uint64_t part_key, row_t *& r_local, uint64_t cor_id);
+inline RC run_getpart_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local);
+inline RC run_getproduct_0(yield_func_t &yield, uint64_t product_key, row_t *& r_local, uint64_t cor_id);
+inline RC run_getproduct_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local);
+inline RC run_getsupplier_0(yield_func_t &yield, uint64_t supplier_key, row_t *& r_local, uint64_t cor_id);
+inline RC run_getsupplier_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local);
+inline RC run_getpartsbyproduct_0(yield_func_t &yield, uint64_t product_key, row_t *& r_local, uint64_t cor_id);
+inline RC run_getpartsbyproduct_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local);
+inline RC run_getpartsbyproduct_2(yield_func_t &yield, uint64_t cor_id, uint64_t product_key, row_t *& r_local);
+inline RC run_getpartsbyproduct_3(yield_func_t &yield, uint64_t cor_id, uint64_t &part_key, row_t *& r_local);
+inline RC run_getpartsbyproduct_4(yield_func_t &yield, uint64_t cor_id, uint64_t part_key, row_t *& r_local);
+inline RC run_getpartsbyproduct_5(yield_func_t &yield, uint64_t cor_id, row_t *& r_local);
+inline RC run_getpartsbysupplier_0(yield_func_t &yield, uint64_t supplier_key, row_t *& r_local, uint64_t cor_id);
+inline RC run_getpartsbysupplier_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local);
+inline RC run_getpartsbysupplier_2(yield_func_t &yield, uint64_t cor_id, uint64_t supplier_key, row_t *& r_local);
+inline RC run_getpartsbysupplier_3(yield_func_t &yield, uint64_t cor_id, uint64_t &part_key, row_t *& r_local);
+inline RC run_getpartsbysupplier_4(yield_func_t &yield, uint64_t cor_id, uint64_t part_key, row_t *& r_local);
+inline RC run_getpartsbysupplier_5(yield_func_t &yield, uint64_t cor_id, row_t *& r_local);
+inline RC run_orderproduct_0(yield_func_t &yield, uint64_t product_key, row_t *& r_local, uint64_t cor_id);
+inline RC run_orderproduct_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local);
+inline RC run_orderproduct_2(yield_func_t &yield, uint64_t cor_id, uint64_t product_key, row_t *& r_local);
+inline RC run_orderproduct_3(yield_func_t &yield, uint64_t cor_id, uint64_t &part_key, row_t *& r_local);
+inline RC run_orderproduct_4(yield_func_t &yield, uint64_t part_key, row_t *& r_local, uint64_t cor_id);
+inline RC run_orderproduct_5(yield_func_t &yield, uint64_t cor_id, row_t *& r_local);
+inline RC run_updateproductpart_0(yield_func_t &yield, uint64_t product_key, row_t *& r_local, uint64_t cor_id);
+inline RC run_updateproductpart_1(yield_func_t &yield, uint64_t cor_id, uint64_t part_key, row_t *& r_local);
+inline RC run_updatepart_0(yield_func_t &yield, uint64_t cor_id, uint64_t part_key, row_t *& r_local);
+inline RC run_updatepart_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local);
 };
 
 #endif

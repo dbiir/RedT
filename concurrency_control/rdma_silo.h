@@ -20,6 +20,7 @@
 
 #include "row.h"
 #include "semaphore.h"
+#include "routine.h"
 //#include "row_silo.h"
 
 #if CC_ALG == RDMA_SILO
@@ -37,26 +38,14 @@ public:
 class RDMA_silo {
 public:
  // void init();
-  RC validate_rdma_silo(TxnManager * txnMng);
-  RC finish(RC rc,TxnManager * txnMng);
-  // void cleanup(RC rc, TxnManager * txn);
-  // void set_txn_ready(RC rc, TxnManager * txn);
-  // bool is_txn_ready(TxnManager * txn);
+  RC validate_rdma_silo(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_id);
+  RC finish(yield_func_t &yield,RC rc,TxnManager * txnMng, uint64_t cor_id);
+  
   static bool     _pre_abort;
 private:
-  bool remote_try_lock(TxnManager * txnMng , uint64_t num);
-  bool remote_commit_write(TxnManager * txnMng , uint64_t num , row_t * data , ts_t time);
-  bool validate_rw_remote(TxnManager * txnMng , uint64_t num);
-//   void release_remote_lock(TxnManager * txn , uint64_t num);
-  // RC get_rw_set(TxnManager * txni, silo_set_ent * &rset, silo_set_ent *& wset);
-  // RC validate_coor(TxnManager * txn);
-  // RC validate_part(TxnManager * txn);
-  // RC validate_write_set(tictoc_set_ent * wset, TxnManager * txn, uint64_t commit_ts);
-  // RC validate_read_set(tictoc_set_ent * rset, TxnManager * txn, uint64_t commit_ts);
-  // RC lock_write_set(tictoc_set_ent * wset, TxnManager * txn);
-  // void unlock_write_set(RC rc, tictoc_set_ent * wset, TxnManager * txn);
-  // void compute_commit_ts(TxnManager * txn);
- 	// sem_t 	_semaphore;
+    bool validate_rw_remote(yield_func_t &yield,TxnManager * txnMng , uint64_t num, uint64_t cor_id);
+    bool remote_commit_write(yield_func_t &yield, TxnManager * txnMng , uint64_t num , row_t * data , ts_t time, uint64_t cor_id);
+
 };
 
 #endif

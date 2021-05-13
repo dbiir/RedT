@@ -51,7 +51,6 @@
 #include "transport.h"
 #include "qps/op.hh"
 
-
 void YCSBTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	TxnManager::init(thd_id, h_wl);
 	_wl = (YCSBWorkload *) h_wl;
@@ -104,8 +103,7 @@ RC YCSBTxnManager::acquire_locks() {
   return rc;
 }
 
-
-RC YCSBTxnManager::run_txn() {
+RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
 	assert(CC_ALG != CALVIN);
@@ -118,11 +116,12 @@ RC YCSBTxnManager::run_txn() {
 		//query->print();
 		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
 	}
-
+	
 	uint64_t starttime = get_sys_clock();
 
 	while(rc == RCOK && !is_done()) {
-		rc = run_txn_state();
+
+		rc = run_txn_state(yield, cor_id);
 	}
 
 	uint64_t curr_time = get_sys_clock();
@@ -131,14 +130,16 @@ RC YCSBTxnManager::run_txn() {
 	txn_stats.wait_starttime = get_sys_clock();
 //RDMA_SILO:logic?
 	if(IS_LOCAL(get_txn_id())) {  //for one-side rdma, must be local
-		if(is_done() && rc == RCOK)
-		rc = start_commit();
+		if(is_done() && rc == RCOK) {
+			// printf("a txn is done\n");
+			rc = start_commit(yield, cor_id);
+		}
 		else if(rc == Abort)
-		rc = start_abort();
+		rc = start_abort(yield, cor_id);
 	} else if(rc == Abort){
-		rc = abort();
+		rc = abort(yield, cor_id);
 	}
-
+	
   return rc;
 
 }
@@ -154,7 +155,9 @@ RC YCSBTxnManager::run_txn_post_wait() {
 	return RCOK;
 }
 
-bool YCSBTxnManager::is_done() { return next_record_id >= ((YCSBQuery*)query)->requests.size(); }
+bool YCSBTxnManager::is_done() { 
+	return next_record_id >= ((YCSBQuery*)query)->requests.size();
+}
 
 void YCSBTxnManager::next_ycsb_state() {
   switch(state) {
@@ -180,9 +183,10 @@ bool YCSBTxnManager::is_local_request(uint64_t idx) {
   return GET_NODE_ID(_wl->key_to_part(((YCSBQuery*)query)->requests[idx]->key)) == g_node_id;
 }
 
-itemid_t* YCSBTxnManager::ycsb_read_remote_index(ycsb_request * req) {
+itemid_t* YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id) {
 	uint64_t part_id = _wl->key_to_part( req->key );
   	uint64_t loc = GET_NODE_ID(part_id);
+	// printf("loc:%d and g_node_id:%d\n", loc, g_node_id);
 	assert(loc != g_node_id);
 	uint64_t thd_id = get_thd_id();
 
@@ -192,24 +196,26 @@ itemid_t* YCSBTxnManager::ycsb_read_remote_index(ycsb_request * req) {
 	uint64_t index_addr = (index_key) * sizeof(IndexInfo);
 	uint64_t index_size = sizeof(IndexInfo);
 
-    itemid_t* item = read_remote_index(loc, index_addr,req->key);
+    itemid_t* item = read_remote_index(yield, loc, index_addr,req->key, cor_id);
 	return item;
 }
 
-RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_local) {
+RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_request * req, row_t *& row_local, uint64_t cor_id) {
 	// get the index of row to be operated
-	itemid_t * m_item;
-	m_item = ycsb_read_remote_index(req);
 	
+	itemid_t * m_item;
+    m_item = ycsb_read_remote_index(yield, req, cor_id);
+
 	uint64_t part_id = _wl->key_to_part( req->key );
     uint64_t loc = GET_NODE_ID(part_id);
 	assert(loc != g_node_id);
+    
     RC rc = RCOK;
     uint64_t version = 0;
     uint64_t lock = get_txn_id() + 1;
 
 #if CC_ALG == RDMA_CNULL
-    row_t * test_row = read_remote_row(loc,m_item->offset);
+    row_t * test_row = read_remote_row(yield,loc,m_item->offset,,cor_id);
     assert(test_row->get_primary_key() == req->key);
 	mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
     mem_allocator.free(m_item, sizeof(itemid_t));
@@ -221,7 +227,7 @@ RC YCSBTxnManager::send_remote_one_side_request(ycsb_request * req,row_t *& row_
 		uint64_t tts = get_timestamp();
 
 		//read remote data
-        row_t * test_row = read_remote_row(loc,m_item->offset);
+        row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 		assert(test_row->get_primary_key() == req->key);
 
         //preserve the txn->access
@@ -239,7 +245,7 @@ if(req->acctype == RD || req->acctype == WR){
 	uint64_t tts = get_timestamp();
     uint64_t lock = get_txn_id()+1;
     uint64_t try_lock = -1;
-    try_lock = cas_remote_content(loc,m_item->offset,0,lock);//lock
+    try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);//lock
     if(try_lock != 0){
        INC_STATS(get_thd_id(), lock_fail, 1);
        rc = Abort;
@@ -273,7 +279,7 @@ if(req->acctype == RD || req->acctype == WR){
 #endif
 		if(req->acctype == RD){ //读集元素
 			//第一次rdma read，得到数据项的锁信息
-            row_t * lock_read = read_remote_row(loc,m_item->offset);
+            row_t * lock_read = read_remote_row(yield,loc,m_item->offset,cor_id);
 
 			new_lock_info = 0;
 			lock_info = lock_read->_tid_word;
@@ -302,7 +308,7 @@ remote_atomic_retry_lock:
             }
 #else
             uint64_t try_lock = -1;
-            try_lock = cas_remote_content(loc,m_item->offset,lock_info,new_lock_info);
+            try_lock = cas_remote_content(yield,loc,m_item->offset,lock_info,new_lock_info,cor_id);
             if(try_lock != lock_info){
                 num_atomic_retry++;
                 total_num_atomic_retry++;
@@ -331,7 +337,7 @@ remote_atomic_retry_lock:
 #else
 			//RDMA CAS加锁
 			uint64_t try_lock = -1;
-			try_lock = cas_remote_content(loc,m_item->offset,lock_info,new_lock_info);
+			try_lock = cas_remote_content(yield,loc,m_item->offset,lock_info,new_lock_info,cor_id);
 			if(try_lock != lock_info){ //如果CAS失败:对写集元素来说,即已经有锁;
 				DEBUG_M("TxnManager::get_row(abort) access free\n");
 				row_local = NULL;
@@ -345,7 +351,7 @@ remote_atomic_retry_lock:
 
 #if !ENABLE_DBPA
 		//read remote data
-        row_t * test_row = read_remote_row(loc,m_item->offset);
+        row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
         assert(test_row->get_primary_key() == req->key);
 #endif
         //preserve the txn->access
@@ -383,7 +389,7 @@ if(req->acctype == RD || req->acctype == WR){
 #endif
 #else
         uint64_t try_lock = -1;
-        try_lock = cas_remote_content(loc,m_item->offset,0,1);
+        try_lock = cas_remote_content(yield,loc,m_item->offset,0,1,cor_id);
 
 		if(try_lock != 0){ //CAS fail
 			DEBUG_M("TxnManager::get_row(abort) access free\n");
@@ -397,7 +403,7 @@ if(req->acctype == RD || req->acctype == WR){
 #endif
 
 #if !ENABLE_DBPA 
-        row_t * test_row = read_remote_row(loc,m_item->offset);
+        row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
         assert(test_row->get_primary_key() == req->key);
 #endif
         access_t type = req->acctype;
@@ -437,7 +443,7 @@ retry_lock:
 #else		
 retry_lock:
         uint64_t try_lock = -1;
-        try_lock = cas_remote_content(loc,m_item->offset,0,tts);
+        try_lock = cas_remote_content(yield,loc,m_item->offset,0,tts,cor_id);
 
 		if(try_lock != 0){ // cas fail
 			if(tts <= try_lock){  //wait
@@ -459,7 +465,7 @@ retry_lock:
 		}
 #endif
 #if !ENABLE_DBPA 
-        row_t * test_row = read_remote_row(loc,m_item->offset);
+        row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
         assert(test_row->get_primary_key() == req->key);
 #endif
         access_t type = req->acctype;
@@ -475,13 +481,13 @@ retry_lock:
     ts_t ts = get_timestamp();
 
     uint64_t try_lock = -1;
-    try_lock = cas_remote_content(loc,m_item->offset,0,lock);
+    try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);
 	if(try_lock != 0) {
 		rc = Abort;
         return rc;
 	}
 
-    row_t * remote_row = read_remote_row(loc,m_item->offset);
+    row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 	assert(remote_row->get_primary_key() == req->key);
 
     if(req->acctype == RD) {
@@ -503,7 +509,7 @@ retry_lock:
     if (rc == Abort){
 		DEBUG_M("TxnManager::get_row(abort) access free\n");
 
-        try_lock = cas_remote_content(loc,m_item->offset,lock , 0);
+        try_lock = cas_remote_content(yield, loc,m_item->offset,lock , 0, cor_id);
 
 		//mem_allocator.free(m_item,sizeof(itemid_t));
 		mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
@@ -531,13 +537,13 @@ retry_lock:
     ts_t ts = get_timestamp();
 
     uint64_t try_lock = -1;
-    try_lock = cas_remote_content(loc,m_item->offset,0,lock);
+    try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);
 	if(try_lock != 0) {
 		rc = Abort;
         return rc;
 	}
 
-    row_t * remote_row = read_remote_row(loc,m_item->offset);
+    row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 	assert(remote_row->get_primary_key() == req->key);
 
     if(req->acctype == RD) {
@@ -594,7 +600,7 @@ retry_lock:
     // char *write_buf = Rdma::get_row_client_memory(get_thd_id());
     // memcpy(write_buf, (char*)remote_row, operate_size);
 
-    assert(write_remote_row(loc,operate_size,m_item->offset,(char*)remote_row) == true);
+    assert(write_remote_row(yield,loc,operate_size,m_item->offset,(char*)remote_row,cor_id) == true);
 
     if(rc == Abort) {
         mem_allocator.free(m_item, sizeof(itemid_t));
@@ -611,13 +617,13 @@ retry_lock:
     ts_t ts = get_timestamp();
 
     uint64_t try_lock = -1;
-    try_lock = cas_remote_content(loc,m_item->offset,0,lock);
+    try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);
 	if(try_lock != 0) {
 		rc = Abort;
         return rc;
 	}
 
-    row_t * remote_row = read_remote_row(loc,m_item->offset);
+    row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 	assert(remote_row->get_primary_key() == req->key);
 
     if(req->acctype == RD) {
@@ -631,9 +637,9 @@ retry_lock:
 				rc = WAIT;
 				while(rc == WAIT) {
                     //release lock
-                    try_lock = cas_remote_content(loc,m_item->offset,lock,0);
+                    try_lock = cas_remote_content(yield,loc,m_item->offset,lock,0,cor_id);
                     //add lock
-                    try_lock = cas_remote_content(loc,m_item->offset,0,lock);
+                    try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);
 				
 					if (try_lock != 0) {
 						row_local = NULL;
@@ -643,7 +649,7 @@ retry_lock:
 						return Abort; //CAS fail
 					}
 
-                    remote_row = read_remote_row(loc,m_item->offset);
+                    remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 					assert(remote_row->get_primary_key() == req->key);
 
 					if(remote_row->cicada_version[i].state == Cicada_PENDING) {
@@ -671,9 +677,9 @@ retry_lock:
 				rc = WAIT;
 				while(rc == WAIT) {
 					//release lock
-                    try_lock = cas_remote_content(loc,m_item->offset,lock,0);
+                    try_lock = cas_remote_content(yield,loc,m_item->offset,lock,0,cor_id);
                     //add lock
-                    try_lock = cas_remote_content(loc,m_item->offset,0,lock);
+                    try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);
 
 					if (try_lock != 0) {
 						row_local = NULL;
@@ -683,7 +689,7 @@ retry_lock:
 
 						return Abort; //CAS fail
 					}
-				    remote_row = read_remote_row(loc,m_item->offset);
+				    remote_row = read_remote_row(yield,loc,m_item->offset,,cor_id);
 					assert(remote_row->get_primary_key() == req->key);
 
 					if(remote_row->cicada_version[i].state == Cicada_PENDING) {
@@ -704,7 +710,7 @@ retry_lock:
 			
 		}
 	}
-    try_lock = cas_remote_content(loc,m_item->offset,lock ,0);
+    try_lock = cas_remote_content(yield,loc,m_item->offset,lock ,0,cor_id);
 
     // if(rc != Abort)this->version_num.push_back(version);
     if(rc == Abort) {
@@ -719,6 +725,7 @@ retry_lock:
 #endif
 
 }
+
 
 RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
@@ -749,19 +756,22 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 }
 
 
-RC YCSBTxnManager::run_txn_state() {
-  	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	ycsb_request * req = ycsb_query->requests[next_record_id];
 	uint64_t part_id = _wl->key_to_part( req->key );
   	bool loc = GET_NODE_ID(part_id) == g_node_id;
-
+	
 	RC rc = RCOK;
 	switch (state) {
 	case YCSB_0 :
 		if(loc) {
-			rc = run_ycsb_0(req,row);
+			//yield(h_thd->_routines[0]);
+			rc = run_ycsb_0(yield,req,row,cor_id);
 		} else if (rdma_one_side()) {
-			rc = send_remote_one_side_request(req,row);
+			// printf("%ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
+			rc = send_remote_one_side_request(yield, req, row, cor_id);
+			// yield(h_thd->_routines[0]);
 		} else {
 			rc = send_remote_request();
 		}
@@ -783,7 +793,7 @@ RC YCSBTxnManager::run_txn_state() {
   return rc;
 }
 
-RC YCSBTxnManager::run_ycsb_0(ycsb_request * req,row_t *& row_local) {
+RC YCSBTxnManager::run_ycsb_0(yield_func_t &yield,ycsb_request * req,row_t *& row_local,uint64_t cor_id) {
   uint64_t starttime = get_sys_clock();
   RC rc = RCOK;
   int part_id = _wl->key_to_part( req->key );
@@ -797,7 +807,7 @@ RC YCSBTxnManager::run_ycsb_0(ycsb_request * req,row_t *& row_local) {
     mem_allocator.free(m_item, sizeof(itemid_t));
   }
   INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
-  rc = get_row(row, type,row_local);
+  rc = get_row(yield,row, type,row_local,cor_id);
   return rc;
 }
 
@@ -832,7 +842,7 @@ RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {
   return RCOK;
 }
 
-RC YCSBTxnManager::run_calvin_txn() {
+RC YCSBTxnManager::run_calvin_txn(yield_func_t &yield,uint64_t cor_id) {
   RC rc = RCOK;
   uint64_t starttime = get_sys_clock();
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
@@ -859,7 +869,7 @@ RC YCSBTxnManager::run_calvin_txn() {
 	  case CALVIN_LOC_RD:
 		// Phase 2: Perform local reads
 		DEBUG("(%ld,%ld) local reads\n",txn->txn_id,txn->batch_id);
-		rc = run_ycsb();
+		rc = run_ycsb(yield,cor_id);
 		//release_read_locks(query);
 
 		this->phase = CALVIN_SERVE_RD;
@@ -892,7 +902,7 @@ RC YCSBTxnManager::run_calvin_txn() {
 	  case CALVIN_EXEC_WR:
 		// Phase 5: Execute transaction / perform local writes
 		DEBUG("(%ld,%ld) execute writes\n",txn->txn_id,txn->batch_id);
-		rc = run_ycsb();
+		rc = run_ycsb(yield,cor_id);
 		this->phase = CALVIN_DONE;
 		break;
 	  default:
@@ -907,7 +917,7 @@ RC YCSBTxnManager::run_calvin_txn() {
   return rc;
 }
 
-RC YCSBTxnManager::run_ycsb() {
+RC YCSBTxnManager::run_ycsb(yield_func_t &yield,uint64_t cor_id) {
   RC rc = RCOK;
   assert(CC_ALG == CALVIN);
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
@@ -922,7 +932,7 @@ RC YCSBTxnManager::run_ycsb() {
 
 	if (!loc) continue;
 
-	rc = run_ycsb_0(req,row);
+	rc = run_ycsb_0(yield,req,row,cor_id);
 	assert(rc == RCOK);
 
 	rc = run_ycsb_1(req->acctype,row);

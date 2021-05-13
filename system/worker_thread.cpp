@@ -41,16 +41,23 @@
 #include "focc.h"
 #include "bocc.h"
 #include "transport.h"
-
+#include "routine.h"
+#include <boost/bind.hpp>
 
 void WorkerThread::setup() {
 	if( get_thd_id() == 0) {
     send_init_done_to_all_nodes();
   }
+#if USE_COROUTINE
+  for(uint64_t i = 0; i <= COROUTINE_CNT; ++i) {
+    _cor_txn_id[i] = 0;
+  }
+#else
   _thd_txn_id = 0;
+#endif
 }
 
-void WorkerThread::fakeprocess(Message * msg) {
+void WorkerThread::fakeprocess(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   RC rc __attribute__ ((unused));
 
   DEBUG("%ld Processing %ld %d\n",get_thd_id(),msg->get_txn_id(),msg->get_rtype());
@@ -70,7 +77,7 @@ void WorkerThread::fakeprocess(Message * msg) {
 #endif
 				break;
 			case RFWD:
-        rc = process_rfwd(msg);
+        rc = process_rfwd(yield, msg, cor_id);
 				break;
 			case RQRY:
         rc = RCOK;
@@ -91,7 +98,7 @@ void WorkerThread::fakeprocess(Message * msg) {
 #endif
 				break;
 			case RQRY_RSP:
-        rc = process_rqry_rsp(msg);
+        rc = process_rqry_rsp(yield, msg, cor_id);
 				break;
 			case RFIN:
         rc = RCOK;
@@ -106,13 +113,13 @@ void WorkerThread::fakeprocess(Message * msg) {
         // rc = process_rfin(msg);
 				break;
 			case RACK_PREP:
-        rc = process_rack_prep(msg);
+        rc = process_rack_prep(yield, msg, cor_id);
 				break;
 			case RACK_FIN:
         rc = process_rack_rfin(msg);
 				break;
 			case RTXN_CONT:
-        rc = process_rtxn_cont(msg);
+        rc = process_rtxn_cont(yield, msg, cor_id);
 				break;
       case CL_QRY:
       case CL_QRY_O:
@@ -120,7 +127,7 @@ void WorkerThread::fakeprocess(Message * msg) {
 #if CC_ALG == CALVIN
         rc = process_calvin_rtxn(msg);
 #else
-        rc = process_rtxn(msg);
+        rc = process_rtxn(yield, msg, cor_id);
 #endif
 				break;
 			case LOG_FLUSHED:
@@ -164,7 +171,7 @@ void WorkerThread::statqueue(uint64_t thd_id, Message * msg, uint64_t starttime)
   }
 }
 
-void WorkerThread::process(Message * msg) {
+void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   RC rc __attribute__ ((unused));
 
   DEBUG("%ld Processing %ld %d\n",get_thd_id(),msg->get_txn_id(),msg->get_rtype());
@@ -175,31 +182,31 @@ void WorkerThread::process(Message * msg) {
         //rc = process_rpass(msg);
 				break;
 			case RPREPARE:
-        rc = process_rprepare(msg);
+        rc = process_rprepare(yield, msg, cor_id);
 				break;
 			case RFWD:
-        rc = process_rfwd(msg);
+        rc = process_rfwd(yield, msg, cor_id);
 				break;
 			case RQRY:
-        rc = process_rqry(msg);
+        rc = process_rqry(yield, msg, cor_id);
 				break;
 			case RQRY_CONT:
-        rc = process_rqry_cont(msg);
+        rc = process_rqry_cont(yield, msg, cor_id);
 				break;
 			case RQRY_RSP:
-        rc = process_rqry_rsp(msg);
+        rc = process_rqry_rsp(yield, msg, cor_id);
 				break;
 			case RFIN:
-        rc = process_rfin(msg);
+        rc = process_rfin(yield, msg, cor_id);
 				break;
 			case RACK_PREP:
-        rc = process_rack_prep(msg);
+        rc = process_rack_prep(yield, msg, cor_id);
 				break;
 			case RACK_FIN:
         rc = process_rack_rfin(msg);
 				break;
 			case RTXN_CONT:
-        rc = process_rtxn_cont(msg);
+        rc = process_rtxn_cont(yield, msg, cor_id);
 				break;
       case CL_QRY:
       case CL_QRY_O:
@@ -207,7 +214,7 @@ void WorkerThread::process(Message * msg) {
 #if CC_ALG == CALVIN
         rc = process_calvin_rtxn(msg);
 #else
-        rc = process_rtxn(msg);
+        rc = process_rtxn(yield, msg, cor_id);
 #endif
 				break;
 			case LOG_FLUSHED:
@@ -234,6 +241,109 @@ void WorkerThread::process(Message * msg) {
   DEBUG("%ld EndProcessing %d %ld\n",get_thd_id(),msg->get_rtype(),msg->get_txn_id());
 }
 
+#if USE_COROUTINE
+
+void WorkerThread::co_check_if_done(RC rc, uint64_t cor_id) {
+  if (cor_txn_man[cor_id]->waiting_for_response()) return;
+  if (rc == Commit) {
+    cor_txn_man[cor_id]->txn_stats.finish_start_time = get_sys_clock();
+    co_commit(cor_id);
+  }
+  if (rc == Abort) {
+    cor_txn_man[cor_id]->txn_stats.finish_start_time = get_sys_clock();
+    co_abort(cor_id);
+  }
+}
+
+void WorkerThread::co_release_txn_man(uint64_t cor_id) {
+  txn_table.release_transaction_manager(get_thd_id(), cor_txn_man[cor_id]->get_txn_id(),
+                                        cor_txn_man[cor_id]->get_batch_id());
+  cor_txn_man[cor_id] = NULL;
+}
+
+
+// Can't use txn_man after this function
+void WorkerThread::co_commit(uint64_t cor_id) {
+  assert(cor_txn_man[cor_id]);
+  assert(IS_LOCAL(cor_txn_man[cor_id]->get_txn_id()));
+
+  uint64_t timespan = get_sys_clock() - cor_txn_man[cor_id]->txn_stats.starttime;
+  DEBUG("COMMIT %ld %f -- %f\n", cor_txn_man[cor_id]->get_txn_id(),
+        simulation->seconds_from_start(get_sys_clock()), (double)timespan / BILLION);
+
+  // ! trans total time
+  uint64_t end_time = get_sys_clock();
+  uint64_t timespan_short  = end_time - cor_txn_man[cor_id]->txn_stats.restart_starttime;
+  uint64_t two_pc_timespan  = end_time - cor_txn_man[cor_id]->txn_stats.prepare_start_time;
+  uint64_t finish_timespan  = end_time - cor_txn_man[cor_id]->txn_stats.finish_start_time;
+  uint64_t prepare_timespan = cor_txn_man[cor_id]->txn_stats.finish_start_time - cor_txn_man[cor_id]->txn_stats.prepare_start_time;
+  INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+  INC_STATS(get_thd_id(), trans_prepare_count, 1);
+
+  INC_STATS(get_thd_id(), trans_2pc_time, two_pc_timespan);
+  INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
+  INC_STATS(get_thd_id(), trans_commit_time, finish_timespan);
+  INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
+
+  INC_STATS(get_thd_id(), trans_2pc_count, 1);
+  INC_STATS(get_thd_id(), trans_finish_count, 1);
+  INC_STATS(get_thd_id(), trans_commit_count, 1);
+  INC_STATS(get_thd_id(), trans_total_count, 1);
+
+  // Send result back to client
+#if !SERVER_GENERATE_QUERIES
+#if USE_RDMA == CHANGE_MSG_QUEUE
+    tport_man.rdma_thd_send_msg(get_thd_id(), cor_txn_man[cor_id]->client_id, Message::create_message(cor_txn_man[cor_id],CL_RSP));
+#else
+    msg_queue.enqueue(get_thd_id(),Message::create_message(cor_txn_man[cor_id],CL_RSP),cor_txn_man[cor_id]->client_id);
+#endif
+#endif
+  // remove txn from pool
+  co_release_txn_man(cor_id);
+  // Do not use txn_man after this
+}
+
+void WorkerThread::co_abort(uint64_t cor_id) {
+  DEBUG("ABORT %ld -- %f\n", cor_txn_man[cor_id]->get_txn_id(),
+        (double)get_sys_clock() - run_starttime / BILLION);
+  // TODO: TPCC Rollback here
+
+  ++cor_txn_man[cor_id]->abort_cnt;
+  cor_txn_man[cor_id]->reset();
+
+  uint64_t end_time = get_sys_clock();
+  uint64_t timespan_short  = end_time - cor_txn_man[cor_id]->txn_stats.restart_starttime;
+  uint64_t two_pc_timespan  = end_time - cor_txn_man[cor_id]->txn_stats.prepare_start_time;
+  uint64_t finish_timespan  = end_time - cor_txn_man[cor_id]->txn_stats.finish_start_time;
+  uint64_t prepare_timespan = cor_txn_man[cor_id]->txn_stats.finish_start_time - cor_txn_man[cor_id]->txn_stats.prepare_start_time;
+  INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+  INC_STATS(get_thd_id(), trans_prepare_count, 1);
+
+  INC_STATS(get_thd_id(), trans_2pc_time, two_pc_timespan);
+  INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
+  INC_STATS(get_thd_id(), trans_abort_time, finish_timespan);
+  INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
+
+  INC_STATS(get_thd_id(), trans_2pc_count, 1);
+  INC_STATS(get_thd_id(), trans_finish_count, 1);
+  INC_STATS(get_thd_id(), trans_abort_count, 1);
+  INC_STATS(get_thd_id(), trans_total_count, 1);
+  #if WORKLOAD != DA //actually DA do not need real abort. Just count it and do not send real abort msg.
+  uint64_t penalty =
+      abort_queue.enqueue(get_thd_id(), cor_txn_man[cor_id]->get_txn_id(), cor_txn_man[cor_id]->get_abort_cnt());
+
+  cor_txn_man[cor_id]->txn_stats.total_abort_time += penalty;
+  #endif
+}
+
+
+uint64_t WorkerThread::co_get_next_txn_id(uint64_t cor_id) {
+  uint64_t txn_id =
+      (get_node_id() + (get_thd_id() + (cor_id-1) * g_thread_cnt) * g_node_cnt) + (COROUTINE_CNT * g_thread_cnt * g_node_cnt * _cor_txn_id[cor_id]);
+  ++_cor_txn_id[cor_id];
+  return txn_id;
+}
+#endif
 void WorkerThread::check_if_done(RC rc) {
   if (txn_man->waiting_for_response()) return;
   if (rc == Commit) {
@@ -252,8 +362,8 @@ void WorkerThread::release_txn_man() {
   txn_man = NULL;
 }
 
-void WorkerThread::calvin_wrapup() {
-  txn_man->release_locks(RCOK);
+void WorkerThread::calvin_wrapup(yield_func_t &yield, uint64_t cor_id) {
+  txn_man->release_locks(yield, RCOK, cor_id);
   txn_man->commit_stats();
   DEBUG("(%ld,%ld) calvin ack to %ld\n", txn_man->get_txn_id(), txn_man->get_batch_id(),
         txn_man->return_id);
@@ -372,8 +482,183 @@ char type2char(DATxnType txn_type)
       return 'U';
   }
 }
+#if USE_COROUTINE
+RC WorkerThread::co_run(yield_func_t &yield, uint64_t cor_id) {
+  //tsetup();
+  printf("Running WorkerThread %ld:%ld\n",_thd_id, cor_id);
 
-RC WorkerThread::run() {
+  uint64_t ready_starttime;
+  uint64_t idle_starttime = 0;
+
+	while(!simulation->is_done()) {
+    cor_txn_man[cor_id] = NULL;
+    heartbeat();
+
+    progress_stats();
+    Message* msg;
+
+  // DA takes msg logic
+
+  // #define TEST_MSG_order
+  #ifdef TEST_MSG_order
+    while(1)
+    {
+      msg = work_queue.dequeue(get_thd_id());
+      if (!msg) {
+        if (idle_starttime == 0) idle_starttime = get_sys_clock();
+        continue;
+      }
+      printf("s seq_id:%lu type:%c trans_id:%lu item:%c state:%lu next_state:%lu\n",
+      ((DAClientQueryMessage*)msg)->seq_id,
+      type2char(((DAClientQueryMessage*)msg)->txn_type),
+      ((DAClientQueryMessage*)msg)->trans_id,
+      static_cast<char>('x'+((DAClientQueryMessage*)msg)->item_id),
+      ((DAClientQueryMessage*)msg)->state,
+      (((DAClientQueryMessage*)msg)->next_state));
+      fflush(stdout);
+    }
+  #endif
+
+    msg = work_queue.dequeue(get_thd_id());
+
+    if(!msg) {
+      if (idle_starttime == 0) idle_starttime = get_sys_clock();
+      //todo: add sleep 0.01ms
+      continue;
+    }
+    simulation->last_da_query_time = get_sys_clock();
+    if(idle_starttime > 0) {
+      INC_STATS(_thd_id,worker_idle_time,get_sys_clock() - idle_starttime);
+      idle_starttime = 0;
+    }
+    //uint64_t starttime = get_sys_clock();
+
+    if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O) || CC_ALG == CALVIN) {
+      cor_txn_man[cor_id] = get_transaction_manager(msg);
+
+      if (CC_ALG != CALVIN && IS_LOCAL(cor_txn_man[cor_id]->get_txn_id())) {
+        if (msg->rtype != RTXN_CONT &&
+            ((msg->rtype != RACK_PREP) || (cor_txn_man[cor_id]->get_rsp_cnt() == 1))) {
+          cor_txn_man[cor_id]->txn_stats.work_queue_time_short += msg->lat_work_queue_time;
+          cor_txn_man[cor_id]->txn_stats.cc_block_time_short += msg->lat_cc_block_time;
+          cor_txn_man[cor_id]->txn_stats.cc_time_short += msg->lat_cc_time;
+          cor_txn_man[cor_id]->txn_stats.msg_queue_time_short += msg->lat_msg_queue_time;
+          cor_txn_man[cor_id]->txn_stats.process_time_short += msg->lat_process_time;
+          /*
+          if (msg->lat_network_time/BILLION > 1.0) {
+            printf("%ld %d %ld -> %ld: %f %f\n",msg->txn_id, msg->rtype,
+          msg->return_node_id,get_node_id() ,msg->lat_network_time/BILLION,
+          msg->lat_other_time/BILLION);
+          }
+          */
+          cor_txn_man[cor_id]->txn_stats.network_time_short += msg->lat_network_time;
+        }
+
+      } else {
+          cor_txn_man[cor_id]->txn_stats.clear_short();
+      }
+      if (CC_ALG != CALVIN) {
+        cor_txn_man[cor_id]->txn_stats.lat_network_time_start = msg->lat_network_time;
+        cor_txn_man[cor_id]->txn_stats.lat_other_time_start = msg->lat_other_time;
+      }
+      cor_txn_man[cor_id]->txn_stats.msg_queue_time += msg->mq_time;
+      cor_txn_man[cor_id]->txn_stats.msg_queue_time_short += msg->mq_time;
+      msg->mq_time = 0;
+      cor_txn_man[cor_id]->txn_stats.work_queue_time += msg->wq_time;
+      cor_txn_man[cor_id]->txn_stats.work_queue_time_short += msg->wq_time;
+      //cor_txn_man[cor_id]->txn_stats.network_time += msg->ntwk_time;
+      msg->wq_time = 0;
+      cor_txn_man[cor_id]->txn_stats.work_queue_cnt += 1;
+
+
+      ready_starttime = get_sys_clock();
+      bool ready = cor_txn_man[cor_id]->unset_ready();
+      INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
+      if(!ready) {
+        // Return to work queue, end processing
+        work_queue.enqueue(get_thd_id(),msg,true);
+        continue;
+      }
+      cor_txn_man[cor_id]->register_thread(this, cor_id);
+    }
+#ifdef FAKE_PROCESS
+    fakeprocess(msg);
+#else
+    process(yield, msg, cor_id);
+    // yield(_routines[0]);
+#endif
+    // process(msg);  /// DA
+    ready_starttime = get_sys_clock();
+    if(cor_txn_man[cor_id]) {
+      bool ready = cor_txn_man[cor_id]->set_ready();
+      assert(ready);
+    }
+    INC_STATS(get_thd_id(),worker_deactivate_txn_time,get_sys_clock() - ready_starttime);
+
+    // delete message
+    ready_starttime = get_sys_clock();
+#if CC_ALG != CALVIN
+    msg->release();
+#endif
+    INC_STATS(get_thd_id(),worker_release_msg_time,get_sys_clock() - ready_starttime);
+    
+	}
+  printf("FINISH %ld:%ld\n",_node_id,_thd_id);
+  fflush(stdout);
+  return FINISH;
+}
+
+void WorkerThread::create_routines(int coroutines) {
+    _routines = new coroutine_func_t[1 + coroutines];
+
+    _routines[0] = coroutine_func_t(bind(&WorkerThread::master_routine, this, _1, 0));
+    for(uint64_t i = 1; i <= coroutines; ++i) {
+    _routines[i] = coroutine_func_t(bind(&WorkerThread::co_run, this, _1, i));
+    }
+    total_worker_coroutine = coroutines;
+    printf("Init coroutine succ\n");
+}
+
+void WorkerThread::master_routine(yield_func_t &yield, int cor_id) {
+    tsetup();
+    printf("Running WorkerThread %ld:%ld\n",_thd_id, cor_id);
+    printf("This is new master routine\n");
+    //yield(_routines[1]);
+    while(!simulation->is_done()) {
+        yield(_routines[1]);
+        
+        for(uint64_t i = 1; i <= COROUTINE_CNT; i++)
+        {
+            // yield(_routines[i]);
+            uint64_t starttime;
+            uint64_t endtime;
+            starttime = get_sys_clock();
+            uint64_t target_server = un_res_p.front().first;
+            uint64_t thd_id = un_res_p.front().second;
+            // printf("sever:%ld thd_id:%ld", target_server, thd_id);
+            un_res_p.pop();
+            auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+            RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+            endtime = get_sys_clock();
+
+            INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+            DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+        // auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+            // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+        }
+    }
+    printf("FINISH %ld:%ld:%ld\n",_node_id,_thd_id, cor_id);
+    fflush(stdout);
+}
+#endif
+void WorkerThread::no_routines() {
+     _routines = new coroutine_func_t[1];
+
+     _routines[0] = coroutine_func_t(bind(&WorkerThread::run, this, _1, 0));
+     printf("Init coroutine succ\n");
+}
+RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
+
   tsetup();
   printf("Running WorkerThread %ld\n",_thd_id);
 
@@ -469,12 +754,14 @@ RC WorkerThread::run() {
         work_queue.enqueue(get_thd_id(),msg,true);
         continue;
       }
+#if !USE_COROUTINE
       txn_man->register_thread(this);
+#endif
     }
 #ifdef FAKE_PROCESS
-    fakeprocess(msg);
+    fakeprocess(yield, msg, cor_id);
 #else
-    process(msg);
+    process(yield, msg, cor_id);
 
 #endif
     // process(msg);  /// DA
@@ -497,7 +784,8 @@ RC WorkerThread::run() {
   return FINISH;
 }
 
-RC WorkerThread::process_rfin(Message * msg) {
+
+RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RFIN %ld\n",msg->get_txn_id());
   assert(CC_ALG != CALVIN);
 
@@ -509,7 +797,7 @@ RC WorkerThread::process_rfin(Message * msg) {
 #endif
 
   if(((FinishMessage*)msg)->rc == Abort) {
-    txn_man->abort();
+    txn_man->abort(yield, cor_id);
     txn_man->reset();
     txn_man->reset_query();
 #if USE_RDMA == CHANGE_MSG_QUEUE
@@ -520,7 +808,7 @@ RC WorkerThread::process_rfin(Message * msg) {
 #endif
     return Abort;
   }
-  txn_man->commit();
+  txn_man->commit(yield, cor_id);
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
   if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC ||
        CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == DLI_BASE ||
@@ -536,7 +824,7 @@ RC WorkerThread::process_rfin(Message * msg) {
   return RCOK;
 }
 
-RC WorkerThread::process_rack_prep(Message * msg) {
+RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RPREP_ACK %ld\n",msg->get_txn_id());
 
   RC rc = RCOK;
@@ -605,7 +893,7 @@ RC WorkerThread::process_rack_prep(Message * msg) {
     if (CC_ALG == TICTOC)
       rc = RCOK;
     else
-      rc = txn_man->validate();
+      rc = txn_man->validate(yield, cor_id);
   }
   uint64_t finish_start_time = get_sys_clock();
   txn_man->txn_stats.finish_start_time = finish_start_time;
@@ -624,9 +912,9 @@ RC WorkerThread::process_rack_prep(Message * msg) {
   }
   txn_man->send_finish_messages();
   if(rc == Abort) {
-    txn_man->abort();
+    txn_man->abort(yield, cor_id);
   } else {
-    txn_man->commit();
+    txn_man->commit(yield, cor_id);
   }
 
   return rc;
@@ -654,14 +942,14 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
   return rc;
 }
 
-RC WorkerThread::process_rqry_rsp(Message * msg) {
+RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RQRY_RSP %ld\n",msg->get_txn_id());
   assert(IS_LOCAL(msg->get_txn_id()));
 
   txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
 
   if(((QueryResponseMessage*)msg)->rc == Abort) {
-    txn_man->start_abort();
+    txn_man->start_abort(yield, cor_id);
     return Abort;
   }
 #if CC_ALG == TICTOC
@@ -672,12 +960,12 @@ RC WorkerThread::process_rqry_rsp(Message * msg) {
                             txn_man->_min_commit_ts : qmsg->_min_commit_ts;
 #endif
   txn_man->send_RQRY_RSP = false;
-  RC rc = txn_man->run_txn();
+  RC rc = txn_man->run_txn(yield, cor_id);
   check_if_done(rc);
   return rc;
 }
 
-RC WorkerThread::process_rqry(Message * msg) {
+RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RQRY %ld\n",msg->get_txn_id());
 #if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
 #else
@@ -711,7 +999,7 @@ RC WorkerThread::process_rqry(Message * msg) {
   dta_time_table.init(get_thd_id(), txn_man->get_txn_id(), txn_man->get_start_timestamp());
 #endif
   txn_man->send_RQRY_RSP = true;
-  rc = txn_man->run_txn();
+  rc = txn_man->run_txn(yield, cor_id);
 
   // Send response
   if(rc != WAIT) {
@@ -724,14 +1012,14 @@ RC WorkerThread::process_rqry(Message * msg) {
   return rc;
 }
 
-RC WorkerThread::process_rqry_cont(Message * msg) {
+RC WorkerThread::process_rqry_cont(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RQRY_CONT %ld\n",msg->get_txn_id());
   assert(!IS_LOCAL(msg->get_txn_id()));
   RC rc = RCOK;
 
   txn_man->run_txn_post_wait();
   txn_man->send_RQRY_RSP = false;
-  rc = txn_man->run_txn();
+  rc = txn_man->run_txn(yield, cor_id);
 
   // Send response
   if(rc != WAIT) {
@@ -745,7 +1033,7 @@ RC WorkerThread::process_rqry_cont(Message * msg) {
 }
 
 
-RC WorkerThread::process_rtxn_cont(Message * msg) {
+RC WorkerThread::process_rtxn_cont(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RTXN_CONT %ld\n",msg->get_txn_id());
   assert(IS_LOCAL(msg->get_txn_id()));
 
@@ -753,12 +1041,12 @@ RC WorkerThread::process_rtxn_cont(Message * msg) {
 
   txn_man->run_txn_post_wait();
   txn_man->send_RQRY_RSP = false;
-  RC rc = txn_man->run_txn();
+  RC rc = txn_man->run_txn(yield, cor_id);
   check_if_done(rc);
   return RCOK;
 }
 
-RC WorkerThread::process_rprepare(Message * msg) {
+RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RPREP %ld\n",msg->get_txn_id());
     RC rc = RCOK;
 
@@ -771,7 +1059,7 @@ RC WorkerThread::process_rprepare(Message * msg) {
     //                         txn_man->_min_commit_ts : qmsg->_min_commit_ts;
 #endif
     // Validate transaction
-    rc  = txn_man->validate();
+    rc  = txn_man->validate(yield, cor_id);
     txn_man->set_rc(rc);
 #if USE_RDMA == CHANGE_MSG_QUEUE
     tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RACK_PREP));
@@ -780,7 +1068,7 @@ RC WorkerThread::process_rprepare(Message * msg) {
 #endif
     // Clean up as soon as abort is possible
     if(rc == Abort) {
-      txn_man->abort();
+      txn_man->abort(yield, cor_id);
     }
 
     return rc;
@@ -793,10 +1081,164 @@ uint64_t WorkerThread::get_next_txn_id() {
   return txn_id;
 }
 
-RC WorkerThread::process_rtxn(Message * msg) {
+RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_id) {
   RC rc = RCOK;
   uint64_t txn_id = UINT64_MAX;
   bool is_cl_o = msg->get_rtype() == CL_QRY_O;
+#if USE_COROUTINE
+if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
+    // This is a new transaction
+    // Only set new txn_id when txn first starts
+    #if WORKLOAD == DA
+      msg->txn_id=((DAClientQueryMessage*)msg)->trans_id;
+      txn_id=((DAClientQueryMessage*)msg)->trans_id;
+    #else
+      txn_id = co_get_next_txn_id(cor_id);
+      msg->txn_id = txn_id;
+    #endif
+    // Put txn in txn_table
+    cor_txn_man[cor_id] = txn_table.get_transaction_manager(get_thd_id(),txn_id,0);
+    
+    cor_txn_man[cor_id]->register_thread(this, cor_id);
+    // printf("txn_id:%ld cor_id:%ld\n", cor_txn_man[cor_id]->get_txn_id(), cor_id);
+    uint64_t ready_starttime = get_sys_clock();
+    bool ready = cor_txn_man[cor_id]->unset_ready();
+    INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
+    assert(ready);
+    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2) {
+      #if WORKLOAD == DA //mvcc use timestamp
+        if (da_stamp_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
+        {
+          da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]=get_next_ts();
+          cor_txn_man[cor_id]->set_timestamp(da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
+        }
+        else
+        cor_txn_man[cor_id]->set_timestamp(da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
+      #else
+      cor_txn_man[cor_id]->set_timestamp(get_next_ts());
+      #endif
+    }
+    cor_txn_man[cor_id]->txn_stats.starttime = get_sys_clock();
+    cor_txn_man[cor_id]->txn_stats.restart_starttime = cor_txn_man[cor_id]->txn_stats.starttime;
+    msg->copy_to_txn(cor_txn_man[cor_id]);
+    DEBUG("START %ld %f %lu\n", cor_txn_man[cor_id]->get_txn_id(),
+          simulation->seconds_from_start(get_sys_clock()), cor_txn_man[cor_id]->txn_stats.starttime);
+    #if WORKLOAD==DA
+      if(da_start_trans_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
+      {
+        da_start_trans_tab.insert(cor_txn_man[cor_id]->get_txn_id());
+          INC_STATS(get_thd_id(),local_txn_start_cnt,1);
+      }
+    #else
+      INC_STATS(get_thd_id(), local_txn_start_cnt, 1);
+    #endif
+
+  } else {
+    cor_txn_man[cor_id]->txn_stats.restart_starttime = get_sys_clock();
+    DEBUG("RESTART %ld %f %lu\n", cor_txn_man[cor_id]->get_txn_id(),
+        simulation->seconds_from_start(get_sys_clock()), cor_txn_man[cor_id]->txn_stats.starttime);
+  }
+    // Get new timestamps
+    if(is_cc_new_timestamp()) {
+    #if WORKLOAD==DA //mvcc use timestamp
+      if(da_stamp_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
+      {
+        da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]=get_next_ts();
+        cor_txn_man[cor_id]->set_timestamp(da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
+      }
+      else
+        cor_txn_man[cor_id]->set_timestamp(da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
+    #else
+      cor_txn_man[cor_id]->set_timestamp(get_next_ts());
+    #endif
+    }
+
+#if CC_ALG == MVCC|| CC_ALG == WSI || CC_ALG == SSI
+    txn_table.update_min_ts(get_thd_id(),txn_id,0,cor_txn_man[cor_id]->get_timestamp());
+#endif
+
+#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+  #if WORKLOAD==DA
+    if(da_start_stamp_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
+    {
+      da_start_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]=get_next_ts();
+      cor_txn_man[cor_id]->set_start_timestamp(da_start_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
+    }
+    else
+      cor_txn_man[cor_id]->set_start_timestamp(da_start_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
+  #else
+      cor_txn_man[cor_id]->set_start_timestamp(get_next_ts());
+  #endif
+#endif
+#if CC_ALG == WSI || CC_ALG == SSI
+    txn_table.update_min_ts(get_thd_id(),txn_id,0,cor_txn_man[cor_id]->get_start_timestamp());
+#endif
+#if CC_ALG == MAAT
+  #if WORKLOAD==DA
+  if(da_start_stamp_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
+  {
+    da_start_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]=1;
+    time_table.init(get_thd_id(), cor_txn_man[cor_id]->get_txn_id());
+    assert(time_table.get_lower(get_thd_id(), cor_txn_man[cor_id]->get_txn_id()) == 0);
+    assert(time_table.get_upper(get_thd_id(), cor_txn_man[cor_id]->get_txn_id()) == UINT64_MAX);
+    assert(time_table.get_state(get_thd_id(), cor_txn_man[cor_id]->get_txn_id()) == MAAT_RUNNING);
+  }
+  #else
+  time_table.init(get_thd_id(),cor_txn_man[cor_id]->get_txn_id());
+  assert(time_table.get_lower(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == 0);
+  assert(time_table.get_upper(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == UINT64_MAX);
+  assert(time_table.get_state(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == MAAT_RUNNING);
+  #endif
+#endif
+#if CC_ALG == WOOKONG
+  txn_table.update_min_ts(get_thd_id(),txn_id,0,cor_txn_man[cor_id]->get_timestamp());
+  wkdb_time_table.init(get_thd_id(),cor_txn_man[cor_id]->get_txn_id(), cor_txn_man[cor_id]->get_timestamp());
+  //assert(wkdb_time_table.get_lower(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == 0);
+  assert(wkdb_time_table.get_upper(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == UINT64_MAX);
+  assert(wkdb_time_table.get_state(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == WKDB_RUNNING);
+#endif
+#if CC_ALG == DTA
+  txn_table.update_min_ts(get_thd_id(),txn_id,0,cor_txn_man[cor_id]->get_timestamp());
+  dta_time_table.init(get_thd_id(), cor_txn_man[cor_id]->get_txn_id(), cor_txn_man[cor_id]->get_timestamp());
+  // assert(dta_time_table.get_lower(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == 0);
+  assert(dta_time_table.get_upper(get_thd_id(), cor_txn_man[cor_id]->get_txn_id()) == UINT64_MAX);
+  assert(dta_time_table.get_state(get_thd_id(), cor_txn_man[cor_id]->get_txn_id()) == DTA_RUNNING);
+#endif
+#if CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
+  txn_table.update_min_ts(get_thd_id(), txn_id, 0, cor_txn_man[cor_id]->get_start_timestamp());
+  dta_time_table.init(get_thd_id(), cor_txn_man[cor_id]->get_txn_id(), cor_txn_man[cor_id]->get_start_timestamp());
+#endif
+  rc = init_phase();
+
+  cor_txn_man[cor_id]->txn_stats.init_complete_time = get_sys_clock();
+  INC_STATS(get_thd_id(),trans_init_time, cor_txn_man[cor_id]->txn_stats.init_complete_time - cor_txn_man[cor_id]->txn_stats.restart_starttime);
+  INC_STATS(get_thd_id(),trans_init_count, 1);
+  if (rc != RCOK) return rc;
+  #if WORKLOAD == DA
+    printf("thd_id:%lu stxn_id:%lu batch_id:%lu seq_id:%lu type:%c rtype:%d trans_id:%lu item:%c laststate:%lu state:%lu next_state:%lu\n",
+      this->_thd_id,
+      ((DAClientQueryMessage*)msg)->txn_id,
+      ((DAClientQueryMessage*)msg)->batch_id,
+      ((DAClientQueryMessage*)msg)->seq_id,
+      type2char(((DAClientQueryMessage*)msg)->txn_type),
+      ((DAClientQueryMessage*)msg)->rtype,
+      ((DAClientQueryMessage*)msg)->trans_id,
+      static_cast<char>('x'+((DAClientQueryMessage*)msg)->item_id),
+      ((DAClientQueryMessage*)msg)->last_state,
+      ((DAClientQueryMessage*)msg)->state,
+      ((DAClientQueryMessage*)msg)->next_state);
+    fflush(stdout);
+  #endif
+  // Execute transaction
+  cor_txn_man[cor_id]->send_RQRY_RSP = false;
+  if (is_cl_o) {
+    rc = cor_txn_man[cor_id]->send_remote_request();
+  } else {
+    rc = cor_txn_man[cor_id]->run_txn(yield, cor_id);
+  }
+  co_check_if_done(rc, cor_id); 
+#else
   if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
     // This is a new transaction
     // Only set new txn_id when txn first starts
@@ -809,7 +1251,9 @@ RC WorkerThread::process_rtxn(Message * msg) {
     #endif
     // Put txn in txn_table
     txn_man = txn_table.get_transaction_manager(get_thd_id(),txn_id,0);
+#if !USE_COROUTINE
     txn_man->register_thread(this);
+#endif
     uint64_t ready_starttime = get_sys_clock();
     bool ready = txn_man->unset_ready();
     INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
@@ -941,12 +1385,14 @@ RC WorkerThread::process_rtxn(Message * msg) {
   #endif
   // Execute transaction
   txn_man->send_RQRY_RSP = false;
+
   if (is_cl_o) {
     rc = txn_man->send_remote_request();
   } else {
-    rc = txn_man->run_txn();
+    rc = txn_man->run_txn(yield, cor_id);
   }
   check_if_done(rc);
+  #endif
   return rc;
 }
 
@@ -989,7 +1435,7 @@ RC WorkerThread::process_log_flushed(Message * msg) {
   return RCOK;
 }
 
-RC WorkerThread::process_rfwd(Message * msg) {
+RC WorkerThread::process_rfwd(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RFWD (%ld,%ld)\n",msg->get_txn_id(),msg->get_batch_id());
   txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
   assert(CC_ALG == CALVIN);
@@ -997,32 +1443,32 @@ RC WorkerThread::process_rfwd(Message * msg) {
   assert(responses_left >=0);
   if(txn_man->calvin_collect_phase_done()) {
     assert(ISSERVERN(txn_man->return_id));
-    RC rc = txn_man->run_calvin_txn();
+    RC rc = txn_man->run_calvin_txn(yield, cor_id);
     if(rc == RCOK && txn_man->calvin_exec_phase_done()) {
-      calvin_wrapup();
+      calvin_wrapup(yield, cor_id);
       return RCOK;
     }
   }
   return WAIT;
 }
 
-RC WorkerThread::process_calvin_rtxn(Message * msg) {
+RC WorkerThread::process_calvin_rtxn(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("START %ld %f %lu\n", txn_man->get_txn_id(),
         simulation->seconds_from_start(get_sys_clock()), txn_man->txn_stats.starttime);
   assert(ISSERVERN(txn_man->return_id));
   txn_man->txn_stats.local_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
   // Execute
-  RC rc = txn_man->run_calvin_txn();
+  RC rc = txn_man->run_calvin_txn(yield, cor_id);
   // if((txn_man->phase==6 && rc == RCOK) || txn_man->active_cnt == 0 || txn_man->participant_cnt ==
   // 1) {
   if(rc == RCOK && txn_man->calvin_exec_phase_done()) {
-    calvin_wrapup();
+    calvin_wrapup(yield, cor_id);
   }
   return RCOK;
 }
 
 bool WorkerThread::is_cc_new_timestamp() {
-  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == RDMA_MVCC || CC_ALG ==RDMA_TS1 );
+  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == RDMA_MVCC || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA);
 }
 
 ts_t WorkerThread::get_next_ts() {

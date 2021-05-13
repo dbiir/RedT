@@ -18,7 +18,7 @@
 #define _THREAD_H_
 
 #include "global.h"
-
+#include "routine.h"
 class Workload;
 
 class Thread {
@@ -42,8 +42,12 @@ public:
     // to run with pthread.
     // conversion is done within the function.
     virtual RC run() = 0;
+    // virtual RC run(yield_func_t &yield, int cor_id);
     virtual void setup() = 0;
-
+// #if USE_COROUTINE
+    std::queue<std::pair<uint64_t, uint64_t>> un_res_p;
+    coroutine_func_t *_routines = NULL;
+// #endif
 private:
   uint64_t prog_time;
   uint64_t heartbeat_time;

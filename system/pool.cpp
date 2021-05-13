@@ -331,14 +331,14 @@ void AccessPool::put(uint64_t thd_id, Access * item) {
 }
 
 void AccessPool::free_all() {
-  Access * item;
-  DEBUG_M("access_pool free\n");
-  //while(pool->pop(item)) {
+    Access * item;
+    DEBUG_M("access_pool free\n");
+    //while(pool->pop(item)) {
     for(uint64_t thd_id = 0; thd_id < g_total_thread_cnt; thd_id++) {
-  while(pool[thd_id]->pop(item)) {
-    mem_allocator.free(item,sizeof(item));
-  }
-  }
+        while(pool[thd_id]->pop(item)) {
+            mem_allocator.free(item,sizeof(item));
+        }
+    }
 }
 
 void TxnTablePool::init(Workload * wl, uint64_t size) {

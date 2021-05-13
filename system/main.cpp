@@ -65,7 +65,8 @@
 void network_test();
 void network_test_recv();
 void * run_thread(void *);
-
+void * run_co_thread(void *);
+void * run_nco_thread(void *);
 WorkerThread * worker_thds;
 WorkerNumThread * worker_num_thds;
 InputThread * input_thds;
@@ -417,15 +418,19 @@ int main(int argc, char *argv[]) {
 
 	uint64_t id = 0;
 	for (uint64_t i = 0; i < wthd_cnt; i++) {
-// #if SET_AFFINITY
-// 		CPU_ZERO(&cpus);
-// 		CPU_SET(cpu_cnt, &cpus);
-// 		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-// 		cpu_cnt++;
-// #endif
+#if SET_AFFINITY
+		// CPU_ZERO(&cpus);
+		// CPU_SET(cpu_cnt, &cpus);
+		// pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+		// cpu_cnt++;
+#endif
 		assert(id >= 0 && id < wthd_cnt);
 		worker_thds[i].init(id,g_node_id,m_wl);
-		pthread_create(&p_thds[id++], &attr, run_thread, (void *)&worker_thds[i]);
+#if USE_COROUTINE
+		pthread_create(&p_thds[id++], &attr, run_co_thread, (void *)&worker_thds[i]);
+#else
+		pthread_create(&p_thds[id++], &attr, run_nco_thread, (void *)&worker_thds[i]);
+#endif
 	}
 	for (uint64_t j = 0; j < rthd_cnt ; j++) {
 		assert(id >= wthd_cnt && id < wthd_cnt + rthd_cnt);
@@ -513,7 +518,20 @@ void * run_thread(void * id) {
 	thd->run();
 	return NULL;
 }
-
+void * run_nco_thread(void * id) {
+		WorkerThread * thd = (WorkerThread *) id;
+	thd->no_routines();
+	thd->start_routine();
+	return NULL;
+}
+#if USE_COROUTINE
+void * run_co_thread(void * id) {
+		WorkerThread * thd = (WorkerThread *) id;
+	thd->create_routines(COROUTINE_CNT);
+	thd->start_routine();
+	return NULL;
+}
+#endif
 void network_test() {
 
 			/*

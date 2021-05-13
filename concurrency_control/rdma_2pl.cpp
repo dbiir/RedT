@@ -9,7 +9,7 @@
 #include "row_rdma_2pl.h"
 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
-void RDMA_2pl::write_and_unlock(row_t * row, row_t * data, TxnManager * txnMng) {
+void RDMA_2pl::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnManager * txnMng,uint64_t cor_id) {
 	//row->copy(data);  //copy access->data to access->orig_row
     //no need for last step:data = orig_row in local situation
     uint64_t lock_info = row->_tid_word;
@@ -19,7 +19,7 @@ void RDMA_2pl::write_and_unlock(row_t * row, row_t * data, TxnManager * txnMng) 
 #endif
 }
 
-void RDMA_2pl::remote_write_and_unlock(RC rc, TxnManager * txnMng , uint64_t num){
+void RDMA_2pl::remote_write_and_unlock(yield_func_t &yield,RC rc, TxnManager * txnMng , uint64_t num,uint64_t cor_id){
     Access *access = txnMng->txn->accesses[num];
     row_t *data = access->data;
     data->_tid_word = 0; //write data and unlock
@@ -37,7 +37,7 @@ void RDMA_2pl::remote_write_and_unlock(RC rc, TxnManager * txnMng , uint64_t num
     // memcpy(test_buf, (char*)data, operate_size);
 
 #if DEBUG_PRINTF
-    row_t * remote_row = txnMng->read_remote_row(loc,off);
+    row_t * remote_row = txnMng->read_remote_row(yield,loc,off,cor_id);
     uint64_t orig_lock_info = remote_row->_tid_word;
 	mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 
@@ -45,14 +45,14 @@ void RDMA_2pl::remote_write_and_unlock(RC rc, TxnManager * txnMng , uint64_t num
     else if(CC_ALG == RDMA_NO_WAIT2) assert(orig_lock_info == 1);
 #endif
 
-    assert(txnMng->write_remote_row(loc,operate_size,off,(char*)data) == true);
+    assert(txnMng->write_remote_row(yield,loc,operate_size,off,(char*)data,cor_id) == true);
 
 #if DEBUG_PRINTF 
     printf("---线程号：%lu, 远程解写锁成功，锁位置: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), orig_lock_info);
 #endif
 }
 
-void RDMA_2pl::unlock(row_t * row , TxnManager * txnMng){
+void RDMA_2pl::unlock(yield_func_t &yield,row_t * row , TxnManager * txnMng,uint64_t cor_id){
 #if CC_ALG == RDMA_NO_WAIT
 retry_unlock: 
     uint64_t lock_type;
@@ -75,7 +75,7 @@ retry_unlock:
         uint64_t thd_id = txnMng->get_thd_id();
         uint64_t off = (char*)row - rdma_global_buffer;
 
-        uint64_t try_lock = txnMng->cas_remote_content(loc,off,lock_info,new_lock_info);
+        uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,lock_info,new_lock_info,cor_id);
 
 		if(try_lock != lock_info){
         //atomicity is destroyed
@@ -101,14 +101,14 @@ retry_unlock:
 #endif
 }
 
-void RDMA_2pl::remote_unlock(TxnManager * txnMng , uint64_t num){
+void RDMA_2pl::remote_unlock(yield_func_t &yield,TxnManager * txnMng , uint64_t num,uint64_t cor_id){
 #if CC_ALG == RDMA_NO_WAIT
     Access *access = txnMng->txn->accesses[num];
 
     uint64_t off = access->offset;
     uint64_t loc = access->location;
 
-    row_t * remote_row = txnMng->read_remote_row(loc,off);
+    row_t * remote_row = txnMng->read_remote_row(yield,loc,off,cor_id);
     uint64_t *lock_info = (uint64_t *)mem_allocator.alloc(sizeof(uint64_t));
     *lock_info = remote_row->_tid_word;
 	mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
@@ -126,7 +126,7 @@ remote_retry_unlock:
     assert(lock_num > 0); //already locked
 
     //remote CAS unlock
-    uint64_t try_lock = txnMng->cas_remote_content(loc,off,*lock_info,new_lock_info);
+    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,*lock_info,new_lock_info,cor_id);
     if(try_lock != *lock_info){ //atomicity is destroyed，CAS fail
         txnMng->num_atomic_retry++;
         total_num_atomic_retry++;
@@ -152,7 +152,7 @@ remote_retry_unlock:
     // *test_buf = 0;
     row_t *unlock_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
     unlock_row->_tid_word = 0;
-    assert(txnMng->write_remote_row(loc,operate_size,off,(char *)unlock_row) == true);
+    assert(txnMng->write_remote_row(yield,loc,operate_size,off,(char *)unlock_row,cor_id) == true);
     mem_allocator.free(unlock_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 
 #if DEBUG_PRINTF
@@ -163,7 +163,7 @@ remote_retry_unlock:
 
 
 //write back and unlock
-void RDMA_2pl::finish(RC rc, TxnManager * txnMng){
+void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id){
 	Transaction *txn = txnMng->txn;
     uint64_t starttime = get_sys_clock();
     //NO_WAIT has no problem of deadlock,so doesnot need to bubble sort the write_set in primary key order
@@ -182,11 +182,11 @@ void RDMA_2pl::finish(RC rc, TxnManager * txnMng){
         //local
         if(txn->accesses[read_set[i]]->location == g_node_id){
             Access * access = txn->accesses[ read_set[i] ];
-            unlock(access->orig_row, txnMng);
+            unlock(yield,access->orig_row, txnMng,cor_id);
         }else{
         //remote
             Access * access = txn->accesses[ read_set[i] ];
-            remote_unlock(txnMng, read_set[i]);
+            remote_unlock(yield,txnMng, read_set[i],cor_id);
         }
     }
     //for write set element,write back and release lock
@@ -194,11 +194,11 @@ void RDMA_2pl::finish(RC rc, TxnManager * txnMng){
         //local
         if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
             Access * access = txn->accesses[ txnMng->write_set[i] ];
-            write_and_unlock(access->orig_row, access->data, txnMng); 
+            write_and_unlock(yield,access->orig_row, access->data, txnMng,cor_id); 
         }else{
         //remote
             Access * access = txn->accesses[ txnMng->write_set[i] ];
-            remote_write_and_unlock(rc, txnMng, txnMng->write_set[i]);
+            remote_write_and_unlock(yield,rc, txnMng, txnMng->write_set[i],cor_id);
         }
     }
 

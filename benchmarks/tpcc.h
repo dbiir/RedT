@@ -125,11 +125,11 @@ public:
 	void init(uint64_t thd_id, Workload * h_wl);
   void reset();
   RC acquire_locks();
-	RC run_txn();
+	RC run_txn(yield_func_t &yield, uint64_t cor_id);
 	RC run_txn_post_wait();
-	RC run_calvin_txn();
-  RC run_tpcc_phase2();
-  RC run_tpcc_phase5();
+	RC run_calvin_txn(yield_func_t &yield, uint64_t cor_id);
+  RC run_tpcc_phase2(yield_func_t &yield, uint64_t cor_id);
+  RC run_tpcc_phase5(yield_func_t &yield, uint64_t cor_id);
 	TPCCRemTxnType state;
   void copy_remote_items(TPCCQueryMessage * msg);
 private:
@@ -140,7 +140,7 @@ private:
   uint64_t next_item_id;
 
 void next_tpcc_state();
-RC run_txn_state();
+RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
   bool is_done();
   bool is_local_item(uint64_t idx);
   RC send_remote_request();
@@ -148,35 +148,36 @@ RC run_txn_state();
   itemid_t* tpcc_read_remote_index(TPCCQuery * query);
   RC send_remote_one_side_request(TPCCQuery * query,row_t *& row_local);
 
-  RC run_payment_0(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
-                   row_t*& r_wh_local);
+  RC run_payment_0(yield_func_t &yield,uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
+                   row_t*& r_wh_local,uint64_t cor_id);
   RC run_payment_1(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
                    row_t* r_wh_local);
-  RC run_payment_2(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
-                   row_t*& r_dist_local);
+  RC run_payment_2(yield_func_t &yield,uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
+                   row_t*& r_dist_local,uint64_t cor_id);
   RC run_payment_3(uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
                    row_t* r_dist_local);
-  RC run_payment_4(uint64_t w_id, uint64_t d_id, uint64_t c_id, uint64_t c_w_id, uint64_t c_d_id,
-                   char* c_last, double h_amount, bool by_last_name, row_t*& r_cust_local);
+  RC run_payment_4(yield_func_t &yield,uint64_t w_id, uint64_t d_id, uint64_t c_id, uint64_t c_w_id, uint64_t c_d_id,
+                   char* c_last, double h_amount, bool by_last_name, row_t*& r_cust_local,uint64_t cor_id);
   RC run_payment_5(uint64_t w_id, uint64_t d_id, uint64_t c_id, uint64_t c_w_id, uint64_t c_d_id,
                    char* c_last, double h_amount, bool by_last_name, row_t* r_cust_local);
-  RC new_order_0(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
-                 uint64_t o_entry_d, uint64_t* o_id, row_t*& r_wh_local);
+  RC new_order_0(yield_func_t &yield,uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
+                 uint64_t o_entry_d, uint64_t* o_id, row_t*& r_wh_local,uint64_t cor_id);
   RC new_order_1(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
                  uint64_t o_entry_d, uint64_t* o_id, row_t* r_wh_local);
-  RC new_order_2(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
-                 uint64_t o_entry_d, uint64_t* o_id, row_t*& r_cust_local);
+  RC new_order_2(yield_func_t &yield,uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
+                 uint64_t o_entry_d, uint64_t* o_id, row_t*& r_cust_local,uint64_t cor_id);
   RC new_order_3(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
                  uint64_t o_entry_d, uint64_t* o_id, row_t* r_cust_local);
-  RC new_order_4(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
-                 uint64_t o_entry_d, uint64_t* o_id, row_t*& r_dist_local);
+  RC new_order_4(yield_func_t &yield,uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
+                 uint64_t o_entry_d, uint64_t* o_id, row_t*& r_dist_local,uint64_t cor_id);
   RC new_order_5(uint64_t w_id, uint64_t d_id, uint64_t c_id, bool remote, uint64_t ol_cnt,
                  uint64_t o_entry_d, uint64_t* o_id, row_t* r_dist_local);
-	RC new_order_6(uint64_t ol_i_id, row_t *& r_item_local);
+	RC new_order_6(yield_func_t &yield,uint64_t ol_i_id, row_t *& r_item_local,uint64_t cor_id);
 	RC new_order_7(uint64_t ol_i_id, row_t * r_item_local);
-  RC new_order_8(uint64_t w_id, uint64_t d_id, bool remote, uint64_t ol_i_id,
+  RC new_order_8(yield_func_t &yield,uint64_t w_id, uint64_t d_id, bool remote, uint64_t ol_i_id,
                  uint64_t ol_supply_w_id, uint64_t ol_quantity, uint64_t ol_number, uint64_t o_id,
-                 row_t*& r_stock_local);
+                 row_t*& r_stock_local,
+                 uint64_t cor_id);
   RC new_order_9(uint64_t w_id, uint64_t d_id, bool remote, uint64_t ol_i_id,
                  uint64_t ol_supply_w_id, uint64_t ol_quantity, uint64_t ol_number,
                  uint64_t ol_amount, uint64_t o_id, row_t* r_stock_local);

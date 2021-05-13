@@ -77,8 +77,7 @@ RC PPSTxnManager::run_txn_post_wait() {
     return RCOK;
 }
 
-
-RC PPSTxnManager::run_txn() {
+RC PPSTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #if MODE == SETUP_MODE
   return RCOK;
 #endif
@@ -103,7 +102,7 @@ RC PPSTxnManager::run_txn() {
 
 
   while(rc == RCOK && !is_done()) {
-    rc = run_txn_state();
+    rc = run_txn_state(yield, cor_id);
   }
 
   uint64_t curr_time = get_sys_clock();
@@ -112,9 +111,9 @@ RC PPSTxnManager::run_txn() {
 
   if(IS_LOCAL(get_txn_id())) {
     if(is_done() && rc == RCOK)
-      rc = start_commit();
+      rc = start_commit(yield, cor_id);
     else if(rc == Abort)
-      rc = start_abort();
+      rc = start_abort(yield, cor_id);
   }
 
   return rc;
@@ -465,7 +464,7 @@ RC PPSTxnManager::send_remote_request() {
   return WAIT_REM;
 }
 
-RC PPSTxnManager::run_txn_state() {
+RC PPSTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
     PPSQuery* pps_query = (PPSQuery*) query;
 	RC rc = RCOK;
     uint64_t part_key = pps_query->part_key;
@@ -477,129 +476,129 @@ RC PPSTxnManager::run_txn_state() {
   switch(state) {
     case PPS_GETPART0:
       if (part_loc)
-        rc = run_getpart_0(part_key, row);
+        rc = run_getpart_0(yield, part_key, row, cor_id);
       else
         rc = send_remote_request();
       break;
     case PPS_GETPART1:
-        rc = run_getpart_1(row);
+        rc = run_getpart_1(yield, cor_id, row);
       break;
     case PPS_GETPRODUCT0:
       if (product_loc)
-        rc = run_getproduct_0(product_key, row);
+        rc = run_getproduct_0(yield, product_key, row, cor_id);
       else
         rc = send_remote_request();
       break;
     case PPS_GETPRODUCT1:
-        rc = run_getproduct_1(row);
+        rc = run_getproduct_1(yield, cor_id, row);
       break;
     case PPS_GETSUPPLIER0:
       if (supplier_loc)
-        rc = run_getsupplier_0(supplier_key, row);
+        rc = run_getsupplier_0(yield, supplier_key, row, cor_id);
       else
         rc = send_remote_request();
       break;
     case PPS_GETSUPPLIER1:
-        rc = run_getsupplier_1(row);
+        rc = run_getsupplier_1(yield, cor_id, row);
       break;
     case PPS_GETPARTBYSUPPLIER0:
       if (supplier_loc)
-        rc = run_getpartsbysupplier_0(supplier_key, row);
+        rc = run_getpartsbysupplier_0(yield, supplier_key, row, cor_id);
       else
         rc = send_remote_request();
       break;
     case PPS_GETPARTBYSUPPLIER1:
-        rc = run_getpartsbysupplier_1(row);
+        rc = run_getpartsbysupplier_1(yield, cor_id, row);
       break;
     case PPS_GETPARTBYSUPPLIER2:
       if (supplier_loc)
-        rc = run_getpartsbysupplier_2(supplier_key, row);
+        rc = run_getpartsbysupplier_2(yield, cor_id, supplier_key, row);
       else
         rc = send_remote_request();
       break;
     case PPS_GETPARTBYSUPPLIER3:
-        rc = run_getpartsbysupplier_3(pps_query->part_key, row);
+        rc = run_getpartsbysupplier_3(yield, cor_id, pps_query->part_key, row);
       break;
     case PPS_GETPARTBYSUPPLIER4:
       if (part_loc)
-        rc = run_getpartsbysupplier_4(pps_query->part_key, row);
+        rc = run_getpartsbysupplier_4(yield, cor_id, pps_query->part_key, row);
       else
         rc = send_remote_request();
       break;
     case PPS_GETPARTBYSUPPLIER5:
-        rc = run_getpartsbysupplier_5(row);
+        rc = run_getpartsbysupplier_5(yield, cor_id, row);
       break;
     case PPS_GETPARTBYPRODUCT0:
       if (product_loc)
-        rc = run_getpartsbyproduct_0(product_key, row);
+        rc = run_getpartsbyproduct_0(yield ,product_key, row, cor_id);
       else
         rc = send_remote_request();
       break;
     case PPS_GETPARTBYPRODUCT1:
-        rc = run_getpartsbyproduct_1(row);
+        rc = run_getpartsbyproduct_1(yield, cor_id, row);
       break;
     case PPS_GETPARTBYPRODUCT2:
       if (product_loc)
-        rc = run_getpartsbyproduct_2(product_key, row);
+        rc = run_getpartsbyproduct_2(yield, cor_id, product_key, row);
       else
         rc = send_remote_request();
       break;
     case PPS_GETPARTBYPRODUCT3:
-        rc = run_getpartsbyproduct_3(pps_query->part_key,row);
+        rc = run_getpartsbyproduct_3(yield, cor_id, pps_query->part_key,row);
       break;
     case PPS_GETPARTBYPRODUCT4:
       if (part_loc)
-        rc = run_getpartsbyproduct_4(pps_query->part_key, row);
+        rc = run_getpartsbyproduct_4(yield, cor_id, pps_query->part_key, row);
       else
         rc = send_remote_request();
       break;
     case PPS_GETPARTBYPRODUCT5:
-        rc = run_getpartsbyproduct_5(row);
+        rc = run_getpartsbyproduct_5(yield, cor_id, row);
       break;
     case PPS_ORDERPRODUCT0:
       if (product_loc)
-        rc = run_orderproduct_0(product_key, row);
+        rc = run_orderproduct_0(yield, product_key, row, cor_id);
       else
         rc = send_remote_request();
       break;
     case PPS_ORDERPRODUCT1:
-        rc = run_orderproduct_1(row);
+        rc = run_orderproduct_1(yield, cor_id, row);
       break;
     case PPS_ORDERPRODUCT2:
       if (product_loc)
-        rc = run_orderproduct_2(product_key, row);
+        rc = run_orderproduct_2(yield, cor_id, product_key, row);
       else
         rc = send_remote_request();
       break;
     case PPS_ORDERPRODUCT3:
-        rc = run_orderproduct_3(pps_query->part_key,row);
+        rc = run_orderproduct_3(yield, cor_id, pps_query->part_key,row);
       break;
     case PPS_ORDERPRODUCT4:
       if (part_loc)
-        rc = run_orderproduct_4(pps_query->part_key, row);
+        rc = run_orderproduct_4(yield, pps_query->part_key, row, cor_id);
       else
         rc = send_remote_request();
       break;
     case PPS_ORDERPRODUCT5:
-        rc = run_orderproduct_5(row);
+        rc = run_orderproduct_5(yield, cor_id, row);
       break;
     case PPS_UPDATEPRODUCTPART0:
       if (product_loc)
-        rc = run_updateproductpart_0(product_key, row);
+        rc = run_updateproductpart_0(yield, product_key, row, cor_id);
       else
         rc = send_remote_request();
       break;
     case PPS_UPDATEPRODUCTPART1:
-        rc = run_updateproductpart_1(part_key, row);
+        rc = run_updateproductpart_1(yield, cor_id, part_key, row);
       break;
     case PPS_UPDATEPART0:
       if (part_loc)
-        rc = run_updatepart_0(part_key, row);
+        rc = run_updatepart_0(yield, cor_id, part_key, row);
       else
         rc = send_remote_request();
       break;
     case PPS_UPDATEPART1:
-        rc = run_updatepart_1(row);
+        rc = run_updatepart_1(yield, cor_id, row);
       break;
     case PPS_FIN:
       state = PPS_FIN;
@@ -611,7 +610,7 @@ RC PPSTxnManager::run_txn_state() {
   return rc;
 }
 
-inline RC PPSTxnManager::run_getpart_0(uint64_t part_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getpart_0(yield_func_t &yield, uint64_t part_key, row_t *& r_local, uint64_t cor_id) {
   /*
     SELECT * FROM PARTS WHERE PART_KEY = :part_key;
    */
@@ -621,10 +620,10 @@ inline RC PPSTxnManager::run_getpart_0(uint64_t part_key, row_t *& r_local) {
 		item = index_read(index, part_key, parts_to_partition(part_key));
 		assert(item != NULL);
 		row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_getpart_1(row_t *& r_local) {
+inline RC PPSTxnManager::run_getpart_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local) {
   /*
     SELECT * FROM PARTS WHERE PART_KEY = :part_key;
    */
@@ -634,7 +633,7 @@ inline RC PPSTxnManager::run_getpart_1(row_t *& r_local) {
 }
 
 
-inline RC PPSTxnManager::run_getproduct_0(uint64_t product_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getproduct_0(yield_func_t &yield, uint64_t product_key, row_t *& r_local, uint64_t cor_id) {
   /*
     SELECT * FROM PRODUCTS WHERE PRODUCT_KEY = :product_key;
    */
@@ -644,10 +643,10 @@ inline RC PPSTxnManager::run_getproduct_0(uint64_t product_key, row_t *& r_local
 		item = index_read(index, product_key, products_to_partition(product_key));
 		assert(item != NULL);
 		row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_getproduct_1(row_t *& r_local) {
+inline RC PPSTxnManager::run_getproduct_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local) {
   /*
     SELECT * FROM PRODUCTS WHERE PRODUCT_KEY = :product_key;
    */
@@ -683,7 +682,7 @@ inline void PPSTxnManager::getAllFields(row_t *& r_local) {
   */
 }
 
-inline RC PPSTxnManager::run_getsupplier_0(uint64_t supplier_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getsupplier_0(yield_func_t &yield, uint64_t supplier_key, row_t *& r_local, uint64_t cor_id) {
   /*
     SELECT * FROM SUPPLIERS WHERE SUPPLIER_KEY = :supplier_key;
    */
@@ -693,12 +692,12 @@ inline RC PPSTxnManager::run_getsupplier_0(uint64_t supplier_key, row_t *& r_loc
 		item = index_read(index, supplier_key, suppliers_to_partition(supplier_key));
 		assert(item != NULL);
 		row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
     return rc;
 
 }
 
-inline RC PPSTxnManager::run_getsupplier_1(row_t *& r_local) {
+inline RC PPSTxnManager::run_getsupplier_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local) {
   /*
     SELECT * FROM SUPPLIERS WHERE SUPPLIER_KEY = :supplier_key;
    */
@@ -708,7 +707,7 @@ inline RC PPSTxnManager::run_getsupplier_1(row_t *& r_local) {
 
 }
 
-inline RC PPSTxnManager::run_getpartsbyproduct_0(uint64_t product_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbyproduct_0(yield_func_t &yield, uint64_t product_key, row_t *& r_local, uint64_t cor_id) {
   /*
     SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
@@ -718,10 +717,10 @@ inline RC PPSTxnManager::run_getpartsbyproduct_0(uint64_t product_key, row_t *& 
 		item = index_read(index, product_key, products_to_partition(product_key));
 		assert(item != NULL);
 		row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_getpartsbyproduct_1(row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbyproduct_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local) {
   /*
     SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
@@ -730,7 +729,7 @@ inline RC PPSTxnManager::run_getpartsbyproduct_1(row_t *& r_local) {
   return RCOK;
 }
 
-inline RC PPSTxnManager::run_getpartsbyproduct_2(uint64_t product_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbyproduct_2(yield_func_t &yield, uint64_t cor_id, uint64_t product_key, row_t *& r_local) {
   /*
     SELECT PART_KEY FROM USES WHERE PRODUCT_KEY = ?
    */
@@ -745,12 +744,12 @@ inline RC PPSTxnManager::run_getpartsbyproduct_2(uint64_t product_key, row_t *& 
     }
 		assert(item != NULL);
 		row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
   DEBUG("From product_key %ld -- %lx\n",product_key,(uint64_t)r_local);
     return rc;
 }
 
-inline RC PPSTxnManager::run_getpartsbyproduct_3(uint64_t &part_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbyproduct_3(yield_func_t &yield, uint64_t cor_id, uint64_t &part_key, row_t *& r_local) {
   /*
     SELECT PART_KEY FROM USES WHERE PRODUCT_KEY = ?
    */
@@ -763,7 +762,7 @@ inline RC PPSTxnManager::run_getpartsbyproduct_3(uint64_t &part_key, row_t *& r_
   return RCOK;
 }
 
-inline RC PPSTxnManager::run_getpartsbyproduct_4(uint64_t part_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbyproduct_4(yield_func_t &yield, uint64_t cor_id, uint64_t part_key, row_t *& r_local) {
   /*
    SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
    */
@@ -774,10 +773,10 @@ inline RC PPSTxnManager::run_getpartsbyproduct_4(uint64_t part_key, row_t *& r_l
 		item = index_read(index, part_key, parts_to_partition(part_key));
 		assert(item != NULL);
 		row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_getpartsbyproduct_5(row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbyproduct_5(yield_func_t &yield, uint64_t cor_id, row_t *& r_local) {
   /*
    SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
    */
@@ -787,7 +786,7 @@ inline RC PPSTxnManager::run_getpartsbyproduct_5(row_t *& r_local) {
   return RCOK;
 }
 
-inline RC PPSTxnManager::run_orderproduct_0(uint64_t product_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_orderproduct_0(yield_func_t &yield, uint64_t product_key, row_t *& r_local, uint64_t cor_id) {
   /*
     SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
@@ -797,10 +796,10 @@ inline RC PPSTxnManager::run_orderproduct_0(uint64_t product_key, row_t *& r_loc
 		item = index_read(index, product_key, products_to_partition(product_key));
 		assert(item != NULL);
 		row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_orderproduct_1(row_t *& r_local) {
+inline RC PPSTxnManager::run_orderproduct_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local) {
   /*
     SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
@@ -809,7 +808,7 @@ inline RC PPSTxnManager::run_orderproduct_1(row_t *& r_local) {
   return RCOK;
 }
 
-inline RC PPSTxnManager::run_orderproduct_2(uint64_t product_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_orderproduct_2(yield_func_t &yield, uint64_t cor_id, uint64_t product_key, row_t *& r_local) {
     /*
       SELECT PART_KEY FROM USES WHERE PRODUCT_KEY = ?
      */
@@ -824,12 +823,12 @@ inline RC PPSTxnManager::run_orderproduct_2(uint64_t product_key, row_t *& r_loc
     }
     assert(item != NULL);
     row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
     DEBUG("From product_key %ld -- %lx\n",product_key,(uint64_t)r_local);
     return rc;
 }
 
-inline RC PPSTxnManager::run_orderproduct_3(uint64_t &part_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_orderproduct_3(yield_func_t &yield, uint64_t cor_id, uint64_t &part_key, row_t *& r_local) {
   /*
     SELECT PART_KEY FROM USES WHERE PRODUCT_KEY = ?
    */
@@ -842,7 +841,7 @@ inline RC PPSTxnManager::run_orderproduct_3(uint64_t &part_key, row_t *& r_local
   return RCOK;
 }
 
-inline RC PPSTxnManager::run_orderproduct_4(uint64_t part_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_orderproduct_4(yield_func_t &yield, uint64_t part_key, row_t *& r_local, uint64_t cor_id) {
     /*
      SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
      */
@@ -853,10 +852,10 @@ inline RC PPSTxnManager::run_orderproduct_4(uint64_t part_key, row_t *& r_local)
     item = index_read(index, part_key, parts_to_partition(part_key));
     assert(item != NULL);
     row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, WR, r_local);
+    rc = get_row(yield, r_loc, WR, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_orderproduct_5(row_t *& r_local) {
+inline RC PPSTxnManager::run_orderproduct_5(yield_func_t &yield, uint64_t cor_id, row_t *& r_local) {
   /*
    SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
    */
@@ -871,7 +870,7 @@ inline RC PPSTxnManager::run_orderproduct_5(row_t *& r_local) {
 }
 
 
-inline RC PPSTxnManager::run_getpartsbysupplier_0(uint64_t supplier_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbysupplier_0(yield_func_t &yield, uint64_t supplier_key, row_t *& r_local, uint64_t cor_id) {
   /*
     SELECT FIELD1, FIELD2, FIELD3 FROM suppliers WHERE supplier_KEY = ?
    */
@@ -881,10 +880,10 @@ inline RC PPSTxnManager::run_getpartsbysupplier_0(uint64_t supplier_key, row_t *
 		item = index_read(index, supplier_key, suppliers_to_partition(supplier_key));
 		assert(item != NULL);
 		row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_getpartsbysupplier_1(row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbysupplier_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local) {
   /*
     SELECT FIELD1, FIELD2, FIELD3 FROM suppliers WHERE supplier_KEY = ?
    */
@@ -893,7 +892,7 @@ inline RC PPSTxnManager::run_getpartsbysupplier_1(row_t *& r_local) {
   return RCOK;
 }
 
-inline RC PPSTxnManager::run_getpartsbysupplier_2(uint64_t supplier_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbysupplier_2(yield_func_t &yield, uint64_t cor_id, uint64_t supplier_key, row_t *& r_local) {
   /*
     SELECT PART_KEY FROM USES WHERE supplier_KEY = ?
    */
@@ -908,10 +907,10 @@ inline RC PPSTxnManager::run_getpartsbysupplier_2(uint64_t supplier_key, row_t *
     }
     assert(item != NULL);
     row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_getpartsbysupplier_3(uint64_t &part_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbysupplier_3(yield_func_t &yield, uint64_t cor_id, uint64_t &part_key, row_t *& r_local) {
   /*
     SELECT PART_KEY FROM USES WHERE supplier_KEY = ?
    */
@@ -919,7 +918,7 @@ inline RC PPSTxnManager::run_getpartsbysupplier_3(uint64_t &part_key, row_t *& r
     DEBUG("Read part_key %ld\n",part_key);
     return RCOK;
 }
-inline RC PPSTxnManager::run_getpartsbysupplier_4(uint64_t part_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbysupplier_4(yield_func_t &yield, uint64_t cor_id, uint64_t part_key, row_t *& r_local) {
   /*
    SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
    */
@@ -929,10 +928,10 @@ inline RC PPSTxnManager::run_getpartsbysupplier_4(uint64_t part_key, row_t *& r_
     item = index_read(index, part_key, parts_to_partition(part_key));
     assert(item != NULL);
     row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, RD, r_local);
+    rc = get_row(yield, r_loc, RD, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_getpartsbysupplier_5(row_t *& r_local) {
+inline RC PPSTxnManager::run_getpartsbysupplier_5(yield_func_t &yield, uint64_t cor_id, row_t *& r_local) {
   /*
    SELECT FIELD1, FIELD2, FIELD3 FROM PARTS WHERE PART_KEY = ?
    */
@@ -941,7 +940,7 @@ inline RC PPSTxnManager::run_getpartsbysupplier_5(row_t *& r_local) {
   return RCOK;
 }
 
-inline RC PPSTxnManager::run_updateproductpart_0(uint64_t product_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_updateproductpart_0(yield_func_t &yield, uint64_t product_key, row_t *& r_local, uint64_t cor_id) {
   /*
     SELECT FIELD1, FIELD2, FIELD3 FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
@@ -952,10 +951,10 @@ inline RC PPSTxnManager::run_updateproductpart_0(uint64_t product_key, row_t *& 
     item = index_read(index, product_key, products_to_partition(product_key));
     assert(item != NULL);
     row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, WR, r_local);
+    rc = get_row(yield, r_loc, WR, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_updateproductpart_1(uint64_t part_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_updateproductpart_1(yield_func_t &yield, uint64_t cor_id, uint64_t part_key, row_t *& r_local) {
   /*
     UPDATE PART_KEY FROM PRODUCTS WHERE PRODUCT_KEY = ?
    */
@@ -964,7 +963,7 @@ inline RC PPSTxnManager::run_updateproductpart_1(uint64_t part_key, row_t *& r_l
   return RCOK;
 }
 
-inline RC PPSTxnManager::run_updatepart_0(uint64_t part_key, row_t *& r_local) {
+inline RC PPSTxnManager::run_updatepart_0(yield_func_t &yield, uint64_t cor_id, uint64_t part_key, row_t *& r_local) {
   /*
     SELECT * FROM PARTS WHERE PART_KEY = :part_key;
    */
@@ -974,10 +973,10 @@ inline RC PPSTxnManager::run_updatepart_0(uint64_t part_key, row_t *& r_local) {
 		item = index_read(index, part_key, parts_to_partition(part_key));
 		assert(item != NULL);
 		row_t* r_loc = (row_t *) item->location;
-    rc = get_row(r_loc, WR, r_local);
+    rc = get_row(yield, r_loc, WR, r_local, cor_id);
     return rc;
 }
-inline RC PPSTxnManager::run_updatepart_1(row_t *& r_local) {
+inline RC PPSTxnManager::run_updatepart_1(yield_func_t &yield, uint64_t cor_id, row_t *& r_local) {
   /*
     SELECT * FROM PARTS WHERE PART_KEY = :part_key;
    */
@@ -988,7 +987,7 @@ inline RC PPSTxnManager::run_updatepart_1(row_t *& r_local) {
   return RCOK;
 }
 
-RC PPSTxnManager::run_calvin_txn() {
+RC PPSTxnManager::run_calvin_txn(yield_func_t &yield, uint64_t cor_id) {
   RC rc = RCOK;
   uint64_t starttime = get_sys_clock();
   PPSQuery* pps_query = (PPSQuery*) query;
@@ -1013,7 +1012,7 @@ RC PPSTxnManager::run_calvin_txn() {
       case CALVIN_LOC_RD:
         // Phase 2: Perform local reads
         DEBUG("(%ld,%ld) local reads\n",txn->txn_id,txn->batch_id);
-        rc = run_pps_phase2();
+        rc = run_pps_phase2(yield, cor_id);
         //release_read_locks(pps_query);
         if (isRecon()) {
             this->phase = CALVIN_DONE;
@@ -1050,7 +1049,7 @@ RC PPSTxnManager::run_calvin_txn() {
         // Phase 5: Execute transaction / perform local writes
         DEBUG("(%ld,%ld) execute writes\n",txn->txn_id,txn->batch_id);
         if (txn->rc == RCOK) {
-            rc = run_pps_phase5();
+            rc = run_pps_phase5(yield, cor_id);
         }
         this->phase = CALVIN_DONE;
         break;
@@ -1067,7 +1066,7 @@ RC PPSTxnManager::run_calvin_txn() {
 }
 
 
-RC PPSTxnManager::run_pps_phase2() {
+RC PPSTxnManager::run_pps_phase2(yield_func_t &yield, uint64_t cor_id) {
     PPSQuery* pps_query = (PPSQuery*) query;
     RC rc = RCOK;
     uint64_t part_key = pps_query->part_key;
@@ -1081,30 +1080,30 @@ RC PPSTxnManager::run_pps_phase2() {
 	switch (pps_query->txn_type) {
     case PPS_GETPART:
         if (part_loc) {
-            rc = run_getpart_0(part_key, row);
-            rc = run_getpart_1(row);
+            rc = run_getpart_0(yield, part_key, row, cor_id);
+            rc = run_getpart_1(yield, cor_id, row);
         }
         break;
     case PPS_GETSUPPLIER:
         if (supplier_loc) {
-            rc = run_getsupplier_0(supplier_key, row);
-            rc = run_getsupplier_1(row);
+            rc = run_getsupplier_0(yield, supplier_key, row, cor_id);
+            rc = run_getsupplier_1(yield, cor_id, row);
         }
         break;
     case PPS_GETPRODUCT:
         if (product_loc) {
-            rc = run_getproduct_0(product_key, row);
-            rc = run_getproduct_1(row);
+            rc = run_getproduct_0(yield, product_key, row, cor_id);
+            rc = run_getproduct_1(yield, cor_id, row);
         }
         break;
     case PPS_GETPARTBYSUPPLIER:
         if (supplier_loc) {
-            rc = run_getpartsbysupplier_0(supplier_key, row);
-            rc = run_getpartsbysupplier_1(row);
-            rc = run_getpartsbysupplier_2(supplier_key, row);
+            rc = run_getpartsbysupplier_0(yield, supplier_key, row, cor_id);
+            rc = run_getpartsbysupplier_1(yield, cor_id, row);
+            rc = run_getpartsbysupplier_2(yield, cor_id, supplier_key, row);
             while (row != NULL) {
                 ++parts_processed_count;
-                rc = run_getpartsbysupplier_3(part_key, row);
+                rc = run_getpartsbysupplier_3(yield, cor_id, part_key, row);
                 if (isRecon()) {
                     pps_query->part_keys.add(part_key);
           } else {
@@ -1115,7 +1114,7 @@ RC PPSTxnManager::run_pps_phase2() {
                         break;
                     }
                 }
-                rc = run_getpartsbysupplier_2(supplier_key, row);
+                rc = run_getpartsbysupplier_2(yield, cor_id, supplier_key, row);
             }
 
         }
@@ -1127,20 +1126,20 @@ RC PPSTxnManager::run_pps_phase2() {
                 part_key = pps_query->part_keys[key];
                 part_loc = GET_NODE_ID(parts_to_partition(part_key)) == g_node_id;
                 if (part_loc) {
-                    rc = run_getpartsbysupplier_4(part_key, row);
-                    rc = run_getpartsbysupplier_5(row);
+                    rc = run_getpartsbysupplier_4(yield, cor_id, part_key, row);
+                    rc = run_getpartsbysupplier_5(yield, cor_id, row);
                 }
             }
         }
         break;
     case PPS_GETPARTBYPRODUCT:
         if (product_loc) {
-            rc = run_getpartsbyproduct_0(product_key, row);
-            rc = run_getpartsbyproduct_1(row);
-            rc = run_getpartsbyproduct_2(product_key, row);
+            rc = run_getpartsbyproduct_0(yield, product_key, row, cor_id);
+            rc = run_getpartsbyproduct_1(yield, cor_id, row);
+            rc = run_getpartsbyproduct_2(yield, cor_id, product_key, row);
             while (row != NULL) {
                 ++parts_processed_count;
-                rc = run_getpartsbyproduct_3(part_key, row);
+                rc = run_getpartsbyproduct_3(yield, cor_id, part_key, row);
                 if (isRecon()) {
                     pps_query->part_keys.add(part_key);
           } else {
@@ -1150,7 +1149,7 @@ RC PPSTxnManager::run_pps_phase2() {
                         break;
                     }
                 }
-                rc = run_getpartsbyproduct_2(product_key, row);
+                rc = run_getpartsbyproduct_2(yield, cor_id, product_key, row);
             }
 
         }
@@ -1162,20 +1161,20 @@ RC PPSTxnManager::run_pps_phase2() {
                 part_key = pps_query->part_keys[key];
                 part_loc = GET_NODE_ID(parts_to_partition(part_key)) == g_node_id;
                 if (part_loc) {
-                    rc = run_getpartsbyproduct_4(part_key, row);
-                    rc = run_getpartsbyproduct_5(row);
+                    rc = run_getpartsbyproduct_4(yield, cor_id, part_key, row);
+                    rc = run_getpartsbyproduct_5(yield, cor_id, row);
                 }
             }
         }
         break;
     case PPS_ORDERPRODUCT:
         if (product_loc) {
-            rc = run_orderproduct_0(product_key, row);
-            rc = run_orderproduct_1(row);
-            rc = run_orderproduct_2(product_key, row);
+            rc = run_orderproduct_0(yield, product_key, row, cor_id);
+            rc = run_orderproduct_1(yield, cor_id, row);
+            rc = run_orderproduct_2(yield, cor_id, product_key, row);
             while (row != NULL) {
                 ++parts_processed_count;
-                rc = run_orderproduct_3(part_key, row);
+                rc = run_orderproduct_3(yield, cor_id, part_key, row);
                 if (isRecon()) {
                     pps_query->part_keys.add(part_key);
           } else {
@@ -1185,7 +1184,7 @@ RC PPSTxnManager::run_pps_phase2() {
                         break;
                     }
                 }
-                rc = run_orderproduct_2(product_key, row);
+                rc = run_orderproduct_2(yield, cor_id, product_key, row);
             }
         }
         break;
@@ -1199,7 +1198,7 @@ RC PPSTxnManager::run_pps_phase2() {
     return rc;
 }
 
-RC PPSTxnManager::run_pps_phase5() {
+RC PPSTxnManager::run_pps_phase5(yield_func_t &yield, uint64_t cor_id) {
     PPSQuery* pps_query = (PPSQuery*) query;
     RC rc = RCOK;
     uint64_t part_key = pps_query->part_key;
@@ -1226,8 +1225,8 @@ RC PPSTxnManager::run_pps_phase5() {
           part_key = pps_query->part_keys[key];
           part_loc = GET_NODE_ID(parts_to_partition(part_key)) == g_node_id;
           if (part_loc) {
-              rc = run_orderproduct_4(part_key, row);
-              rc = run_orderproduct_5(row);
+              rc = run_orderproduct_4(yield, part_key, row, cor_id);
+              rc = run_orderproduct_5(yield, cor_id, row);
           }
       }
       break;
@@ -1235,14 +1234,14 @@ RC PPSTxnManager::run_pps_phase5() {
       if (product_loc) {
 
           DEBUG("UPDATE Product %ld Part %ld\n",product_key,part_key);
-          rc = run_updateproductpart_0(product_key, row);
-          rc = run_updateproductpart_1(part_key, row);
+          rc = run_updateproductpart_0(yield, product_key, row, cor_id);
+          rc = run_updateproductpart_1(yield, cor_id, part_key, row);
       }
       break;
   case PPS_UPDATEPART:
       if (part_loc) {
-          rc = run_updatepart_0(part_key, row);
-          rc = run_updatepart_1(row);
+          rc = run_updatepart_0(yield, cor_id, part_key, row);
+          rc = run_updatepart_1(yield, cor_id, row);
       }
       break;
     default:

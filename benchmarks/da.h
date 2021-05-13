@@ -46,9 +46,9 @@ class DATxnManager : public TxnManager {
   void init(uint64_t thd_id, Workload* h_wl);
   void reset();
   RC acquire_locks();
-  RC run_txn();
+  RC run_txn(yield_func_t &yield, uint64_t cor_id);
   RC run_txn_post_wait();
-  RC run_calvin_txn();
+  RC run_calvin_txn(yield_func_t &yield,uint64_t cor_id);
 
   void copy_remote_items(DAQueryMessage* msg);
 

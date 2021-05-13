@@ -55,23 +55,26 @@ RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
 	RC rc = RCOK;
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	//while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
-	if(!local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
-		return Abort;
-	}
+	// if(!local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
+	// 	return Abort;
+	// }
 	DEBUG("READ %ld -- %ld\n", txn->get_txn_id(), _row->get_primary_key());
 	uint64_t version = 0;	
 	if(type == RD) {
-		for(int cnt = _row->version_cnt - 1; cnt >= _row->version_cnt - 5 && cnt >= 0; cnt--) {
+		for(int cnt = _row->version_cnt; cnt >= _row->version_cnt - 4 && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
-			if(_row->cicada_version[i].Wts > txn->start_ts || _row->cicada_version[i].state == Cicada_ABORTED) {
+			if(_row->cicada_version[i].Wts > txn->get_timestamp() || _row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
 			}
 			if(_row->cicada_version[i].state == Cicada_PENDING) {
 				// --todo !---pendind need wait //
+				
 				rc = WAIT;
 				while(rc == WAIT) {
-					ATOM_CAS(_row->_tid_word,1,0);
-					while (!ATOM_CAS(_row->_tid_word, 0, 1)) {}
+					// local_cas_lock(txn, txn->get_txn_id(), 0);
+					// if(!local_cas_lock(txn, 0, txn->get_txn_id())){
+					// 	return Abort;
+					// }
 					if(_row->cicada_version[i].state == Cicada_PENDING) {
 						rc = WAIT;
 					} else if (_row->cicada_version[i].state == Cicada_ABORTED) {
@@ -81,6 +84,9 @@ RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
 						version = _row->cicada_version[i].key;
 					}
 				}
+				//rc = Abort;
+				// rc = RCOK;
+				// version = _row->cicada_version[i].key;
 			} else {
 				rc = RCOK;
 				version = _row->cicada_version[i].key;
@@ -89,17 +95,20 @@ RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
 		}
 	} else if(type == WR) {
 		assert(_row->version_cnt >= 0);
-		for(int cnt = _row->version_cnt - 1; cnt >= _row->version_cnt - 5 && cnt >= 0; cnt--) {
+		for(int cnt = _row->version_cnt; cnt >= _row->version_cnt - 4 && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
-			if(_row->cicada_version[i].Wts > txn->start_ts || _row->cicada_version[i].Wts > txn->start_ts || _row->cicada_version[i].state == Cicada_ABORTED) {
+			if(_row->cicada_version[i].Wts > txn->get_timestamp() || _row->cicada_version[i].Rts > txn->get_timestamp() || _row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
 			}
 			if(_row->cicada_version[i].state == Cicada_PENDING) {
 				// --todo !---pendind need wait //
+				
 				rc = WAIT;
 				while(rc == WAIT) {
-					ATOM_CAS(_row->_tid_word,1,0);
-					while (!ATOM_CAS(_row->_tid_word, 0, 1)) {}
+					// local_cas_lock(txn, txn->get_txn_id(), 0);
+					// if(!local_cas_lock(txn, 0, txn->get_txn_id())){
+					// 	return Abort;
+					// }
 					if(_row->cicada_version[i].state == Cicada_PENDING) {
 						rc = WAIT;
 					} else if (_row->cicada_version[i].state == Cicada_ABORTED) {
@@ -109,15 +118,17 @@ RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
 						version = _row->cicada_version[i].key;
 					}
 				}
+				// rc = Abort;
+				// rc = RCOK;
+				// version = _row->cicada_version[i].key;
 			} else {
-				if(_row->cicada_version[i].Wts > txn->start_ts || _row->cicada_version[i].Rts > txn->start_ts) {
+				if(_row->cicada_version[i].Wts > txn->get_timestamp() || _row->cicada_version[i].Rts > txn->get_timestamp()) {
 					rc = Abort;
 				} else {
 					rc = RCOK;
 					version = _row->cicada_version[i].key;
 				}
 			}
-			
 		}
 	}
 	txn->version_num.push_back(version);
@@ -125,7 +136,7 @@ RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
 	txn->txn_stats.cc_time += timespan;
 	txn->txn_stats.cc_time_short += timespan;
 	//ATOM_CAS(_row->_tid_word,1,0);
-	local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+	// local_cas_lock(txn, txn->get_txn_id() + 1, 0);
 	return rc;
 }
 
@@ -152,7 +163,7 @@ RC Row_rdma_cicada::commit(uint64_t num, TxnManager * txn, row_t * data) {
 	INC_STATS(txn->get_thd_id(),mtx[33],get_sys_clock() - mtx_wait_starttime);
 	DEBUG("CICADA Commit %ld: %d,%lu -- %ld\n", txn->get_txn_id(), num, txn->get_commit_timestamp(),
 			_row->get_primary_key());
-	_row->cicada_version[num % HIS_CHAIN_NUM].state = Cicada_ABORTED;
+	_row->cicada_version[num % HIS_CHAIN_NUM].state = Cicada_COMMITTED;
 
 	uint64_t txn_commit_ts = txn->get_commit_timestamp();
 	local_cas_lock(txn, txn->get_txn_id() + 1, 0);

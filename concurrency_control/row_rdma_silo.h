@@ -17,8 +17,8 @@ public:
 	void				write(row_t * data, uint64_t tid , ts_t time);
 
 	void 				lock();
-	void 				release(TxnManager * txnMng , uint64_t num);
-	bool				try_lock(TxnManager * txnMng , uint64_t num);
+	void 				release(yield_func_t &yield, TxnManager * txnMng , uint64_t num, uint64_t cor_id);
+	bool				try_lock(yield_func_t &yield, TxnManager * txnMng , uint64_t num, uint64_t cor_id);
 	uint64_t 			get_tid();
 	bool 				assert_lock(uint64_t txn_id){ return _row->_tid_word == txn_id; }
 

@@ -62,24 +62,28 @@ public:
 	void reset();
 	void partial_reset();
   RC acquire_locks();
-	RC run_txn();
+	RC run_txn(yield_func_t &yield, uint64_t cor_id);
+  // RC run_co_txn(yield_func_t &yield, uint64_t cor_id);
   RC run_txn_post_wait();
-	RC run_calvin_txn();
+	RC run_calvin_txn(yield_func_t &yield,uint64_t cor_id);
   void copy_remote_requests(YCSBQueryMessage * msg);
 private:
   void next_ycsb_state();
-  RC run_txn_state();
-  RC send_remote_one_side_request(ycsb_request * req,row_t *& row_local);
+  RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
+  // RC run_co_txn_state(yield_func_t &yield, uint64_t cor_id);
+  RC send_remote_one_side_request(yield_func_t &yield, ycsb_request * req,row_t *& row_local, uint64_t cor_id);
+  // RC co_send_remote_one_side_request(yield_func_t &yield, ycsb_request * reqs, row_t *& row_local, uint64_t cor_id);
   RC mvcc_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC send_timestamp_remote_one_side_request(ycsb_request * req,row_t *& row_local);
 
-  itemid_t* ycsb_read_remote_index(ycsb_request * req);
+  itemid_t* ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id);
+  // itemid_t* co_ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id);
 //   itemid_t* read_remote_index(ycsb_request * req);
 
-  RC run_ycsb_0(ycsb_request * req,row_t *& row_local);
+  RC run_ycsb_0(yield_func_t &yield,ycsb_request * req,row_t *& row_local,uint64_t cor_id);
   RC run_ycsb_1(access_t acctype, row_t * row_local);
-  RC run_ycsb();
+  RC run_ycsb(yield_func_t &yield,uint64_t cor_id);
   bool is_done() ;
   bool is_local_request(uint64_t idx) ;
   RC send_remote_request() ;

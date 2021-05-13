@@ -25,9 +25,9 @@ RC DATxnManager::run_txn_post_wait() {
   return RCOK;
 }
 RC DATxnManager::acquire_locks(){return RCOK;}
-RC DATxnManager::run_calvin_txn(){return RCOK;}
+RC DATxnManager::run_calvin_txn(yield_func_t &yield,uint64_t cor_id){return RCOK;}
 void DATxnManager::reset(){TxnManager::reset();}
-RC DATxnManager::run_txn() {
+RC DATxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #if MODE == SETUP_MODE
   return RCOK;
 #endif
@@ -85,34 +85,34 @@ RC DATxnManager::run_txn() {
 
       switch (txn_type) {
         case DA_WRITE: {
-          rc = get_row(TempRow, WR, row);
+          rc = get_row(yield,TempRow, WR, row,cor_id);
           if(rc == RCOK)
             row->set_value(VALUE, version);
           else
           {
-            rc = start_abort();
+            rc = start_abort(yield, cor_id);
             already_abort_tab.insert(trans_id);
           }
           break;
         }
         case DA_READ: {
-          rc = get_row(TempRow, RD, row);
+          rc = get_row(yield,TempRow, RD, row,cor_id);
           if(rc == RCOK)
             row->get_value(VALUE, value[0]);
           else
           {
-            rc = start_abort();
+            rc = start_abort(yield, cor_id);
             already_abort_tab.insert(trans_id);
           }
           break;
         }
         case DA_COMMIT: {
-          rc=start_commit();
+          rc=start_commit(yield, cor_id);
           break;
         }
         case DA_ABORT: {
           INC_STATS(get_thd_id(), positive_txn_abort_cnt, 1);
-          rc = start_abort();
+          rc = start_abort(yield, cor_id);
           break;
         }
         case DA_SCAN: {
@@ -121,7 +121,7 @@ RC DATxnManager::run_txn() {
             item = index_read(index, item_id, 0);
             assert(item != NULL);
             TempRow = ((row_t *)item->location);
-            rc = get_row(TempRow, WR, row);
+            rc = get_row(yield,TempRow, WR, row,cor_id);
             row->get_value(VALUE, value[i]);
           }
           break;

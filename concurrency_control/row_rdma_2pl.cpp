@@ -45,7 +45,7 @@ bool Row_rdma_2pl::conflict_lock(uint64_t lock_info, lock_t l2, uint64_t& new_lo
     }
 }
 
-RC Row_rdma_2pl::lock_get(lock_t type, TxnManager * txn, row_t * row) {  //本地加锁
+RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row_t * row,uint64_t cor_id) {  //本地加锁
 	assert(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2);
     RC rc;
 #if CC_ALG == RDMA_NO_WAIT
@@ -66,19 +66,24 @@ atomic_retry_lock:
     //RDMA CAS，不用本地CAS
         uint64_t loc = g_node_id;
         uint64_t thd_id = txn->get_thd_id();
-		uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-		auto mr = client_rm_handler->get_reg_attr().value();
 
-		rdmaio::qp::Op<> op;
-		op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(lock_info,new_lock_info);
-		assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
-		auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+        uint64_t try_lock = -1;
+        try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,lock_info,new_lock_info,cor_id);
 
-		RDMA_ASSERT(res_s2 == IOCode::Ok);
-		auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-		RDMA_ASSERT(res_p2 == IOCode::Ok);
+		// uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+		// auto mr = client_rm_handler->get_reg_attr().value();
 
-		if(*tmp_buf2 != lock_info){ //如果CAS失败，原子性被破坏	
+		// rdmaio::qp::Op<> op;
+		// op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(lock_info,new_lock_info);
+		// assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
+		// auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+
+		// RDMA_ASSERT(res_s2 == IOCode::Ok);
+		// auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+		// RDMA_ASSERT(res_p2 == IOCode::Ok);
+
+		//if(*tmp_buf2 != lock_info){ //如果CAS失败，原子性被破坏	
+		if(try_lock != lock_info){ //如果CAS失败，原子性被破坏	
 #if DEBUG_PRINTF
             printf("---atomic_retry_lock\n");
 #endif 
@@ -111,20 +116,24 @@ atomic_retry_lock:
 #if CC_ALG == RDMA_NO_WAIT2
     //RDMA CAS，不用本地CAS
         uint64_t loc = g_node_id;
-        uint64_t thd_id = txn->get_thd_id();
-		uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-		auto mr = client_rm_handler->get_reg_attr().value();
+        uint64_t try_lock = -1;
+        try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,1,cor_id);
 
-		rdmaio::qp::Op<> op;
-		op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(0,1);
-		assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
-		auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+        // uint64_t thd_id = txn->get_thd_id();
+		// uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+		// auto mr = client_rm_handler->get_reg_attr().value();
 
-		RDMA_ASSERT(res_s2 == IOCode::Ok);
-		auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-		RDMA_ASSERT(res_p2 == IOCode::Ok);
+		// rdmaio::qp::Op<> op;
+		// op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(0,1);
+		// assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
+		// auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
 
-		if(*tmp_buf2 != 0) rc = Abort; //加锁冲突，Abort	
+		// RDMA_ASSERT(res_s2 == IOCode::Ok);
+		// auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+		// RDMA_ASSERT(res_p2 == IOCode::Ok);
+
+		// if(*tmp_buf2 != 0) rc = Abort; //加锁冲突，Abort	
+		if(try_lock != 0) rc = Abort; //加锁冲突，Abort	
         else{   //加锁成功
 #if DEBUG_PRINTF
         printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: 0, new_lock_info: 1\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id());
@@ -144,21 +153,25 @@ atomic_retry_lock:
     		//直接RDMA CAS加锁
 local_retry_lock:
         uint64_t loc = g_node_id;
-        uint64_t thd_id = txn->get_thd_id();
-		uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-		auto mr = client_rm_handler->get_reg_attr().value();
-        uint64_t tts = txn->get_timestamp();
+        uint64_t try_lock = -1;
+        try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,tts,cor_id);
 
-		rdmaio::qp::Op<> op;
-		op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(0,tts);
-		assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
-		auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+        // uint64_t thd_id = txn->get_thd_id();
+		// uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+		// auto mr = client_rm_handler->get_reg_attr().value();
+        // uint64_t tts = txn->get_timestamp();
 
-		RDMA_ASSERT(res_s2 == IOCode::Ok);
-		auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-		RDMA_ASSERT(res_p2 == IOCode::Ok);
+		// rdmaio::qp::Op<> op;
+		// op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(0,tts);
+		// assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
+		// auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
 
-		if(*tmp_buf2 != 0){ //如果CAS失败
+		// RDMA_ASSERT(res_s2 == IOCode::Ok);
+		// auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+		// RDMA_ASSERT(res_p2 == IOCode::Ok);
+
+		// if(*tmp_buf2 != 0){ //如果CAS失败
+		if(try_lock != 0){ //如果CAS失败
 			if(tts <= *tmp_buf2){  //wait
 #if DEBUG_PRINTF
             printf("---local_retry_lock\n");

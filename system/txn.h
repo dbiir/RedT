@@ -24,10 +24,13 @@
 #include "row_rdma_maat.h"
 #include "rdma_maat.h"
 #include "transport/message.h"
+#include "worker_thread.h"
+#include "routine.h"
 //#include "wl.h"
 
 class Workload;
 class Thread;
+class WorkerThread;
 class row_t;
 class table_t;
 class BaseQuery;
@@ -162,15 +165,25 @@ public:
 	void clear();
 	void reset_query();
 	void release();
+#if USE_COROUTINE
+    WorkerThread * h_thd;
+	uint64_t _cor_id;
+#else
 	Thread * h_thd;
+#endif
 	Workload * h_wl;
 
-	virtual RC      run_txn() = 0;
+	virtual RC      run_txn(yield_func_t &yield, uint64_t cor_id) = 0;
 	virtual RC      run_txn_post_wait() = 0;
-	virtual RC      run_calvin_txn() = 0;
+	virtual RC      run_calvin_txn(yield_func_t &yield,uint64_t cor_id) = 0;
 	virtual RC      acquire_locks() = 0;
 	virtual RC 		send_remote_request() = 0;
+	#if !USE_COROUTINE
 	void            register_thread(Thread * h_thd);
+	#else
+	void            register_thread(WorkerThread * h_thd, uint64_t cor_id);
+	#endif
+	void            register_coroutine(WorkerThread * h_thd, uint64_t cor_id);
 	uint64_t        get_thd_id();
 	Workload *      get_wl();
 	void            set_txn_id(txnid_t txn_id);
@@ -191,12 +204,12 @@ public:
 	uint64_t        incr_lr();
 	uint64_t        decr_lr();
 
-	RC commit();
-	RC start_commit();
-	RC start_abort();
-	RC abort();
+	RC commit(yield_func_t &yield, uint64_t cor_id);
+	RC start_commit(yield_func_t &yield, uint64_t cor_id);
+	RC start_abort(yield_func_t &yield, uint64_t cor_id);
+	RC abort(yield_func_t &yield, uint64_t cor_id);
 
-	void release_locks(RC rc);
+	void release_locks(yield_func_t &yield, RC rc, uint64_t cor_id);
 
 bool rdma_one_side() {
   if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL) return true;
@@ -208,15 +221,29 @@ bool rdma_one_side() {
 #if CC_ALG == RDMA_MAAT
     RdmaTimeTableNode * read_remote_timetable(uint64_t target_server,uint64_t remote_offset);
 #endif
+
     bool write_remote_row(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content);
     bool write_remote_index(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content);
-    bool write_unlock_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf);
+    bool write_unlock_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf);//TODO
 
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
-    bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
-
+     bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
 	row_t * cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap);
+
+//***********coroutine**********//
+	row_t * read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
+    itemid_t * read_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t key, uint64_t cor_id);
+#if CC_ALG == RDMA_MAAT
+    RdmaTimeTableNode * read_remote_timetable(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset, uint64_t cor_id);
+#endif
+
+    bool write_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *local_buf, uint64_t cor_id);
+    bool write_remote_index(yield_func_t &yield,uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content, uint64_t cor_id);
+
+    uint64_t cas_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t old_value, uint64_t new_value, uint64_t cor_id);
+    bool loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value, uint64_t cor_id);
+	row_t * cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap, uint64_t cor_id);
 
 	bool isRecon() {
 		assert(CC_ALG == CALVIN || !recon);
@@ -272,8 +299,8 @@ bool rdma_one_side() {
 #endif
 	bool aborted;
 	uint64_t return_id;
-	RC        validate();
-	void            cleanup(RC rc);
+	RC        validate(yield_func_t &yield, uint64_t cor_id);
+	void            cleanup(yield_func_t &yield, RC rc, uint64_t cor_id);
 	void            cleanup_row(RC rc,uint64_t rid);
 	void release_last_row_lock();
 	RC send_remote_reads();
@@ -386,7 +413,8 @@ protected:
 	itemid_t *      index_read(INDEX * index, idx_key_t key, int part_id);
 	itemid_t *      index_read(INDEX * index, idx_key_t key, int part_id, int count);
 	RC get_lock(row_t * row, access_t type);
-	RC get_row(row_t * row, access_t type, row_t *& row_rtn);
+	//RC get_row(row_t * row, access_t type, row_t *& row_rtn);
+    RC get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& row_rtn,uint64_t cor_id);
 	RC get_row_post_wait(row_t *& row_rtn);
 
 	// For Waiting

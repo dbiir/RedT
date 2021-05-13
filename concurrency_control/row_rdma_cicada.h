@@ -30,10 +30,10 @@ struct RdmaCicadaVersion{
 	CicadaState state;
   // char data[ROW_DEFAULT_SIZE];
 
-	void init(uint64_t key) {
+	void init(uint64_t key, uint64_t rts, uint64_t wts) {
 		this->key = key;
-		Rts = 0;
-		Wts = get_sys_clock();
+		Rts = rts;
+		Wts = wts;
 		state = Cicada_PENDING;
 	}
 };

@@ -27,6 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
+#define USE_COROUTINE false
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -72,9 +73,10 @@
 // Simulation + Hardware
 /***********************************************/
 #define NODE_CNT 4
-#define THREAD_CNT 16
+#define THREAD_CNT 40
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
+#define COROUTINE_CNT 16
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
@@ -142,7 +144,7 @@
 /***********************************************/
 #define TPORT_TYPE tcp
 #define TPORT_PORT 7000
-#define TPORT_TWOSIDE_PORT 13000
+#define TPORT_TWOSIDE_PORT 15000
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -170,7 +172,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_SILO
+#define CC_ALG RDMA_NO_WAIT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000

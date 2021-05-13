@@ -117,8 +117,11 @@ void * Rdma::client_qp(void *arg){
   RDMA_ASSERT(fetch_res == IOCode::Ok) << std::get<0>(fetch_res.desc);
   rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);
   remote_mr_attr[node_id] = std::get<1>(fetch_res.desc);
-
+#if USE_COROUTINE
+	for(int thread_id = 0;thread_id < g_thread_cnt * (COROUTINE_CNT + 1); thread_id ++){
+#else
   for(int thread_id = 0;thread_id < g_thread_cnt ; thread_id ++){
+#endif
 	rc_qp[node_id][thread_id] = RDMARC::create(nic, QPConfig()).value();
 
 	qp_name[node_id][thread_id] = "client-qp" + std::to_string(g_node_id) + std::to_string(node_id) + std::to_string(thread_id);
@@ -174,14 +177,14 @@ char* Rdma::get_index_client_memory(uint64_t thd_id) {
 }
 
 char* Rdma::get_row_client_memory(uint64_t thd_id) {
-	char* temp = (char *)(client_rdma_rm->raw_ptr + sizeof(IndexInfo) * g_thread_cnt);
+	char* temp = (char *)(client_rdma_rm->raw_ptr + sizeof(IndexInfo) * g_thread_cnt * (COROUTINE_CNT + 1));
     temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * thd_id;
     return temp;
 }
 
 char* Rdma::get_table_client_memory(uint64_t thd_id) {
-	char* temp = (char *)(client_rdma_rm->raw_ptr + sizeof(IndexInfo) * g_thread_cnt);
- 	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * g_thread_cnt;
+	char* temp = (char *)(client_rdma_rm->raw_ptr + sizeof(IndexInfo) * g_thread_cnt * (COROUTINE_CNT + 1));
+ 	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * g_thread_cnt * (COROUTINE_CNT + 1);
   	temp += sizeof(table_t) * thd_id;
   	return temp;
 }
@@ -247,8 +250,11 @@ void Rdma::init(){
 
 	uint64_t thread_num = 0;
 	uint64_t node_id = 0;
+#if USE_COROUTINE
+	pthread_t *client_thread = new pthread_t[g_total_node_cnt * g_thread_cnt * (COROUTINE_CNT + 1)];
+#else
 	pthread_t *client_thread = new pthread_t[g_total_node_cnt * g_thread_cnt];
-
+#endif
 	pthread_t server_thread;
 	printf("g_total_node_cnt = %d",g_total_node_cnt);
 

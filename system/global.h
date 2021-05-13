@@ -218,12 +218,12 @@ extern rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
 extern std::vector<rdmaio::ConnectManager> cm;
 extern rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
 extern rdmaio::Arc<rdmaio::RNic> nic;
-extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT];
+extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
 
 extern rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
 
 extern string rdma_server_add[NODE_CNT];
-extern string qp_name[NODE_CNT][THREAD_CNT];
+extern string qp_name[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
 
 //extern rdmaio::ConnectManager cm[NODE_CNT];
 //extern r2::Allocator *r2_allocator;
