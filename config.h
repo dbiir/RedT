@@ -27,7 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-#define USE_COROUTINE false
+#define USE_COROUTINE true
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -73,7 +73,7 @@
 // Simulation + Hardware
 /***********************************************/
 #define NODE_CNT 4
-#define THREAD_CNT 40
+#define THREAD_CNT 36
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 16

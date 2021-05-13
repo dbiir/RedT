@@ -71,10 +71,10 @@ public:
         printf("start routine 0\n");
         _routines[0]();
     }
-    u_int64_t _cor_id = 0;
+    uint64_t _cor_id = 0;
     
     int total_worker_coroutine = 0;
-
+    uint64_t last_yield_time;
 
 private:
 #if USE_COROUTINE

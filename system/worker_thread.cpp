@@ -625,8 +625,11 @@ void WorkerThread::master_routine(yield_func_t &yield, int cor_id) {
     printf("This is new master routine\n");
     //yield(_routines[1]);
     while(!simulation->is_done()) {
+        last_yield_time = get_sys_clock();
         yield(_routines[1]);
-        
+        uint64_t yield_endtime = get_sys_clock();
+        INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - last_yield_time);
+        DEL_STATS(get_thd_id(), worker_process_time, yield_endtime - last_yield_time);
         for(uint64_t i = 1; i <= COROUTINE_CNT; i++)
         {
             // yield(_routines[i]);

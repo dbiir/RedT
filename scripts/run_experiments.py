@@ -203,7 +203,7 @@ for exp in exps:
 
     tcnt = []
     for e in experiments:
-        tcnt.append(e[-5])
+        tcnt.append(e[-6])
     tcnt = sorted(list(set(tcnt)))
 
     sk = []
