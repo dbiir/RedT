@@ -88,6 +88,7 @@ private:
 // #endif
     ts_t        _curr_ts;
     ts_t        get_next_ts();
+    ts_t        co_get_next_ts(uint64_t cor_id);
 };
 
 class WorkerNumThread : public Thread {

@@ -1130,13 +1130,13 @@ if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
       #if WORKLOAD == DA //mvcc use timestamp
         if (da_stamp_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
         {
-          da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]=get_next_ts();
+          da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]=co_get_next_ts(cor_id);
           cor_txn_man[cor_id]->set_timestamp(da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
         }
         else
         cor_txn_man[cor_id]->set_timestamp(da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
       #else
-      cor_txn_man[cor_id]->set_timestamp(get_next_ts());
+      cor_txn_man[cor_id]->set_timestamp(co_get_next_ts(cor_id));
       #endif
     }
     cor_txn_man[cor_id]->txn_stats.starttime = get_sys_clock();
@@ -1164,13 +1164,13 @@ if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
     #if WORKLOAD==DA //mvcc use timestamp
       if(da_stamp_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
       {
-        da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]=get_next_ts();
+        da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]=co_get_next_ts(cor_id);
         cor_txn_man[cor_id]->set_timestamp(da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
       }
       else
         cor_txn_man[cor_id]->set_timestamp(da_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
     #else
-      cor_txn_man[cor_id]->set_timestamp(get_next_ts());
+      cor_txn_man[cor_id]->set_timestamp(co_get_next_ts(cor_id));
     #endif
     }
 
@@ -1183,13 +1183,13 @@ if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
   #if WORKLOAD==DA
     if(da_start_stamp_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
     {
-      da_start_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]=get_next_ts();
+      da_start_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]=co_get_next_ts(cor_id);
       cor_txn_man[cor_id]->set_start_timestamp(da_start_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
     }
     else
       cor_txn_man[cor_id]->set_start_timestamp(da_start_stamp_tab[cor_txn_man[cor_id]->get_txn_id()]);
   #else
-      cor_txn_man[cor_id]->set_start_timestamp(get_next_ts());
+      cor_txn_man[cor_id]->set_start_timestamp(co_get_next_ts(cor_id));
   #endif
 #endif
 #if CC_ALG == WSI || CC_ALG == SSI
@@ -1503,6 +1503,21 @@ ts_t WorkerThread::get_next_ts() {
 		return _curr_ts - 1;
 	} else {
 		_curr_ts = glob_manager.get_ts(get_thd_id());
+		return _curr_ts;
+	}
+}
+ts_t WorkerThread::co_get_next_ts(uint64_t cor_id) {
+	if (g_ts_batch_alloc) {
+		if (_curr_ts % g_ts_batch_num == 0) {
+			_curr_ts = glob_manager.get_ts(get_thd_id());
+			_curr_ts ++;
+		} else {
+			_curr_ts ++;
+		}
+		return _curr_ts - 1;
+	} else {
+		_curr_ts = glob_manager.get_ts(get_thd_id());
+    _curr_ts = _curr_ts * COROUTINE_CNT + cor_id;
 		return _curr_ts;
 	}
 }
