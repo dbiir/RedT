@@ -217,6 +217,9 @@ public:
   // Worker thread
   double worker_idle_time;
   double worker_yield_time;
+  double worker_msg_time;
+  double worker_waitcomp_time;
+  uint64_t worker_yield_cnt;
   double worker_activate_txn_time;
   double worker_deactivate_txn_time;
   double worker_release_msg_time;

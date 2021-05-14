@@ -239,11 +239,14 @@ void Stats_thd::clear() {
   // Worker thread
   worker_idle_time=0;
   worker_yield_time=0;
+  worker_msg_time=0;
+  worker_waitcomp_time=0;
   worker_activate_txn_time=0;
   worker_deactivate_txn_time=0;
   worker_release_msg_time=0;
   worker_process_time=0;
   worker_process_cnt=0;
+  worker_yield_cnt=0;
   for(uint64_t i = 0; i < NO_MSG; i ++) {
     worker_process_cnt_by_type[i]=0;
     worker_process_time_by_type[i]=0;
@@ -880,13 +883,16 @@ void Stats_thd::print(FILE * outf, bool prog) {
   fprintf(outf,
     ",worker_idle_time=%f"
     ",worker_yield_time=%f"
+    ",worker_msg_time=%f"
+    ",worker_waitcomp_time=%f"
+    ",worker_yield_cnt=%ld"
     ",worker_activate_txn_time=%f"
     ",worker_deactivate_txn_time=%f"
     ",worker_release_msg_time=%f"
     ",worker_process_time=%f"
     ",worker_process_cnt=%ld"
           ",worker_process_avg_time=%f",
-          worker_idle_time / BILLION, worker_yield_time / BILLION, worker_activate_txn_time / BILLION,
+          worker_idle_time / BILLION, worker_yield_time / BILLION, worker_msg_time / BILLION, worker_waitcomp_time / BILLION, worker_yield_cnt, worker_activate_txn_time / BILLION,
           worker_deactivate_txn_time / BILLION, worker_release_msg_time / BILLION,
           worker_process_time / BILLION, worker_process_cnt, worker_process_avg_time / BILLION);
   for(uint64_t i = 0; i < NO_MSG; i ++) {
@@ -1539,6 +1545,9 @@ void Stats_thd::combine(Stats_thd * stats) {
   // Worker thread
   worker_idle_time+=stats->worker_idle_time;
   worker_yield_time+=stats->worker_yield_time;
+  worker_msg_time+=stats->worker_msg_time;
+  worker_waitcomp_time+=stats->worker_waitcomp_time;
+  worker_yield_cnt+=stats->worker_yield_cnt;
   worker_activate_txn_time+=stats->worker_activate_txn_time;
   worker_deactivate_txn_time+=stats->worker_deactivate_txn_time;
   worker_release_msg_time+=stats->worker_release_msg_time;

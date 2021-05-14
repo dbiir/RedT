@@ -73,7 +73,7 @@
 // Simulation + Hardware
 /***********************************************/
 #define NODE_CNT 4
-#define THREAD_CNT 24
+#define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 32

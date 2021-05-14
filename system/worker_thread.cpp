@@ -544,6 +544,7 @@ RC WorkerThread::co_run(yield_func_t &yield, uint64_t cor_id) {
     simulation->last_da_query_time = get_sys_clock();
     if(idle_starttime > 0) {
       INC_STATS(_thd_id,worker_idle_time,get_sys_clock() - idle_starttime);
+      INC_STATS(_thd_id,worker_msg_time,get_sys_clock() - idle_starttime);
       idle_starttime = 0;
     }
     //uint64_t starttime = get_sys_clock();
@@ -645,28 +646,29 @@ void WorkerThread::master_routine(yield_func_t &yield, int cor_id) {
         uint64_t yield_endtime = get_sys_clock();
         INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - last_yield_time);
         INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - last_yield_time);
-        uint64_t starttime;
-        uint64_t endtime;
-        starttime = get_sys_clock();
-        for(uint64_t i = 1; i <= COROUTINE_CNT; i++)
+        INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+        // uint64_t starttime;
+        // uint64_t endtime;
+        // starttime = get_sys_clock();
+        // for(uint64_t i = 1; i <= COROUTINE_CNT; i++)
         {
             // yield(_routines[i]);
             
             
-            uint64_t target_server = un_res_p.front().first;
-            uint64_t thd_id = un_res_p.front().second;
-            // printf("sever:%ld thd_id:%ld", target_server, thd_id);
-            un_res_p.pop();
-            auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-            RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+            // uint64_t target_server = un_res_p.front().first;
+            // uint64_t thd_id = un_res_p.front().second;
+            // // printf("sever:%ld thd_id:%ld", target_server, thd_id);
+            // un_res_p.pop();
+            // auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+            // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
             
 
             
         // auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
             // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
         }
-        endtime = get_sys_clock();
-        INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+        // endtime = get_sys_clock();
+        // INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
     }
     printf("FINISH %ld:%ld:%ld\n",_node_id,_thd_id, cor_id);
     fflush(stdout);
