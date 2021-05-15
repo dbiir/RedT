@@ -371,3 +371,6 @@ int g_init_cnt = 0;
 
 int total_num_atomic_retry = 0;  
 int max_num_atomic_retry = 0;
+
+//the maximum number of doorbell batched row
+int max_batch_index = REQ_PER_QUERY; 

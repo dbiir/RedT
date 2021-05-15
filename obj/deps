@@ -784,7 +784,8 @@ obj/rdma_2pl.o: concurrency_control/rdma_2pl.cpp system/helper.h \
  concurrency_control/row_rdma_maat.h transport/message.h system/logger.h \
  system/array.h system/worker_thread.h system/thread.h system/routine.h \
  transport/rdma.h transport/nn.hpp rlibv2/qps/op.hh \
- concurrency_control/rdma_2pl.h concurrency_control/row_rdma_2pl.h
+ concurrency_control/rdma_2pl.h concurrency_control/row_rdma_2pl.h \
+ benchmarks/dbpa.hpp
 obj/rdma_cicada.o: concurrency_control/rdma_cicada.cpp system/global.h \
  config.h statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/global.h system/helper.h \

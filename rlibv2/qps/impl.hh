@@ -133,11 +133,10 @@ public:
     qp_init_attr.recv_cq = recv_cq;
     qp_init_attr.qp_type = type;
     qp_init_attr.sq_sig_all = 0;
-
     qp_init_attr.cap.max_send_wr = config.max_send_sz();
     qp_init_attr.cap.max_recv_wr = config.max_recv_sz();
-    qp_init_attr.cap.max_send_sge = 1;
-    qp_init_attr.cap.max_recv_sge = 1;
+    qp_init_attr.cap.max_send_sge = 10;
+    qp_init_attr.cap.max_recv_sge = 10;
     qp_init_attr.cap.max_inline_data = kMaxInlinSz;
 
     auto qp = ibv_create_qp(nic->get_pd(), &qp_init_attr);

@@ -81,7 +81,6 @@ public:
     qp_init_attr.send_cq = send_cq;
     qp_init_attr.recv_cq = recv_cq;
     qp_init_attr.qp_type = type;
-
     qp_init_attr.cap.max_send_wr = config.max_send_size;
     qp_init_attr.cap.max_recv_wr = config.max_recv_size;
     qp_init_attr.cap.max_send_sge = 1;

@@ -27,7 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-#define USE_COROUTINE true
+#define USE_COROUTINE false
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -178,8 +178,8 @@
 #define QUEUE_C  APACITY_NEW 1000000
 
 #define DEBUG_PRINTF  false
-#define ENABLE_DBPA  false
-
+#define USE_DBPA  true
+#define USE_OR true 
 /***********************************************/
 // USE RDMA
 /**********************************************/

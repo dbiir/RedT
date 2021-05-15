@@ -229,8 +229,9 @@ bool rdma_one_side() {
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
      bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
+#if USE_DBPA
 	row_t * cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap);
-
+#endif
 //***********coroutine**********//
 	row_t * read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
     itemid_t * read_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t key, uint64_t cor_id);
@@ -243,7 +244,6 @@ bool rdma_one_side() {
 
     uint64_t cas_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t old_value, uint64_t new_value, uint64_t cor_id);
     bool loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value, uint64_t cor_id);
-	row_t * cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap, uint64_t cor_id);
 
 	bool isRecon() {
 		assert(CC_ALG == CALVIN || !recon);

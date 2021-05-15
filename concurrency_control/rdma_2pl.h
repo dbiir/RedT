@@ -15,7 +15,7 @@ private:
     void remote_write_and_unlock(yield_func_t &yield,RC rc, TxnManager * txnMng , uint64_t num,uint64_t cor_id);
     void unlock(yield_func_t &yield,row_t * row , TxnManager * txnMng,uint64_t cor_id);
     void remote_unlock(yield_func_t &yield,TxnManager * txnMng , uint64_t num,uint64_t cor_id);
-    
+	void batch_unlock_remote(int loc, RC rc, TxnManager * txnMng , vector<uint64_t> remote_access);
 
 };
 

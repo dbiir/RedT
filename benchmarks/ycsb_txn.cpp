@@ -274,7 +274,7 @@ if(req->acctype == RD || req->acctype == WR){
 
 		uint64_t new_lock_info;
 		uint64_t lock_info;
-#if ENABLE_DBPA
+#if USE_DBPA
 		row_t * test_row = NULL;
 #endif
 		if(req->acctype == RD){ //读集元素
@@ -295,17 +295,18 @@ remote_atomic_retry_lock:
 				return Abort;
 			}
 			assert(new_lock_info!=0);
-#if ENABLE_DBPA
-            uint64_t try_lock = -1;
-            test_row = cas_and_read_remote(try_lock,loc,m_item->offset,lock_info,new_lock_info);
-            if(try_lock != lock_info){ //CAS fail: Atomicity violated
-                num_atomic_retry++;
-                total_num_atomic_retry++;
-                if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
-                mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-                lock_info = try_lock;
-                goto remote_atomic_retry_lock;
-            }
+#if USE_DBPA
+			uint64_t try_lock = -1;
+			test_row = cas_and_read_remote(try_lock,loc,m_item->offset,lock_info,new_lock_info);
+			if(try_lock != lock_info){ //CAS fail: Atomicity violated
+				num_atomic_retry++;
+				total_num_atomic_retry++;
+				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
+				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				lock_info = try_lock;
+				goto remote_atomic_retry_lock;
+			}
+			assert(test_row->get_primary_key() == req->key);
 #else
             uint64_t try_lock = -1;
             try_lock = cas_remote_content(yield,loc,m_item->offset,lock_info,new_lock_info,cor_id);
@@ -317,12 +318,15 @@ remote_atomic_retry_lock:
                     lock_info = try_lock;
                     goto remote_atomic_retry_lock;
             }
+			//read remote data
+        	row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+        	assert(test_row->get_primary_key() == req->key);
 #endif
 		}
 		else{ //写集元素直接CAS即可，不需要RDMA READ
 			lock_info = 0; //只有lock_info==0时才可以CAS，否则加写锁失败，Abort
 			new_lock_info = 3; //二进制11，即1个写锁
-#if ENABLE_DBPA
+#if USE_DBPA
 			uint64_t try_lock;
 			test_row = cas_and_read_remote(try_lock,loc,m_item->offset,lock_info,new_lock_info);
 			if(try_lock != lock_info){ //CAS fail: lock conflict. Ignore read content 
@@ -334,8 +338,8 @@ remote_atomic_retry_lock:
 				return Abort; //原子性被破坏，CAS失败			
 			}	
 			//CAS success, now get read content
+			assert(test_row->get_primary_key() == req->key);
 #else
-			//RDMA CAS加锁
 			uint64_t try_lock = -1;
 			try_lock = cas_remote_content(yield,loc,m_item->offset,lock_info,new_lock_info,cor_id);
 			if(try_lock != lock_info){ //如果CAS失败:对写集元素来说,即已经有锁;
@@ -345,15 +349,12 @@ remote_atomic_retry_lock:
 				mem_allocator.free(m_item, sizeof(itemid_t));
 				return Abort; //原子性被破坏，CAS失败			
 			}	
-           
+			//read remote data
+			row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+			assert(test_row->get_primary_key() == req->key);   
 #endif
 		}
 
-#if !ENABLE_DBPA
-		//read remote data
-        row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
-        assert(test_row->get_primary_key() == req->key);
-#endif
         //preserve the txn->access
         access_t type = req->acctype;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
@@ -368,7 +369,7 @@ remote_atomic_retry_lock:
 #if CC_ALG == RDMA_NO_WAIT2
 if(req->acctype == RD || req->acctype == WR){
 		uint64_t tts = get_timestamp();
-#if ENABLE_DBPA
+#if USE_DBPA
 		//cas result
 		uint64_t try_lock;
 		//read result
@@ -384,10 +385,13 @@ if(req->acctype == RD || req->acctype == WR){
 		}
 		//CAS success, now get read content
 		assert(test_row->_tid_word == 1);		
+        assert(test_row->get_primary_key() == req->key);
 #if DEBUG_PRINTF
 		printf("---thread id：%lu, remote lock success，lock location: %lu; %p, txn id: %lu,original lock_info: 0, new_lock_info: 1\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id());
 #endif
-#else
+#endif
+
+#if !USE_DBPA 
         uint64_t try_lock = -1;
         try_lock = cas_remote_content(yield,loc,m_item->offset,0,1,cor_id);
 
@@ -399,10 +403,6 @@ if(req->acctype == RD || req->acctype == WR){
 
 			return Abort;
 		}
-
-#endif
-
-#if !ENABLE_DBPA 
         row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
         assert(test_row->get_primary_key() == req->key);
 #endif
@@ -418,7 +418,7 @@ if(req->acctype == RD || req->acctype == WR){
 if(req->acctype == RD || req->acctype == WR){
 		uint64_t tts = get_timestamp();
 
-#if ENABLE_DBPA
+#if USE_DBPA
 retry_lock:
 		uint64_t try_lock;
 		row_t* test_row = cas_and_read_remote(try_lock,loc,m_item->offset,0,tts);
@@ -440,7 +440,10 @@ retry_lock:
 				return Abort;			
 			}
 		}
-#else		
+		assert(test_row->get_primary_key() == req->key);
+#endif
+
+#if !USE_DBPA 
 retry_lock:
         uint64_t try_lock = -1;
         try_lock = cas_remote_content(yield,loc,m_item->offset,0,tts,cor_id);
@@ -463,8 +466,6 @@ retry_lock:
 				return Abort;
 			}
 		}
-#endif
-#if !ENABLE_DBPA 
         row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
         assert(test_row->get_primary_key() == req->key);
 #endif

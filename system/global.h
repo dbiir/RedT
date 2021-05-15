@@ -518,3 +518,5 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 
 extern int total_num_atomic_retry;  
 extern int max_num_atomic_retry;
+
+extern int max_batch_index;

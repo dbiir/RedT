@@ -1507,56 +1507,24 @@ void TxnManager::release_locks(yield_func_t &yield, RC rc, uint64_t cor_id) {
 	uint64_t timespan = (get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(), txn_cleanup_time,  timespan);
 }
-#if ENABLE_DBPA
+#if USE_DBPA
 row_t * TxnManager::cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap){
 	uint64_t thd_id = get_thd_id();
 	uint64_t *local_buf1 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-	char *local_buf2 = Rdma::get_row_client_memory2(thd_id);
+	char *local_buf2 = Rdma::get_row_client_memory(thd_id,2);
 	uint64_t read_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
 
-	uint64_t starttime;
-	uint64_t endtime;
-	starttime = get_sys_clock();
-
-	RDMACASRead dbreq;
-	dbreq.set_cas_meta(compare,swap,local_buf1);
-	dbreq.set_read_meta(local_buf2,read_size);
-	auto dbres = dbreq.post_reqs(rc_qp[target_server][thd_id],(uint64_t)(remote_mr_attr[target_server].buf + remote_offset));
+	DBrequests dbreq(2);
+	dbreq.init();
+	dbreq.set_atomic_meta(0,compare,swap,local_buf1,(uint64_t)(remote_mr_attr[target_server].buf + remote_offset));
+	dbreq.set_rdma_meta(1, IBV_WR_RDMA_READ, read_size, local_buf2, (uint64_t)(remote_mr_attr[target_server].buf + remote_offset));
+	auto dbres = dbreq.post_reqs(rc_qp[target_server][thd_id]);
 
 	//only one signaled request need to be polled
 	RDMA_ASSERT(dbres == IOCode::Ok);
 	auto dbres1 = rc_qp[target_server][thd_id]->wait_one_comp();
 	RDMA_ASSERT(dbres1 == IOCode::Ok);
-
-	endtime = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
-
-	try_lock = *local_buf1;
-	row_t *test_row = (row_t *)mem_allocator.alloc(read_size);
-    memcpy(test_row, local_buf2, read_size);
-    return test_row;
-}
-row_t * TxnManager::cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap, uint64_t cor_id){
-	uint64_t thd_id = get_thd_id();
-	uint64_t *local_buf1 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-	char *local_buf2 = Rdma::get_row_client_memory2(thd_id);
-	uint64_t read_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-
-	RDMACASRead dbreq;
-	dbreq.set_cas_meta(compare,swap,local_buf1);
-	dbreq.set_read_meta(local_buf2,read_size);
-	auto dbres = dbreq.post_reqs(rc_qp[target_server][thd_id],(uint64_t)(remote_mr_attr[target_server].buf + remote_offset));
-
-	//only one signaled request need to be polled
-	RDMA_ASSERT(dbres == IOCode::Ok);
-	auto dbres1 = rc_qp[target_server][thd_id]->wait_one_comp();
-	RDMA_ASSERT(dbres1 == IOCode::Ok);
-
-	endtime = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
-
+	
 	try_lock = *local_buf1;
 	row_t *test_row = (row_t *)mem_allocator.alloc(read_size);
     memcpy(test_row, local_buf2, read_size);

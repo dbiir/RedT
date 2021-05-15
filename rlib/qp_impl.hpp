@@ -231,7 +231,6 @@ class RCQPImpl {
     qp_init_attr.send_cq = cq;
     qp_init_attr.recv_cq = cq; // TODO, need seperate handling for two-sided over RC QP
     qp_init_attr.qp_type = IBV_QPT_RC;
-
     qp_init_attr.cap.max_send_wr = RC_MAX_SEND_SIZE;
     qp_init_attr.cap.max_recv_wr = RC_MAX_RECV_SIZE;	/* Can be set to 1, if RC Two-sided is not required */
     qp_init_attr.cap.max_send_sge = 1;
@@ -279,7 +278,6 @@ class UDQPImpl {
 	qp_init_attr.send_cq = cq;
 	qp_init_attr.recv_cq = recv_cq;
 	qp_init_attr.qp_type = IBV_QPT_UD;
-
 	qp_init_attr.cap.max_send_wr  = config.max_send_size;
 	qp_init_attr.cap.max_recv_wr  = config.max_recv_size;
 	qp_init_attr.cap.max_send_sge = 1;

@@ -154,6 +154,8 @@ atomic_retry_lock:
 local_retry_lock:
         uint64_t loc = g_node_id;
         uint64_t try_lock = -1;
+        uint64_t tts = txn->get_timestamp();
+
         try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,tts,cor_id);
 
         // uint64_t thd_id = txn->get_thd_id();
@@ -172,7 +174,7 @@ local_retry_lock:
 
 		// if(*tmp_buf2 != 0){ //如果CAS失败
 		if(try_lock != 0){ //如果CAS失败
-			if(tts <= *tmp_buf2){  //wait
+			if(tts <= try_lock){  //wait
 #if DEBUG_PRINTF
             printf("---local_retry_lock\n");
 #endif 

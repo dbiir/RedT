@@ -7,6 +7,8 @@
 #include "qps/op.hh"
 #include "rdma_2pl.h"
 #include "row_rdma_2pl.h"
+#include "dbpa.hpp"
+
 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 void RDMA_2pl::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnManager * txnMng,uint64_t cor_id) {
@@ -161,6 +163,100 @@ remote_retry_unlock:
 #endif
 }
 
+#if USE_DBPA
+void RDMA_2pl::batch_unlock_remote(int loc, RC rc, TxnManager * txnMng , vector<uint64_t> remote_access_noorder){
+    DBrequests dbreq(remote_access_noorder.size());   
+    uint64_t thd_id = txnMng->get_thd_id();
+    dbreq.init(); 
+    vector<uint64_t> remote_need_cas,remote_access;
+    for(int i=0;i<remote_access_noorder.size();i++){
+        Access *access = txnMng->txn->accesses[remote_access_noorder[i]];
+        if(access->type == WR){
+            remote_access.push_back(remote_access_noorder[i]);
+        }
+        else remote_access.insert(remote_access.begin(),remote_access_noorder[i]);
+    }
+    for(int i=0; i<remote_access.size();i++){
+        Access *access = txnMng->txn->accesses[remote_access[i]];
+        uint64_t off = access->offset;
+        uint64_t operate_size;
+        if(access->type == WR){
+            row_t *data = access->data;
+            data-> _tid_word = 0; //write data and unlock
+            if(rc != Abort) operate_size = row_t::get_row_size(data->tuple_size);
+            else operate_size = sizeof(uint64_t);
+            char *local_buf = Rdma::get_row_client_memory(thd_id,i+1);
+            memcpy(local_buf, (char*)data, operate_size);
+            dbreq.set_rdma_meta(i,IBV_WR_RDMA_WRITE,operate_size,local_buf,(uint64_t)(remote_mr_attr[loc].buf + off));
+        }
+        else{
+            operate_size = sizeof(uint64_t);
+            uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id,i+1);            
+#if CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+            *local_buf = 0;
+            dbreq.set_rdma_meta(i,IBV_WR_RDMA_WRITE,operate_size,(char*)local_buf,(uint64_t)(remote_mr_attr[loc].buf + off));
+#endif
+#if CC_ALG == RDMA_NO_WAIT
+            remote_need_cas.push_back(remote_access[i]);
+            dbreq.set_rdma_meta(i,IBV_WR_RDMA_READ,operate_size,(char*)local_buf,(uint64_t)(remote_mr_attr[loc].buf + off));            
+#endif
+        }
+    }
+    auto dbres = dbreq.post_reqs(rc_qp[loc][thd_id]);
+
+	//only one signaled request need to be polled
+	RDMA_ASSERT(dbres == IOCode::Ok);
+//not use outstanding requests here for RDMA_NO_WAIT
+#if !USE_OR || CC_ALG == RDMA_NO_WAIT
+    auto dbres1 = rc_qp[loc][thd_id]->wait_one_comp();
+    RDMA_ASSERT(dbres1 == IOCode::Ok);       
+#endif
+
+#if CC_ALG == RDMA_NO_WAIT
+    vector<uint64_t> orig_lock_info;
+    for(int i = 0;i<remote_need_cas.size();i++){
+        uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id,i+1);            
+        orig_lock_info.push_back(*local_buf);
+    }
+    while(remote_need_cas.size()>0){
+        DBrequests dbreq(remote_need_cas.size());   
+        dbreq.init(); 
+        for(int i=0;i<remote_need_cas.size();i++){
+            Access *access = txnMng->txn->accesses[remote_need_cas[i]];
+            uint64_t off = access->offset;
+            uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id,i+1);            
+            uint64_t lock_info = orig_lock_info[i];
+            uint64_t new_lock_info,lock_type,lock_num;
+            Row_rdma_2pl::info_decode(lock_info,lock_type,lock_num);
+            Row_rdma_2pl::info_encode(new_lock_info,lock_type,lock_num-1);
+            assert((lock_type == 0)&&(lock_num > 0)); //must have at least 1 read lock
+            dbreq.set_atomic_meta(i,lock_info,new_lock_info,local_buf,remote_mr_attr[loc].buf + off);            
+        }
+        auto dbres = dbreq.post_reqs(rc_qp[loc][thd_id]);
+
+        //only one signaled request need to be polled
+        RDMA_ASSERT(dbres == IOCode::Ok);
+        auto dbres1 = rc_qp[loc][thd_id]->wait_one_comp();
+        RDMA_ASSERT(dbres1 == IOCode::Ok);
+        
+        vector<uint64_t> tmp;
+        vector<uint64_t> tmp_lock_info;
+        for(int i=0;i<remote_need_cas.size();i++){
+            uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id,i+1);            
+            if(*local_buf != orig_lock_info[i]){ //CAS fail, atomicity violated
+                txnMng->num_atomic_retry++;
+                total_num_atomic_retry++;
+                if(txnMng->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txnMng->num_atomic_retry;
+                tmp_lock_info.push_back(*local_buf);
+                tmp.push_back(remote_need_cas[i]);
+            }        
+        }
+        remote_need_cas = tmp;
+        orig_lock_info = tmp_lock_info;
+    }
+#endif
+}
+#endif
 
 //write back and unlock
 void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id){
@@ -177,6 +273,7 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
 			read_set[cur_rd_idx ++] = rid;
 	}
 
+    vector<vector<uint64_t>> remote_access(g_node_cnt);
     //for read set element, release lock
     for (uint64_t i = 0; i < txn->row_cnt-txn->write_cnt; i++) {
         //local
@@ -185,8 +282,11 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
             unlock(yield,access->orig_row, txnMng,cor_id);
         }else{
         //remote
+            remote_access[txn->accesses[read_set[i]]->location].push_back(read_set[i]);
+#if !USE_DBPA
             Access * access = txn->accesses[ read_set[i] ];
             remote_unlock(yield,txnMng, read_set[i],cor_id);
+#endif
         }
     }
     //for write set element,write back and release lock
@@ -197,10 +297,29 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
             write_and_unlock(yield,access->orig_row, access->data, txnMng,cor_id); 
         }else{
         //remote
+            remote_access[txn->accesses[txnMng->write_set[i]]->location].push_back(txnMng->write_set[i]);
+#if !USE_DBPA
             Access * access = txn->accesses[ txnMng->write_set[i] ];
             remote_write_and_unlock(yield,rc, txnMng, txnMng->write_set[i],cor_id);
+#endif
         }
     }
+
+#if USE_DBPA
+    for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
+        if(remote_access[i].size() > 0){
+            batch_unlock_remote(i, rc, txnMng, remote_access[i]);
+        }
+    }
+#if USE_OR && CC_ALG != RDMA_NO_WAIT
+    for(int i=0;i<g_node_cnt;i++){ //poll result
+        if(remote_access[i].size() > 0){
+            auto dbres1 = rc_qp[i][txnMng->get_thd_id()]->wait_one_comp();
+            RDMA_ASSERT(dbres1 == IOCode::Ok);       
+        }
+    }
+#endif 
+#endif
 
     uint64_t timespan = get_sys_clock() - starttime;
     txnMng->txn_stats.cc_time += timespan;
