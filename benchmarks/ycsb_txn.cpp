@@ -747,12 +747,10 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	switch (state) {
 	case YCSB_0 :
 		if(loc) {
-			//yield(h_thd->_routines[0]);
 			rc = run_ycsb_0(yield,req,row,cor_id);
 		} else if (rdma_one_side()) {
 			// printf("%ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
 			rc = send_remote_one_side_request(yield, req, row, cor_id);
-			// yield(h_thd->_routines[0]);
 		} else {
 			rc = send_remote_request();
 		}

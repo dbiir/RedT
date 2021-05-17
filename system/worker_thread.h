@@ -75,7 +75,9 @@ public:
     
     int total_worker_coroutine = 0;
     uint64_t last_yield_time;
+    uint64_t start_wait_time;
     uint64_t cor_process_starttime[COROUTINE_CNT + 1];
+    int64_t pendings[COROUTINE_CNT + 1];
 private:
 #if USE_COROUTINE
     uint64_t _cor_txn_id[COROUTINE_CNT + 1];

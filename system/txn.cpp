@@ -1584,20 +1584,26 @@ row_t * TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,
 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
 #if USE_COROUTINE
 	// h_thd->un_res_p.push(std::make_pair(target_server, thd_id));
-	h_thd->last_yield_time = get_sys_clock();
+	
+	uint64_t waitcomp_time;
+	std::pair<int,ibv_wc> res_p;
 	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
-	yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
-	
-	uint64_t yield_endtime = get_sys_clock();
-	
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-    RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+	h_thd->start_wait_time = get_sys_clock();
+	do {
+		h_thd->last_yield_time = get_sys_clock();
+		
+		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+		uint64_t yield_endtime = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
+		waitcomp_time = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+	} while (res_p.first == 0);
+    // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
-	uint64_t waitcomp_time = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
-	INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+	
+	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->start_wait_time);
 	// yield(h_thd->_routines[0]);
 #else
 	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
@@ -1670,21 +1676,26 @@ RdmaTimeTableNode * TxnManager::read_remote_timetable(uint64_t target_server,uin
 #if USE_COROUTINE
 	// h_thd->un_res_p.push(std::make_pair(target_server, thd_id));
 	
-	h_thd->last_yield_time = get_sys_clock();
+		
+	uint64_t waitcomp_time;
+	std::pair<int,ibv_wc> res_p;
 	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
-	yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
-	
-	uint64_t yield_endtime = get_sys_clock();
-	
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-    RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+	h_thd->start_wait_time = get_sys_clock();
+	do {
+		h_thd->last_yield_time = get_sys_clock();
+		
+		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+		uint64_t yield_endtime = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
+		waitcomp_time = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+	} while (res_p.first == 0);
+    // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
-	uint64_t waitcomp_time = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
-	INC_STATS(get_thd_id(), worker_yield_cnt, 1);
 	
+	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->start_wait_time);
 	
 	// yield(h_thd->_routines[0]);
 #else
@@ -1726,20 +1737,26 @@ RdmaTimeTableNode * TxnManager::read_remote_timetable(uint64_t target_server,uin
 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
 #if USE_COROUTINE
 	// h_thd->un_res_p.push(std::make_pair(target_server, thd_id));
-	h_thd->last_yield_time = get_sys_clock();
+		
+	uint64_t waitcomp_time;
+	std::pair<int,ibv_wc> res_p;
 	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
-	yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
-	
-	uint64_t yield_endtime = get_sys_clock();
-	
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-    RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+	h_thd->start_wait_time = get_sys_clock();
+	do {
+		h_thd->last_yield_time = get_sys_clock();
+		
+		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+		uint64_t yield_endtime = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
+		waitcomp_time = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+	} while (res_p.first == 0);
+    // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
-	uint64_t waitcomp_time = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
-	INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+	
+	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->start_wait_time);
 #else
 	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
@@ -1779,20 +1796,26 @@ RdmaTimeTableNode * TxnManager::read_remote_timetable(uint64_t target_server,uin
 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
 #if USE_COROUTINE
 	// h_thd->un_res_p.push(std::make_pair(target_server, thd_id));
-	h_thd->last_yield_time = get_sys_clock();
+
+	uint64_t waitcomp_time;
+	std::pair<int,ibv_wc> res_p;
 	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
-	yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
-	
-	uint64_t yield_endtime = get_sys_clock();
-	
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-    RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+	h_thd->start_wait_time = get_sys_clock();
+	do {
+		h_thd->last_yield_time = get_sys_clock();
+		
+		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+		uint64_t yield_endtime = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
+		waitcomp_time = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+	} while (res_p.first == 0);
+    // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
-	uint64_t waitcomp_time = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
-	INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+	
+	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->start_wait_time);
 	// yield(h_thd->_routines[0]);
 #else
 	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
@@ -1830,20 +1853,26 @@ bool TxnManager::write_remote_index(yield_func_t &yield,uint64_t target_server,u
 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
 #if USE_COROUTINE
 	// h_thd->un_res_p.push(std::make_pair(target_server, thd_id));
-	h_thd->last_yield_time = get_sys_clock();
+		
+	uint64_t waitcomp_time;
+	std::pair<int,ibv_wc> res_p;
 	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
-	yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
-	
-	uint64_t yield_endtime = get_sys_clock();
-	
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-    RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+	h_thd->start_wait_time = get_sys_clock();
+	do {
+		h_thd->last_yield_time = get_sys_clock();
+		
+		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+		uint64_t yield_endtime = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
+		waitcomp_time = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+	} while (res_p.first == 0);
+    // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
-	uint64_t waitcomp_time = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
-	INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+	
+	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->start_wait_time);
 #else
 	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
@@ -1877,21 +1906,27 @@ uint64_t TxnManager::cas_remote_content(yield_func_t &yield, uint64_t target_ser
     RDMA_ASSERT(res_s2 == IOCode::Ok);
 #if USE_COROUTINE
 	// h_thd->un_res_p.push(std::make_pair(target_server, thd_id));
-	h_thd->last_yield_time = get_sys_clock();
+		
+	uint64_t waitcomp_time;
+	std::pair<int,ibv_wc> res_p;
 	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
-	yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
-	
-	uint64_t yield_endtime = get_sys_clock();
-	
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-    RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+	h_thd->start_wait_time = get_sys_clock();
+	do {
+		h_thd->last_yield_time = get_sys_clock();
+		
+		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+		uint64_t yield_endtime = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
+		waitcomp_time = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+	} while (res_p.first == 0);
+    // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
-	uint64_t waitcomp_time = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
-	INC_STATS(get_thd_id(), worker_yield_cnt, 1);
-	// yield(h_thd->_routines[0]);
+	
+	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->start_wait_time);
+
 #else
 	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
@@ -1999,21 +2034,27 @@ RdmaTimeTableNode * TxnManager::read_remote_timetable(yield_func_t &yield,uint64
 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
 #if USE_COROUTINE
 	// h_thd->un_res_p.push(std::make_pair(target_server, thd_id));
-	h_thd->last_yield_time = get_sys_clock();
+		
+	uint64_t waitcomp_time;
+	std::pair<int,ibv_wc> res_p;
 	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
-	yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
-
-	uint64_t yield_endtime = get_sys_clock();
-	
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-    RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+	h_thd->start_wait_time = get_sys_clock();
+	do {
+		h_thd->last_yield_time = get_sys_clock();
+		
+		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+		uint64_t yield_endtime = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
+		waitcomp_time = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+	} while (res_p.first == 0);
+    // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
-	uint64_t waitcomp_time = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
-	INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
-	INC_STATS(get_thd_id(), worker_yield_cnt, 1);
-	// yield(h_thd->_routines[0]);
+	
+	INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - h_thd->start_wait_time);
+
 #else
 	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
