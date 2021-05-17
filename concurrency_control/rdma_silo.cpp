@@ -115,7 +115,9 @@ RC RDMA_silo::validate_rdma_silo(yield_func_t &yield, TxnManager * txnMng, uint6
                 uint64_t off = txn->accesses[ txnMng->write_set[i] ]->offset;
                 uint64_t loc = txn->accesses[ txnMng->write_set[i] ]->location;
                 uint64_t lock = txnMng->get_txn_id();
-				if(txnMng->cas_remote_content(yield,loc,off,0,lock,cor_id) != 0){//remote lock fail
+
+				uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,0,lock,cor_id);
+				if(try_lock != 0){//remote lock fail
                     INC_STATS(txnMng->get_thd_id(), remote_lock_fail_abort, 1); //12%
 					INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
 					rc = Abort;
@@ -296,26 +298,45 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 		if (txnMng->num_locks > txnMng->get_access_cnt())
 			return rc;
 
-		for (uint64_t i = 0; i < txnMng->num_locks; i++) {
-
+		vector<vector<uint64_t>> remote_access(g_node_cnt);
+		for (uint64_t i = 0; i < txnMng->num_locks; i++){
             uint64_t num = txnMng->write_set[i];
             uint64_t remote_offset = txn->accesses[num]->offset;
             uint64_t loc = txn->accesses[num]->location;
 	        uint64_t lock = txnMng->get_txn_id();
-
 			//local
 			if(txn->accesses[num]->location == g_node_id){
-				txn->accesses[ num ]->orig_row->manager->release(yield,txnMng,num,cor_id);
+				txn->accesses[ num ]->orig_row->_tid_word = 0;
+				//txn->accesses[ num ]->orig_row->manager->release(yield,txnMng,num,cor_id);
 			} else{
 			//remote(release lock)
+				remote_access[loc].push_back(num);
+#if !USE_DBPA
                 uint64_t try_lock = txnMng->cas_remote_content(yield,loc,remote_offset,lock,0,cor_id);
                 // assert(try_lock == lock);
+#endif
 			}
-
 		}
-	} else {
-	//commit
+#if USE_DBPA
+    for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
+        if(remote_access[i].size() > 0){
+            txnMng->batch_unlock_remote(i, Abort, txnMng, remote_access);
+        }
+    }
+#if USE_OR
+    for(int i=0;i<g_node_cnt;i++){ //poll result
+        if(remote_access[i].size() > 0){
+            auto dbres1 = rc_qp[i][txnMng->get_thd_id()]->wait_one_comp();
+            RDMA_ASSERT(dbres1 == IOCode::Ok);       
+        }
+    }
+#endif 
+#endif
+	} 
+	else { //commit
 		ts_t time = get_sys_clock();
+
+		vector<vector<uint64_t>> remote_access(g_node_cnt);
 		for (uint64_t i = 0; i < txn->write_cnt; i++) {
             uint64_t num = txnMng->write_set[i];
             uint64_t remote_offset = txn->accesses[num]->offset;
@@ -326,15 +347,36 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 			if(txn->accesses[num]->location == g_node_id){
 				Access * access = txn->accesses[ num ];
 				access->orig_row->manager->write( access->data, txnMng->get_txn_id(),time);
-				txn->accesses[ num ]->orig_row->manager->release(yield,txnMng,num,cor_id);
+				
+				access->orig_row->_tid_word = 0;
+				//txn->accesses[ num ]->orig_row->manager->release(yield,txnMng,num,cor_id);
 			}else{
 			//remote
+				remote_access[loc].push_back(num);
+#if !USE_DBPA
 				Access * access = txn->accesses[ num ];
 				remote_commit_write(yield,txnMng,num,access->data,time,cor_id);
                 uint64_t try_lock = txnMng->cas_remote_content(yield,loc,remote_offset,lock,0,cor_id);
                 // assert(try_lock == lock);
+#endif
 			}
 		}
+#if USE_DBPA
+    for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
+        if(remote_access[i].size() > 0){
+            txnMng->batch_unlock_remote(i, RCOK, txnMng, remote_access,time);
+        }
+    }
+#if USE_OR
+    for(int i=0;i<g_node_cnt;i++){ //poll result
+        if(remote_access[i].size() > 0){
+            auto dbres1 = rc_qp[i][txnMng->get_thd_id()]->wait_one_comp();
+            RDMA_ASSERT(dbres1 == IOCode::Ok);       
+        }
+    }
+#endif 
+#endif
+
 	}
   for (uint64_t i = 0; i < txn->row_cnt; i++) {
     //local

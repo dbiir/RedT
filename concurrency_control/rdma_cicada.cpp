@@ -174,10 +174,14 @@ RC RDMA_Cicada::remote_read_or_write(Access * data, TxnManager * txnMng, uint64_
 
     RC rc = RCOK;
 
+#if USE_DBPA
+	uint64_t try_lock;
+	row_t * temp_row = txnMng->cas_and_read_remote(try_lock,loc,off,0,lock);
+#else
     uint64_t try_lock = txnMng->cas_remote_content(loc,off,0,lock);
     // assert(try_lock == 0);
-
     row_t *temp_row = txnMng->read_remote_row(loc,off);
+#endif
 	assert(temp_row->get_primary_key() == data->data->get_primary_key());
 
 	if(data->type == RD) {

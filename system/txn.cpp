@@ -1508,6 +1508,217 @@ void TxnManager::release_locks(yield_func_t &yield, RC rc, uint64_t cor_id) {
 	INC_STATS(get_thd_id(), txn_cleanup_time,  timespan);
 }
 #if USE_DBPA
+void TxnManager::batch_unlock_remote(int loc, RC rc, TxnManager * txnMng , vector<vector<uint64_t>> remote_index_origin, ts_t time){
+	vector<uint64_t> remote_access_noorder = remote_index_origin[loc];
+	////for write, overlap is allowed
+	// int count = 0;
+	// if(loc>=1){
+	// 	for(int i=0;i<loc;i++){
+	// 		count += remote_index_origin[i].size();
+	// 	}
+	// }
+
+    DBrequests dbreq(remote_access_noorder.size());   
+    uint64_t thd_id = txnMng->get_thd_id();
+    dbreq.init(); 
+    vector<uint64_t> remote_need_cas,remote_access;
+    for(int i=0;i<remote_access_noorder.size();i++){
+        Access *access = txnMng->txn->accesses[remote_access_noorder[i]];
+        if(access->type == WR){
+            remote_access.push_back(remote_access_noorder[i]);
+        }
+        else remote_access.insert(remote_access.begin(),remote_access_noorder[i]);
+    }
+    for(int i=0; i<remote_access.size();i++){
+        Access *access = txnMng->txn->accesses[remote_access[i]];
+        uint64_t off = access->offset;
+        uint64_t operate_size;
+        if(access->type == WR){
+            row_t *data = access->data;
+            data-> _tid_word = 0; //write data and unlock
+			if(CC_ALG == RDMA_SILO) data->timestamp = time;
+            if(rc != Abort) operate_size = row_t::get_row_size(data->tuple_size);
+            else operate_size = sizeof(uint64_t);
+            char *local_buf = Rdma::get_row_client_memory(thd_id,i+1);
+            memcpy(local_buf, (char*)data, operate_size);
+            dbreq.set_rdma_meta(i,IBV_WR_RDMA_WRITE,operate_size,local_buf,(uint64_t)(remote_mr_attr[loc].buf + off));
+        }
+        else{
+            operate_size = sizeof(uint64_t);
+            uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id,i+1);            
+#if CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+            *local_buf = 0;
+            dbreq.set_rdma_meta(i,IBV_WR_RDMA_WRITE,operate_size,(char*)local_buf,(uint64_t)(remote_mr_attr[loc].buf + off));
+#endif
+#if CC_ALG == RDMA_NO_WAIT
+            remote_need_cas.push_back(remote_access[i]);
+            dbreq.set_rdma_meta(i,IBV_WR_RDMA_READ,operate_size,(char*)local_buf,(uint64_t)(remote_mr_attr[loc].buf + off));            
+#endif
+        }
+    }
+    auto dbres = dbreq.post_reqs(rc_qp[loc][thd_id]);
+
+	//only one signaled request need to be polled
+	RDMA_ASSERT(dbres == IOCode::Ok);
+//not use outstanding requests here for RDMA_NO_WAIT
+#if !USE_OR || CC_ALG == RDMA_NO_WAIT
+    auto dbres1 = rc_qp[loc][thd_id]->wait_one_comp();
+    RDMA_ASSERT(dbres1 == IOCode::Ok);       
+#endif
+
+#if CC_ALG == RDMA_NO_WAIT
+    vector<uint64_t> orig_lock_info;
+    for(int i = 0;i<remote_need_cas.size();i++){
+        uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id,i+1);            
+        orig_lock_info.push_back(*local_buf);
+    }
+    while(remote_need_cas.size()>0){
+        DBrequests dbreq(remote_need_cas.size());   
+        dbreq.init(); 
+        for(int i=0;i<remote_need_cas.size();i++){
+            Access *access = txnMng->txn->accesses[remote_need_cas[i]];
+            uint64_t off = access->offset;
+            uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id,i+1);            
+            uint64_t lock_info = orig_lock_info[i];
+            uint64_t new_lock_info,lock_type,lock_num;
+            Row_rdma_2pl::info_decode(lock_info,lock_type,lock_num);
+            Row_rdma_2pl::info_encode(new_lock_info,lock_type,lock_num-1);
+            assert((lock_type == 0)&&(lock_num > 0)); //must have at least 1 read lock
+            dbreq.set_atomic_meta(i,lock_info,new_lock_info,local_buf,remote_mr_attr[loc].buf + off);            
+        }
+        auto dbres = dbreq.post_reqs(rc_qp[loc][thd_id]);
+
+        //only one signaled request need to be polled
+        RDMA_ASSERT(dbres == IOCode::Ok);
+        auto dbres1 = rc_qp[loc][thd_id]->wait_one_comp();
+        RDMA_ASSERT(dbres1 == IOCode::Ok);
+        
+        vector<uint64_t> tmp;
+        vector<uint64_t> tmp_lock_info;
+        for(int i=0;i<remote_need_cas.size();i++){
+            uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id,i+1);            
+            if(*local_buf != orig_lock_info[i]){ //CAS fail, atomicity violated
+                txnMng->num_atomic_retry++;
+                total_num_atomic_retry++;
+                if(txnMng->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txnMng->num_atomic_retry;
+                tmp_lock_info.push_back(*local_buf);
+                tmp.push_back(remote_need_cas[i]);
+            }        
+        }
+        remote_need_cas = tmp;
+        orig_lock_info = tmp_lock_info;
+    }
+#endif
+}
+#endif
+
+#if USE_DBPA && CC_ALG == RDMA_SILO
+ void TxnManager::batch_read(BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin){
+	 vector<uint64_t> remote_index = remote_index_origin[loc];
+	 int count = 0;
+	 if(loc>=1){
+		for(int i=0;i<loc;i++){
+			count += remote_index_origin[i].size();
+		}
+	 }
+	 
+	 DBrequests dbreq(remote_index.size());
+	 dbreq.init();
+	 uint64_t thd_id = get_thd_id();
+	 YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	 for(int i=0;i<remote_index.size();i++){
+		 if(rtype == R_INDEX){
+			ycsb_request * req = ycsb_query->requests[remote_index[i]];
+			uint64_t index_key = req->key / g_node_cnt;
+			uint64_t index_addr = (index_key) * sizeof(IndexInfo);
+			char *local_buf = Rdma::get_index_client_memory(thd_id,count+i+1);
+			dbreq.set_rdma_meta(i,IBV_WR_RDMA_READ,sizeof(IndexInfo),local_buf,(uint64_t)(remote_mr_attr[loc].buf + index_addr));
+		 }
+		 else if(rtype == R_ROW){
+			uint64_t read_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
+			itemid_t * m_item = reqId_index.find(remote_index[i])->second;
+			char *local_buf = Rdma::get_row_client_memory(thd_id,count+i+1);
+			dbreq.set_rdma_meta(i,IBV_WR_RDMA_READ,read_size,local_buf,(uint64_t)(remote_mr_attr[loc].buf + m_item->offset));
+		 }
+	 }
+	 auto dbres = dbreq.post_reqs(rc_qp[loc][thd_id]);
+
+ 	 //only one signaled request need to be polled
+	 RDMA_ASSERT(dbres == IOCode::Ok);
+#if !USE_OR
+	 auto dbres1 = rc_qp[loc][thd_id]->wait_one_comp();
+	 RDMA_ASSERT(dbres1 == IOCode::Ok);
+	 
+	 for(int i=0;i<remote_index.size();i++){
+		if(rtype == R_INDEX){
+			char *local_buf = Rdma::get_index_client_memory(thd_id,count+i+1);
+			ycsb_request * req = ycsb_query->requests[remote_index[i]];
+	//		uint64_t index_key = req->key / g_node_cnt;
+	//		uint64_t index_addr = (index_key) * sizeof(IndexInfo);
+			assert(((IndexInfo*)local_buf)->key == req->key);
+			itemid_t* item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
+
+			item->location = ((IndexInfo*)local_buf)->address;
+			item->type = ((IndexInfo*)local_buf)->type;
+			item->valid = ((IndexInfo*)local_buf)->valid;
+			item->offset = ((IndexInfo*)local_buf)->offset;
+			item->table_offset = ((IndexInfo*)local_buf)->table_offset;
+			reqId_index.insert(pair<int, itemid_t*>(remote_index[i],item));
+		}
+		else if(rtype == R_ROW){
+			uint64_t read_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
+			char *local_buf = Rdma::get_row_client_memory(thd_id,count+i+1);
+			row_t *test_row = (row_t *)mem_allocator.alloc(read_size);
+    		memcpy(test_row, local_buf, read_size);
+			reqId_row.insert(pair<int, row_t*>(remote_index[i],test_row));
+		}
+	 }
+#endif
+ }
+ void TxnManager::get_batch_read(BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin){
+	 int count = 0;
+	 if(loc>=1){
+		for(int i=0;i<loc;i++){
+			count += remote_index_origin[i].size();
+		}
+	 }
+	 
+	 vector<uint64_t> remote_index = remote_index_origin[loc];
+	 uint64_t thd_id = get_thd_id();
+	 YCSBQuery* ycsb_query = (YCSBQuery*) query;
+
+	 auto dbres1 = rc_qp[loc][thd_id]->wait_one_comp();
+	 RDMA_ASSERT(dbres1 == IOCode::Ok);
+	 
+	 for(int i=0;i<remote_index.size();i++){
+		if(rtype == R_INDEX){
+			char *local_buf = Rdma::get_index_client_memory(thd_id,count+i+1);
+			ycsb_request * req = ycsb_query->requests[remote_index[i]];
+	//		uint64_t index_key = req->key / g_node_cnt;
+	//		uint64_t index_addr = (index_key) * sizeof(IndexInfo);
+			assert(((IndexInfo*)local_buf)->key == req->key);
+			itemid_t* item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
+
+			item->location = ((IndexInfo*)local_buf)->address;
+			item->type = ((IndexInfo*)local_buf)->type;
+			item->valid = ((IndexInfo*)local_buf)->valid;
+			item->offset = ((IndexInfo*)local_buf)->offset;
+			item->table_offset = ((IndexInfo*)local_buf)->table_offset;
+			reqId_index.insert(pair<int, itemid_t*>(remote_index[i],item));
+		}
+		else if(rtype == R_ROW){
+			uint64_t read_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
+			char *local_buf = Rdma::get_row_client_memory(thd_id,count+i+1);
+			row_t *test_row = (row_t *)mem_allocator.alloc(read_size);
+    		memcpy(test_row, local_buf, read_size);
+			reqId_row.insert(pair<int, row_t*>(remote_index[i],test_row));
+		}
+	 }
+ 
+ }
+#endif
+
+#if USE_DBPA
 row_t * TxnManager::cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap){
 	uint64_t thd_id = get_thd_id();
 	uint64_t *local_buf1 = (uint64_t *)Rdma::get_row_client_memory(thd_id);

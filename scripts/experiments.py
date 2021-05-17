@@ -206,7 +206,7 @@ def ycsb_skew():
     wl = 'YCSB'
     nnodes = [4]
      #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    algos=['RDMA_NO_WAIT']
+    algos=['RDMA_SILO']
     base_table_size=1048576
     #base_table_size=1048576*4    
     #base_table_size=2097152*8

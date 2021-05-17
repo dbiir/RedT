@@ -119,10 +119,21 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	
 	uint64_t starttime = get_sys_clock();
 
+#if USE_DBPA && CC_ALG == RDMA_SILO
+	//batch read all index for remote access
+	ycsb_batch_read(R_INDEX);
+	//batch read all row for remote access
+	ycsb_batch_read(R_ROW);
+#endif
 	while(rc == RCOK && !is_done()) {
-
 		rc = run_txn_state(yield, cor_id);
 	}
+#if USE_DBPA && CC_ALG == RDMA_SILO
+	reqId_index.erase(reqId_index.begin(),reqId_index.end());
+	reqId_row.erase(reqId_row.begin(),reqId_row.end());
+#endif
+
+	
 
 	uint64_t curr_time = get_sys_clock();
 	txn_stats.process_time += curr_time - starttime;
@@ -183,6 +194,34 @@ bool YCSBTxnManager::is_local_request(uint64_t idx) {
   return GET_NODE_ID(_wl->key_to_part(((YCSBQuery*)query)->requests[idx]->key)) == g_node_id;
 }
 
+#if USE_DBPA && CC_ALG == RDMA_SILO
+void YCSBTxnManager::ycsb_batch_read(BatchReadType rtype){
+  	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	vector<vector<uint64_t>> remote_index(g_node_cnt);
+
+	for(int i=0;i<ycsb_query->requests.size();i++){
+		ycsb_request * req = ycsb_query->requests[i];
+		uint64_t part_id = _wl->key_to_part( req->key );
+		uint64_t loc = GET_NODE_ID(part_id);
+		if(loc != g_node_id){  //remote
+			remote_index[loc].push_back(i);
+		}
+	}
+	for(int i=0;i<g_node_cnt;i++){
+		if(remote_index[i].size()>0){
+			batch_read(rtype,i, remote_index);
+		}
+	}
+#if USE_OR
+	for(int i=0;i<g_node_cnt;i++){
+		if(remote_index[i].size()>0){
+			get_batch_read(rtype,i, remote_index);
+		}
+	}
+#endif
+ }
+#endif
+
 itemid_t* YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id) {
 	uint64_t part_id = _wl->key_to_part( req->key );
   	uint64_t loc = GET_NODE_ID(part_id);
@@ -201,10 +240,14 @@ itemid_t* YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_reque
 }
 
 RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_request * req, row_t *& row_local, uint64_t cor_id) {
-	// get the index of row to be operated
 	
+	// get the index of row to be operated
 	itemid_t * m_item;
+#if USE_DBPA && CC_ALG == RDMA_SILO
+	m_item = reqId_index.find(next_record_id)->second;
+#else
     m_item = ycsb_read_remote_index(yield, req, cor_id);
+#endif
 
 	uint64_t part_id = _wl->key_to_part( req->key );
     uint64_t loc = GET_NODE_ID(part_id);
@@ -227,7 +270,11 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
 		uint64_t tts = get_timestamp();
 
 		//read remote data
+#if USE_DBPA
+		row_t * test_row = reqId_row.find(next_record_id)->second;
+#else
         row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+#endif
 		assert(test_row->get_primary_key() == req->key);
 
         //preserve the txn->access
@@ -538,13 +585,23 @@ retry_lock:
     ts_t ts = get_timestamp();
 
     uint64_t try_lock = -1;
+#if USE_DBPA
+	row_t * remote_row = cas_and_read_remote(try_lock,loc,m_item->offset,0,lock);
+	if(try_lock != 0) {
+		rc = Abort;
+		//row_local = NULL;
+		//mem_allocator.free(m_item, sizeof(itemid_t));
+		mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+        return rc;
+	}	
+#else
     try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);
 	if(try_lock != 0) {
 		rc = Abort;
         return rc;
 	}
-
     row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+#endif
 	assert(remote_row->get_primary_key() == req->key);
 
     if(req->acctype == RD) {

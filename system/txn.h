@@ -41,6 +41,7 @@ class TPCCQuery;
 //class r_query;
 
 enum TxnState {START,INIT,EXEC,PREP,FIN,DONE};
+enum BatchReadType {R_INDEX=0,R_ROW};
 
 class Access {
 public:
@@ -230,6 +231,9 @@ bool rdma_one_side() {
      bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
 #if USE_DBPA
+	void batch_unlock_remote(int loc, RC rc, TxnManager * txnMng , vector<vector<uint64_t>> remote_index_origin,ts_t time = 0);
+    void get_batch_read(BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin);
+    void batch_read(BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin);
 	row_t * cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap);
 #endif
 //***********coroutine**********//
@@ -424,6 +428,10 @@ protected:
 
 	sem_t rsp_mutex;
 	bool registed_;
+#if USE_DBPA && CC_ALG == RDMA_SILO
+  	map<int, itemid_t*> reqId_index;
+  	map<int, row_t*> reqId_row;
+#endif
 };
 
 #endif
