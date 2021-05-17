@@ -73,10 +73,10 @@
 // Simulation + Hardware
 /***********************************************/
 #define NODE_CNT 4
-#define THREAD_CNT 10
+#define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 32
+#define COROUTINE_CNT 10
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
@@ -144,7 +144,7 @@
 /***********************************************/
 #define TPORT_TYPE tcp
 #define TPORT_PORT 7000
-#define TPORT_TWOSIDE_PORT 15000
+#define TPORT_TWOSIDE_PORT 13000
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128

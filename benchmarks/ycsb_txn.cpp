@@ -614,14 +614,8 @@ retry_lock:
 
 #if CC_ALG == RDMA_CICADA
 
+ 
     ts_t ts = get_timestamp();
-
-    uint64_t try_lock = -1;
-    try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);
-	if(try_lock != 0) {
-		rc = Abort;
-        return rc;
-	}
 
     row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 	assert(remote_row->get_primary_key() == req->key);
@@ -630,25 +624,16 @@ retry_lock:
 		assert(remote_row->version_cnt >= 0);
 		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
-			if(remote_row->cicada_version[i].Wts > this->start_ts || remote_row->cicada_version[i].state == Cicada_ABORTED) {
+			if(remote_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
+			}
+			if(remote_row->cicada_version[i].Wts > this->get_timestamp()) {
+				rc = Abort;
+				break;
 			}
 			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
 				rc = WAIT;
 				while(rc == WAIT) {
-                    //release lock
-                    try_lock = cas_remote_content(yield,loc,m_item->offset,lock,0,cor_id);
-                    //add lock
-                    try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);
-				
-					if (try_lock != 0) {
-						row_local = NULL;
-						txn->rc = Abort;
-						mem_allocator.free(m_item, sizeof(itemid_t));
-						printf("RDMA_MAAT cas lock fault\n");
-						return Abort; //CAS fail
-					}
-
                     remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 					assert(remote_row->get_primary_key() == req->key);
 
@@ -660,6 +645,10 @@ retry_lock:
 					}
 				}				
 			} else {
+				if(remote_row->cicada_version[i].Wts > this->get_timestamp()) {
+					rc = Abort;
+					
+				}
 				rc = RCOK;
 				version = remote_row->cicada_version[i].key;
 			}	
@@ -669,27 +658,19 @@ retry_lock:
 		assert(remote_row->version_cnt >= 0);
 		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
-			if(remote_row->cicada_version[i].Wts > this->start_ts || remote_row->cicada_version[i].Rts > this->start_ts || remote_row->cicada_version[i].state == Cicada_ABORTED) {
+			if(remote_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
+			}
+			if(remote_row->cicada_version[i].Wts > this->get_timestamp() || remote_row->cicada_version[i].Rts > this->get_timestamp()) {
+				rc = Abort;
+				break;
 			}
 			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
 				// --todo !---pendind need wait //
 				rc = WAIT;
 				while(rc == WAIT) {
-					//release lock
-                    try_lock = cas_remote_content(yield,loc,m_item->offset,lock,0,cor_id);
-                    //add lock
-                    try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);
-
-					if (try_lock != 0) {
-						row_local = NULL;
-						txn->rc = Abort;
-						mem_allocator.free(m_item, sizeof(itemid_t));
-						printf("RDMA_MAAT cas lock fault\n");
-
-						return Abort; //CAS fail
-					}
-				    remote_row = read_remote_row(yield,loc,m_item->offset,,cor_id);
+					
+				    remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 					assert(remote_row->get_primary_key() == req->key);
 
 					if(remote_row->cicada_version[i].state == Cicada_PENDING) {
@@ -700,17 +681,17 @@ retry_lock:
 					}
 				}
 			} else {
-				if(remote_row->cicada_version[i].Wts > this->start_ts || remote_row->cicada_version[i].Rts > this->start_ts) {
+				if(remote_row->cicada_version[i].Wts > this->get_timestamp() || remote_row->cicada_version[i].Rts > this->get_timestamp()) {
 					rc = Abort;
 				} else {
 					rc = RCOK;
 					version = remote_row->cicada_version[i].key;
-				}	
+				}
 			}
 			
 		}
 	}
-    try_lock = cas_remote_content(yield,loc,m_item->offset,lock ,0,cor_id);
+    // try_lock = cas_remote_content(yield,loc,m_item->offset,lock ,0,cor_id);
 
     // if(rc != Abort)this->version_num.push_back(version);
     if(rc == Abort) {
