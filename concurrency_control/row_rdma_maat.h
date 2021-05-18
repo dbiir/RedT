@@ -16,7 +16,7 @@
 
 #ifndef ROW_RDMA_MAAT_H
 #define ROW_RDMA_MAAT_H
-
+#include "routine.h"
 #if CC_ALG == RDMA_MAAT
 
 class Row_rdma_maat {
@@ -27,7 +27,7 @@ public:
   RC read(TxnManager * txn);
   RC prewrite(TxnManager * txn);
   RC abort(access_t type, TxnManager * txn);
-  RC commit(access_t type, TxnManager * txn, row_t * data);
+  RC commit(yield_func_t &yield, access_t type, TxnManager * txn, row_t * data, uint64_t cor_id);
   void write(row_t * data);
   void ucread_erase(uint64_t txn_id);
   void ucwrite_erase(uint64_t txn_id);

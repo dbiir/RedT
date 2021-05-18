@@ -11,7 +11,7 @@ void Row_rdma_ts1::init(row_t * row) {
 	_row = row;
 }
 
-RC Row_rdma_ts1::access(TxnManager * txn, Access *access, access_t type) {
+RC Row_rdma_ts1::access(yield_func_t &yield, TxnManager * txn, Access *access, access_t type, uint64_t cor_id) {
 	RC rc;
 	uint64_t starttime = get_sys_clock();
 	ts_t ts = txn->get_timestamp();
@@ -76,7 +76,7 @@ end:
 	return rc;
 }
 
-RC Row_rdma_ts1::local_commit(TxnManager * txn, Access *access, access_t type) {
+RC Row_rdma_ts1::local_commit(yield_func_t &yield, TxnManager * txn, Access *access, access_t type, uint64_t cor_id) {
 #if DEBUG_PRINTF
 	printf("[本地提交]事务号：%d，主键：%d，锁：%lu，tid：%lu,rts:%lu,wts:%lu\n",txn->get_txn_id(),_row->get_primary_key(),_row->mutx,_row->tid,_row->rts,_row->wts);
 #endif

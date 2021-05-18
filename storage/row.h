@@ -138,7 +138,7 @@ public:
 	RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row);
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
 #if CC_ALG == RDMA_TS1
-	uint64_t return_row(access_t type, TxnManager *txn, Access *access);
+	uint64_t return_row(yield_func_t &yield, access_t type, TxnManager *txn, Access *access, uint64_t cor_id);
 #endif
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
@@ -162,7 +162,7 @@ public:
 		volatile uint64_t _tid_word;
 		RdmaCicadaVersion cicada_version[HIS_CHAIN_NUM];
 		Row_rdma_cicada * manager;
-		uint64_t version_cnt;
+		int64_t version_cnt;
 
 	#elif CC_ALG == RDMA_TS1
 		volatile uint64_t	mutx;

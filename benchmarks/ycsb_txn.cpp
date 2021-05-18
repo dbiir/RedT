@@ -256,7 +256,7 @@ if(req->acctype == RD || req->acctype == WR){
     row_t * test_row = read_remote_row(loc,m_item->offset);
     assert(test_row->get_primary_key() == req->key);
 
-    try_lock = cas_remote_content(loc,m_item->offset,lock,0);//release lock
+    try_lock = cas_remote_content(yield, loc,m_item->offset,lock,0,cor_id);//release lock
     assert(try_lock == lock);
 
     //preserve the txn->access
@@ -643,6 +643,7 @@ retry_lock:
 						rc = RCOK;
 						version = remote_row->cicada_version[i].key;
 					}
+					// rc =Abort;	
 				}				
 			} else {
 				if(remote_row->cicada_version[i].Wts > this->get_timestamp()) {
@@ -679,6 +680,7 @@ retry_lock:
 						version = remote_row->cicada_version[i].key;
 						rc = RCOK;
 					}
+					// rc = Abort;
 				}
 			} else {
 				if(remote_row->cicada_version[i].Wts > this->get_timestamp() || remote_row->cicada_version[i].Rts > this->get_timestamp()) {

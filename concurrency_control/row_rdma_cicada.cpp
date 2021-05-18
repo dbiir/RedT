@@ -87,6 +87,7 @@ RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
 						rc = RCOK;
 						version = _row->cicada_version[i].key;
 					}
+					// rc = Abort;
 				}
 				//rc = Abort;
 				// rc = RCOK;
@@ -125,6 +126,7 @@ RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
 						rc = RCOK;
 						version = _row->cicada_version[i].key;
 					}
+					// rc = Abort;
 				}
 				// rc = Abort;
 				// rc = RCOK;

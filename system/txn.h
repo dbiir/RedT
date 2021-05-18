@@ -301,7 +301,7 @@ bool rdma_one_side() {
 	uint64_t return_id;
 	RC        validate(yield_func_t &yield, uint64_t cor_id);
 	void            cleanup(yield_func_t &yield, RC rc, uint64_t cor_id);
-	void            cleanup_row(RC rc,uint64_t rid);
+	void            cleanup_row(yield_func_t &yield, RC rc,uint64_t rid, uint64_t cor_id);
 	void release_last_row_lock();
 	RC send_remote_reads();
 

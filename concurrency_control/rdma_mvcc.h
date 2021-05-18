@@ -32,8 +32,8 @@ class rdma_mvcc {
 public:
 	void init(row_t * row);
 	RC access(TxnManager * txn, TsType type, row_t * row);
-    RC finish(RC rc,TxnManager * txnMng); 
-    RC validate_local(TxnManager * txnMng);
+    RC finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t cor_id); 
+    RC validate_local(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_id);
 private:
  	pthread_mutex_t * latch;
 	bool blatch;
@@ -42,12 +42,12 @@ private:
 
 
     bool get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn);
-    uint64_t remote_lock(TxnManager * txnMng , uint64_t num);
+    uint64_t remote_lock(yield_func_t &yield, TxnManager * txnMng , uint64_t num, uint64_t cor_id);
     uint64_t local_lock(TxnManager * txnMng , uint64_t num);
     void * local_write_back(TxnManager * txnMng , uint64_t num);
-    void * remote_write_back(TxnManager * txnMng , uint64_t num);
+    void * remote_write_back(yield_func_t &yield, TxnManager * txnMng , uint64_t num, uint64_t cor_id);
     void * abort_release_local_lock(TxnManager * txnMng , uint64_t num);
-    void * abort_release_remote_lock(TxnManager * txnMng , uint64_t num);
+    void * abort_release_remote_lock(yield_func_t &yield, TxnManager * txnMng , uint64_t num, uint64_t cor_id);
   
 
 	MVReqEntry * readreq_mvcc;

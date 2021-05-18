@@ -21,6 +21,7 @@ limitations under the License.
 #include "semaphore.h"
 #include "maat.h"
 #include "row_rdma_maat.h"
+#include "routine.h"
 
 #if CC_ALG == RDMA_MAAT
 
@@ -53,12 +54,13 @@ struct RdmaTimeTableNode{
 class RDMA_Maat {
 public:
 	void init();
-	RC validate(TxnManager * txn);
-	RC finish(RC rc, TxnManager *txnMng);
+	RC validate(yield_func_t &yield, TxnManager * txn, uint64_t cor_id);
+	RC finish(yield_func_t &yield, RC rc, TxnManager *txnMng, uint64_t cor_id);
 	RC find_bound(TxnManager * txn);
-	RC remote_abort(TxnManager * txn, Access * data);
-	RC remote_commit(TxnManager * txn, Access * data);
-	RdmaTimeTableNode * read_remote_timetable(TxnManager * txn, uint64_t node_id);
+	RC remote_abort(yield_func_t &yield, TxnManager * txn, Access * data, uint64_t cor_id);
+	RC remote_commit(yield_func_t &yield, TxnManager * txn, Access * data, uint64_t cor_id);
+	// RdmaTimeTableNode * read_remote_timetable(yield_func_t &yield, TxnManager * txn, uint64_t node_id, uint64_t cor_id);
+	// RdmaTimeTableNode * read_remote_timetable(TxnManager * txn, uint64_t node_id);
 private:
 	sem_t 	_semaphore;
 };
@@ -77,8 +79,8 @@ public:
 	void local_set_upper(uint64_t thd_id, uint64_t key, uint64_t value);
 	void local_set_state(uint64_t thd_id, uint64_t key, MAATState value);
 
-	RdmaTimeTableNode * remote_get_timeNode(TxnManager *txnMng, uint64_t key);
-	void remote_set_timeNode(TxnManager *txnMng, uint64_t key, RdmaTimeTableNode * value);
+	RdmaTimeTableNode * remote_get_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id);
+	void remote_set_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTimeTableNode * value, uint64_t cor_id);
 private:
 	// hash table
 	uint64_t hash(uint64_t key);

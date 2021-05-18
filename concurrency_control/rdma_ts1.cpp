@@ -127,7 +127,7 @@ void RDMA_ts1::read_remote_row(TxnManager * txn, row_t * remote_row, uint64_t lo
 	memcpy(remote_row, test_buf, operate_size);
 }
 
-void  RDMA_ts1::write_remote(RC rc, TxnManager * txn, Access * access) {
+void  RDMA_ts1::write_remote(yield_func_t &yield, RC rc, TxnManager * txn, Access * access, uint64_t cor_id) {
 	uint64_t off = access->offset;
     uint64_t loc = access->location;
 	uint64_t thd_id = txn->get_thd_id();
@@ -140,7 +140,7 @@ void  RDMA_ts1::write_remote(RC rc, TxnManager * txn, Access * access) {
 	printf("[远程写的传入数据]rc:%d,事务号：%d，主键：%d，锁：%lu，tid：%lu,rts：%lu,wts：%lu\n",rc,txn->get_txn_id(),access->data->get_primary_key(),access->data->mutx,access->data->tid,access->data->rts,access->data->wts);
 #endif
 
-    txn->write_remote_row(loc,operate_size,off,(char*)access->data);
+    txn->write_remote_row(yield,loc,operate_size,off,(char*)access->data,cor_id);
     INC_STATS(txn->get_thd_id(), rdma_write_cnt, 1);
     // char *local_loc = Rdma::get_row_client_memory(thd_id);
     // memcpy(local_loc, (char*)access->data, operate_size);
@@ -156,7 +156,7 @@ if(access->type == WR){
 
 }
  
-void  RDMA_ts1::commit_write(TxnManager * txn , uint64_t num , access_t type){
+void  RDMA_ts1::commit_write(yield_func_t &yield, TxnManager * txn , uint64_t num , access_t type, uint64_t cor_id){
 	Access * access = txn->txn->accesses[num];
 	uint64_t loc = access->location;
     uint64_t offset = access->offset;
@@ -185,8 +185,8 @@ void  RDMA_ts1::commit_write(TxnManager * txn , uint64_t num , access_t type){
 
 // read_remote_row(txn, remote_row, loc, offset);
 
-    assert(txn->loop_cas_remote(loc,offset,0,lock_num) == true);//lock in loop
-	row_t *remote_row = txn->read_remote_row(loc,offset);
+    assert(txn->loop_cas_remote(yield,loc,offset,0,lock_num,cor_id) == true);//lock in loop
+	row_t *remote_row = txn->read_remote_row(yield,loc,offset,cor_id);
 
 	if (type == XP) {
 		remote_row->tid = 0;
@@ -202,7 +202,7 @@ void  RDMA_ts1::commit_write(TxnManager * txn , uint64_t num , access_t type){
 	}
 	remote_row->mutx = 0;
 	memcpy(row, remote_row, row_t::get_row_size(remote_row->tuple_size));
-	write_remote(RCOK,txn,access);
+	write_remote(yield,RCOK,txn,access,cor_id);
 	// assert(remote_row->mutx != 0);
 
 	row->free_row();

@@ -27,11 +27,11 @@ class TxnManager;
 class RDMA_Cicada {
 public:
 	void init();
-	RC validate(TxnManager * txn);
-	RC finish(RC rc, TxnManager *txnMng);
-	RC remote_abort(TxnManager * txn, Access * data, uint64_t num);
-	RC remote_commit(TxnManager * txn, Access * data, uint64_t num);
-	RC remote_read_or_write(Access * access, TxnManager * txn, uint64_t num, bool real_write);
+	RC validate(yield_func_t &yield, TxnManager * txn, uint64_t cor_id);
+	RC finish(yield_func_t &yield, RC rc, TxnManager *txnMng, uint64_t cor_id);
+	RC remote_abort(yield_func_t &yield, TxnManager * txn, Access * data, uint64_t num, uint64_t cor_id);
+	RC remote_commit(yield_func_t &yield, TxnManager * txn, Access * data, uint64_t num, uint64_t cor_id);
+	RC remote_read_or_write(yield_func_t &yield, Access * access, TxnManager * txn, uint64_t num, bool real_write, uint64_t cor_id);
 private:
 	sem_t 	_semaphore;
 };

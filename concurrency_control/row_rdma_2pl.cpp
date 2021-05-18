@@ -154,13 +154,13 @@ atomic_retry_lock:
 local_retry_lock:
         uint64_t loc = g_node_id;
         uint64_t try_lock = -1;
+        
+
+        uint64_t thd_id = txn->get_thd_id();
+		uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+		auto mr = client_rm_handler->get_reg_attr().value();
+        uint64_t tts = txn->get_timestamp();
         try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,tts,cor_id);
-
-        // uint64_t thd_id = txn->get_thd_id();
-		// uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-		// auto mr = client_rm_handler->get_reg_attr().value();
-        // uint64_t tts = txn->get_timestamp();
-
 		// rdmaio::qp::Op<> op;
 		// op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(0,tts);
 		// assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);

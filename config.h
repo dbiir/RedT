@@ -74,7 +74,7 @@
 // Simulation + Hardware
 /***********************************************/
 #define NODE_CNT 2
-#define THREAD_CNT 4
+#define THREAD_CNT 1
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -281,7 +281,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 4194304
+#define SYNTH_TABLE_SIZE 1048576
 #define ZIPF_THETA 0.001
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
