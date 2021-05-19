@@ -105,14 +105,14 @@ def ycsb_coroutine():
     #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
     # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    algos = ['RDMA_NO_WAIT']
+    algos = ['RDMA_CICADA']
     base_table_size=1048576
     # base_table_size=1048576*8
     #base_table_size=2097152*8
     txn_write_perc = [0.2]
     tup_write_perc = [0.2]
     load = [10000]
-    tcnt = [24]
+    tcnt = [10]
     ctcnt = [4]
     cocnt = [10]
     scnt = [1]

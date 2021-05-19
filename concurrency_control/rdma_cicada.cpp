@@ -354,7 +354,7 @@ RC RDMA_Cicada::remote_abort(yield_func_t &yield, TxnManager * txnMng, Access * 
 	uint64_t loc = data->location;
 
 	off = off + sizeof(uint64_t) * 4 + sizeof(RdmaCicadaVersion) * (num % HIS_CHAIN_NUM);
-    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,Cicada_PENDING, Cicada_ABORTED,cor_id);
+    uint64_t try_lock = txnMng->cas_remote_content(loc,off,Cicada_PENDING, Cicada_ABORTED);
 	return Abort;
 }
 
@@ -367,7 +367,7 @@ RC RDMA_Cicada::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access *
 	uint64_t off = data->offset;
 	uint64_t loc = data->location;
 	off = off + sizeof(uint64_t) * 4 + sizeof(RdmaCicadaVersion) * (num % HIS_CHAIN_NUM);
-    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,Cicada_PENDING, Cicada_COMMITTED,cor_id);
+    uint64_t try_lock = txnMng->cas_remote_content(loc,off,Cicada_PENDING, Cicada_COMMITTED);
     
 	return Abort;
 }
