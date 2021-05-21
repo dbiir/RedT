@@ -253,7 +253,7 @@ if(req->acctype == RD || req->acctype == WR){
     }
 
 	//read remote data
-    row_t * test_row = read_remote_row(loc,m_item->offset);
+    row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
     assert(test_row->get_primary_key() == req->key);
 
     try_lock = cas_remote_content(yield, loc,m_item->offset,lock,0,cor_id);//release lock
@@ -633,7 +633,7 @@ retry_lock:
 			}
 			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
 				rc = WAIT;
-				while(rc == WAIT) {
+				while(rc == WAIT && !simulation->is_done()) {
                     remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 					assert(remote_row->get_primary_key() == req->key);
 
@@ -669,7 +669,7 @@ retry_lock:
 			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
 				// --todo !---pendind need wait //
 				rc = WAIT;
-				while(rc == WAIT) {
+				while(rc == WAIT && !simulation->is_done()) {
 					
 				    remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 					assert(remote_row->get_primary_key() == req->key);

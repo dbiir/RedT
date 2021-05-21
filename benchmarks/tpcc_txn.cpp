@@ -865,7 +865,7 @@ retry_lock:
 			}
 			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
 				rc = WAIT;
-				while(rc == WAIT) {
+				while(rc == WAIT && !simulation->is_done()) {
                     //release lock
                     try_lock = cas_remote_content(loc,m_item->offset,lock,0);
                     //add lock
@@ -906,7 +906,7 @@ retry_lock:
 			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
 				// --todo !---pendind need wait //
 				rc = WAIT;
-				while(rc == WAIT) {
+				while(rc == WAIT && !simulation->is_done()) {
 					//release lock
                     try_lock = cas_remote_content(loc,m_item->offset,lock,0);
                     //add lock

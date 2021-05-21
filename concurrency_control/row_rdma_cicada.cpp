@@ -23,6 +23,7 @@ limitations under the License.
 #include "rdma_cicada.h"
 #include "qps/op.hh"
 #include "rdma.h"
+#include "routine.h"
 #if CC_ALG == RDMA_CICADA
 
 void Row_rdma_cicada::init(row_t * row) {
@@ -49,7 +50,7 @@ bool Row_rdma_cicada::local_cas_lock(TxnManager * txnMng , uint64_t info, uint64
   // return 0;
 }
 
-RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
+RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn, row_t * local_row, uint64_t cor_id) {
 	uint64_t starttime = get_sys_clock();
 	
 	RC rc = RCOK;
@@ -74,11 +75,18 @@ RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
 				// --todo !---pendind need wait //
 				
 				rc = WAIT;
-				while(rc == WAIT) {
+				while(rc == WAIT && !simulation->is_done()) {
 					// local_cas_lock(txn, txn->get_txn_id(), 0);
 					// if(!local_cas_lock(txn, 0, txn->get_txn_id())){
 					// 	return Abort;
 					// }
+					txn->h_thd->last_yield_time = get_sys_clock();
+					// printf("do\n");
+					yield(txn->h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+					uint64_t yield_endtime = get_sys_clock();
+					INC_STATS(txn->get_thd_id(), worker_yield_cnt, 1);
+					INC_STATS(txn->get_thd_id(), worker_yield_time, yield_endtime - txn->h_thd->last_yield_time);
+					INC_STATS(txn->get_thd_id(), worker_idle_time, yield_endtime - txn->h_thd->last_yield_time);
 					if(_row->cicada_version[i].state == Cicada_PENDING) {
 						rc = WAIT;
 					} else if (_row->cicada_version[i].state == Cicada_ABORTED) {
@@ -87,7 +95,7 @@ RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
 						rc = RCOK;
 						version = _row->cicada_version[i].key;
 					}
-					// rc = Abort;
+					rc = Abort;
 				}
 				//rc = Abort;
 				// rc = RCOK;
@@ -113,11 +121,18 @@ RC Row_rdma_cicada::access(access_t type, TxnManager * txn, row_t * local_row) {
 				// --todo !---pendind need wait //
 				
 				rc = WAIT;
-				while(rc == WAIT) {
+				while(rc == WAIT && !simulation->is_done()) {
 					// local_cas_lock(txn, txn->get_txn_id(), 0);
 					// if(!local_cas_lock(txn, 0, txn->get_txn_id())){
 					// 	return Abort;
 					// }
+					txn->h_thd->last_yield_time = get_sys_clock();
+					// printf("do\n");
+					yield(txn->h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+					uint64_t yield_endtime = get_sys_clock();
+					INC_STATS(txn->get_thd_id(), worker_yield_cnt, 1);
+					INC_STATS(txn->get_thd_id(), worker_yield_time, yield_endtime - txn->h_thd->last_yield_time);
+					INC_STATS(txn->get_thd_id(), worker_idle_time, yield_endtime - txn->h_thd->last_yield_time);
 					if(_row->cicada_version[i].state == Cicada_PENDING) {
 						rc = WAIT;
 					} else if (_row->cicada_version[i].state == Cicada_ABORTED) {

@@ -41,7 +41,7 @@ struct RdmaCicadaVersion{
 class Row_rdma_cicada {
 public:
 	void init(row_t * row);
-  RC access(access_t type, TxnManager * txn, row_t * local_row);
+  RC access(yield_func_t &yield, access_t type, TxnManager * txn, row_t * local_row, uint64_t cor_id);
   RC abort(uint64_t num, TxnManager * txn);
   RC commit(uint64_t num, TxnManager * txn, row_t * data);
   void write(row_t * data);
