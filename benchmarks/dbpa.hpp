@@ -1,4 +1,4 @@
-#if USE_DBPA
+#if USE_DBPA == true
 class DBrequests {
 public:
   DBrequests(int n):num(n){

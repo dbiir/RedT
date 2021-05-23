@@ -1,2 +1,7 @@
-RDMA_CICADA 
+RDMA_MVCC 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
+504.40322
+0.0
+33.190525
+0.314287
+0.269257

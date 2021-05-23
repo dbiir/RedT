@@ -172,14 +172,19 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_TS1
+#define CC_ALG RDMA_MVCC
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
 
 #define DEBUG_PRINTF  false
-#define USE_DBPA  true
+
+#if RDMA_ONE_SIDE 
+//OR can be used only when enable DB&PA, consider merge this two option when finish
+#define USE_DBPA true
 #define USE_OR true
+#endif
+
 /***********************************************/
 // USE RDMA
 /**********************************************/

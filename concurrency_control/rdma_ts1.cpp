@@ -169,7 +169,7 @@ void  RDMA_ts1::commit_write(TxnManager * txn , uint64_t num , access_t type){
     // row_t *remote_row = Rdma::get_row_client_memory(txn->get_thd_id());
 	ts_t ts = txn->get_timestamp();
 	//validate lock suc
-	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+	// row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 
 // 	bool suc = false;
 // 	//lock row
@@ -184,7 +184,34 @@ void  RDMA_ts1::commit_write(TxnManager * txn , uint64_t num , access_t type){
 // 	}
 
 // read_remote_row(txn, remote_row, loc, offset);
+#if USE_DBPA == true
+	if(type == XP){
+		// //batch set tid = 0 for remote abort write
+		// uint64_t* tid = (uint64_t*)mem_allocator.alloc(sizeof(uint64_t));
+		// *tid = 0;
+		// txn->write_remote_row(loc, sizeof(uint64_t),offset+sizeof(uint64_t),(char*)tid);
+	}
+	else if(type == WR){
+		uint64_t try_lock;
+		row_t* remote_row = txn->cas_and_read_remote(try_lock,loc,offset,offset,0,lock_num);
+		while(try_lock!=0){ //lock fail
+			mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+			remote_row = txn->cas_and_read_remote(try_lock,loc,offset,offset,0,lock_num);
+		}
+		//update wts, tid and unlock
+		if(remote_row->wts < ts) remote_row->wts = ts;
+		remote_row->tid = 0;
+		remote_row->mutx = 0;
 
+		memcpy(row, remote_row, row_t::get_row_size(remote_row->tuple_size));
+		write_remote(RCOK,txn,access);
+		// assert(remote_row->mutx != 0);
+
+		row->free_row();
+		mem_allocator.free(row, row_t::get_row_size(access->data->tuple_size));
+		mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+	}
+#else
     assert(txn->loop_cas_remote(loc,offset,0,lock_num) == true);//lock in loop
 	row_t *remote_row = txn->read_remote_row(loc,offset);
 
@@ -208,7 +235,8 @@ void  RDMA_ts1::commit_write(TxnManager * txn , uint64_t num , access_t type){
 	row->free_row();
 	mem_allocator.free(row, row_t::get_row_size(access->data->tuple_size));
 	mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
-	mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+	// mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+#endif
 }
 
 void RDMA_ts1::finish(RC rc, TxnManager * txnMng){

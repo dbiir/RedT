@@ -181,11 +181,11 @@ public:
         uint64_t version_num;
         //RdmaMVHis historyVer[HIS_CHAIN_NUM];
         //char datas[HIS_CHAIN_NUM][ROW_DEFAULT_SIZE];
+        uint64_t txn_id[HIS_CHAIN_NUM];
         uint64_t rts[HIS_CHAIN_NUM];
         uint64_t start_ts[HIS_CHAIN_NUM];
         uint64_t end_ts[HIS_CHAIN_NUM];
-        uint64_t txn_id[HIS_CHAIN_NUM];
-		//Row_rdma_mvcc *manager;
+		Row_rdma_mvcc *manager;
 	#elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
 		Row_occ * manager;
 

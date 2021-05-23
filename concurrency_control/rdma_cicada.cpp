@@ -174,9 +174,9 @@ RC RDMA_Cicada::remote_read_or_write(Access * data, TxnManager * txnMng, uint64_
 
     RC rc = RCOK;
 
-#if USE_DBPA
+#if USE_DBPA == true
 	uint64_t try_lock;
-	row_t * temp_row = txnMng->cas_and_read_remote(try_lock,loc,off,0,lock);
+	row_t * temp_row = txnMng->cas_and_read_remote(try_lock,loc,off,off,0,lock);
 #else
     uint64_t try_lock = txnMng->cas_remote_content(loc,off,0,lock);
     // assert(try_lock == 0);

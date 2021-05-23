@@ -76,7 +76,7 @@ private:
   RC mvcc_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC send_timestamp_remote_one_side_request(ycsb_request * req,row_t *& row_local);
-#if USE_DBPA && CC_ALG == RDMA_SILO
+#if USE_DBPA == true && CC_ALG == RDMA_SILO
   void ycsb_batch_read(BatchReadType rtype);
 #endif
   itemid_t* ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id);

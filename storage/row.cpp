@@ -168,8 +168,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_rdma_silo *) mem_allocator.align_alloc(sizeof(Row_rdma_silo));
 #elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
   manager = (Row_rdma_2pl *) mem_allocator.align_alloc(sizeof(Row_rdma_2pl));
-// #elif CC_ALG == RDMA_MVCC
-//   manager = (Row_rdma_mvcc *) mem_allocator.align_alloc(sizeof(Row_rdma_mvcc));
+#elif CC_ALG == RDMA_MVCC
+  manager = (Row_rdma_mvcc *) mem_allocator.align_alloc(sizeof(Row_rdma_mvcc));
 
 #elif CC_ALG == RDMA_MAAT
   manager = (Row_rdma_maat *) mem_allocator.align_alloc(sizeof(Row_rdma_maat));
@@ -179,7 +179,7 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_rdma_cicada *) mem_allocator.align_alloc(sizeof(Row_rdma_cicada));
 #endif
 
-#if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC && CC_ALG!=RDMA_MVCC && CC_ALG != RDMA_CNULL
+#if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC && CC_ALG != RDMA_CNULL
 	manager->init(this);
 #endif
 }
@@ -651,6 +651,8 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
    // rc = this->manager->access(txn, type, txn->cur_row);
    txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
    txn->cur_row->init(get_table(), get_part_id());
+   rc = this->manager->access(txn, access, type);
+
    access->data = txn->cur_row;
 #elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN
 #if CC_ALG == HSTORE_SPEC

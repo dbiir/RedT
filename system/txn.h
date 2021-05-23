@@ -227,14 +227,17 @@ bool rdma_one_side() {
     bool write_remote_index(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content);
     bool write_unlock_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf);//TODO
 
+    bool get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn);
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
      bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
-#if USE_DBPA
+#if USE_DBPA == true
 	void batch_unlock_remote(int loc, RC rc, TxnManager * txnMng , vector<vector<uint64_t>> remote_index_origin,ts_t time = 0);
-    void get_batch_read(BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin);
+	row_t * cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t cas_offset, uint64_t read_offset, uint64_t compare, uint64_t swap);
+#if CC_ALG == RDMA_SILO
     void batch_read(BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin);
-	row_t * cas_and_read_remote(uint64_t& try_lock, uint64_t target_server, uint64_t remote_offset, uint64_t compare, uint64_t swap);
+	void get_batch_read(BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin);
+#endif
 #endif
 //***********coroutine**********//
 	row_t * read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
@@ -305,7 +308,7 @@ bool rdma_one_side() {
 	uint64_t return_id;
 	RC        validate(yield_func_t &yield, uint64_t cor_id);
 	void            cleanup(yield_func_t &yield, RC rc, uint64_t cor_id);
-	void            cleanup_row(RC rc,uint64_t rid);
+	void            cleanup_row(RC rc,uint64_t rid,vector<vector<uint64_t>>&remote_access);
 	void release_last_row_lock();
 	RC send_remote_reads();
 
@@ -428,7 +431,7 @@ protected:
 
 	sem_t rsp_mutex;
 	bool registed_;
-#if USE_DBPA && CC_ALG == RDMA_SILO
+#if USE_DBPA == true && CC_ALG == RDMA_SILO
   	map<int, itemid_t*> reqId_index;
   	map<int, row_t*> reqId_row;
 #endif
