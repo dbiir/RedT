@@ -34,7 +34,7 @@ class TxnManager;
 class Row_rdma_mvcc {
 public:
 	void init(row_t * row);
-	RC access(TxnManager * txn, access_t type, row_t * row);
+	RC access(TxnManager * txn, Access *access, access_t type);
    // RdmaMVHis historyVer[HIS_CHAIN_NUM];
     RC finish(RC rc,TxnManager * txnMng); 
     void local_write_back(TxnManager * txnMng , int num);

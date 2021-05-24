@@ -80,6 +80,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					// if(!local_cas_lock(txn, 0, txn->get_txn_id())){
 					// 	return Abort;
 					// }
+#if USE_COROUTINE
 					txn->h_thd->last_yield_time = get_sys_clock();
 					// printf("do\n");
 					yield(txn->h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
@@ -87,6 +88,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					INC_STATS(txn->get_thd_id(), worker_yield_cnt, 1);
 					INC_STATS(txn->get_thd_id(), worker_yield_time, yield_endtime - txn->h_thd->last_yield_time);
 					INC_STATS(txn->get_thd_id(), worker_idle_time, yield_endtime - txn->h_thd->last_yield_time);
+#endif
 					if(_row->cicada_version[i].state == Cicada_PENDING) {
 						rc = WAIT;
 					} else if (_row->cicada_version[i].state == Cicada_ABORTED) {
@@ -126,6 +128,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					// if(!local_cas_lock(txn, 0, txn->get_txn_id())){
 					// 	return Abort;
 					// }
+#if USE_COROUTINE
 					txn->h_thd->last_yield_time = get_sys_clock();
 					// printf("do\n");
 					yield(txn->h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
@@ -133,6 +136,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					INC_STATS(txn->get_thd_id(), worker_yield_cnt, 1);
 					INC_STATS(txn->get_thd_id(), worker_yield_time, yield_endtime - txn->h_thd->last_yield_time);
 					INC_STATS(txn->get_thd_id(), worker_idle_time, yield_endtime - txn->h_thd->last_yield_time);
+#endif
 					if(_row->cicada_version[i].state == Cicada_PENDING) {
 						rc = WAIT;
 					} else if (_row->cicada_version[i].state == Cicada_ABORTED) {

@@ -24,7 +24,7 @@
 #include "qps/op.hh"
 #if CC_ALG == RDMA_MVCC
 void Row_rdma_mvcc::init(row_t * row) {
-
+	_row = row;
 }
 
 row_t * Row_rdma_mvcc::clear_history(TsType type, ts_t ts) {
@@ -52,15 +52,78 @@ bool Row_rdma_mvcc::conflict(TsType type, ts_t ts) {
 	
 	return true;
 }
-
-RC Row_rdma_mvcc::access(TxnManager * txn, access_t type, row_t * row) {
+RC Row_rdma_mvcc::access(TxnManager * txn, Access *access, access_t type) {
 	RC rc = RCOK;
     if(type == RD){
-
+        //local read;
+        row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+        memcpy(temp_row, _row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+        
+        uint64_t change_num = 0;
+		bool result = false;
+		result = txn->get_version(temp_row,&change_num,txn->txn);
+		if(result == false){//no proper version: Abort
+			rc = Abort;
+			return rc;
+		}
+		//check txn_id
+		if(temp_row->txn_id[change_num] != 0 && temp_row->txn_id[change_num] != txn->get_txn_id() + 1){
+			rc = Abort;
+			return rc;
+		}
+        uint64_t version = change_num;
+		uint64_t old_rts = temp_row->rts[version];
+		uint64_t new_rts = txn->get_timestamp();
+		uint64_t rts_offset = access->offset + 2*sizeof(uint64_t) + HIS_CHAIN_NUM*sizeof(uint64_t) + version*sizeof(uint64_t);
+		uint64_t cas_result = txn->cas_remote_content(access->location,rts_offset,old_rts,new_rts);//lock
+		if(cas_result!=old_rts){ //CAS fail, atomicity violated
+			rc = Abort;
+			return rc;			
+		}
+		//read success
+		temp_row->rts[version] = txn->get_timestamp();
+     	
+        txn->cur_row->copy(temp_row);
+		mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+		rc = RCOK;
+		return rc;
     }
     else if(type == WR){
-        
+        uint64_t lock = txn->get_txn_id()+1;
+		uint64_t try_lock = -1;
+		try_lock = txn->cas_remote_content(access->location,access->offset,0,lock);//lock
+		if(try_lock != 0){
+			rc = Abort;
+			return rc;
+		}
+        //local read;
+        row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+        memcpy(temp_row, _row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+
+		uint64_t version = (temp_row->version_num)%HIS_CHAIN_NUM;
+		if((temp_row->txn_id[version] != 0 && temp_row->txn_id[version] != txn->get_txn_id() + 1)||(txn->get_timestamp() <= temp_row->rts[version])){
+			//local unlock and Abort
+			_row->_tid_word = 0;
+			mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+			rc = Abort;
+			return rc;
+		}
+
+		_row->txn_id[version] = txn->get_txn_id() + 1;
+		_row->rts[version] = txn->get_timestamp();
+		//temp_row->version_num = temp_row->version_num + 1;
+		_row->_tid_word = 0;//release lock
+
+        temp_row->txn_id[version] = txn->get_txn_id() + 1;
+		temp_row->rts[version] = txn->get_timestamp();
+		temp_row->_tid_word = 0;
+
+		txn->cur_row->copy(temp_row);
+		mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+		rc = RCOK;
+		return rc;
     }
+	rc = RCOK;
 	return rc;
 }
 
