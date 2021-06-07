@@ -358,6 +358,8 @@ uint64_t WorkerThread::co_get_next_txn_id(uint64_t cor_id) {
   ++_cor_txn_id[cor_id];
   return txn_id;
 }
+
+
 #endif
 void WorkerThread::check_if_done(RC rc) {
   if (txn_man->waiting_for_response()) return;

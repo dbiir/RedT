@@ -173,15 +173,15 @@ void * Rdma::server_qp(void *){
 
 char* Rdma::get_index_client_memory(uint64_t thd_id,int num) { //num>=1
 	char* temp = (char *)(client_rdma_rm->raw_ptr);
-	temp += sizeof(IndexInfo) * ((num-1) * g_thread_cnt + thd_id);
+	temp += sizeof(IndexInfo) * ((num-1) * g_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
     return temp;
 }
 
 char* Rdma::get_row_client_memory(uint64_t thd_id,int num) { //num>=1
 	//when num>1, get extra row for doorbell batched RDMA requests
 	char* temp = (char *)(client_rdma_rm->raw_ptr);
-	temp +=  sizeof(IndexInfo) * (max_batch_index * g_thread_cnt);
-	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * ((num-1) * g_thread_cnt + thd_id);
+	temp +=  sizeof(IndexInfo) * (max_batch_index * g_thread_cnt * (COROUTINE_CNT + 1));
+	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * ((num-1) * g_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
 	return temp;
 }
 

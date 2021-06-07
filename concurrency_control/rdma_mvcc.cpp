@@ -344,15 +344,43 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
 #if USE_DBPA == true
         for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
             if(remote_access[i].size() > 0){
-                txnMng->batch_unlock_remote(i, Abort, txnMng, remote_access);
+                txnMng->batch_unlock_remote(yield, cor_id, i, Abort, txnMng, remote_access);
             }
         }
 #if USE_OR == true
         for(int i=0;i<g_node_cnt;i++){ //poll result
             if(remote_access[i].size() > 0){
             	//to do: add coroutine
-                auto dbres1 = rc_qp[i][txnMng->get_thd_id()]->wait_one_comp();
-                RDMA_ASSERT(dbres1 == IOCode::Ok);       
+#if USE_COROUTINE
+                uint64_t waitcomp_time;
+                std::pair<int,ibv_wc> dbres1;
+                INC_STATS(txnMng->get_thd_id(), worker_process_time, get_sys_clock() - txnMng->h_thd->cor_process_starttime[cor_id]);
+                
+                do {
+                    txnMng->h_thd->start_wait_time = get_sys_clock();
+                    txnMng->h_thd->last_yield_time = get_sys_clock();
+                    // printf("do\n");
+                    yield(txnMng->h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+                    uint64_t yield_endtime = get_sys_clock();
+                    INC_STATS(txnMng->get_thd_id(), worker_yield_cnt, 1);
+                    INC_STATS(txnMng->get_thd_id(), worker_yield_time, yield_endtime - txnMng->h_thd->last_yield_time);
+                    INC_STATS(txnMng->get_thd_id(), worker_idle_time, yield_endtime - txnMng->h_thd->last_yield_time);
+                    dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->poll_send_comp();
+                    waitcomp_time = get_sys_clock();
+                    
+                    INC_STATS(txnMng->get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
+                    INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+                } while (dbres1.first == 0);
+                txnMng->h_thd->cor_process_starttime[cor_id] = get_sys_clock();
+                // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+#else
+                auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
+                RDMA_ASSERT(dbres1 == IOCode::Ok);
+                endtime = get_sys_clock();
+                INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+                DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+#endif 
+  
             }
         }
 #endif 

@@ -251,7 +251,7 @@ UInt64 client_rdma_buffer_size = 300*(1024*1024L);
 UInt64 rdma_index_size = (300*1024*1024L);
 
 // MAAT
-UInt64 rdma_timetable_size = 3*400*1024*1024;
+UInt64 rdma_timetable_size = 3*1024*1024;
 UInt64 row_set_length = ROW_SET_LENGTH;
 
 // MVCC
