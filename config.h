@@ -73,7 +73,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 3
+#define NODE_CNT 2
 #define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -173,7 +173,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_CICADA
+#define CC_ALG RDMA_MAAT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -256,7 +256,7 @@
 #define PRE_ABORT2					"true"
 #define ATOMIC_WORD					false
 // [RDMA_MAAT]
-#define RDMA_TIMETABLE_MAX 20000000
+#define RDMA_TIMETABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
 #define ROW_SET_LENGTH 30
 
 /***********************************************/

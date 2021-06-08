@@ -272,6 +272,8 @@ public:
 };
 
 int get_thdid_from_txnid(uint64_t txnid);
+uint64_t get_thd_id_from_txn_id(uint64_t txn_id);
+uint64_t get_cor_id_from_txn_id(uint64_t txn_id);
 
 // key_to_part() is only for ycsb
 uint64_t key_to_part(uint64_t key);

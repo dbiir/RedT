@@ -40,6 +40,18 @@ void itemid_t::init() {
 }
 
 int get_thdid_from_txnid(uint64_t txnid) { return txnid % g_thread_cnt; }
+uint64_t get_thd_id_from_txn_id(uint64_t txn_id) {
+    uint64_t node_id = txn_id % g_node_cnt;
+    uint64_t thd_id = ((txn_id - node_id ) / g_node_cnt) % g_thread_cnt;
+    return thd_id;
+}
+
+uint64_t get_cor_id_from_txn_id(uint64_t txn_id) {
+    uint64_t node_id = txn_id % g_node_cnt;
+    uint64_t thd_id = get_thd_id_from_txn_id(txn_id);
+    uint64_t cor_id = (((((txn_id - node_id) / g_node_cnt) - thd_id) / g_thread_cnt) % COROUTINE_CNT) + 1;
+    return cor_id;
+}
 
 uint64_t get_part_id(void *addr) { return ((uint64_t)addr / PAGE_SIZE) % g_part_cnt; }
 

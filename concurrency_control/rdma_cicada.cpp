@@ -210,7 +210,7 @@ RC RDMA_Cicada::remote_read_or_write(yield_func_t &yield, Access * data, TxnMana
 			off = off + sizeof(uint64_t) * 2 + sizeof(RdmaCicadaVersion) * (txnMng->version_num[num] % HIS_CHAIN_NUM);
 #if USE_DBPA
 			uint64_t try_lock;
-			row_t * temp_row2 = txnMng->cas_and_read_remote(try_lock,loc,off,off,Rts,txnMng->get_timestamp());
+			row_t * temp_row2 = txnMng->cas_and_read_remote(yield, try_lock,loc,off,off,Rts,txnMng->get_timestamp(), cor_id);
 #else
 			uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,Rts, txnMng->get_timestamp(),cor_id);
 			row_t *temp_row2 = txnMng->read_remote_row(yield,loc,off,cor_id);
@@ -238,7 +238,7 @@ RC RDMA_Cicada::remote_read_or_write(yield_func_t &yield, Access * data, TxnMana
 	if(data->type == WR && real_write == true) {
 #if USE_DBPA
 		uint64_t try_lock;
-		row_t * temp_row = txnMng->cas_and_read_remote(try_lock,loc,off,off,0,lock);
+		row_t * temp_row = txnMng->cas_and_read_remote(yield, try_lock,loc,off,off,0,lock, cor_id);
 #else
 	    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,0,lock,cor_id);
 		row_t * temp_row = txnMng->read_remote_row(yield,loc,off,cor_id);
@@ -329,15 +329,42 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch write back remote
         if(remote_access[i].size() > 0){
 			ts_t temp_time = 0;
-            txnMng->batch_unlock_remote(i, Abort, txnMng, remote_access,temp_time,remote_num);
+            txnMng->batch_unlock_remote(yield, cor_id, i, Abort, txnMng, remote_access,temp_time,remote_num);
         }
     }
 #if USE_OR == true
     for(int i=0;i<g_node_cnt;i++){ //poll result
         if(remote_access[i].size() > 0){
         	//to do: add coroutine
-            auto dbres1 = rc_qp[i][txnMng->get_thd_id()]->wait_one_comp();
-            RDMA_ASSERT(dbres1 == IOCode::Ok);       
+#if USE_COROUTINE
+			uint64_t waitcomp_time;
+			std::pair<int,ibv_wc> dbres1;
+			INC_STATS(txnMng->get_thd_id(), worker_process_time, get_sys_clock() - txnMng->h_thd->cor_process_starttime[cor_id]);
+			
+			do {
+				txnMng->h_thd->start_wait_time = get_sys_clock();
+				txnMng->h_thd->last_yield_time = get_sys_clock();
+				// printf("do\n");
+				yield(txnMng->h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+				uint64_t yield_endtime = get_sys_clock();
+				INC_STATS(txnMng->get_thd_id(), worker_yield_cnt, 1);
+				INC_STATS(txnMng->get_thd_id(), worker_yield_time, yield_endtime - txnMng->h_thd->last_yield_time);
+				INC_STATS(txnMng->get_thd_id(), worker_idle_time, yield_endtime - txnMng->h_thd->last_yield_time);
+				dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->poll_send_comp();
+				waitcomp_time = get_sys_clock();
+				
+				INC_STATS(txnMng->get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
+				INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+			} while (dbres1.first == 0);
+			txnMng->h_thd->cor_process_starttime[cor_id] = get_sys_clock();
+			// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+#else
+            auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
+            RDMA_ASSERT(dbres1 == IOCode::Ok);
+            endtime = get_sys_clock();
+            INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+            DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+#endif     
         }
     }
 #endif 
@@ -368,15 +395,42 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch write back remote
         if(remote_access[i].size() > 0){
 			ts_t temp_time = 0;
-            txnMng->batch_unlock_remote(i, RCOK, txnMng, remote_access,temp_time,remote_num);
+            txnMng->batch_unlock_remote(yield, cor_id, i, RCOK, txnMng, remote_access,temp_time,remote_num);
         }
     }
 #if USE_OR == true
     for(int i=0;i<g_node_cnt;i++){ //poll result
         if(remote_access[i].size() > 0){
         	//to do: add coroutine
-            auto dbres1 = rc_qp[i][txnMng->get_thd_id()]->wait_one_comp();
-            RDMA_ASSERT(dbres1 == IOCode::Ok);       
+#if USE_COROUTINE
+			uint64_t waitcomp_time;
+			std::pair<int,ibv_wc> dbres1;
+			INC_STATS(txnMng->get_thd_id(), worker_process_time, get_sys_clock() - txnMng->h_thd->cor_process_starttime[cor_id]);
+			
+			do {
+				txnMng->h_thd->start_wait_time = get_sys_clock();
+				txnMng->h_thd->last_yield_time = get_sys_clock();
+				// printf("do\n");
+				yield(txnMng->h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+				uint64_t yield_endtime = get_sys_clock();
+				INC_STATS(txnMng->get_thd_id(), worker_yield_cnt, 1);
+				INC_STATS(txnMng->get_thd_id(), worker_yield_time, yield_endtime - txnMng->h_thd->last_yield_time);
+				INC_STATS(txnMng->get_thd_id(), worker_idle_time, yield_endtime - txnMng->h_thd->last_yield_time);
+				dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->poll_send_comp();
+				waitcomp_time = get_sys_clock();
+				
+				INC_STATS(txnMng->get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
+				INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+			} while (dbres1.first == 0);
+			txnMng->h_thd->cor_process_starttime[cor_id] = get_sys_clock();
+			// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+#else
+            auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
+            RDMA_ASSERT(dbres1 == IOCode::Ok);   
+            endtime = get_sys_clock();
+            INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+            DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+#endif      
         }
     }
 #endif 

@@ -208,13 +208,13 @@ void YCSBTxnManager::ycsb_batch_read(BatchReadType rtype){
 	}
 	for(int i=0;i<g_node_cnt;i++){
 		if(remote_index[i].size()>0){
-			batch_read(rtype,i, remote_index);
+			batch_read(yield, rtype, i, remote_index, cor_id);
 		}
 	}
 #if USE_OR == true
 	for(int i=0;i<g_node_cnt;i++){
 		if(remote_index[i].size()>0){
-			get_batch_read(rtype,i, remote_index);
+			get_batch_read(yield, rtype,i, remote_index, cor_id);
 		}
 	}
 #endif
@@ -399,7 +399,7 @@ remote_atomic_retry_lock:
 			assert(new_lock_info!=0);
 #if USE_DBPA == true
 			uint64_t try_lock = -1;
-			test_row = cas_and_read_remote(try_lock,loc,m_item->offset,m_item->offset,lock_info,new_lock_info);
+			test_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,lock_info,new_lock_info,cor_id);
 			if(try_lock != lock_info){ //CAS fail: Atomicity violated
 				num_atomic_retry++;
 				total_num_atomic_retry++;
@@ -430,7 +430,7 @@ remote_atomic_retry_lock:
 			new_lock_info = 3; //二进制11，即1个写锁
 #if USE_DBPA == true
 			uint64_t try_lock;
-			test_row = cas_and_read_remote(try_lock,loc,m_item->offset,m_item->offset,lock_info,new_lock_info);
+			test_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,lock_info,new_lock_info, cor_id);
 			if(try_lock != lock_info){ //CAS fail: lock conflict. Ignore read content 
 				DEBUG_M("TxnManager::get_row(abort) access free\n");
 				row_local = NULL;
@@ -474,7 +474,7 @@ if(req->acctype == RD || req->acctype == WR){
 		//cas result
 		uint64_t try_lock;
 		//read result
-		row_t * test_row = cas_and_read_remote(try_lock,loc,m_item->offset,m_item->offset,0,1);
+		row_t * test_row = cas_and_read_remote(yield,try_lock,loc,m_item->offset,m_item->offset,0,1,cor_id);
 		
 		if(try_lock != 0){ //if CAS failed, ignore read content
 			DEBUG_M("TxnManager::get_row(abort) access free\n");
@@ -726,7 +726,7 @@ retry_lock:
 
     uint64_t try_lock = -1;
 #if USE_DBPA == true
-	row_t * remote_row = cas_and_read_remote(try_lock,loc,m_item->offset,m_item->offset,0,lock);
+	row_t * remote_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,0,lock,cor_id);
 	if(try_lock != 0) {
 		rc = Abort;
 		//row_local = NULL;

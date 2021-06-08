@@ -43,6 +43,7 @@ struct RdmaTimeTableNode{
 
 
 	void init(uint64_t key) {
+		// printf("init table index: %ld\n", key);
 		lower = 0;
 		upper = UINT64_MAX;
 		this->key = key;

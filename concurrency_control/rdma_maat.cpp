@@ -386,7 +386,7 @@ RC RDMA_Maat::remote_abort(yield_func_t &yield, TxnManager * txnMng, Access * da
 	
 #if USE_DBPA == true
 	uint64_t try_lock;
-	row_t * temp_row = txnMng->cas_and_read_remote(try_lock,loc,off,off,0,lock);
+	row_t * temp_row = txnMng->cas_and_read_remote(yield,try_lock,loc,off,off,0,lock,cor_id);
 #else
     uint64_t try_lock = txnMng->cas_remote_content(yield, loc,off,0,lock, cor_id);
     // assert(try_lock == 0);
@@ -459,10 +459,10 @@ RC RDMA_Maat::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access * d
 	uint64_t thd_id = txnMng->get_thd_id();
 	uint64_t lock = txnMng->get_txn_id() + 1;
 	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-	
+	uint64_t key;
 #if USE_DBPA == true
 	uint64_t try_lock;
-	row_t * temp_row = txnMng->cas_and_read_remote(try_lock,loc,off,off,0,lock);
+	row_t * temp_row = txnMng->cas_and_read_remote(yield,try_lock,loc,off,off,0,lock,cor_id);
 #else
     uint64_t try_lock = txnMng->cas_remote_content(yield, loc,off,0,lock, cor_id);
     row_t *temp_row = txnMng->read_remote_row(yield, loc,off, cor_id);
@@ -614,7 +614,7 @@ void RdmaTimeTable::init() {
 	for( i = 0; i < RDMA_TIMETABLE_MAX; i++) {
 		table[i].init(i);
 	}
-	printf("%d",table[200].key);
+	// printf("%d",table[200].key);
 	printf("init %ld rdmaTimeTable\n", i);
 
 }
@@ -622,35 +622,38 @@ void RdmaTimeTable::init() {
 uint64_t RdmaTimeTable::hash(uint64_t key) { return key % table_size; }
 
 
-void RdmaTimeTable::init(uint64_t thd_id, uint64_t key) {
-	//table[key]._lock = g_node_id;
-	table[key].lower = 0;
-	table[key].upper = UINT64_MAX;
-	table[key].key = key;
-	table[key].state = MAAT_RUNNING;
-	table[key]._lock = 0;
-}
+// void RdmaTimeTable::init(uint64_t thd_id, uint64_t key) {
+// 	//table[key]._lock = g_node_id;
+// 	// printf("init table index: %ld\n", key);
+// 	table[key].lower = 0;
+// 	table[key].upper = UINT64_MAX;
+// 	table[key].key = key;
+// 	table[key].state = MAAT_RUNNING;
+// 	table[key]._lock = 0;
+// }
 
 void RdmaTimeTable::release(uint64_t thd_id, uint64_t key) {
 	//table[key]._lock = g_node_id;
-	table[key].lower = 0;
-	table[key].upper = UINT64_MAX;
-	table[key].key = key;
-	table[key].state = MAAT_RUNNING;
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	table[index].lower = 0;
+	table[index].upper = UINT64_MAX;
+	table[index].key = key;
+	table[index].state = MAAT_RUNNING;
 	//table[key]._lock = 0;
 }
 
 uint64_t RdmaTimeTable::local_get_lower(uint64_t thd_id, uint64_t key) {
-
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	//table[key]._lock = g_node_id;
-	uint64_t value = table[key].lower;
+	uint64_t value = table[index].lower;
 	//table[key]._lock = 0;
 	return value;
 }
 
 uint64_t RdmaTimeTable::local_get_upper(uint64_t thd_id, uint64_t key) {
 	//table[key]._lock = g_node_id;
-	uint64_t value = table[key].upper;
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t value = table[index].upper;
 	//table[key]._lock = 0;
 	return value;
 }
@@ -658,36 +661,43 @@ uint64_t RdmaTimeTable::local_get_upper(uint64_t thd_id, uint64_t key) {
 
 void RdmaTimeTable::local_set_lower(uint64_t thd_id, uint64_t key, uint64_t value) {
 	//table[key]._lock = g_node_id;
-	table[key].lower = value;
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	table[index].lower = value;
 	//table[key]._lock = 0;
 }
 
 void RdmaTimeTable::local_set_upper(uint64_t thd_id, uint64_t key, uint64_t value) {
 	//table[key]._lock = g_node_id;
-	table[key].upper = value;
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	table[index].upper = value;
 	//table[key]._lock = 0;
 }
 
 MAATState RdmaTimeTable::local_get_state(uint64_t thd_id, uint64_t key) {
 	//table[key]._lock = g_node_id;
 	MAATState state = MAAT_ABORTED;
-	state = table[key].state;   
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	state = table[index].state;   
 	//table[key]._lock = 0;
 	return state;
 }
 
 void RdmaTimeTable::local_set_state(uint64_t thd_id, uint64_t key, MAATState value) {
 	//table[key]._lock = g_node_id;
-	table[key].state = value;
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	table[index].state = value;
 	//table[key]._lock = 0;
 }
 
 RdmaTimeTableNode * RdmaTimeTable::remote_get_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id) {
 	assert(key % g_node_cnt != g_node_id);
 	uint64_t node_id = key % g_node_cnt;
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	
 	// todo: here we need to get the corresponding index
 	// uint64_t index_key = 0;
-	uint64_t timenode_addr = (key) * sizeof(RdmaTimeTableNode) + (rdma_buffer_size - rdma_timetable_size);
+	// printf("init table index: %ld\n", key);
+	uint64_t timenode_addr = (index) * sizeof(RdmaTimeTableNode) + (rdma_buffer_size - rdma_timetable_size);
 	uint64_t timenode_size = sizeof(RdmaTimeTableNode);
 	// each thread uses only its own piece of client memory address
     uint64_t thd_id = txnMng->get_thd_id();
@@ -714,10 +724,10 @@ RdmaTimeTableNode * RdmaTimeTable::remote_get_timeNode(yield_func_t &yield, TxnM
 void RdmaTimeTable::remote_set_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTimeTableNode * value, uint64_t cor_id) {
 	uint64_t node_id = key % g_node_cnt;
 	assert(node_id != g_node_id);
-
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	// todo: here we need to get the corresponding index
 	// uint64_t index_key = 0;
-	uint64_t timenode_addr = (key) * sizeof(RdmaTimeTableNode) + (rdma_buffer_size - rdma_timetable_size);
+	uint64_t timenode_addr = (index) * sizeof(RdmaTimeTableNode) + (rdma_buffer_size - rdma_timetable_size);
 	uint64_t timenode_size = sizeof(RdmaTimeTableNode);
 	// each thread uses only its own piece of client memory address
     uint64_t thd_id = txnMng->get_thd_id();
