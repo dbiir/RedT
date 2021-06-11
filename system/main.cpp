@@ -82,7 +82,8 @@ CalvinSequencerThread * calvin_seq_thds;
 void parser(int argc, char * argv[]);
 
 int main(int argc, char *argv[]) {
-	
+	RDMA_MEMORY_LATCH = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init(RDMA_MEMORY_LATCH, NULL);
 
     // 0. initialize global data structure
     parser(argc, argv);
@@ -321,13 +322,17 @@ int main(int argc, char *argv[]) {
 	commit_file.open("commit_histroy.txt",ios::app);
 	abort_file.open("abort_histroy.txt",ios::app);
 #endif
+    printf("max_tuple_size:%ld tuple_count:%ld memory_size:%ld\n", max_tuple_size,tuple_count,memory_count);
 
 	// 2. spawn multiple threads
 	uint64_t thd_cnt = g_thread_cnt;
 	uint64_t wthd_cnt = thd_cnt;
 	uint64_t rthd_cnt = g_rem_thread_cnt;
 	uint64_t sthd_cnt = g_send_thread_cnt;
-	uint64_t all_thd_cnt = thd_cnt + rthd_cnt + sthd_cnt + g_abort_thread_cnt + 1;
+	uint64_t all_thd_cnt = thd_cnt + rthd_cnt + sthd_cnt + g_abort_thread_cnt;
+#if USE_WORK_NUM_THREAD
+        all_thd_cnt += 1; 
+#endif
 #if LOGGING
 		all_thd_cnt += 1; // logger thread
 #endif
@@ -352,7 +357,9 @@ int main(int argc, char *argv[]) {
 	pthread_attr_init(&attr);
 
 	worker_thds = new WorkerThread[wthd_cnt];
-	worker_num_thds = new WorkerNumThread[1];
+#if USE_WORK_NUM_THREAD
+    worker_num_thds = new WorkerNumThread[1];
+#endif
 	input_thds = new InputThread[rthd_cnt];
 	output_thds = new OutputThread[sthd_cnt];
 	abort_thds = new AbortThread[1];
@@ -474,9 +481,10 @@ int main(int argc, char *argv[]) {
 	calvin_seq_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], &attr, run_thread, (void *)&calvin_seq_thds[0]);
 #endif
-
+#if USE_WORK_NUM_THREAD
 	worker_num_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], &attr, run_thread, (void *)&worker_num_thds[0]);
+#endif
 	for (uint64_t i = 0; i < all_thd_cnt; i++) pthread_join(p_thds[i], NULL);
 
 	endtime = get_server_clock();

@@ -121,9 +121,9 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 #if USE_DBPA == true && CC_ALG == RDMA_SILO
 	//batch read all index for remote access
-	ycsb_batch_read(R_INDEX);
+	ycsb_batch_read(yield,R_INDEX,cor_id);
 	//batch read all row for remote access
-	ycsb_batch_read(R_ROW);
+	ycsb_batch_read(yield,R_ROW,cor_id);
 #endif
 	while(rc == RCOK && !is_done()) {
 
@@ -194,7 +194,7 @@ bool YCSBTxnManager::is_local_request(uint64_t idx) {
 }
 
 #if USE_DBPA == true && CC_ALG == RDMA_SILO
-void YCSBTxnManager::ycsb_batch_read(BatchReadType rtype){
+void YCSBTxnManager::ycsb_batch_read(yield_func_t &yield,BatchReadType rtype, uint64_t cor_id){
   	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	vector<vector<uint64_t>> remote_index(g_node_cnt);
 

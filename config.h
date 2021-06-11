@@ -27,7 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-#define USE_COROUTINE true
+#define USE_COROUTINE false
 #define MAX_SEND_SIZE 1
 /***********************************************/
 // DA Trans Creator
@@ -54,6 +54,7 @@
 #define SECOND 200 // Set the queue monitoring time.
 // #define THD_ID_QUEUE
 #define ONE_NODE_RECIEVE 0 // only node 0 will receive the txn query
+#define USE_WORK_NUM_THREAD false
 #if 1
 // #define LESS_DIS // Reduce the number of yCSB remote data to 1
 // #define LESS_DIS_NUM 0 // Reduce the number of yCSB remote data to 1
@@ -73,16 +74,16 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
-#define THREAD_CNT 10
+#define NODE_CNT 4
+#define THREAD_CNT 28
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 8
+#define COROUTINE_CNT 2
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
 #define CLIENT_NODE_CNT NODE_CNT
-#define CLIENT_THREAD_CNT 4
+#define CLIENT_THREAD_CNT 1
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
@@ -108,14 +109,14 @@
 // # of transactions to run for warmup
 #define WARMUP            0
 // YCSB or TPCC or PPS or DA
-#define WORKLOAD YCSB
+#define WORKLOAD TPCC
 // print the transaction latency distribution
 #define PRT_LAT_DISTR false
 #define STATS_ENABLE        true
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 10000
+#define MAX_TXN_IN_FLIGHT 200000
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -173,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_MAAT
+#define CC_ALG RDMA_SILO
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -182,8 +183,8 @@
 
 #if RDMA_ONE_SIDE 
 //OR can be used only when enable DB&PA, consider merge this two option when finish
-#define USE_DBPA true
-#define USE_OR true
+#define USE_DBPA false
+#define USE_OR false
 #endif
 
 /***********************************************/
@@ -286,8 +287,8 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 3145728
-#define ZIPF_THETA 0.001
+#define SYNTH_TABLE_SIZE 65536
+#define ZIPF_THETA 0.3
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
@@ -312,7 +313,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH 32
+#define NUM_WH 112
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0
@@ -513,7 +514,7 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 40 * BILLION // ~1 minutes
 #define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
 
 #define SEED 0

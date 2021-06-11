@@ -206,12 +206,17 @@ UInt32 g_logger_thread_cnt = 1;
 #else
 UInt32 g_logger_thread_cnt = 0;
 #endif
+#if USE_WORK_NUM_THREAD
+UInt32 g_work_thread_cnt = 1;
+#else
+UInt32 g_work_thread_cnt = 0;
+#endif
 UInt32 g_send_thread_cnt = SEND_THREAD_CNT;
 #if CC_ALG == CALVIN
 // sequencer + scheduler thread
-UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + 3;
+UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + 2 + g_work_thread_cnt;
 #else
-UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + 1;
+UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + g_work_thread_cnt;
 #endif
 
 UInt32 g_total_client_thread_cnt = g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
@@ -246,7 +251,12 @@ UInt64 g_msg_time_limit = MSG_TIME_LIMIT;
 UInt64 g_log_buf_max = LOG_BUF_MAX;
 UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 
-UInt64 rdma_buffer_size = 12*(1024*1024*1024L);
+UInt64 memory_count = 0;
+UInt64 tuple_count = 0;
+UInt64 max_tuple_size = 0;
+pthread_mutex_t * RDMA_MEMORY_LATCH;
+
+UInt64 rdma_buffer_size = 10*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 300*(1024*1024L);
 UInt64 rdma_index_size = (300*1024*1024L);
 

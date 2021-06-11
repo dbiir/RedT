@@ -272,6 +272,7 @@ extern UInt32 g_this_total_thread_cnt;
 extern UInt32 g_thread_cnt;
 extern UInt32 g_abort_thread_cnt;
 extern UInt32 g_logger_thread_cnt;
+extern UInt32 g_work_thread_cnt;
 extern UInt32 g_tcp_thread_cnt;
 extern UInt32 g_send_thread_cnt;
 extern UInt32 g_rem_thread_cnt;
@@ -286,6 +287,12 @@ extern int32_t g_inflight_max;
 extern uint64_t g_msg_size;
 extern uint64_t g_log_buf_max;
 extern uint64_t g_log_flush_timeout;
+
+extern UInt64 memory_count;
+extern UInt64 tuple_count;
+extern UInt64 max_tuple_size;
+extern pthread_mutex_t * RDMA_MEMORY_LATCH;
+
 extern uint64_t rdma_buffer_size;
 extern uint64_t client_rdma_buffer_size;
 extern uint64_t rdma_index_size;

@@ -68,16 +68,16 @@ public:
   uint64_t result_false;
   uint64_t cas_cnt;
 
-  double  local_lock_fail_abort;
-  double  remote_lock_fail_abort;
-  double  local_readset_validate_fail_abort;
-  double  remote_readset_validate_fail_abort;
-  double  local_writeset_validate_fail_abort;
-  double  remote_writeset_validate_fail_abort;
-  double  validate_lock_abort;
-  double  local_try_lock_fail_abort;
-  double  remote_try_lock_fail_abort;
-  double  cnt_unequal_abort;
+  uint64_t  local_lock_fail_abort;
+  uint64_t  remote_lock_fail_abort;
+  uint64_t  local_readset_validate_fail_abort;
+  uint64_t  remote_readset_validate_fail_abort;
+  uint64_t  local_writeset_validate_fail_abort;
+  uint64_t  remote_writeset_validate_fail_abort;
+  uint64_t  validate_lock_abort;
+  uint64_t  local_try_lock_fail_abort;
+  uint64_t  remote_try_lock_fail_abort;
+  uint64_t  cnt_unequal_abort;
 
   uint64_t tpcc_fin_abort ;
   uint64_t silo_lock_write_abort;

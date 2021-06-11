@@ -1297,7 +1297,7 @@ inline RC TPCCTxnManager::run_payment_5(uint64_t w_id, uint64_t d_id, uint64_t c
 	row_t * r_hist;
 	uint64_t row_id;
 	// Which partition should we be inserting into?
-	_wl->t_history->get_new_row(r_hist, wh_to_part(c_w_id), row_id);
+	_wl->t_history->get_general_new_row(r_hist, wh_to_part(c_w_id), row_id);
 	r_hist->set_value(H_C_ID, c_id);
 	r_hist->set_value(H_C_D_ID, c_d_id);
 	r_hist->set_value(H_C_W_ID, c_w_id);
@@ -1426,7 +1426,7 @@ inline RC TPCCTxnManager::new_order_5(uint64_t w_id, uint64_t d_id, uint64_t c_i
 	+========================================================================================*/
 	row_t * r_order;
 	uint64_t row_id;
-	_wl->t_order->get_new_row(r_order, wh_to_part(w_id), row_id);
+	_wl->t_order->get_general_new_row(r_order, wh_to_part(w_id), row_id);
 	r_order->set_value(O_ID, *o_id);
 	r_order->set_value(O_C_ID, c_id);
 	r_order->set_value(O_D_ID, d_id);
@@ -1441,7 +1441,7 @@ inline RC TPCCTxnManager::new_order_5(uint64_t w_id, uint64_t d_id, uint64_t c_i
 				VALUES (:o_id, :d_id, :w_id);
 		+=======================================================*/
 	row_t * r_no;
-	_wl->t_neworder->get_new_row(r_no, wh_to_part(w_id), row_id);
+	_wl->t_neworder->get_general_new_row(r_no, wh_to_part(w_id), row_id);
 	r_no->set_value(NO_O_ID, *o_id);
 	r_no->set_value(NO_D_ID, d_id);
 	r_no->set_value(NO_W_ID, w_id);
@@ -1568,7 +1568,7 @@ inline RC TPCCTxnManager::new_order_9(uint64_t w_id, uint64_t d_id, bool remote,
 	+====================================================*/
 	row_t * r_ol;
 	uint64_t row_id;
-	_wl->t_orderline->get_new_row(r_ol, wh_to_part(ol_supply_w_id), row_id);
+	_wl->t_orderline->get_general_new_row(r_ol, wh_to_part(ol_supply_w_id), row_id);
 	r_ol->set_value(OL_O_ID, &o_id);
 	r_ol->set_value(OL_D_ID, &d_id);
 	r_ol->set_value(OL_W_ID, &w_id);

@@ -97,7 +97,8 @@ RC RDMA_silo::validate_rdma_silo(yield_func_t &yield, TxnManager * txnMng, uint6
 					break;
 				}
 				DEBUG("silo %ld write lock row %ld \n", txnMng->get_txn_id(), row->get_primary_key());
-				if (!row->manager->assert_lock(txn->txn_id)) {
+				if (!row->manager->assert_lock(txnMng->get_txn_id())) {
+                    // printf("[101]table_name = %s, _tid_word = %ld,lock = %ld\n",row->table_name,row->_tid_word,txnMng->get_txn_id());
 				   //  RDMA_LOG(4) << "txn " << txn->txn_id << " lock "<<row->get_primary_key() <<" failed and abort";
 				    INC_STATS(txnMng->get_thd_id(), local_lock_fail_abort, 1);
 					INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
@@ -318,6 +319,7 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 
 		}
 #if USE_DBPA == true
+    uint64_t starttime = get_sys_clock(), endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
         if(remote_access[i].size() > 0){
             txnMng->batch_unlock_remote(yield, cor_id, i, Abort, txnMng, remote_access);
@@ -352,12 +354,14 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 #else
             auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
             RDMA_ASSERT(dbres1 == IOCode::Ok);
-			endtime = get_sys_clock();
-			INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-			DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif 
         }
     }
+#if !USE_COROUTINE
+    endtime = get_sys_clock();
+    INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
+    DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
+#endif
 #endif 
 #endif
 	} 
@@ -388,6 +392,7 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 			}
 		}
 #if USE_DBPA == true
+    uint64_t starttime = get_sys_clock(), endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
         if(remote_access[i].size() > 0){
             txnMng->batch_unlock_remote(yield, cor_id, i, RCOK, txnMng, remote_access,time);
@@ -422,12 +427,14 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 #else
             auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
             RDMA_ASSERT(dbres1 == IOCode::Ok); 
-			endtime = get_sys_clock();
-			INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-			DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif      
         }
     }
+#if !USE_COROUTINE
+    endtime = get_sys_clock();
+    INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
+    DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
+#endif
 #endif 
 #endif
 
