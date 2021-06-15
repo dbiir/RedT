@@ -79,8 +79,8 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
 
-#if CC_ALG == CALVIN
-	rc = run_calvin_txn();
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+	rc = run_calvin_txn(yield, cor_id);//run_calvin_txn();
 	return rc;
 #endif
 
@@ -133,7 +133,7 @@ bool TPCCTxnManager::is_done() {
 
 RC TPCCTxnManager::acquire_locks() {
 	uint64_t starttime = get_sys_clock();
-	assert(CC_ALG == CALVIN);
+	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
 	locking_done = false;
 	RC rc = RCOK;
 	RC rc2;
@@ -1660,7 +1660,7 @@ RC TPCCTxnManager::run_calvin_txn(yield_func_t &yield, uint64_t cor_id) {
 RC TPCCTxnManager::run_tpcc_phase2(yield_func_t &yield, uint64_t cor_id) {
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	RC rc = RCOK;
-	assert(CC_ALG == CALVIN);
+	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
 
 	uint64_t w_id = tpcc_query->w_id;
 	uint64_t d_id = tpcc_query->d_id;
@@ -1719,7 +1719,7 @@ RC TPCCTxnManager::run_tpcc_phase2(yield_func_t &yield, uint64_t cor_id) {
 RC TPCCTxnManager::run_tpcc_phase5(yield_func_t &yield, uint64_t cor_id) {
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	RC rc = RCOK;
-	assert(CC_ALG == CALVIN);
+	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
 
 	uint64_t w_id = tpcc_query->w_id;
 	uint64_t d_id = tpcc_query->d_id;

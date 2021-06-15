@@ -10,6 +10,7 @@
 #include "index_rdma.h"
 #include "storage/row.h"
 #include "storage/table.h"
+#include "system/rdma_calvin.h"
 char *Rdma::rdma_buffer; //= new char[RDMA_BUFFER_SIZE];
 char ** Rdma::ifaddr = new char *[g_total_node_cnt+20];
 
@@ -118,9 +119,9 @@ void * Rdma::client_qp(void *arg){
   rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);
   remote_mr_attr[node_id] = std::get<1>(fetch_res.desc);
 #if USE_COROUTINE
-	for(int thread_id = 0;thread_id < g_thread_cnt * (COROUTINE_CNT + 1); thread_id ++){
+	for(int thread_id = 0;thread_id < g_total_thread_cnt * (COROUTINE_CNT + 1); thread_id ++){
 #else
-  for(int thread_id = 0;thread_id < g_thread_cnt ; thread_id ++){
+  for(int thread_id = 0;thread_id < g_total_thread_cnt ; thread_id ++){
 #endif
 	rc_qp[node_id][thread_id] = RDMARC::create(nic, QPConfig()).value();
 
@@ -166,6 +167,7 @@ void * Rdma::server_qp(void *){
 								.value()
 								.buf);
 	rdma_timetable_buffer = rdma_global_buffer + (rdma_buffer_size - rdma_timetable_size);
+	rdma_calvin_buffer = rdma_global_buffer + (rdma_buffer_size - rdma_timetable_size - rdma_calvin_buffer_size);
 	rm_ctrl->start_daemon();
 
 	return NULL;
@@ -173,26 +175,38 @@ void * Rdma::server_qp(void *){
 
 char* Rdma::get_index_client_memory(uint64_t thd_id,int num) { //num>=1
 	char* temp = (char *)(client_rdma_rm->raw_ptr);
-	temp += sizeof(IndexInfo) * ((num-1) * g_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
+	temp += sizeof(IndexInfo) * ((num-1) * g_total_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
     return temp;
 }
 
 char* Rdma::get_row_client_memory(uint64_t thd_id,int num) { //num>=1
 	//when num>1, get extra row for doorbell batched RDMA requests
 	char* temp = (char *)(client_rdma_rm->raw_ptr);
-	temp +=  sizeof(IndexInfo) * (max_batch_index * g_thread_cnt * (COROUTINE_CNT + 1));
-	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * ((num-1) * g_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
+	temp +=  sizeof(IndexInfo) * (max_batch_index * g_total_thread_cnt * (COROUTINE_CNT + 1));
+	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * ((num-1) * g_total_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
 	return temp;
 }
 
 /*
 char* Rdma::get_table_client_memory(uint64_t thd_id) {
-	char* temp = (char *)(client_rdma_rm->raw_ptr + sizeof(IndexInfo) * g_thread_cnt);
- 	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * g_thread_cnt;
+	char* temp = (char *)(client_rdma_rm->raw_ptr + sizeof(IndexInfo) * g_total_thread_cnt);
+ 	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * g_total_thread_cnt;
   	temp += sizeof(table_t) * thd_id;
   	return temp;
 }
 */
+
+#if CC_ALG == RDMA_CALVIN
+char* Rdma::get_queue_client_memory() {
+	char * temp =  (char *)(client_rdma_rm->raw_ptr);
+  	return temp;
+}
+
+char* Rdma::get_rear_client_memory() {
+	char * temp =  (char *)(client_rdma_rm->raw_ptr) + g_msg_size;
+  	return temp;
+}
+#endif
 
 #if 0
 void *malloc_huge_pages(size_t size,uint64_t huge_page_sz,bool flag)
@@ -247,9 +261,9 @@ void Rdma::init(){
 	uint64_t thread_num = 0;
 	uint64_t node_id = 0;
 #if USE_COROUTINE
-	pthread_t *client_thread = new pthread_t[g_total_node_cnt * g_thread_cnt * (COROUTINE_CNT + 1)];
+	pthread_t *client_thread = new pthread_t[g_total_node_cnt * g_total_thread_cnt * (COROUTINE_CNT + 1)];
 #else
-	pthread_t *client_thread = new pthread_t[g_total_node_cnt * g_thread_cnt];
+	pthread_t *client_thread = new pthread_t[g_total_node_cnt * g_total_thread_cnt];
 #endif
 	pthread_t server_thread;
 	printf("g_total_node_cnt = %d",g_total_node_cnt);

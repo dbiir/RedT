@@ -99,6 +99,9 @@ class RDMA_ts1;
 #if CC_ALG == RDMA_CICADA
 class RDMA_Cicada;
 #endif
+#if CC_ALG == RDMA_CALVIN
+class RDMA_calvin;
+#endif
 #if CC_ALG == RDMA_CNULL
 class RDMA_Null;
 #endif
@@ -176,6 +179,9 @@ extern RDMA_ts1 rdmats_man;
 #if CC_ALG == RDMA_CICADA
 extern RDMA_Cicada rcicada_man;
 #endif
+#if CC_ALG == RDMA_CALVIN
+extern RDMA_calvin calvin_man;
+#endif
 #if CC_ALG == RDMA_CNULL
 extern RDMA_Null rcnull_man;
 #endif
@@ -209,6 +215,8 @@ extern map<string, string> g_params;
 
 extern char *rdma_global_buffer;
 extern char *rdma_timetable_buffer;
+// CALVIN share memory
+extern char *rdma_calvin_buffer;
 //extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
 extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
 extern rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
@@ -218,12 +226,17 @@ extern rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
 extern std::vector<rdmaio::ConnectManager> cm;
 extern rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
 extern rdmaio::Arc<rdmaio::RNic> nic;
-extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
+// extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
+extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][RDMA_MAX_CLIENT_QP * (COROUTINE_CNT + 1)];
 
 extern rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
 
 extern string rdma_server_add[NODE_CNT];
-extern string qp_name[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
+// #if USE_COROUTINE
+extern string qp_name[NODE_CNT][RDMA_MAX_CLIENT_QP * (COROUTINE_CNT + 1)];
+// else
+// extern string qp_name[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
+// #endif
 
 //extern rdmaio::ConnectManager cm[NODE_CNT];
 //extern r2::Allocator *r2_allocator;
@@ -387,6 +400,7 @@ extern ofstream commit_file;
 extern ofstream abort_file;
 // CALVIN
 extern UInt32 g_seq_thread_cnt;
+extern UInt64 rdma_calvin_buffer_size;
 
 // TICTOC
 extern uint32_t g_max_num_waits;
@@ -482,8 +496,8 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
   (id >= g_node_cnt + g_client_node_cnt && \
    id < g_node_cnt + g_client_node_cnt + g_repl_cnt * g_node_cnt)
 #define ISCLIENTN(id) (id >= g_node_cnt && id < g_node_cnt + g_client_node_cnt)
-#define IS_LOCAL(tid) (tid % g_node_cnt == g_node_id || CC_ALG == CALVIN)
-#define IS_REMOTE(tid) (tid % g_node_cnt != g_node_id || CC_ALG == CALVIN)
+#define IS_LOCAL(tid) (tid % g_node_cnt == g_node_id || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN)
+#define IS_REMOTE(tid) (tid % g_node_cnt != g_node_id || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN)
 #define IS_LOCAL_KEY(key) (key % g_node_cnt == g_node_id)
 
 /*

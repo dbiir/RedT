@@ -224,7 +224,7 @@ uint64_t Message::mget_size() {
   uint64_t size = 0;
   size += sizeof(RemReqType);
   size += sizeof(uint64_t);
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   size += sizeof(uint64_t);
 #endif
   // for stats, send message queue time
@@ -238,7 +238,7 @@ uint64_t Message::mget_size() {
 void Message::mcopy_from_txn(TxnManager * txn) {
   //rtype = query->rtype;
   txn_id = txn->get_txn_id();
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   batch_id = txn->get_batch_id();
 #endif
 }
@@ -249,7 +249,7 @@ void Message::mcopy_from_buf(char * buf) {
   uint64_t ptr = 0;
   COPY_VAL(rtype,buf,ptr);
   COPY_VAL(txn_id,buf,ptr);
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   COPY_VAL(batch_id,buf,ptr);
 #endif
   COPY_VAL(mq_time,buf,ptr);
@@ -261,8 +261,8 @@ void Message::mcopy_from_buf(char * buf) {
   COPY_VAL(lat_process_time,buf,ptr);
   COPY_VAL(lat_network_time,buf,ptr);
   COPY_VAL(lat_other_time,buf,ptr);
-  if ((CC_ALG == CALVIN && rtype == CALVIN_ACK && txn_id % g_node_cnt == g_node_id) ||
-      (CC_ALG != CALVIN && IS_LOCAL(txn_id))) {
+  if (((CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) && rtype == CALVIN_ACK && txn_id % g_node_cnt == g_node_id) ||
+      ((CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) && IS_LOCAL(txn_id))) {
     lat_network_time = (get_sys_clock() - lat_network_time) - lat_other_time;
   } else {
     lat_other_time = get_sys_clock();
@@ -274,7 +274,7 @@ void Message::mcopy_to_buf(char * buf) {
   uint64_t ptr = 0;
   COPY_BUF(buf,rtype,ptr);
   COPY_BUF(buf,txn_id,ptr);
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   COPY_BUF(buf,batch_id,ptr);
 #endif
   COPY_BUF(buf,mq_time,ptr);
@@ -284,8 +284,8 @@ void Message::mcopy_to_buf(char * buf) {
   COPY_BUF(buf,lat_cc_block_time,ptr);
   COPY_BUF(buf,lat_cc_time,ptr);
   COPY_BUF(buf,lat_process_time,ptr);
-  if ((CC_ALG == CALVIN && (rtype == CL_QRY||rtype == CL_QRY_O) && txn_id % g_node_cnt == g_node_id) ||
-      (CC_ALG != CALVIN && IS_LOCAL(txn_id))) {
+  if (((CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) && (rtype == CL_QRY||rtype == CL_QRY_O) && txn_id % g_node_cnt == g_node_id) ||
+      ((CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) && IS_LOCAL(txn_id))) {
     lat_network_time = get_sys_clock();
   } else {
     lat_other_time = get_sys_clock() - lat_other_time;
@@ -740,7 +740,7 @@ uint64_t PPSClientQueryMessage::get_size() {
   size += sizeof(uint64_t)*3;
   size += sizeof(size_t);
   size += sizeof(uint64_t) * part_keys.size();
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   size += sizeof(bool);
 #endif
   return size;
@@ -764,7 +764,7 @@ void PPSClientQueryMessage::copy_from_query(BaseQuery * query) {
 void PPSClientQueryMessage::copy_from_txn(TxnManager * txn) {
   ClientQueryMessage::mcopy_from_txn(txn);
   copy_from_query(txn->query);
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   recon = txn->isRecon();
 #endif
 }
@@ -796,7 +796,7 @@ void PPSClientQueryMessage::copy_to_txn(TxnManager * txn) {
   pps_query->supplier_key = supplier_key;
   pps_query->part_keys.append(part_keys);
 
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   txn->recon = recon;
 #endif
 #if DEBUG_DISTR
@@ -825,7 +825,7 @@ void PPSClientQueryMessage::copy_from_buf(char * buf) {
     part_keys.add(item);
   }
 
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   COPY_VAL(recon,buf,ptr);
 #endif
 
@@ -854,7 +854,7 @@ void PPSClientQueryMessage::copy_to_buf(char * buf) {
     COPY_BUF(buf,item,ptr);
   }
 
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   COPY_BUF(buf,recon,ptr);
 #endif
 

@@ -59,6 +59,7 @@
 #include "rdma_maat.h"
 #include "rdma_ts1.h"
 #include "rdma_cicada.h"
+#include "rdma_calvin.h"
 #include "rdma_null.h"
 #include "key_xid.h"
 #include "rts_cache.h"
@@ -113,6 +114,9 @@ RDMA_ts1 rdmats_man;
 #endif
 #if CC_ALG == RDMA_CICADA
 RDMA_Cicada rcicada_man;
+#endif
+#if CC_ALG == RDMA_CALVIN
+RDMA_calvin calvin_man;
 #endif
 #if CC_ALG == RDMA_CNULL
 RDMA_Null rcnull_man;
@@ -207,7 +211,7 @@ UInt32 g_logger_thread_cnt = 1;
 UInt32 g_logger_thread_cnt = 0;
 #endif
 UInt32 g_send_thread_cnt = SEND_THREAD_CNT;
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 // sequencer + scheduler thread
 UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + 3;
 #else
@@ -261,6 +265,7 @@ UInt64 g_his_recycle_len = HIS_RECYCLE_LEN;
 
 // CALVIN
 UInt32 g_seq_thread_cnt = SEQ_THREAD_CNT;
+UInt64 rdma_calvin_buffer_size = 100*1024*1024;
 
 // TICTOC
 uint32_t g_max_num_waits = MAX_NUM_WAITS;
@@ -330,6 +335,8 @@ map<string, string> g_params;
 
 char *rdma_global_buffer;
 char *rdma_timetable_buffer;
+// CALVIN shared memory
+char *rdma_calvin_buffer;
 //rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
 rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
 //Each thread uses only its own piece of client memory address
@@ -350,12 +357,14 @@ rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
 std::vector<rdmaio::ConnectManager> cm;
 rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
 rdmaio::Arc<rdmaio::RNic> nic;
-rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
+// rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
+rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][RDMA_MAX_CLIENT_QP * (COROUTINE_CNT + 1)];
 
 rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
 
 string rdma_server_add[NODE_CNT];
-string qp_name[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
+// string qp_name[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
+string qp_name[NODE_CNT][RDMA_MAX_CLIENT_QP * (COROUTINE_CNT + 1)];
 //rdmaio::ConnectManager cm[NODE_CNT];
 
 int rdma_server_port[NODE_CNT];

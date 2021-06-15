@@ -170,7 +170,7 @@ public:
 		ts_t wts;
     	ts_t rts;
 		Row_rdma_ts1 * manager;
-	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
+	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP
 	 	Row_ts * manager;

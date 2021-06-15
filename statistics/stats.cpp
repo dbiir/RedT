@@ -316,6 +316,7 @@ void Stats_thd::clear() {
   seq_queue_enqueue_time=0;
   seq_queue_dequeue_time=0;
   sched_queue_wait_time=0;
+  seq_waiting_push_time=0;
   sched_queue_cnt=0;
   sched_queue_enq_cnt=0;
   sched_queue_enqueue_time=0;
@@ -1045,6 +1046,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",seq_queue_cnt=%ld"
   ",seq_queue_enq_cnt=%ld"
   ",seq_queue_wait_avg_time=%f"
+  ",seq_waiting_push_time=%f"
   ",seq_queue_enqueue_time=%f"
   ",seq_queue_dequeue_time=%f"
   ",sched_queue_wait_time=%f"
@@ -1061,7 +1063,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
           seq_txn_cnt, seq_batch_cnt, seq_full_batch_cnt, seq_ack_time / BILLION,
           seq_batch_time / BILLION, seq_process_cnt, seq_complete_cnt, seq_process_time / BILLION,
           seq_prep_time / BILLION, seq_idle_time / BILLION, seq_queue_wait_time / BILLION,
-          seq_queue_cnt, seq_queue_enq_cnt, seq_queue_wait_avg_time / BILLION,
+          seq_queue_cnt, seq_queue_enq_cnt, seq_queue_wait_avg_time / BILLION, seq_waiting_push_time / BILLION,
           seq_queue_enqueue_time / BILLION, seq_queue_dequeue_time / BILLION,
           sched_queue_wait_time / BILLION, sched_queue_cnt, sched_queue_enq_cnt,
           sched_queue_wait_avg_time / BILLION, sched_queue_enqueue_time / BILLION,
@@ -1621,6 +1623,7 @@ void Stats_thd::combine(Stats_thd * stats) {
   seq_queue_enq_cnt+=stats->seq_queue_enq_cnt;
   seq_queue_enqueue_time+=stats->seq_queue_enqueue_time;
   seq_queue_dequeue_time+=stats->seq_queue_dequeue_time;
+  seq_waiting_push_time+=stats->seq_waiting_push_time;
   sched_queue_wait_time+=stats->sched_queue_wait_time;
   sched_queue_cnt+=stats->sched_queue_cnt;
   sched_queue_enq_cnt+=stats->sched_queue_enq_cnt;

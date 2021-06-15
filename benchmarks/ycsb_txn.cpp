@@ -65,7 +65,7 @@ void YCSBTxnManager::reset() {
 
 RC YCSBTxnManager::acquire_locks() {
   uint64_t starttime = get_sys_clock();
-  assert(CC_ALG == CALVIN);
+	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
   locking_done = false;
   RC rc = RCOK;
@@ -106,7 +106,7 @@ RC YCSBTxnManager::acquire_locks() {
 RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
-	assert(CC_ALG != CALVIN);
+	assert(CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN);
 
 	if(IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
 		DEBUG("Running txn %ld\n",txn->txn_id);
@@ -1098,7 +1098,7 @@ RC YCSBTxnManager::run_calvin_txn(yield_func_t &yield,uint64_t cor_id) {
 
 RC YCSBTxnManager::run_ycsb(yield_func_t &yield,uint64_t cor_id) {
   RC rc = RCOK;
-  assert(CC_ALG == CALVIN);
+  assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
 
   for (uint64_t i = 0; i < ycsb_query->requests.size(); i++) {

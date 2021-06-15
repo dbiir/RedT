@@ -27,7 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-#define USE_COROUTINE true
+#define USE_COROUTINE false
 #define MAX_SEND_SIZE 1
 /***********************************************/
 // DA Trans Creator
@@ -74,7 +74,7 @@
 // Simulation + Hardware
 /***********************************************/
 #define NODE_CNT 2
-#define THREAD_CNT 10
+#define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 8
@@ -173,7 +173,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_MAAT
+#define CC_ALG RDMA_CALVIN
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -182,8 +182,8 @@
 
 #if RDMA_ONE_SIDE 
 //OR can be used only when enable DB&PA, consider merge this two option when finish
-#define USE_DBPA true
-#define USE_OR true
+#define USE_DBPA false
+#define USE_OR false
 #endif
 
 /***********************************************/
@@ -202,6 +202,7 @@
 #define RDMA_CQ_NAME "rdma_channel"
 #define RDMA_ENTRY_NUM 8192U
 #define RDMA_SEND_COUNT (256)
+#define RDMA_MAX_CLIENT_QP (25)
 // #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
 // #define RDMA_COLOR_LOG
 
@@ -286,8 +287,8 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 3145728
-#define ZIPF_THETA 0.001
+#define SYNTH_TABLE_SIZE 2097152
+#define ZIPF_THETA 0.5
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
@@ -466,6 +467,7 @@ enum PPSTxnType {
 #define RDMA_TS1 34
 #define RDMA_MAAT 35
 #define RDMA_CICADA 36
+#define RDMA_CALVIN 38
 #define RDMA_CNULL 37
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
