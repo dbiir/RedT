@@ -396,10 +396,10 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
 #if USE_DBPA == true
             if(loc !=  g_node_id){ //remote
                 uint64_t try_lock;
-                remote_row = txnMng->cas_and_read_remote(try_lock,loc,remote_offset,remote_offset,0,lock_num);
+                remote_row = txnMng->cas_and_read_remote(yield,try_lock,loc,remote_offset,remote_offset,0,lock_num, cor_id);
                 while(try_lock!=0){ //lock fail
                     mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-                    remote_row = txnMng->cas_and_read_remote(try_lock,loc,remote_offset,remote_offset,0,lock_num);
+                    remote_row = txnMng->cas_and_read_remote(yield, try_lock,loc,remote_offset,remote_offset,0,lock_num, cor_id);
                 }
             }
             else{ //local

@@ -206,7 +206,7 @@ def ycsb_skew():
     wl = 'YCSB'
     nnodes = [3]
      #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    algos=['RDMA_NO_WAIT2']
+    algos=['RDMA_MVCC']
     base_table_size=1048576
     #base_table_size=1048576*4    
     #base_table_size=2097152*8
@@ -921,7 +921,7 @@ configs = {
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '0UL',
     "NETWORK_DELAY_TEST": 'false',
-    "DONE_TIMER": "1 * 40 * BILLION // ~1 minutes",
+    "DONE_TIMER": "1 * 20 * BILLION // ~1 minutes",
     "WARMUP_TIMER": "1 * 20 * BILLION // ~1 minutes",
     "SEQ_BATCH_TIMER": "5 * 1 * MILLION // ~5ms -- same as CALVIN paper",
     "BATCH_TIMER" : "0",

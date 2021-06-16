@@ -506,8 +506,10 @@ RC WorkerThread::co_run(yield_func_t &yield, uint64_t cor_id) {
 
   uint64_t ready_starttime;
   uint64_t idle_starttime = 0;
+  uint64_t get_msg_starttime = 0;
 
 	while(!simulation->is_done()) {
+    get_msg_starttime = get_sys_clock();
     cor_txn_man[cor_id] = NULL;
     heartbeat();
 
@@ -537,19 +539,22 @@ RC WorkerThread::co_run(yield_func_t &yield, uint64_t cor_id) {
   #endif
 
     msg = work_queue.dequeue(get_thd_id());
-
+    uint64_t get_msg_endtime = get_sys_clock();
+    INC_STATS(_thd_id,worker_idle_time, get_msg_endtime - get_msg_starttime);
+    INC_STATS(_thd_id,worker_msg_time, get_msg_endtime - get_msg_starttime);
     if(!msg) {
-      if (idle_starttime == 0) idle_starttime = get_sys_clock();
-      //todo: add sleep 0.01ms
+
+      last_yield_time = get_sys_clock();
+		  // printf("do\n");
+      // INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - cor_process_starttime[cor_id]);
+      yield(_routines[((cor_id) % COROUTINE_CNT) + 1]);
+      uint64_t yield_endtime = get_sys_clock();
+      INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+      INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - last_yield_time);
+      INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - last_yield_time);
       continue;
     }
     simulation->last_da_query_time = get_sys_clock();
-    if(idle_starttime > 0) {
-      INC_STATS(_thd_id,worker_idle_time,get_sys_clock() - idle_starttime);
-      INC_STATS(_thd_id,worker_msg_time,get_sys_clock() - idle_starttime);
-      idle_starttime = 0;
-    }
-    //uint64_t starttime = get_sys_clock();
 
     if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O) || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) {
       cor_txn_man[cor_id] = get_transaction_manager(msg);
@@ -692,6 +697,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
   uint64_t ready_starttime;
   uint64_t idle_starttime = 0;
+  uint64_t get_msg_starttime = 0;
 
 	while(!simulation->is_done()) {
     txn_man = NULL;
@@ -723,7 +729,9 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
   #endif
 
     msg = work_queue.dequeue(get_thd_id());
-
+    uint64_t get_msg_endtime = get_sys_clock();
+    INC_STATS(_thd_id,worker_idle_time, get_msg_endtime - get_msg_starttime);
+    INC_STATS(_thd_id,worker_msg_time, get_msg_endtime - get_msg_starttime);
     if(!msg) {
       if (idle_starttime == 0) idle_starttime = get_sys_clock();
       //todo: add sleep 0.01ms
@@ -731,7 +739,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
     }
     simulation->last_da_query_time = get_sys_clock();
     if(idle_starttime > 0) {
-      INC_STATS(_thd_id,worker_idle_time,get_sys_clock() - idle_starttime);
+      // INC_STATS(_thd_id,worker_idle_time,get_sys_clock() - idle_starttime);
       idle_starttime = 0;
     }
     //uint64_t starttime = get_sys_clock();
