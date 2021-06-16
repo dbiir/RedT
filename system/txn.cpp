@@ -287,7 +287,7 @@ void Transaction::init() {
 void Transaction::reset(uint64_t thd_id) {
 	release_accesses(thd_id);
 	accesses.clear();
-	//release_inserts(thd_id);
+	release_inserts(thd_id);
 	insert_rows.clear();
 	write_cnt = 0;
 	row_cnt = 0;
@@ -314,9 +314,12 @@ void Transaction::release_inserts(uint64_t thd_id) {
 
 		row->free_row();
 #if RDMA_ONE_SIDE == true
-		r2::AllocatorMaster<>::get_thread_allocator()->free(row);
+		// r2::AllocatorMaster<>::get_thread_allocator()->free(row);
+        uint64_t size = row_t::get_row_size(row->get_schema()->get_tuple_size());
+        mem_allocator.free(row,row_t::get_row_size(size));
 #else
 		DEBUG_M("Transaction::release insert_rows free\n")
+        // mem_allocator.free(row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 		row_pool.put(thd_id,row);
 #endif
 	}

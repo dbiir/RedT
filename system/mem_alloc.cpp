@@ -45,6 +45,7 @@ void * mem_alloc::alloc(uint64_t size) {
   ptr = je_malloc(size);
 #endif
   DEBUG_M("alloc %ld 0x%lx\n",size,(uint64_t)ptr);
+  if(ptr == NULL)printf("%s\n", strerror(errno)); 
   assert(ptr != NULL);
   return ptr;
 }

@@ -54,6 +54,7 @@
 #define SECOND 200 // Set the queue monitoring time.
 // #define THD_ID_QUEUE
 #define ONE_NODE_RECIEVE 0 // only node 0 will receive the txn query
+#define USE_WORK_NUM_THREAD false
 #if 1
 // #define LESS_DIS // Reduce the number of yCSB remote data to 1
 // #define LESS_DIS_NUM 0 // Reduce the number of yCSB remote data to 1
@@ -77,12 +78,12 @@
 #define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 8
+#define COROUTINE_CNT 2
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
 #define CLIENT_NODE_CNT NODE_CNT
-#define CLIENT_THREAD_CNT 4
+#define CLIENT_THREAD_CNT 1
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
@@ -115,7 +116,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 10000
+#define MAX_TXN_IN_FLIGHT 200000
 
 #define SERVER_GENERATE_QUERIES false
 

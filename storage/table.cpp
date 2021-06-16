@@ -105,6 +105,20 @@ RC table_t::general_get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id
 
 
 // the row is not stored locally. the pointer must be maintained by index structure.
+RC table_t::get_general_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
+	RC rc = RCOK;
+    DEBUG_M("table_t::get_new_row alloc\n");
+    uint64_t size = row_t::get_row_size(get_schema()->get_tuple_size());
+	void * ptr = mem_allocator.alloc(row_t::get_row_size(size));
+	assert (ptr != NULL);
+
+	row = (row_t *) ptr;
+	rc = row->init(this, part_id, row_id);
+	row->init_manager(row);
+
+    return rc;
+
+}
 RC table_t::get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
 
 #if RDMA_ONE_SIDE == true
@@ -113,10 +127,15 @@ RC table_t::get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
 
     // printf("[table.cpp:114]tuple_size = %ld \n",get_schema()->get_tuple_size());
     // printf("[table.cpp:115]tuple_size = %ld \n",row_t::get_row_size(get_schema()->get_tuple_size()));
-
-    row_t *ptr = (row_t*)r2::AllocatorMaster<>::get_thread_allocator()->alloc(row_t::get_row_size(get_schema()->get_tuple_size()));
+    pthread_mutex_lock( RDMA_MEMORY_LATCH );
+    uint64_t size = row_t::get_row_size(get_schema()->get_tuple_size());
+    row_t *ptr = (row_t*)r2::AllocatorMaster<>::get_thread_allocator()->alloc(size);
 	assert (ptr != NULL);
 
+    tuple_count++;
+    memory_count += size;
+    max_tuple_size = max_tuple_size > size ? max_tuple_size : size;
+    pthread_mutex_unlock( RDMA_MEMORY_LATCH );
 	row = (row_t *) ptr;
 	rc = row->init(this, part_id, row_id);
 	row->init_manager(row);

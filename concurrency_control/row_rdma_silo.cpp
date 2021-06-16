@@ -89,8 +89,9 @@ Row_rdma_silo::try_lock(yield_func_t &yield, TxnManager * txnMng , uint64_t num,
 	uint64_t thd_id = txnMng->get_thd_id() + cor_id * g_thread_cnt;
 	uint64_t lock = txnMng->get_txn_id();
 
-    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,remote_offset,0,lock,cor_id);
-
+    uint64_t try_lock = -1;
+    try_lock = txnMng->cas_remote_content(yield,loc,remote_offset,0,lock,cor_id);
+    // if(try_lock != 0)printf("lock = %ld , origin number = %ld\n",lock,try_lock);
 	result = true;
     DEBUG("silo %ld try to acquire lock %ld row %ld \n", txnMng->get_txn_id(), _row->_tid_word, _row->get_primary_key());
 	return result;

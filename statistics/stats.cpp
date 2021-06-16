@@ -621,6 +621,19 @@ void Stats_thd::print(FILE * outf, bool prog) {
           single_part_txn_run_time / BILLION, single_part_txn_avg_time / BILLION, txn_write_cnt,
           record_write_cnt, parts_touched, avg_parts_touched);
 
+//   fprintf(outf,
+//   ",local_lock_fail_abort =%ld"
+//   ",remote_lock_fail_abort=%ld"
+//   ",local_readset_validate_fail_abort=%ld"
+//   ",remote_readset_validate_fail_abort=%ld"
+//   ",local_writeset_validate_fail_abort=%ld"
+//   ",remote_writeset_validate_fail_abort=%ld"
+//   ",validate_lock_abort=%ld"
+//   ",local_try_lock_fail_abort=%ld"
+//   ",remote_try_lock_fail_abort=%ld"
+//   ",cnt_unequal_abort=%ld",
+//   local_lock_fail_abort,remote_lock_fail_abort,local_readset_validate_fail_abort,remote_readset_validate_fail_abort,local_writeset_validate_fail_abort,remote_writeset_validate_fail_abort,validate_lock_abort,local_try_lock_fail_abort,remote_try_lock_fail_abort,cnt_unequal_abort);
+
   fprintf(outf, //ywq
   ",valid_abort_cnt = %ld"
   ",lock_row_fail = %ld"
@@ -902,38 +915,38 @@ void Stats_thd::print(FILE * outf, bool prog) {
             i, worker_process_cnt_by_type[i], i, worker_process_time_by_type[i] / BILLION);
   }
 
-//   for(uint64_t i = 0; i < SECOND; i ++) {
-//     fprintf(outf,
-//       ",work_queue_wq_cnt%lu=%lu"
-//       ",work_queue_tx_cnt%lu=%lu"
-//       ,i
-//       ,work_queue_wq_cnt[i]
-//       ,i
-//       ,work_queue_tx_cnt[i]
-//     );
-//   }
+  for(uint64_t i = 0; i < SECOND; i ++) {
+    fprintf(outf,
+      ",work_queue_wq_cnt%lu=%lu"
+      ",work_queue_tx_cnt%lu=%lu"
+      ,i
+      ,work_queue_wq_cnt[i]
+      ,i
+      ,work_queue_tx_cnt[i]
+    );
+  }
 
-//   for(uint64_t i = 0; i < SECOND; i ++) {
-//     fprintf(outf,
-//       ",work_queue_ewq_cnt%lu=%lu"
-//       ",work_queue_dwq_cnt%lu=%lu"
-//       ,i
-//       ,work_queue_ewq_cnt[i]
-//       ,i
-//       ,work_queue_dwq_cnt[i]
-//     );
-//   }
+  for(uint64_t i = 0; i < SECOND; i ++) {
+    fprintf(outf,
+      ",work_queue_ewq_cnt%lu=%lu"
+      ",work_queue_dwq_cnt%lu=%lu"
+      ,i
+      ,work_queue_ewq_cnt[i]
+      ,i
+      ,work_queue_dwq_cnt[i]
+    );
+  }
 
-//   for(uint64_t i = 0; i < SECOND; i ++) {
-//     fprintf(outf,
-//       ",work_queue_etx_cnt%lu=%lu"
-//       ",work_queue_dtx_cnt%lu=%lu"
-//       ,i
-//       ,work_queue_etx_cnt[i]
-//       ,i
-//       ,work_queue_dtx_cnt[i]
-//     );
-//   }
+  for(uint64_t i = 0; i < SECOND; i ++) {
+    fprintf(outf,
+      ",work_queue_etx_cnt%lu=%lu"
+      ",work_queue_dtx_cnt%lu=%lu"
+      ,i
+      ,work_queue_etx_cnt[i]
+      ,i
+      ,work_queue_dtx_cnt[i]
+    );
+  }
 
   // IO
   double mbuf_send_intv_time_avg = 0;

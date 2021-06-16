@@ -130,23 +130,23 @@ def ycsb_scaling():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
-    nnodes = [1,2,3,4]
+    nnodes = [4]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
     # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    algos = ['RDMA_NO_WAIT']
+    algos = ['RDMA_SILO']
     base_table_size=1048576
     # base_table_size=1048576*8
     #base_table_size=2097152*8
     txn_write_perc = [0.2]
     tup_write_perc = [0.2]
     load = [10000]
-    tcnt = [18]
+    tcnt = [10]
     ctcnt = [4]
     scnt = [1]
     rcnt = [1]
-    skew = [0.5]
+    skew = [0.2]
     #skew = [0.0,0.5,0.9]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT","SEND_THREAD_CNT","REM_THREAD_CNT","CLIENT_SEND_THREAD_CNT","CLIENT_REM_THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,cthr,sthr,rthr,sthr,rthr] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
@@ -521,14 +521,14 @@ def tpcc_scaling():
     # nalgos=['RDMA_WAIT_DIE2']
     # nalgos=['WOOKONG']
      #nalgos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    nalgos=['RDMA_WAIT_DIE2']
+    nalgos=['RDMA_SILO']
     npercpay=[0.0]
     # npercpay=[0.0]
-    wh=32
+    wh=28
     # wh=64
-    load = [10000]
-    tcnt = [10]
-    ctcnt = [4]
+    load = [200000]
+    tcnt = [28]
+    ctcnt = [1]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
 
@@ -921,7 +921,7 @@ configs = {
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '0UL',
     "NETWORK_DELAY_TEST": 'false',
-    "DONE_TIMER": "1 * 20 * BILLION // ~1 minutes",
+    "DONE_TIMER": "1 * 40 * BILLION // ~1 minutes",
     "WARMUP_TIMER": "1 * 20 * BILLION // ~1 minutes",
     "SEQ_BATCH_TIMER": "5 * 1 * MILLION // ~5ms -- same as CALVIN paper",
     "BATCH_TIMER" : "0",
