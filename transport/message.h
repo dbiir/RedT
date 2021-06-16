@@ -268,7 +268,7 @@ public:
 
   uint64_t pid;
   uint64_t ts;
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   uint64_t batch_id;
   uint64_t txn_id;
 #endif

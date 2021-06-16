@@ -165,7 +165,7 @@ void TxnStats::commit_stats(uint64_t thd_id, uint64_t txn_id, uint64_t batch_id,
 	total_work_queue_cnt += work_queue_cnt;
 	assert(total_process_time >= process_time);
 
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 
 	INC_STATS(thd_id,lat_s_loc_work_queue_time,work_queue_time);
 	INC_STATS(thd_id,lat_s_loc_msg_queue_time,msg_queue_time);
@@ -380,7 +380,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	_signal_abort = false;
 	_timestamp = glob_manager.get_ts(get_thd_id());
 #endif
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	phase = CALVIN_RW_ANALYSIS;
 	locking_done = false;
 	calvin_locked_rows.init(MAX_ROW_PER_TXN);
@@ -446,7 +446,7 @@ void TxnManager::reset() {
 	start_ts = 0;
 #endif
 
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	phase = CALVIN_RW_ANALYSIS;
 	locking_done = false;
 	calvin_locked_rows.clear();
@@ -476,7 +476,7 @@ void TxnManager::release() {
 	delete uncommitted_reads;
 #endif
 
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	calvin_locked_rows.release();
 #endif
 #if CC_ALG == SILO
@@ -745,7 +745,7 @@ void TxnManager::send_finish_messages() {
 int TxnManager::received_response(RC rc) {
 	assert(txn->rc == RCOK || txn->rc == Abort);
 	if (txn->rc == RCOK) txn->rc = rc;
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	++rsp_cnt;
 #else
   if (rsp_cnt > 0)
@@ -771,7 +771,7 @@ void TxnManager::commit_stats() {
 	DEBUG("Commit_stats execute_time %ld warmup_time %ld\n",warmuptime,g_warmup_timer);
 	if (simulation->is_warmup_done())
 		DEBUG("Commit_stats total_txn_commit_cnt %ld\n",stats._stats[get_thd_id()]->total_txn_commit_cnt);
-	if(!IS_LOCAL(get_txn_id()) && CC_ALG != CALVIN) {
+	if(!IS_LOCAL(get_txn_id()) && (CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN)) {
 		INC_STATS(get_thd_id(),remote_txn_commit_cnt,1);
 		txn_stats.commit_stats(get_thd_id(), get_txn_id(), get_batch_id(), timespan_long,
 													 timespan_short);
@@ -793,7 +793,7 @@ void TxnManager::commit_stats() {
 		INC_STATS(get_thd_id(),cflt_cnt_txn,1);
 	}*/
 	txn_stats.commit_stats(get_thd_id(),get_txn_id(),get_batch_id(),timespan_long, timespan_short);
-	#if CC_ALG == CALVIN
+	#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	return;
 	#endif
 
@@ -901,7 +901,7 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 	uint64_t version = 0;
 	// Handle calvin elsewhere
 
-#if CC_ALG != CALVIN
+#if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
 #if ISOLATION_LEVEL != READ_UNCOMMITTED
 	row_t * orig_r = txn->accesses[rid]->orig_row;
 #if CC_ALG == RDMA_SILO
@@ -1110,7 +1110,7 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 		CC_ALG == DLI_MVCC_BASE
 	dli_man.finish_trans(rc, this);
 #endif
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	// cleanup locked rows
 	for (uint64_t i = 0; i < calvin_locked_rows.size(); i++) {
 		row_t * row = calvin_locked_rows[i];
@@ -1314,7 +1314,7 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	INC_STATS(get_thd_id(), txn_manager_time, timespan);
 	row_rtn  = access->data;
 
-	if (CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN) assert(rc == RCOK);
+	if (CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) assert(rc == RCOK);
 	assert(rc == RCOK);
 	return rc;
 }
@@ -1513,7 +1513,7 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 }
 
 RC TxnManager::send_remote_reads() {
-	assert(CC_ALG == CALVIN);
+	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
 #if !YCSB_ABORT_MODE && WORKLOAD == YCSB
 	return RCOK;
 #endif

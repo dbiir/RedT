@@ -290,6 +290,7 @@ public:
   uint64_t seq_queue_enq_cnt;
   double seq_queue_enqueue_time;
   double seq_queue_dequeue_time;
+  double seq_waiting_push_time;
   double sched_queue_wait_time;
   uint64_t sched_queue_cnt;
   uint64_t sched_queue_enq_cnt;

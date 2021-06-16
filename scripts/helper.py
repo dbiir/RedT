@@ -250,6 +250,7 @@ stat_map = OrderedDict([
   ('seq_process_time', []),
   ('seq_prep_time', []),
   ('seq_idle_time', []),
+  ('seq_waiting_push_time', []),
   ('seq_queue_wait_time', []),
   ('seq_queue_cnt', []),
   ('seq_queue_enq_cnt', []),

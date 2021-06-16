@@ -136,7 +136,7 @@ void row_t::init_manager(row_t * row) {
 	return;
 #endif
 	DEBUG_M("row_t::init_manager alloc \n");
-#if CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN
+#if CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	manager = (Row_lock *) mem_allocator.align_alloc(sizeof(Row_lock));
 #elif CC_ALG == TIMESTAMP
 	manager = (Row_ts *) mem_allocator.align_alloc(sizeof(Row_ts));
@@ -317,7 +317,7 @@ void row_t::free_row() {
 
 RC row_t::get_lock(access_t type, TxnManager * txn) {
 	RC rc = RCOK;
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	lock_t lt = (type == RD || type == SCAN)? DLOCK_SH : DLOCK_EX;
 	rc = this->manager->lock_get(lt, txn);
 #endif
@@ -654,7 +654,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
    rc = this->manager->access(txn, access, type);
 
    access->data = txn->cur_row;
-#elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN
+#elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 #if CC_ALG == HSTORE_SPEC
 	if(txn_table.spec_mode) {
 		DEBUG_M("row_t::get_row HSTORE_SPEC alloc \n");
@@ -791,9 +791,9 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	return 0;
 #endif
 
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == CALVIN
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	assert (row == NULL || row == this || type == XP);
-	if (CC_ALG != CALVIN && ROLL_BACK &&
+	if (CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN && ROLL_BACK &&
 			type == XP) {  // recover from previous writes. should not happen w/ Calvin
 		this->copy(row);
 	}

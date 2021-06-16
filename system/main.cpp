@@ -45,6 +45,7 @@
 #include "da.h"
 #include "maat.h"
 #include "rdma_maat.h"
+#include "rdma_calvin.h"
 #include "rdma_cicada.h"
 #include "ssi.h"
 #include "wsi.h"
@@ -73,7 +74,7 @@ InputThread * input_thds;
 OutputThread * output_thds;
 AbortThread * abort_thds;
 LogThread * log_thds;
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 CalvinLockThread * calvin_lock_thds;
 CalvinSequencerThread * calvin_seq_thds;
 #endif
@@ -218,11 +219,16 @@ int main(int argc, char *argv[]) {
 	txn_table.init();
 	printf("Done\n");
     printf("***********num_wh = %d**********\n",NUM_WH);
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	printf("Initializing sequencer... ");
 	fflush(stdout);
 	seq_man.init(m_wl);
 	printf("Done\n");
+#if CC_ALG == RDMA_CALVIN
+	printf("Initializing RDMA_CALVIN manager... ");
+	calvin_man.init();
+	printf("Done\n");
+#endif
 #endif
 #if CC_ALG == MAAT
 	printf("Initializing Time Table... ");
@@ -336,7 +342,7 @@ int main(int argc, char *argv[]) {
 #if LOGGING
 		all_thd_cnt += 1; // logger thread
 #endif
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 		all_thd_cnt += 2; // sequencer + scheduler thread
 #endif
 
@@ -364,7 +370,7 @@ int main(int argc, char *argv[]) {
 	output_thds = new OutputThread[sthd_cnt];
 	abort_thds = new AbortThread[1];
 	log_thds = new LogThread[1];
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	calvin_lock_thds = new CalvinLockThread[1];
 	calvin_seq_thds = new CalvinSequencerThread[1];
 #endif
@@ -456,12 +462,12 @@ int main(int argc, char *argv[]) {
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&log_thds[0]);
 #endif
 
-#if CC_ALG != CALVIN
+#if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
 	abort_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&abort_thds[0]);
 #endif
 
-#if CC_ALG == CALVIN
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 #if SET_AFFINITY
 	CPU_ZERO(&cpus);
 	CPU_SET(cpu_cnt, &cpus);

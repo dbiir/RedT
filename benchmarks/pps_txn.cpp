@@ -85,7 +85,7 @@ RC PPSTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
   uint64_t starttime = get_sys_clock();
 
 #if CC_ALG == CALVIN
-  rc = run_calvin_txn();
+  rc = run_calvin_txn(yield, cor_id); //run_calvin_txn();
   return rc;
 #endif
 
