@@ -342,6 +342,7 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
 #endif
         }
 #if USE_DBPA == true
+        uint64_t starttime = get_sys_clock(), endtime;
         for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
             if(remote_access[i].size() > 0){
                 txnMng->batch_unlock_remote(yield, cor_id, i, Abort, txnMng, remote_access);
@@ -376,13 +377,14 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
 #else
                 auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
                 RDMA_ASSERT(dbres1 == IOCode::Ok);
-                endtime = get_sys_clock();
-                INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-                DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif 
-  
             }
         }
+#if !USE_COROUTINE
+        endtime = get_sys_clock();
+        INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
+        DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
+#endif 
 #endif 
 #endif
      }
@@ -396,10 +398,10 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
 #if USE_DBPA == true
             if(loc !=  g_node_id){ //remote
                 uint64_t try_lock;
-                remote_row = txnMng->cas_and_read_remote(try_lock,loc,remote_offset,remote_offset,0,lock_num);
+                remote_row = txnMng->cas_and_read_remote(yield, try_lock,loc,remote_offset,remote_offset,0,lock_num, cor_id);
                 while(try_lock!=0){ //lock fail
                     mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-                    remote_row = txnMng->cas_and_read_remote(try_lock,loc,remote_offset,remote_offset,0,lock_num);
+                    remote_row = txnMng->cas_and_read_remote(yield, try_lock,loc,remote_offset,remote_offset,0,lock_num, cor_id);
                 }
             }
             else{ //local

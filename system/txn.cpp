@@ -1566,6 +1566,8 @@ row_t * TxnManager::cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock,
 	char *local_buf2 = Rdma::get_row_client_memory(thd_id,2);
 	uint64_t read_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
 
+	uint64_t starttime = get_sys_clock(), endtime;
+
 	DBrequests dbreq(2);
 	dbreq.init();
 	dbreq.set_atomic_meta(0,compare,swap,local_buf1,(uint64_t)(remote_mr_attr[target_server].buf + cas_offset));
