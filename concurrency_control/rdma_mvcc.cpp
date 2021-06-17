@@ -329,7 +329,7 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
            }
 #else
            //lock in loop
-           assert(txnMng->loop_cas_remote(yield,loc,remote_offset,0,lock_num,cor_id) == true);
+        //    assert(txnMng->loop_cas_remote(yield,loc,remote_offset,0,lock_num,cor_id) == true);
 
            //release lock
            if(txn->accesses[num]->location == g_node_id){
@@ -337,8 +337,8 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
            }else{
                abort_release_remote_lock(yield,txnMng,num,cor_id);
            }
-           uint64_t release_lock = txnMng->cas_remote_content(yield,loc,remote_offset,lock_num,0,cor_id);
-           assert(release_lock == lock_num);
+        //    uint64_t release_lock = txnMng->cas_remote_content(yield,loc,remote_offset,lock_num,0,cor_id);
+        //    assert(release_lock == lock_num);
 #endif
         }
 #if USE_DBPA == true

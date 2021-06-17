@@ -700,6 +700,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
   uint64_t get_msg_starttime = 0;
 
 	while(!simulation->is_done()) {
+    get_msg_starttime = get_sys_clock();
     txn_man = NULL;
     heartbeat();
 
