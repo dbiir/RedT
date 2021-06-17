@@ -74,7 +74,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 4
+#define NODE_CNT 1
 #define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -116,7 +116,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 10000
+#define MAX_TXN_IN_FLIGHT 100000
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -174,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_MVCC
+#define CC_ALG RDMA_SILO
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -183,8 +183,8 @@
 
 #if RDMA_ONE_SIDE 
 //OR can be used only when enable DB&PA, consider merge this two option when finish
-#define USE_DBPA true
-#define USE_OR true
+#define USE_DBPA false
+#define USE_OR false
 #endif
 
 /***********************************************/
@@ -203,7 +203,23 @@
 #define RDMA_CQ_NAME "rdma_channel"
 #define RDMA_ENTRY_NUM 8192U
 #define RDMA_SEND_COUNT (256)
-#define RDMA_MAX_CLIENT_QP (25)
+
+#if USE_WORK_NUM_THREAD
+  #define WORK_THREAD_NUM 1
+#else
+  #define WORK_THREAD_NUM 0
+#endif
+#if LOGGING
+  #define LOG_THREAD_NUM 1
+#else
+  #define LOG_THREAD_NUM 0
+#endif
+#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+  #define CALVIN_THREAD_NUM 2
+#else
+  #define CALVIN_THREAD_NUM 0
+#endif
+#define RDMA_MAX_CLIENT_QP (THREAD_CNT + REM_THREAD_CNT + SEND_THREAD_CNT + 1 + LOG_THREAD_NUM + WORK_THREAD_NUM + CALVIN_THREAD_NUM)
 // #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
 // #define RDMA_COLOR_LOG
 
@@ -288,7 +304,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 4194304
+#define SYNTH_TABLE_SIZE 1048576
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
@@ -516,7 +532,7 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 40 * BILLION // ~1 minutes
 #define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
 
 #define SEED 0

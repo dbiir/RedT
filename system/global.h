@@ -228,6 +228,7 @@ extern rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
 extern rdmaio::Arc<rdmaio::RNic> nic;
 // extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
 extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][RDMA_MAX_CLIENT_QP * (COROUTINE_CNT + 1)];
+extern pthread_mutex_t * RDMA_QP_LATCH;
 
 extern rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
 
