@@ -127,11 +127,11 @@ void * Rdma::client_qp(void *arg){
 
 	qp_name[node_id][thread_id] = "client-qp" + std::to_string(g_node_id) + std::to_string(node_id) + std::to_string(thread_id);
 
-	printf("qp_name = %s, rdma_server_port[node_id] = %d \n",qp_name[node_id][thread_id].c_str(),rdma_server_port[node_id]);
+	// printf("qp_name = %s, rdma_server_port[node_id] = %d \n",qp_name[node_id][thread_id].c_str(),rdma_server_port[node_id]);
 	auto qp_res = cm_.cc_rc(qp_name[node_id][thread_id], rc_qp[node_id][thread_id], reg_nic_name, QPConfig());
 	RDMA_ASSERT(qp_res == IOCode::Ok) << std::get<0>(qp_res.desc);
 	auto key = std::get<1>(qp_res.desc);
-	RDMA_LOG(4) << "client fetch QP authentical key: " << key;
+	// RDMA_LOG(4) << "client fetch QP authentical key: " << key;
 
 	rc_qp[node_id][thread_id]->bind_remote_mr(remote_attr);
 	rc_qp[node_id][thread_id]->bind_local_mr(client_rm_handler->get_reg_attr().value());

@@ -324,7 +324,7 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
 		uint64_t lock = get_txn_id()+1;
 		uint64_t try_lock = -1;
 #if USE_DBPA
-		test_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,0,lock, cor_id);
+		test_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,0,lock,cor_id);
 		if(try_lock != 0){
 			INC_STATS(get_thd_id(), lock_fail, 1);
 			mem_allocator.free(test_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
