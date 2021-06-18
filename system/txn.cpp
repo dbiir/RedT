@@ -1061,6 +1061,7 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 		cleanup_row(yield, rc,rid,remote_access,cor_id);  //return abort write row
 	}
 #if USE_DBPA == true && CC_ALG == RDMA_TS1 
+	uint64_t starttime = get_sys_clock(), endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
         if(remote_access[i].size() > 0){
             batch_unlock_remote(yield, cor_id, i, Abort, this, remote_access);
@@ -1095,12 +1096,15 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 #else
             auto dbres1 = rc_qp[i][get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
             RDMA_ASSERT(dbres1 == IOCode::Ok);
-			endtime = get_sys_clock();
-			INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-			DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif    
         }
     }
+#if !USE_COROUTINE
+	endtime = get_sys_clock();
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+#endif 
 #endif 
 #endif 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
@@ -1602,6 +1606,7 @@ row_t * TxnManager::cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock,
 	RDMA_ASSERT(dbres1 == IOCode::Ok);
 	endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif
 	try_lock = *local_buf1;
@@ -1846,6 +1851,7 @@ void TxnManager::batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int l
 	auto dbres1 = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(dbres1 == IOCode::Ok);
 	endtime = get_sys_clock();
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif
@@ -1928,6 +1934,7 @@ row_t * TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,
 	INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif
 
@@ -1984,6 +1991,7 @@ row_t * TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
     endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif
 
@@ -2046,6 +2054,7 @@ row_t * TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,
 	INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif
 	
@@ -2103,6 +2112,7 @@ bool TxnManager::write_remote_index(yield_func_t &yield,uint64_t target_server,u
 	INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif
 
@@ -2155,6 +2165,7 @@ uint64_t TxnManager::cas_remote_content(yield_func_t &yield, uint64_t target_ser
     endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 #endif
 
     return *local_buf;
@@ -2195,6 +2206,7 @@ row_t * TxnManager::read_remote_row(uint64_t target_server,uint64_t remote_offse
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 
     row_t *test_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
     memcpy(test_row, local_buf, operate_size);
@@ -2229,6 +2241,7 @@ RdmaTimeTableNode * TxnManager::read_remote_timetable(uint64_t target_server,uin
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 
     RdmaTimeTableNode *test_row = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
     memcpy(test_row, local_buf, operate_size);
@@ -2285,6 +2298,7 @@ RdmaTimeTableNode * TxnManager::read_remote_timetable(yield_func_t &yield, uint6
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 #endif
 
     RdmaTimeTableNode *test_row = (RdmaTimeTableNode *)mem_allocator.alloc(sizeof(RdmaTimeTableNode));
@@ -2318,6 +2332,7 @@ itemid_t * TxnManager::read_remote_index(uint64_t target_server,uint64_t remote_
 
 	endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 
     itemid_t* item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
@@ -2359,6 +2374,7 @@ bool TxnManager::write_remote_row(uint64_t target_server,uint64_t operate_size,u
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 
     return true;
 }
@@ -2390,6 +2406,7 @@ bool TxnManager::write_remote_index(uint64_t target_server,uint64_t operate_size
 	INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 
     return true;
@@ -2444,9 +2461,6 @@ uint64_t TxnManager::cas_remote_content(uint64_t target_server,uint64_t remote_o
     assert(op.set_payload(local_buf, sizeof(uint64_t), mr.key) == true);
     auto res_s2 = op.execute(rc_qp[target_server][thd_id], IBV_SEND_SIGNALED);
 
-	endtime = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 
     RDMA_ASSERT(res_s2 == IOCode::Ok);
     auto res_p2 = rc_qp[target_server][thd_id]->wait_one_comp();
@@ -2454,6 +2468,7 @@ uint64_t TxnManager::cas_remote_content(uint64_t target_server,uint64_t remote_o
 
     endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 
     return *local_buf;

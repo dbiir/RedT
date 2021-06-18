@@ -382,6 +382,7 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
         }
 #if !USE_COROUTINE
         endtime = get_sys_clock();
+        INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
         INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
         DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
 #endif 

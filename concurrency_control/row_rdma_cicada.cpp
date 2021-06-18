@@ -88,6 +88,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					INC_STATS(txn->get_thd_id(), worker_yield_cnt, 1);
 					INC_STATS(txn->get_thd_id(), worker_yield_time, yield_endtime - txn->h_thd->last_yield_time);
 					INC_STATS(txn->get_thd_id(), worker_idle_time, yield_endtime - txn->h_thd->last_yield_time);
+					INC_STATS(txn->get_thd_id(), worker_proto_wait_time, yield_endtime - txn->h_thd->last_yield_time);
 #endif
 					if(_row->cicada_version[i].state == Cicada_PENDING) {
 						rc = WAIT;
@@ -136,6 +137,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					INC_STATS(txn->get_thd_id(), worker_yield_cnt, 1);
 					INC_STATS(txn->get_thd_id(), worker_yield_time, yield_endtime - txn->h_thd->last_yield_time);
 					INC_STATS(txn->get_thd_id(), worker_idle_time, yield_endtime - txn->h_thd->last_yield_time);
+					INC_STATS(txn->get_thd_id(), worker_proto_wait_time, yield_endtime - txn->h_thd->last_yield_time);
 #endif
 					if(_row->cicada_version[i].state == Cicada_PENDING) {
 						rc = WAIT;
