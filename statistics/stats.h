@@ -366,6 +366,14 @@ public:
   double dta_range;
   uint64_t dta_commit_cnt;
 
+  //CICADA
+  uint64_t cicada_case1_cnt;
+  uint64_t cicada_case2_cnt;
+  uint64_t cicada_case3_cnt;
+  uint64_t cicada_case4_cnt;
+  uint64_t cicada_case5_cnt;
+  uint64_t cicada_case6_cnt;
+
   // Logging
   uint64_t log_write_cnt;
   double log_write_time;

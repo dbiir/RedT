@@ -85,6 +85,7 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
 					continue;
 				}
 				if(access->orig_row->cicada_version[i].Wts > txnMng->get_timestamp() || access->orig_row->cicada_version[i].Rts > txnMng->get_timestamp()) {
+					INC_STATS(txnMng->get_thd_id(), cicada_case1_cnt, 1);
 					rc = Abort;
 					// printf("Abort 1\n");
 					break;
@@ -110,6 +111,7 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
         //remote
             access = txn->accesses[ txnMng->write_set[j] ];
 			rc = remote_read_or_write(yield, access, txnMng, txnMng->write_set[j], true, cor_id);
+			if (rc == Abort) INC_STATS(txnMng->get_thd_id(), cicada_case2_cnt, 1);
         }
     }
 	// 3.	对读集中的每一项
@@ -126,7 +128,7 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
 				}
 				if(access->orig_row->cicada_version[i].Wts > txnMng->get_timestamp()) {
 					rc = Abort;
-					// printf("Abort 5\n");
+					INC_STATS(txnMng->get_thd_id(), cicada_case3_cnt, 1);
 					break;
 				}
 				// printf("version:%d : num:%d: cor_id:%ld\n", access->orig_row->cicada_version[i].key, txnMng->version_num[read_set[i]], cor_id);
@@ -146,6 +148,7 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
         //remote
             access = txn->accesses[ read_set[j] ];
             rc = remote_read_or_write(yield, access, txnMng, read_set[j], true, cor_id);
+			if (rc == Abort) INC_STATS(txnMng->get_thd_id(), cicada_case4_cnt, 1);
         }
     } 
 	if(rc == RCOK)
@@ -157,6 +160,7 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
 				int i = cnt % HIS_CHAIN_NUM;
 				if(access->orig_row->cicada_version[i].Wts > txnMng->get_timestamp() || access->orig_row->cicada_version[i].Rts > txnMng->get_timestamp() || access->orig_row->cicada_version[i].state == Cicada_ABORTED) {
 					rc = Abort;
+					INC_STATS(txnMng->get_thd_id(), cicada_case5_cnt, 1);
 					continue;
 				}
 				if(access->orig_row->cicada_version[i].key >= txnMng->version_num[txnMng->write_set[j]]) {
@@ -175,6 +179,7 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
             access = txn->accesses[ txnMng->write_set[j] ];
 			
 			rc = remote_read_or_write(yield, access, txnMng, txnMng->write_set[j], false, cor_id);
+			if (rc == Abort) INC_STATS(txnMng->get_thd_id(), cicada_case6_cnt, 1);
         }
     }
 	timespan = get_sys_clock() - start_time;

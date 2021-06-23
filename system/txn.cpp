@@ -1817,7 +1817,7 @@ void TxnManager::batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int l
 			count += remote_index_origin[i].size();
 		}
 	 }
-	 
+	 uint64_t starttime = get_sys_clock(), endtime;
 	 vector<uint64_t> remote_index = remote_index_origin[loc];
 	 uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
 	 YCSBQuery* ycsb_query = (YCSBQuery*) query;
