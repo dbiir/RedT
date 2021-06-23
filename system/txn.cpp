@@ -679,7 +679,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	} 
 	else { // is not multi-part or use rdma
 		rc = validate(yield, cor_id);
-		rc = RCOK;
+		// rc = RCOK;
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
 
@@ -1820,7 +1820,7 @@ void TxnManager::batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int l
 			count += remote_index_origin[i].size();
 		}
 	 }
-	 
+	 uint64_t starttime = get_sys_clock(), endtime;
 	 vector<uint64_t> remote_index = remote_index_origin[loc];
 	 uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
 	 YCSBQuery* ycsb_query = (YCSBQuery*) query;

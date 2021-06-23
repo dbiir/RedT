@@ -375,6 +375,17 @@ void Stats_thd::clear() {
   dta_range = 0;
   dta_commit_cnt = 0;
 
+  // CICADA
+  // dta_validate_cnt = 0;
+  // dta_validate_time = 0;
+  // dta_cs_wait_time = 0;
+  cicada_case1_cnt = 0;
+  cicada_case2_cnt = 0;
+  cicada_case3_cnt = 0;
+  cicada_case4_cnt = 0;
+  cicada_case5_cnt = 0;
+  cicada_case6_cnt = 0;
+
   // WKDB
   wkdb_validate_cnt=0;
   wkdb_validate_time=0;
@@ -1171,6 +1182,16 @@ void Stats_thd::print(FILE * outf, bool prog) {
           dta_cs_wait_time / BILLION, dta_cs_wait_avg / BILLION, dta_case1_cnt, dta_case2_cnt,
           dta_case3_cnt, dta_case4_cnt, dta_case5_cnt, dta_range / BILLION, dta_commit_cnt,
           dta_commit_avg, dta_range_avg);
+  fprintf(outf,
+          ",cicada_case1_cnt=%ld"
+          ",cicada_case2_cnt=%ld"
+          ",cicada_case3_cnt=%ld"
+          ",cicada_case4_cnt=%ld"
+          ",cicada_case5_cnt=%ld"
+          ",cicada_case6_cnt=%ld",
+          cicada_case1_cnt, cicada_case2_cnt,
+          cicada_case3_cnt, cicada_case4_cnt, 
+          cicada_case5_cnt, cicada_case6_cnt);
   // Logging
   double log_write_avg_time = 0;
   if (log_write_cnt > 0) log_write_avg_time = log_write_time / log_write_cnt;
@@ -1691,6 +1712,14 @@ void Stats_thd::combine(Stats_thd * stats) {
   dta_case5_cnt += stats->dta_case5_cnt;
   dta_range += stats->dta_range;
   dta_commit_cnt += stats->dta_commit_cnt;
+
+  // CICADA
+  cicada_case1_cnt += stats->cicada_case1_cnt;
+  cicada_case2_cnt += stats->cicada_case2_cnt;
+  cicada_case3_cnt += stats->cicada_case3_cnt;
+  cicada_case4_cnt += stats->cicada_case4_cnt;
+  cicada_case5_cnt += stats->cicada_case5_cnt;
+  cicada_case6_cnt += stats->cicada_case6_cnt;
 
   // WKDB
   wkdb_validate_cnt+=stats->wkdb_validate_cnt;

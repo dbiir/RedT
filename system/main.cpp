@@ -220,6 +220,13 @@ int main(int argc, char *argv[]) {
 	txn_table.init();
 	printf("Done\n");
     printf("***********num_wh = %d**********\n",NUM_WH);
+#if SERVER_GENERATE_QUERIES
+	printf("Initializing client query queue... ");
+	fflush(stdout);
+	client_query_queue.init(m_wl);
+	printf("Done\n");
+	fflush(stdout);
+#endif
 #if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	printf("Initializing sequencer... ");
 	fflush(stdout);
@@ -288,7 +295,6 @@ int main(int argc, char *argv[]) {
 	wkdb_man.init();
 	printf("Done\n");
 #endif
-
 #if CC_ALG == TICTOC
 	printf("Initializing MaaT manager... ");
 	fflush(stdout);
@@ -316,15 +322,6 @@ int main(int argc, char *argv[]) {
 	logger.init("logfile.log");
 	printf("Done\n");
 #endif
-
-#if SERVER_GENERATE_QUERIES
-	printf("Initializing client query queue... ");
-	fflush(stdout);
-	client_query_queue.init(m_wl);
-	printf("Done\n");
-	fflush(stdout);
-#endif
-
 #if WORKLOAD==DA
 	commit_file.open("commit_histroy.txt",ios::app);
 	abort_file.open("abort_histroy.txt",ios::app);
