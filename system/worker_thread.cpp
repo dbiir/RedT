@@ -1122,7 +1122,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   uint64_t txn_id = UINT64_MAX;
   bool is_cl_o = msg->get_rtype() == CL_QRY_O;
 #if USE_COROUTINE
-if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
+  if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
     // This is a new transaction
     // Only set new txn_id when txn first starts
     #if WORKLOAD == DA
@@ -1141,7 +1141,7 @@ if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
     bool ready = cor_txn_man[cor_id]->unset_ready();
     INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
     assert(ready);
-    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2) {
+    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT) {
       #if WORKLOAD == DA //mvcc use timestamp
         if (da_stamp_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
         {
@@ -1294,7 +1294,7 @@ if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
     bool ready = txn_man->unset_ready();
     INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
     assert(ready);
-    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2) {
+    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT) {
       #if WORKLOAD == DA //mvcc use timestamp
         if (da_stamp_tab.count(txn_man->get_txn_id())==0)
         {

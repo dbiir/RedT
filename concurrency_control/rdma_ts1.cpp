@@ -193,10 +193,10 @@ void  RDMA_ts1::commit_write(yield_func_t &yield, TxnManager * txn , uint64_t nu
 	}
 	else if(type == WR){
 		uint64_t try_lock;
-		row_t* remote_row = txn->cas_and_read_remote(try_lock,loc,offset,offset,0,lock_num);
+		row_t* remote_row = txn->cas_and_read_remote(yield,try_lock,loc,offset,offset,0,lock_num,cor_id);
 		while(try_lock!=0){ //lock fail
 			mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-			remote_row = txn->cas_and_read_remote(try_lock,loc,offset,offset,0,lock_num);
+			remote_row = txn->cas_and_read_remote(yield,try_lock,loc,offset,offset,0,lock_num,cor_id);
 		}
 		//update wts, tid and unlock
 		if(remote_row->wts < ts) remote_row->wts = ts;

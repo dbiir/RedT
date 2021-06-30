@@ -775,8 +775,11 @@ retry_lock:
 
         }
 		for(uint64_t i = 0; i < row_set_length; i++) {
-			assert(i < row_set_length - 1);
-			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
+			if(i >= row_set_length - 1) {
+				rc = Abort;
+				break;
+			}
+			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TXNTABLE_MAX) {
 				break;
 			}
 			uncommitted_writes.insert(remote_row->uncommitted_writes[i]);
@@ -785,11 +788,14 @@ retry_lock:
 			greatest_write_timestamp = remote_row->timestamp_last_write;
 		}
 		for(uint64_t i = 0; i < row_set_length; i++) {
-			assert(i < row_set_length - 1);
+			if(i >= row_set_length - 1) {
+				rc = Abort;
+				break;
+			}
 			if(remote_row->uncommitted_reads[i] == get_txn_id()) {
 				break;
 			}
-			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
+			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TXNTABLE_MAX) {
                 remote_row->ucreads_len += 1;
 				remote_row->uncommitted_reads[i] = get_txn_id();
 				break;
@@ -799,8 +805,11 @@ retry_lock:
 	// }else if(type == WR) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
 
-			assert(i < row_set_length - 1);
-			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
+			if(i >= row_set_length - 1) {
+				rc = Abort;
+				break;
+			}
+			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TXNTABLE_MAX) {
 				break;
 			}
 			uncommitted_reads.insert(remote_row->uncommitted_reads[i]);
@@ -813,9 +822,12 @@ retry_lock:
 		}
 		bool in_set = false;
 		for(uint64_t i = 0; i < row_set_length; i++) {
-			assert(i < row_set_length - 1);
+			if(i >= row_set_length - 1) {
+				rc = Abort;
+				break;
+			}
 			if(remote_row->uncommitted_writes[i] == get_txn_id()) in_set = true;
-			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
+			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TXNTABLE_MAX) {
 				if(in_set == false) {
                     remote_row->ucwrites_len += 1;
                     remote_row->uncommitted_writes[i] = get_txn_id();

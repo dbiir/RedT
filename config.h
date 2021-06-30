@@ -74,7 +74,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
+#define NODE_CNT 3
 #define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -174,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_MVCC
+#define CC_ALG RDMA_CICADA
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -183,14 +183,14 @@
 
 #if RDMA_ONE_SIDE 
 //OR can be used only when enable DB&PA, consider merge this two option when finish
-#define USE_DBPA true
-#define USE_OR true
+#define USE_DBPA false
+#define USE_OR false
 #endif
 
 /***********************************************/
 // USE RDMA
 /**********************************************/
-#if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || RDMA_TWO_SIDE == true
+#if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || RDMA_TWO_SIDE == true
 // #define USE_RDMA CHANGE_MSG_QUEUE
 #define USE_RDMA CHANGE_TCP_ONLY
 #endif
@@ -258,7 +258,7 @@
 #define PRE_ABORT2					"true"
 #define ATOMIC_WORD					false
 // [RDMA_MAAT]
-#define RDMA_TIMETABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
+#define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
 #define ROW_SET_LENGTH 30
 
 /***********************************************/
@@ -276,7 +276,7 @@
 // max number of rows touched per transaction
 #define MAX_ROW_PER_TXN       64
 #define QUERY_INTVL         1UL
-#define MAX_TXN_PER_PART 500000
+#define MAX_TXN_PER_PART 100000
 #define FIRST_PART_LOCAL      true
 #define MAX_TUPLE_SIZE        1024 // in bytes
 #define GEN_BY_MPR false
@@ -470,6 +470,7 @@ enum PPSTxnType {
 #define RDMA_CICADA 36
 #define RDMA_CALVIN 38
 #define RDMA_CNULL 37
+#define RDMA_WOUND_WAIT 39
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

@@ -243,11 +243,17 @@ int main(int argc, char *argv[]) {
 #if CC_ALG == RDMA_MAAT
 	printf("Initializing Time Table... ");
 	fflush(stdout);
-	rdma_time_table.init();
+	rdma_txn_table.init();
 	printf("Done\n");
 	printf("Initializing MaaT manager... ");
 	fflush(stdout);
 	rmaat_man.init();
+	printf("Done\n");
+#endif
+#if CC_ALG == RDMA_WOUND_WAIT
+    printf("Initializing Txn Table... ");
+	fflush(stdout);
+	rdma_txn_table.init();
 	printf("Done\n");
 #endif
 #if CC_ALG == RDMA_CICADA

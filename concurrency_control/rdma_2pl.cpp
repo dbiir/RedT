@@ -8,7 +8,7 @@
 #include "rdma_2pl.h"
 #include "row_rdma_2pl.h"
 
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
 void RDMA_2pl::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnManager * txnMng,uint64_t cor_id) {
 	//row->copy(data);  //copy access->data to access->orig_row
     //no need for last step:data = orig_row in local situation
@@ -92,7 +92,7 @@ retry_unlock:
     printf("---线程号：%lu, 本地解读锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info, new_lock_info);
 #endif     
 
-#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
     assert(row->_tid_word != 0);
     row->_tid_word = 0;
 #if DEBUG_PRINTF
@@ -141,7 +141,7 @@ remote_retry_unlock:
     printf("---thd：%lu, remote release lock succ,lock location: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), *lock_info, new_lock_info);
 #endif
 	mem_allocator.free(lock_info, sizeof(uint64_t));
-#elif CC_ALG == RDMA_NO_WAIT2 ||  CC_ALG == RDMA_WAIT_DIE2
+#elif CC_ALG == RDMA_NO_WAIT2 ||  CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
     Access *access = txnMng->txn->accesses[num];
     uint64_t off = access->offset;
     uint64_t loc = access->location;
@@ -244,11 +244,10 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
 #else  
             
             auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
-            RDMA_ASSERT(dbres1 == IOCode::Ok);  
-            endtime = get_sys_clock();
-            INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-            DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
-#endif     
+            RDMA_ASSERT(dbres1 == IOCode::Ok);
+            INC_STATS(txnMng->get_thd_id(), worker_idle_time, get_sys_clock()-starttime);
+            DEL_STATS(txnMng->get_thd_id(), worker_process_time, get_sys_clock()-starttime);
+#endif      
         }
     }
 #endif 

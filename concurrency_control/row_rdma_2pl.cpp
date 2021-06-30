@@ -8,7 +8,7 @@
 #include "row_rdma_2pl.h"
 #include "global.h"
 
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
 
 void Row_rdma_2pl::init(row_t * row){
 	_row = row;
@@ -46,7 +46,7 @@ bool Row_rdma_2pl::conflict_lock(uint64_t lock_info, lock_t l2, uint64_t& new_lo
 }
 
 RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row_t * row,uint64_t cor_id) {  //本地加锁
-	assert(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2);
+	assert(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT);
     RC rc;
 #if CC_ALG == RDMA_NO_WAIT
 atomic_retry_lock:
@@ -161,16 +161,6 @@ local_retry_lock:
 		auto mr = client_rm_handler->get_reg_attr().value();
         uint64_t tts = txn->get_timestamp();
         try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,tts,cor_id);
-		// rdmaio::qp::Op<> op;
-		// op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(0,tts);
-		// assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
-		// auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
-
-		// RDMA_ASSERT(res_s2 == IOCode::Ok);
-		// auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-		// RDMA_ASSERT(res_p2 == IOCode::Ok);
-
-		// if(*tmp_buf2 != 0){ //如果CAS失败
 		if(try_lock != 0){ //如果CAS失败
 			if(tts <= *tmp_buf2){  //wait
 #if DEBUG_PRINTF
@@ -189,6 +179,54 @@ local_retry_lock:
         else{ //加锁成功
             rc = RCOK;
         }
+#endif
+#if CC_ALG == RDMA_WOUND_WAIT
+    		//直接RDMA CAS加锁 
+local_retry_lock:
+        uint64_t loc = g_node_id;
+        uint64_t try_lock = -1;
+        
+
+        uint64_t thd_id = txn->get_thd_id();
+		uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+		auto mr = client_rm_handler->get_reg_attr().value();
+        uint64_t tts = txn->get_timestamp();
+        try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,tts,cor_id);
+        if(try_lock == 0) {
+            _row->lock_owner = txn->get_txn_id();
+            rc = RCOK;
+        }
+		if(try_lock != 0){ //如果CAS失败
+            WOUNDState state;
+            RdmaTxnTableNode * value;
+			if(_row->lock_owner % g_node_cnt == g_node_id) {
+				state = rdma_txn_table.local_get_state(txn->get_thd_id(), _row->lock_owner);
+			} else {
+		    	value = rdma_txn_table.remote_get_state(yield, txn, _row->lock_owner, cor_id);
+                state = value->state;
+			}
+			if(tts <= *tmp_buf2 && state != WOUND_COMMITTING && state != WOUND_ABORTING){  //wound   
+                if(_row->lock_owner % g_node_cnt == g_node_id) {
+					rdma_txn_table.local_set_state(txn->get_thd_id(), _row->lock_owner, WOUND_ABORTING);
+				} else {
+                    value->state = WOUND_ABORTING;
+					rdma_txn_table.remote_set_state(yield, txn, _row->lock_owner, value, cor_id);
+                    mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+				}
+                goto local_retry_lock;	
+			}	
+			else{ //wait
+				// rc = Abort;
+#if DEBUG_PRINTF
+            printf("---local_retry_lock\n");
+#endif 
+                total_num_atomic_retry++;
+                txn->num_atomic_retry++;
+                if(txn->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txn->num_atomic_retry;
+				//sleep(1);
+				goto local_retry_lock;	
+			}
+		}
 #endif
 	return rc;
 }

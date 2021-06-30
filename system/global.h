@@ -86,12 +86,15 @@ class RDMA_silo;
 #elif CC_ALG == RDMA_MVCC
 class rdma_mvcc;
 #endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
 class RDMA_2pl;
+#endif
+#if CC_ALG == RDMA_WOUND_WAIT
+class RdmaTxnTable;
 #endif
 #if CC_ALG == RDMA_MAAT
 class RDMA_Maat;
-class RdmaTimeTable;
+class RdmaTxnTable;
 #endif
 #if CC_ALG == RDMA_TS1
 class RDMA_ts1;
@@ -166,12 +169,15 @@ extern RDMA_silo rsilo_man;
 #elif CC_ALG == RDMA_MVCC
 extern rdma_mvcc rmvcc_man;
 #endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
 extern RDMA_2pl r2pl_man;
+#endif
+#if CC_ALG == RDMA_WOUND_WAIT
+extern RdmaTxnTable rdma_txn_table;
 #endif
 #if CC_ALG == RDMA_MAAT
 extern RDMA_Maat rmaat_man;
-extern RdmaTimeTable rdma_time_table;
+extern RdmaTxnTable rdma_txn_table;
 #endif
 #if CC_ALG ==RDMA_TS1
 extern RDMA_ts1 rdmats_man;
@@ -214,7 +220,7 @@ extern RtsCache wkdb_rts_cache;
 extern map<string, string> g_params;
 
 extern char *rdma_global_buffer;
-extern char *rdma_timetable_buffer;
+extern char *rdma_txntable_buffer;
 // CALVIN share memory
 extern char *rdma_calvin_buffer;
 //extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
@@ -310,7 +316,7 @@ extern uint64_t rdma_buffer_size;
 extern uint64_t client_rdma_buffer_size;
 extern uint64_t rdma_index_size;
 // MAAT
-extern uint64_t rdma_timetable_size;
+extern uint64_t rdma_txntable_size;
 extern uint64_t row_set_length;
 
 extern UInt32 g_max_txn_per_part;
