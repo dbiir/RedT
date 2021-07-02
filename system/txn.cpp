@@ -443,6 +443,7 @@ void TxnManager::reset() {
 #if CC_ALG == RDMA_CICADA
 	uncommitted_set.clear();
 	start_ts = 0;
+	version_num.clear();
 #endif
 
 #if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
@@ -678,7 +679,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	} 
 	else { // is not multi-part or use rdma
 		rc = validate(yield, cor_id);
-		rc = RCOK;
+		// rc = RCOK;
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
 

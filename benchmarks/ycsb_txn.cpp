@@ -936,7 +936,7 @@ retry_lock:
 
     if(req->acctype == RD) {
 		assert(remote_row->version_cnt >= 0);
-		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
+		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(remote_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
@@ -956,6 +956,7 @@ retry_lock:
 					} else {
 						rc = RCOK;
 						version = remote_row->cicada_version[i].key;
+						// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 					}
 					// rc =Abort;	
 				}				
@@ -966,12 +967,13 @@ retry_lock:
 				}
 				rc = RCOK;
 				version = remote_row->cicada_version[i].key;
+				// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 			}	
 		}
 	}
     	if(req->acctype == WR) {
 		assert(remote_row->version_cnt >= 0);
-		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
+		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(remote_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
@@ -992,6 +994,7 @@ retry_lock:
 						rc = WAIT;
 					} else {
 						version = remote_row->cicada_version[i].key;
+						// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 						rc = RCOK;
 					}
 					// rc = Abort;
@@ -1000,8 +1003,10 @@ retry_lock:
 				if(remote_row->cicada_version[i].Wts > this->get_timestamp() || remote_row->cicada_version[i].Rts > this->get_timestamp()) {
 					rc = Abort;
 				} else {
+					
 					rc = RCOK;
 					version = remote_row->cicada_version[i].key;
+					// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 				}
 			}
 			
@@ -1014,6 +1019,7 @@ retry_lock:
         mem_allocator.free(m_item, sizeof(itemid_t));
 		return rc;
 	}
+	
     this->version_num.push_back(version);
     rc = preserve_access(row_local,m_item,remote_row,req->acctype,remote_row->get_primary_key(),loc);
 	

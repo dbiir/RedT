@@ -870,7 +870,7 @@ retry_lock:
 
     if(type == RD) {
 		assert(remote_row->version_cnt >= 0);
-		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
+		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(remote_row->cicada_version[i].Wts > this->start_ts || remote_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
@@ -910,7 +910,7 @@ retry_lock:
 	}
     if(type == WR) {
 		assert(remote_row->version_cnt >= 0);
-		for(int cnt = remote_row->version_cnt ; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
+		for(int cnt = remote_row->version_cnt ; cnt >= remote_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(remote_row->cicada_version[i].Wts > this->start_ts || remote_row->cicada_version[i].Rts > this->start_ts || remote_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
