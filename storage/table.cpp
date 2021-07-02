@@ -86,24 +86,6 @@ RC table_t::get_new_row(row_t *& row) {
 	return RCOK;
 }
 
-// get new row beyond register memeory
-RC table_t::general_get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
-
-	RC rc = RCOK;
-    DEBUG_M("table_t::get_new_row alloc\n");
-	void * ptr = mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-	assert (ptr != NULL);
-
-	row = (row_t *) ptr;
-	rc = row->init(this, part_id, row_id);
-	row->init_manager(row);
-
-  return rc;
-
-}
-
-
-
 // the row is not stored locally. the pointer must be maintained by index structure.
 RC table_t::get_general_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
 	RC rc = RCOK;

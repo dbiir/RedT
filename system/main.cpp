@@ -85,7 +85,8 @@ void parser(int argc, char * argv[]);
 int main(int argc, char *argv[]) {
 	RDMA_MEMORY_LATCH = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init(RDMA_MEMORY_LATCH, NULL);
-
+	RDMA_QP_LATCH = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init(RDMA_QP_LATCH, NULL);
     // 0. initialize global data structure
     parser(argc, argv);
 #if SEED != 0

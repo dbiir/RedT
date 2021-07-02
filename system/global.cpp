@@ -372,7 +372,7 @@ rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
 rdmaio::Arc<rdmaio::RNic> nic;
 // rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
 rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][RDMA_MAX_CLIENT_QP * (COROUTINE_CNT + 1)];
-
+pthread_mutex_t * RDMA_QP_LATCH;
 rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
 
 string rdma_server_add[NODE_CNT];

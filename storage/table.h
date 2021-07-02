@@ -39,8 +39,6 @@ public:
 	RC get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id);
     RC get_general_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id);
 
-    RC general_get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id);
-
 	void delete_row(); // TODO delete_row is not supportet yet
 
 	Catalog*  get_schema() { return &schema; };
@@ -66,8 +64,7 @@ public:
 	// new row.
 	RC get_new_row(row_t *& row); // this is equivalent to insert()
 	RC get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id);
-     RC general_get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id);
-
+    RC get_general_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id);
 	void delete_row(); // TODO delete_row is not supportet yet
 
 	uint64_t get_table_size() { return *cur_tab_size; };
