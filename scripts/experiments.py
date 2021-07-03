@@ -130,12 +130,12 @@ def ycsb_scaling():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
-    nnodes = [4]
+    nnodes = [2]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
     # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    algos = ['RDMA_SILO']
+    algos = ['SILO']
     base_table_size=1048576
     # base_table_size=1048576*8
     #base_table_size=2097152*8

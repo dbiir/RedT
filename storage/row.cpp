@@ -36,6 +36,7 @@
 #include "row_tictoc.h"
 #include "row_ssi.h"
 #include "row_wsi.h"
+#include "row_cicada.h"
 #include "row_null.h"
 #include "row_silo.h"
 #include "row_rdma_silo.h"
@@ -177,6 +178,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_rdma_ts1 *) mem_allocator.align_alloc(sizeof(Row_rdma_ts1));
 #elif CC_ALG == RDMA_CICADA
   manager = (Row_rdma_cicada *) mem_allocator.align_alloc(sizeof(Row_rdma_cicada));
+#elif CC_ALG == CICADA
+	manager = (Row_cicada *) mem_allocator.align_alloc(sizeof(Row_cicada));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC && CC_ALG != RDMA_CNULL
@@ -389,10 +392,30 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #endif
-
+#if CC_ALG == CICADA
+	uint64_t init_time = get_sys_clock();
+	DEBUG_M("row_t::get_row CICADA alloc \n");
+	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
+	txn->cur_row->init(get_table(), get_part_id());
+	INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
+	
+	rc = this->manager->access(txn, type, access);
+	
+	uint64_t copy_time = get_sys_clock();
+	if (rc == RCOK ) {
+		txn->cur_row->copy(this);
+		access->data = txn->cur_row;
+	} else if (rc == WAIT) {
+		rc = WAIT;
+		INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+		goto end;
+	} else if (rc == Abort) {
+	}
+	goto end;
+#endif
 #if CC_ALG == RDMA_CICADA
   uint64_t init_time = get_sys_clock();
-  DEBUG_M("row_t::get_row MAAT alloc \n");
+  DEBUG_M("row_t::get_row RDMA_CICADA alloc \n");
 	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), get_part_id());
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);

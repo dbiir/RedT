@@ -57,6 +57,8 @@
 #include "rdma_maat.h"
 #include "rdma_ts1.h"
 #include "rdma_cicada.h"
+#include "cicada.h"
+#include "row_cicada.h"
 #include "rdma_null.h"
 #include "transport.h"
 #include "dbpa.hpp"
@@ -659,7 +661,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 				rc = WAIT_REM;
 			}
 		} else if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == DLI_BASE ||
-				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI) {
+				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;
@@ -966,7 +968,8 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 	} else {
 		assert(false);
 	}
-
+#elif CC_ALG == CICADA
+	version = orig_r->manager->commit(this, type);
 #else
   if (ROLL_BACK && type == XP &&
       (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
@@ -1414,7 +1417,8 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 			CC_ALG != SSI && CC_ALG != DLI_BASE && CC_ALG != DLI_OCC &&
 			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
 			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO &&
-			CC_ALG != RDMA_SILO && CC_ALG != RDMA_MVCC && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA) {
+			CC_ALG != RDMA_SILO && CC_ALG != RDMA_MVCC && CC_ALG != RDMA_MAAT && 
+			CC_ALG != RDMA_CICADA && CC_ALG != CICADA) {
 		return RCOK; //no validate in NO_WAIT
 	}
 	RC rc = RCOK;
@@ -1424,6 +1428,7 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 	if(CC_ALG == FOCC && rc == RCOK) rc = focc_man.validate(this);
 	if(CC_ALG == SSI && rc == RCOK) rc = ssi_man.validate(this);
 	if(CC_ALG == WSI && rc == RCOK) rc = wsi_man.validate(this);
+	if(CC_ALG == CICADA && rc == RCOK) rc = cicada_man.validate(this);
 	if(CC_ALG == MAAT  && rc == RCOK) {
 		rc = maat_man.validate(this);
 		// Note: home node must be last to validate

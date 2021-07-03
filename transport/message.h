@@ -383,7 +383,7 @@ public:
   void release() {}
 
   uint64_t pid;
-#if CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == DTA || CC_ALG == WOOKONG
+#if CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == CICADA
   uint64_t ts;
 #endif
 #if CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3

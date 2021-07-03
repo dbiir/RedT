@@ -77,6 +77,9 @@ public:
     uint64_t	location;
 	uint64_t	offset;
 #endif
+#if CC_ALG == CICADA
+	uint64_t	recordId;	//already readed record id
+#endif
 	void cleanup();
 };
 

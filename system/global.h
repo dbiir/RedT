@@ -75,6 +75,7 @@ class Focc;
 class Bocc;
 class ssi;
 class wsi;
+class Cicada;
 class Maat;
 class Dta;
 class Wkdb;
@@ -155,6 +156,7 @@ extern Focc focc_man;
 extern Bocc bocc_man;
 extern ssi ssi_man;
 extern wsi wsi_man;
+extern Cicada cicada_man;
 extern Maat maat_man;
 extern Dta dta_man;
 extern Wkdb wkdb_man;
@@ -483,6 +485,8 @@ enum access_t {RD, WR, XP, SCAN};
 enum lock_t {DLOCK_EX = 0, DLOCK_SH, LOCK_NONE };
 /* TIMESTAMP */
 enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
+/* CICADA */
+enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 
 /*DA query build queue*/
 //queue<DAQuery> query_build_queue;
