@@ -49,7 +49,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn) {
 }
 
 RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txncnt) {
-    assert (CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+    assert (CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN || CC_ALG == WOUND_WAIT);
     RC rc;
     uint64_t starttime = get_sys_clock();
     uint64_t lock_get_start_time = starttime;
@@ -71,6 +71,14 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
 	if (CC_ALG == WAIT_DIE && !conflict) {
 		if (waiters_head && txn->get_timestamp() < waiters_head->txn->get_timestamp()) {
 			conflict = true;
+		}
+	}
+  if (CC_ALG == WOUND_WAIT && !conflict) {
+		if (waiters_head && txn->get_timestamp() > waiters_head->txn->get_timestamp()) { //时间戳比等待队列都小的时候可以直接读，否则等待
+			conflict = true;
+      DEBUG("txn_id = %ld not conflict, but T.ts(%lu) > waiter_head.ts(%lu) has to WAIT: owners_num %d, own type %d, req type %d, key %ld %lx\n", txn->get_txn_id()
+              ,txn->txn->timestamp, waiters_head->txn->get_timestamp()
+              ,owner_cnt, lock_type, type, _row->get_primary_key(), (uint64_t)_row);
 		}
 	}
     if ((CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) && !conflict) {
@@ -156,6 +164,119 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
               rc = Abort;
             }
         } 
+        else if (CC_ALG == WOUND_WAIT) {
+            /////////////////////WOUND_WAIT///////////////////////////
+            //  - T is the txn currently running
+            //  IF T.ts < min ts of owners
+            //      T can wound the owners
+            //      IF O.state = commit then T WAIT
+            //  ELSE
+            //      IF T.ts > max ts of owners
+            //          T can wait
+            //      ELSE
+            //          T should Abort
+            /////////////////////////////////////////////////////////
+            bool canwait = true;
+            bool canwound = true;
+            LockEntry * en;
+            for(uint64_t i = 0; i < owners_size; i++) {
+                en = owners[i];
+                while (en != NULL) {
+                    assert(txn->get_txn_id() != en->txn->get_txn_id());
+                    assert(txn->get_timestamp() != en->txn->get_timestamp());  
+                    if (txn->get_timestamp() > en->txn->get_timestamp())
+                        canwound = false;
+                    else
+                      canwait = false;
+                    
+                    if (!canwait && !canwound) break;
+                    en = en->next;
+                }   
+                if (!canwait && !canwound) break;
+            }
+            if (canwound) {
+                //移除之前的owners,已经开始提交的事务不移除
+                LockEntry * head;
+                LockEntry * prev;
+                assert(canwait == false);
+                assert(txn->txn_state == RUNNING); 
+                DEBUG("txn_id = %ld start WOUND lock: owners_num %d, own type %d, req type %d, key %ld %lx\n", txn->get_txn_id(),
+                    owner_cnt, lock_type, type, _row->get_primary_key(), (uint64_t)_row);   
+                for(uint64_t i = 0; i < owners_size; i++) {
+                    head = owners[i];
+                    if (head == NULL) continue;
+                    //处理头部
+                    while (head != NULL && head->txn->txn_state != STARTCOMMIT) {
+                        en = head;
+                        head = head->next;
+                        en->txn->txn_state = WOUNDED;
+                        DEBUG("[WOUNDED]txn_id = %ld\n",en->txn->txn->txn_id);
+                        return_entry(en);
+                        owner_cnt --;
+                    }
+                    owners[i] = head;
+                    if (head == NULL) continue;
+                    else 
+                        canwait = true;
+                    //处理中部和尾部
+                    prev = head;
+                    while (prev->next != NULL) {
+                        en = prev->next;
+                        if (en->txn->txn_state == STARTCOMMIT) { //开始提交的事务不wound，原本要执行抢锁的事务进行等待
+                            canwait = true;
+                            prev = prev->next;
+                            DEBUG("[NOT WOUNDED]txn_id = %ld is committing, txn_id = %ld wait\n"
+                                ,en->txn->txn->txn_id, txn->txn->txn_id);
+                        } else {
+                            en->txn->txn_state = WOUNDED;
+                            DEBUG("[WOUNDED]txn_id = %ld\n",en->txn->txn->txn_id);
+                            prev->next = en->next; //删掉en
+                            return_entry(en);
+                            owner_cnt --;
+                        }
+                    }
+                }
+                //该txn加入owner
+                if (!canwait) {
+                    goto lock;
+                }
+            }
+            else if (canwait) {
+                // insert txn to the right position
+                // the waiter list is always in timestamp order
+                LockEntry * entry = get_entry();
+                entry->start_ts = get_sys_clock();
+                entry->txn = txn;
+                entry->type = type;
+                LockEntry * en;
+                ATOM_CAS(txn->lock_ready,1,0);
+                txn->incr_lr();
+                en = waiters_head;
+                while (en != NULL && txn->get_timestamp() > en->txn->get_timestamp()) {
+                    en = en->next;
+                }
+                if (en) {
+                    LIST_INSERT_BEFORE(en, entry,waiters_head);
+                } else {
+                    LIST_PUT_TAIL(waiters_head, waiters_tail, entry);
+                }
+
+                waiter_cnt ++;
+                DEBUG("lk_wait (%ld,%ld): owners %d, own type %d, req type %d, key %ld %lx\n",
+                    txn->get_txn_id(), txn->get_batch_id(), owner_cnt, lock_type, type,
+                    _row->get_primary_key(), (uint64_t)_row);
+                rc = WAIT;
+            } 
+            else if (!canwait && !canwound) {
+                DEBUG("abort (%ld,%ld): owners %d, own type %d, req type %d, key %ld %lx\n",
+                    txn->get_txn_id(), txn->get_batch_id(), owner_cnt, lock_type, type,
+                    _row->get_primary_key(), (uint64_t)_row);
+                rc = Abort;
+            }
+            else {
+                assert(false);
+            }
+        }
         else if (CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN){
             LockEntry * entry = get_entry();
             entry->start_ts = get_sys_clock();
@@ -179,6 +300,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
         }
     } 
     else {  //no conflict
+  lock:
     DEBUG("1lock (%ld,%ld): owners %d, own type %d, req type %d, key %ld %lx\n", txn->get_txn_id(),
           txn->get_batch_id(), owner_cnt, lock_type, type, _row->get_primary_key(), (uint64_t)_row);
 #if DEBUG_TIMELINE
@@ -295,6 +417,9 @@ RC Row_lock::lock_release(TxnManager * txn) {
       }
     } 
     else { // NOT find the entry in the owner list
+#if CC_ALG == WOUND_WAIT
+      DEBUG("txn_id = %ld release lock but not in owners\n",txn->txn->txn_id);
+#else
       assert(false);
           en = waiters_head;
     while (en != NULL && en->txn != txn) en = en->next;
@@ -305,6 +430,7 @@ RC Row_lock::lock_release(TxnManager * txn) {
     if (en == waiters_tail) waiters_tail = en->prev;
           return_entry(en);
           waiter_cnt --;
+  #endif
       }
 #endif
 

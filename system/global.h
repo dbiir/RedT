@@ -460,6 +460,13 @@ enum CALVIN_PHASE {
   CALVIN_DONE
 };
 
+//WOUND_WAIT
+enum TxnStatus {
+  RUNNING = 0,
+  WOUNDED,
+  STARTCOMMIT
+};
+
 /* Thread */
 typedef uint64_t txnid_t;
 

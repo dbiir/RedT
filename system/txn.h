@@ -308,6 +308,9 @@ bool rdma_one_side() {
 	ts_t 			_cur_tid;
 	RC				validate_silo();
 #endif
+#if CC_ALG == WOUND_WAIT
+	TxnStatus		txn_state;
+#endif
 	bool aborted;
 	uint64_t return_id;
 	RC        validate(yield_func_t &yield, uint64_t cor_id);

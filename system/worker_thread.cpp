@@ -1295,7 +1295,7 @@ if(msg->get_rtype() == CL_QRY || msg->get_rtype() == CL_QRY_O) {
     bool ready = txn_man->unset_ready();
     INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
     assert(ready);
-    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2) {
+    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == WOUND_WAIT) {
       #if WORKLOAD == DA //mvcc use timestamp
         if (da_stamp_tab.count(txn_man->get_txn_id())==0)
         {

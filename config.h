@@ -174,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG SILO
+#define CC_ALG CALVIN
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -487,6 +487,7 @@ enum PPSTxnType {
 #define RDMA_CALVIN 38
 #define RDMA_CNULL 37
 #define CICADA  39
+#define WOUND_WAIT 40
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
