@@ -521,7 +521,7 @@ if(req->acctype == RD || req->acctype == WR){
 #if USE_DBPA == true
 retry_lock:
 		uint64_t try_lock;
-		row_t* test_row = cas_and_read_remote(try_lock,loc,m_item->offset,m_item->offset,0,tts);
+		row_t* test_row = cas_and_read_remote(yield,try_lock,loc,m_item->offset,m_item->offset,0,tts, cor_id);
 		if(try_lock != 0){// CAS fail
 			if(tts <= try_lock){ //wait
 				num_atomic_retry++;
@@ -598,7 +598,7 @@ retry_lock:
 				ts_t new_rts = ts;
 				ts_t cas_result;
 				uint64_t rts_offset = m_item->offset + sizeof(uint64_t)+sizeof(uint64_t)+sizeof(ts_t);
-				row_t * second_row = cas_and_read_remote(cas_result,loc,rts_offset,m_item->offset,old_rts,new_rts);
+				row_t * second_row = cas_and_read_remote(yield,cas_result,loc,rts_offset,m_item->offset,old_rts,new_rts, cor_id);
 				if(cas_result!=old_rts){ //cas fail, atomicity violated
 					rc = Abort;
 					DEBUG_M("TxnManager::get_row(abort) access free\n");
@@ -635,7 +635,7 @@ retry_lock:
 			uint64_t new_tid = ts;
 			ts_t cas_result;
 			uint64_t tid_offset = m_item->offset + sizeof(uint64_t);
-			row_t * second_row = cas_and_read_remote(cas_result,loc,tid_offset,m_item->offset,old_tid,new_tid);
+			row_t * second_row = cas_and_read_remote(yield,cas_result,loc,tid_offset,m_item->offset,old_tid,new_tid, cor_id);
 			if(cas_result!=old_tid){ //cas fail, atomicity violated
 				rc = Abort;
 				DEBUG_M("TxnManager::get_row(abort) access free\n");

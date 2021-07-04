@@ -1061,7 +1061,8 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 		cleanup_row(yield, rc,rid,remote_access,cor_id);  //return abort write row
 	}
 #if USE_DBPA == true && CC_ALG == RDMA_TS1 
-	uint64_t starttime = get_sys_clock(), endtime;
+	starttime = get_sys_clock();
+	uint64_t endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
         if(remote_access[i].size() > 0){
             batch_unlock_remote(yield, cor_id, i, Abort, this, remote_access);

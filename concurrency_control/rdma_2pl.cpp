@@ -210,7 +210,8 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
     }
 
 #if USE_DBPA == true
-    uint64_t starttime = get_sys_clock(), endtime;
+    starttime = get_sys_clock();
+    uint64_t endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
         if(remote_access[i].size() > 0){
             txnMng->batch_unlock_remote(yield, cor_id, i, rc, txnMng, remote_access);
