@@ -77,6 +77,9 @@ public:
     uint64_t	location;
 	uint64_t	offset;
 #endif
+#if CC_ALG == CICADA
+	uint64_t	recordId;	//already readed record id
+#endif
 	void cleanup();
 };
 
@@ -304,6 +307,9 @@ bool rdma_one_side() {
 	bool 			_validation_no_wait;
 	ts_t 			_cur_tid;
 	RC				validate_silo();
+#endif
+#if CC_ALG == WOUND_WAIT
+	TxnStatus		txn_state;
 #endif
 	bool aborted;
 	uint64_t return_id;
