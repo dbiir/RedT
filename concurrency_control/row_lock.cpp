@@ -164,6 +164,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
               rc = Abort;
             }
         } 
+#if CC_ALG == WOUND_WAIT
         else if (CC_ALG == WOUND_WAIT) {
             /////////////////////WOUND_WAIT///////////////////////////
             //  - T is the txn currently running
@@ -277,6 +278,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
                 assert(false);
             }
         }
+#endif
         else if (CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN){
             LockEntry * entry = get_entry();
             entry->start_ts = get_sys_clock();

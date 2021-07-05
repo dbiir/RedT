@@ -62,7 +62,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 	DEBUG("READ %ld -- %ld\n", txn->get_txn_id(), _row->get_primary_key());
 	uint64_t version = 0;	
 	if(type == RD) {
-		for(int cnt = _row->version_cnt; cnt >= _row->version_cnt - 4 && cnt >= 0; cnt--) {
+		for(int cnt = _row->version_cnt; cnt >= _row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
@@ -93,12 +93,12 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					if(_row->cicada_version[i].state == Cicada_PENDING) {
 						rc = WAIT;
 					} else if (_row->cicada_version[i].state == Cicada_ABORTED) {
+						rc = Abort;
 						break;
 					} else {
 						rc = RCOK;
 						version = _row->cicada_version[i].key;
 					}
-					rc = Abort;
 				}
 				//rc = Abort;
 				// rc = RCOK;
@@ -111,7 +111,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 		}
 	} else if(type == WR) {
 		assert(_row->version_cnt >= 0);
-		for(int cnt = _row->version_cnt; cnt >= _row->version_cnt - 4 && cnt >= 0; cnt--) {
+		for(int cnt = _row->version_cnt; cnt >= _row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;

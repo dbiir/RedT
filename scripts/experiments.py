@@ -206,7 +206,7 @@ def ycsb_skew():
     wl = 'YCSB'
     nnodes = [3]
      #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    algos=['RDMA_MVCC']
+    algos=['RDMA_CICADA']
     base_table_size=1048576
     #base_table_size=1048576*4    
     #base_table_size=2097152*8
@@ -910,7 +910,7 @@ configs = {
     "CLIENT_THREAD_CNT" : 4,
     "CLIENT_REM_THREAD_CNT" : 1,
     "CLIENT_SEND_THREAD_CNT" : 1,
-    "MAX_TXN_PER_PART" : 500000,
+    "MAX_TXN_PER_PART" : 100000,
     "WORKLOAD" : "YCSB",
     "CC_ALG" : "WAIT_DIE",
     "MPR" : 1.0,

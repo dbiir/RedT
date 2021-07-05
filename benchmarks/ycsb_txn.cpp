@@ -585,6 +585,110 @@ retry_lock:
 	return rc;
 #endif
 
+#if CC_ALG == RDMA_WOUND_WAIT
+if(req->acctype == RD || req->acctype == WR){
+		uint64_t tts = get_timestamp();
+
+#if USE_DBPA == true
+retry_lock:
+		uint64_t try_lock;
+		row_t* test_row = cas_and_read_remote(yield,try_lock,loc,m_item->offset,m_item->offset,0,tts,cor_id);
+		if(try_lock != 0){// CAS fail
+			if(tts <= try_lock){ //wound
+				// num_atomic_retry++;
+				// total_num_atomic_retry++;
+				// if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+				// //sleep(1);
+				// mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				// goto retry_lock;			
+			}
+			else{ //wait
+				// DEBUG_M("TxnManager::get_row(abort) access free\n");
+				// row_local = NULL;
+				// txn->rc = Abort;
+				// mem_allocator.free(m_item, sizeof(itemid_t));
+				// mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				// return Abort;
+				num_atomic_retry++;
+				total_num_atomic_retry++;
+				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+				//sleep(1);
+				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				goto retry_lock;			
+			}
+		}
+		assert(test_row->get_primary_key() == req->key);
+#endif
+
+#if USE_DBPA == false 
+retry_lock:
+        uint64_t try_lock = -1;
+        try_lock = cas_remote_content(yield,loc,m_item->offset,0,tts,cor_id);
+		row_t * test_row;
+		if(try_lock == 0) {
+			test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+			assert(test_row->get_primary_key() == req->key);
+			test_row->lock_owner = txn->txn_id;
+			
+			assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
+		}
+		if(try_lock != 0){ // cas fail
+			// printf("try_lock: %ld\n", try_lock);
+		    test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+			assert(test_row->get_primary_key() == req->key);
+			WOUNDState state;
+			RdmaTxnTableNode * value;
+			if(test_row->lock_owner % g_node_cnt == g_node_id) {
+				state = rdma_txn_table.local_get_state(get_thd_id(), test_row->lock_owner);
+			} else {
+		    	value = rdma_txn_table.remote_get_state(yield, this, test_row->lock_owner, cor_id);
+				state = value->state;
+			}
+			// printf("read remote state:%ld", state);
+			if(tts <= try_lock && state != WOUND_COMMITTING && state != WOUND_ABORTING){  //wound
+			    
+				if(test_row->lock_owner % g_node_cnt == g_node_id) {
+					rdma_txn_table.local_set_state(get_thd_id(), test_row->lock_owner, WOUND_ABORTING);
+
+				} else {
+					value->state = WOUND_ABORTING;
+					rdma_txn_table.remote_set_state(yield, this, test_row->lock_owner, value, cor_id);
+					mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+				}
+				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				goto retry_lock;
+				// num_atomic_retry++;
+				// total_num_atomic_retry++;
+				// if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+				// //sleep(1);
+				// goto retry_lock;			
+			}	
+			else{ //wait
+				// DEBUG_M("TxnManager::get_row(abort) access free\n");
+				// row_local = NULL;
+				// txn->rc = Abort;
+				// mem_allocator.free(m_item, sizeof(itemid_t));
+
+				// return Abort;
+				num_atomic_retry++;
+				total_num_atomic_retry++;
+				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				//sleep(1);
+				goto retry_lock;
+			}
+		}
+        
+        
+#endif
+        access_t type = req->acctype;
+        rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+        return rc;	
+	}
+	rc = RCOK;
+	return rc;
+#endif
+
 #if CC_ALG == RDMA_TS1
     
     ts_t ts = get_timestamp();
@@ -754,8 +858,11 @@ retry_lock:
 
     if(req->acctype == RD) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
-			assert(i < row_set_length - 1);
-			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
+			if(i >= row_set_length - 1) {
+				rc = Abort;
+				break;
+			}
+			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TXNTABLE_MAX) {
 				break;
 			}
 			uncommitted_writes.insert(remote_row->uncommitted_writes[i]);
@@ -764,11 +871,14 @@ retry_lock:
 			greatest_write_timestamp = remote_row->timestamp_last_write;
 		}
 		for(uint64_t i = 0; i < row_set_length; i++) {
-			assert(i < row_set_length - 1);
+			if(i >= row_set_length - 1) {
+				rc = Abort;
+				break;
+			}
 			if(remote_row->uncommitted_reads[i] == get_txn_id()) {
 				break;
 			}
-			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
+			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TXNTABLE_MAX) {
 				remote_row->uncommitted_reads[i] = get_txn_id();
 				break;
 			}
@@ -776,8 +886,11 @@ retry_lock:
 	}else if(req->acctype == WR) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
 
-			assert(i < row_set_length - 1);
-			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TIMETABLE_MAX) {
+			if(i >= row_set_length - 1) {
+				rc = Abort;
+				break;
+			}
+			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TXNTABLE_MAX) {
 				break;
 			}
 			uncommitted_reads.insert(remote_row->uncommitted_reads[i]);
@@ -790,9 +903,12 @@ retry_lock:
 		}
 		bool in_set = false;
 		for(uint64_t i = 0; i < row_set_length; i++) {
-			assert(i < row_set_length - 1);
+			if(i >= row_set_length - 1) {
+				rc = Abort;
+				break;
+			}
 			if(remote_row->uncommitted_writes[i] == get_txn_id()) in_set = true;
-			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TIMETABLE_MAX) {
+			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TXNTABLE_MAX) {
 				if(in_set == false)
 				remote_row->uncommitted_writes[i] = get_txn_id();
 				break;
@@ -828,7 +944,7 @@ retry_lock:
 
     if(req->acctype == RD) {
 		assert(remote_row->version_cnt >= 0);
-		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
+		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(remote_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
@@ -848,6 +964,7 @@ retry_lock:
 					} else {
 						rc = RCOK;
 						version = remote_row->cicada_version[i].key;
+						// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 					}
 					// rc =Abort;	
 				}				
@@ -858,12 +975,13 @@ retry_lock:
 				}
 				rc = RCOK;
 				version = remote_row->cicada_version[i].key;
+				// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 			}	
 		}
 	}
     	if(req->acctype == WR) {
 		assert(remote_row->version_cnt >= 0);
-		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - 4 && cnt >= 0; cnt--) {
+		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(remote_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
@@ -884,6 +1002,7 @@ retry_lock:
 						rc = WAIT;
 					} else {
 						version = remote_row->cicada_version[i].key;
+						// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 						rc = RCOK;
 					}
 					// rc = Abort;
@@ -892,8 +1011,10 @@ retry_lock:
 				if(remote_row->cicada_version[i].Wts > this->get_timestamp() || remote_row->cicada_version[i].Rts > this->get_timestamp()) {
 					rc = Abort;
 				} else {
+					
 					rc = RCOK;
 					version = remote_row->cicada_version[i].key;
+					// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 				}
 			}
 			
@@ -906,6 +1027,7 @@ retry_lock:
         mem_allocator.free(m_item, sizeof(itemid_t));
 		return rc;
 	}
+	
     this->version_num.push_back(version);
     rc = preserve_access(row_local,m_item,remote_row,req->acctype,remote_row->get_primary_key(),loc);
 	
@@ -954,6 +1076,12 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	RC rc = RCOK;
 	switch (state) {
 	case YCSB_0 :
+#if CC_ALG == RDMA_WOUND_WAIT
+        // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
+		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
+			rc = Abort;
+		} else {
+#endif
 		if(loc) {
 			rc = run_ycsb_0(yield,req,row,cor_id);
 		} else if (rdma_one_side()) {
@@ -962,6 +1090,9 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		} else {
 			rc = send_remote_request();
 		}
+#if CC_ALG == RDMA_WOUND_WAIT
+		}
+#endif
 	  break;
 	case YCSB_1 :
 		//read local row,for message queue by TCP/IP,write set has actually been written in this point,
