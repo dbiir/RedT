@@ -27,7 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-#define USE_COROUTINE true
+#define USE_COROUTINE false
 #define MAX_SEND_SIZE 1
 /***********************************************/
 // DA Trans Creator
@@ -74,8 +74,8 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 1
-#define THREAD_CNT 24
+#define NODE_CNT 2
+#define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 8
@@ -116,7 +116,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 100000
+#define MAX_TXN_IN_FLIGHT 10000
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -174,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_NO_WAIT2
+#define CC_ALG RDMA_CICADA
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -487,6 +487,8 @@ enum PPSTxnType {
 #define RDMA_CALVIN 38
 #define RDMA_CNULL 37
 #define RDMA_WOUND_WAIT 39
+#define CICADA  40
+#define WOUND_WAIT 41
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
@@ -533,8 +535,8 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 10 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false

@@ -26,6 +26,7 @@
 #include "focc.h"
 #include "ssi.h"
 #include "wsi.h"
+#include "cicada.h"
 #include "transport.h"
 #include "rdma.h"
 #include "work_queue.h"
@@ -94,6 +95,7 @@ Dta dta_man;
 Wkdb wkdb_man;
 ssi ssi_man;
 wsi wsi_man;
+Cicada cicada_man;
 Tictoc tictoc_man;
 Transport tport_man;
 Rdma rdma_man;

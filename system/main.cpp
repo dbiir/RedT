@@ -47,6 +47,7 @@
 #include "rdma_maat.h"
 #include "rdma_calvin.h"
 #include "rdma_cicada.h"
+#include "cicada.h"
 #include "ssi.h"
 #include "wsi.h"
 #include "focc.h"
@@ -268,6 +269,11 @@ int main(int argc, char *argv[]) {
 	printf("Initializing CICADA manager... ");
 	fflush(stdout);
 	rcicada_man.init();
+	printf("Done\n");
+#endif
+#if CC_ALG == CICADA
+	printf("Initializing CICADA manager... ");
+	cicada_man.init();
 	printf("Done\n");
 #endif
 #if CC_ALG == SSI

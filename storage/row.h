@@ -70,6 +70,7 @@ class Row_rdma_2pl;
 class Row_rdma_maat;
 class Row_rdma_ts1;
 class Row_rdma_cicada;
+class Row_cicada;
 
 //struct RdmaMVHis;
 
@@ -167,14 +168,15 @@ public:
 		RdmaCicadaVersion cicada_version[HIS_CHAIN_NUM];
 		Row_rdma_cicada * manager;
 		int64_t version_cnt;
-
+	#elif CC_ALG == CICADA
+		Row_cicada * manager;
 	#elif CC_ALG == RDMA_TS1
 		volatile uint64_t	mutx;
 		volatile uint64_t	tid;
 		ts_t wts;
     	ts_t rts;
 		Row_rdma_ts1 * manager;
-	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN || CC_ALG == WOUND_WAIT
 		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP
 	 	Row_ts * manager;

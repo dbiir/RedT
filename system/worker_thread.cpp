@@ -849,7 +849,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
   if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC ||
        CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == DLI_BASE ||
-       CC_ALG == DLI_OCC || CC_ALG == SILO)
+       CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == CICADA)
 #if USE_RDMA == CHANGE_MSG_QUEUE
     tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->get_txn_id()), Message::create_message(txn_man, RACK_FIN));
 #else
@@ -1295,7 +1295,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     bool ready = txn_man->unset_ready();
     INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
     assert(ready);
-    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT) {
+    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == WOUND_WAIT) {
       #if WORKLOAD == DA //mvcc use timestamp
         if (da_stamp_tab.count(txn_man->get_txn_id())==0)
         {
@@ -1505,7 +1505,7 @@ RC WorkerThread::process_calvin_rtxn(yield_func_t &yield, Message * msg, uint64_
 }
 
 bool WorkerThread::is_cc_new_timestamp() {
-  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == RDMA_MVCC || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA);
+  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == RDMA_MVCC || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == CICADA);
 }
 
 ts_t WorkerThread::get_next_ts() {

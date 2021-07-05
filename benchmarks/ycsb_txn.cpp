@@ -126,8 +126,13 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	ycsb_batch_read(yield,R_ROW,cor_id);
 #endif
 	while(rc == RCOK && !is_done()) {
-
 		rc = run_txn_state(yield, cor_id);
+#if CC_ALG == WOUND_WAIT
+		if (txn_state == WOUNDED) {
+			rc = Abort;
+			break;
+		}  
+#endif
 	}
 #if USE_DBPA == true && CC_ALG == RDMA_SILO
 	reqId_index.erase(reqId_index.begin(),reqId_index.end());
@@ -142,6 +147,9 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	if(IS_LOCAL(get_txn_id())) {  //for one-side rdma, must be local
 		if(is_done() && rc == RCOK) {
 			// printf("a txn is done\n");
+#if CC_ALG == WOUND_WAIT
+      		txn_state = STARTCOMMIT;
+#endif
 			rc = start_commit(yield, cor_id);
 		}
 		else if(rc == Abort)
