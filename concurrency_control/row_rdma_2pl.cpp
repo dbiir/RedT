@@ -182,10 +182,11 @@ local_retry_lock:
 #endif
 #if CC_ALG == RDMA_WOUND_WAIT
     		//直接RDMA CAS加锁 
+        int retry_time = 0;
 local_retry_lock:
         uint64_t loc = g_node_id;
         uint64_t try_lock = -1;
-        
+        retry_time += 1;
 
         uint64_t thd_id = txn->get_thd_id();
 		uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
@@ -196,7 +197,7 @@ local_retry_lock:
             _row->lock_owner = txn->get_txn_id();
             rc = RCOK;
         }
-		if(try_lock != 0){ //如果CAS失败
+		if(try_lock != 0 && retry_time <= 10){ //如果CAS失败
             WOUNDState state;
             RdmaTxnTableNode * value;
 			if(_row->lock_owner % g_node_cnt == g_node_id) {
@@ -213,7 +214,8 @@ local_retry_lock:
 					rdma_txn_table.remote_set_state(yield, txn, _row->lock_owner, value, cor_id);
                     mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				}
-                goto local_retry_lock;	
+					goto local_retry_lock;	
+                
 			}	
 			else{ //wait
 				// rc = Abort;
@@ -224,9 +226,11 @@ local_retry_lock:
                 txn->num_atomic_retry++;
                 if(txn->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txn->num_atomic_retry;
 				//sleep(1);
-				goto local_retry_lock;	
+					goto local_retry_lock;	
 			}
-		}
+		} else if(try_lock != 0 && retry_time > 10) {
+            rc = Abort;
+        }
 #endif
 	return rc;
 }

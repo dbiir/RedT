@@ -588,54 +588,25 @@ retry_lock:
 #if CC_ALG == RDMA_WOUND_WAIT
 if(req->acctype == RD || req->acctype == WR){
 		uint64_t tts = get_timestamp();
-
-#if USE_DBPA == true
-retry_lock:
-		uint64_t try_lock;
-		row_t* test_row = cas_and_read_remote(yield,try_lock,loc,m_item->offset,m_item->offset,0,tts,cor_id);
-		if(try_lock != 0){// CAS fail
-			if(tts <= try_lock){ //wound
-				// num_atomic_retry++;
-				// total_num_atomic_retry++;
-				// if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
-				// //sleep(1);
-				// mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-				// goto retry_lock;			
-			}
-			else{ //wait
-				// DEBUG_M("TxnManager::get_row(abort) access free\n");
-				// row_local = NULL;
-				// txn->rc = Abort;
-				// mem_allocator.free(m_item, sizeof(itemid_t));
-				// mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-				// return Abort;
-				num_atomic_retry++;
-				total_num_atomic_retry++;
-				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
-				//sleep(1);
-				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-				goto retry_lock;			
-			}
-		}
-		assert(test_row->get_primary_key() == req->key);
-#endif
-
-#if USE_DBPA == false 
+        int retry_time = 0;
 retry_lock:
         uint64_t try_lock = -1;
-        try_lock = cas_remote_content(yield,loc,m_item->offset,0,tts,cor_id);
 		row_t * test_row;
+		
+#if USE_DBPA
+		test_row = cas_and_read_remote(yield,try_lock,loc,m_item->offset,m_item->offset,0,tts, cor_id);
+#else
+        try_lock = cas_remote_content(yield,loc,m_item->offset,0,tts,cor_id);
+		test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+#endif
+		assert(test_row->get_primary_key() == req->key);
+		retry_time += 1;
 		if(try_lock == 0) {
-			test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
-			assert(test_row->get_primary_key() == req->key);
-			test_row->lock_owner = txn->txn_id;
-			
+			test_row->lock_owner = txn->txn_id;			
 			assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
 		}
-		if(try_lock != 0){ // cas fail
-			// printf("try_lock: %ld\n", try_lock);
-		    test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
-			assert(test_row->get_primary_key() == req->key);
+		if(try_lock != 0 && retry_time <= 10){ // cas fail
+			// printf("try_lock: %ld\n", retry_time);
 			WOUNDState state;
 			RdmaTxnTableNode * value;
 			if(test_row->lock_owner % g_node_cnt == g_node_id) {
@@ -655,8 +626,9 @@ retry_lock:
 					rdma_txn_table.remote_set_state(yield, this, test_row->lock_owner, value, cor_id);
 					mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				}
+				// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-				goto retry_lock;
+					goto retry_lock;
 				// num_atomic_retry++;
 				// total_num_atomic_retry++;
 				// if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
@@ -673,14 +645,20 @@ retry_lock:
 				num_atomic_retry++;
 				total_num_atomic_retry++;
 				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+				// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				// if(test_row->lock_owner % g_node_cnt != g_node_id)
+				// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				//sleep(1);
-				goto retry_lock;
+					goto retry_lock;			
 			}
-		}
-        
-        
-#endif
+			
+		} else if(try_lock != 0 && retry_time > 10) {
+			mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+			mem_allocator.free(m_item, sizeof(itemid_t));
+			rc = Abort;
+			return rc;
+		}       
         access_t type = req->acctype;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
         return rc;	
@@ -688,6 +666,8 @@ retry_lock:
 	rc = RCOK;
 	return rc;
 #endif
+
+
 
 #if CC_ALG == RDMA_TS1
     
@@ -956,6 +936,7 @@ retry_lock:
 			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
 				rc = WAIT;
 				while(rc == WAIT && !simulation->is_done()) {
+					mem_allocator.free(remote_row, sizeof(row_t));
                     remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 					assert(remote_row->get_primary_key() == req->key);
 
@@ -994,7 +975,7 @@ retry_lock:
 				// --todo !---pendind need wait //
 				rc = WAIT;
 				while(rc == WAIT && !simulation->is_done()) {
-					
+					mem_allocator.free(remote_row, sizeof(row_t));
 				    remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 					assert(remote_row->get_primary_key() == req->key);
 

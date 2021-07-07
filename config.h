@@ -27,7 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-#define USE_COROUTINE false
+#define USE_COROUTINE true
 #define MAX_SEND_SIZE 1
 /***********************************************/
 // DA Trans Creator
@@ -74,8 +74,8 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 2
-#define THREAD_CNT 10
+#define NODE_CNT 3
+#define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 8
@@ -118,7 +118,7 @@
 #define FIN_BY_TIME true
 #define MAX_TXN_IN_FLIGHT 10000
 
-#define SERVER_GENERATE_QUERIES false
+#define SERVER_GENERATE_QUERIES true
 
 /***********************************************/
 // Memory System
@@ -174,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_CICADA
+#define CC_ALG RDMA_WOUND_WAIT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -183,8 +183,8 @@
 
 #if RDMA_ONE_SIDE 
 //OR can be used only when enable DB&PA, consider merge this two option when finish
-#define USE_DBPA false
-#define USE_OR false
+#define USE_DBPA true
+#define USE_OR true
 #endif
 
 /***********************************************/
@@ -304,8 +304,8 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 1048576
-#define ZIPF_THETA 0.001
+#define SYNTH_TABLE_SIZE 3145728
+#define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
