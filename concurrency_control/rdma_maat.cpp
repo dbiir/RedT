@@ -663,7 +663,7 @@ void RdmaTxnTable::local_set_state(uint64_t thd_id, uint64_t key, WOUNDState val
 	table[index].state = value;
 }
 
-RdmaTxnTableNode * RdmaTxnTable::remote_get_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id) {
+char * RdmaTxnTable::remote_get_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id) {
 	uint64_t node_id = key % g_node_cnt;
 	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	
@@ -674,8 +674,7 @@ RdmaTxnTableNode * RdmaTxnTable::remote_get_state(yield_func_t &yield, TxnManage
 	uint64_t timenode_size = sizeof(RdmaTxnTableNode);
 	// each thread uses only its own piece of client memory address
     uint64_t thd_id = txnMng->get_thd_id();
-    RdmaTxnTableNode * item = txnMng->read_remote_timetable(yield,node_id,timenode_addr,cor_id);
-	WOUNDState value = item->state;
+    char * item = txnMng->read_remote_txntable(yield,node_id,timenode_addr,cor_id);
 	// printf("WOUNDState:%ld\n", value);
 	return item; 
 }

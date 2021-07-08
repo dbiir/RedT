@@ -183,6 +183,8 @@ local_retry_lock:
 #if CC_ALG == RDMA_WOUND_WAIT
     		//直接RDMA CAS加锁 
         int retry_time = 0;
+        bool is_wound = false;
+        RdmaTxnTableNode * value = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
 local_retry_lock:
         uint64_t loc = g_node_id;
         uint64_t try_lock = -1;
@@ -197,23 +199,25 @@ local_retry_lock:
             _row->lock_owner = txn->get_txn_id();
             rc = RCOK;
         }
-		if(try_lock != 0 && retry_time <= 10){ //如果CAS失败
+		if(try_lock != 0 && retry_time <= MAX_RETRY_TIME){ //如果CAS失败
             WOUNDState state;
-            RdmaTxnTableNode * value;
+            char * local_buf;
 			if(_row->lock_owner % g_node_cnt == g_node_id) {
 				state = rdma_txn_table.local_get_state(txn->get_thd_id(), _row->lock_owner);
 			} else {
-		    	value = rdma_txn_table.remote_get_state(yield, txn, _row->lock_owner, cor_id);
+		    	local_buf = rdma_txn_table.remote_get_state(yield, txn, _row->lock_owner, cor_id);
+                memcpy(value, local_buf, sizeof(RdmaTxnTableNode));
                 state = value->state;
 			}
-			if(tts <= *tmp_buf2 && state != WOUND_COMMITTING && state != WOUND_ABORTING){  //wound   
+			if(tts <= *tmp_buf2 && state != WOUND_COMMITTING && state != WOUND_ABORTING && is_wound == false){  //wound   
                 if(_row->lock_owner % g_node_cnt == g_node_id) {
 					rdma_txn_table.local_set_state(txn->get_thd_id(), _row->lock_owner, WOUND_ABORTING);
 				} else {
                     value->state = WOUND_ABORTING;
 					rdma_txn_table.remote_set_state(yield, txn, _row->lock_owner, value, cor_id);
-                    mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+                    // mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				}
+                    is_wound = true;
 					goto local_retry_lock;	
                 
 			}	
@@ -228,9 +232,11 @@ local_retry_lock:
 				//sleep(1);
 					goto local_retry_lock;	
 			}
-		} else if(try_lock != 0 && retry_time > 10) {
+		} else if(try_lock != 0 && retry_time > MAX_RETRY_TIME) {
             rc = Abort;
         }
+    
+    mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 #endif
 	return rc;
 }

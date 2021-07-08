@@ -1,2 +1,7 @@
 RDMA_WOUND_WAIT 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
+1480.853677
+0.0
+285.157923
+0.899724
+0.008339

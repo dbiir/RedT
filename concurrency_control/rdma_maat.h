@@ -82,7 +82,7 @@ public:
 	WOUNDState local_get_state(uint64_t thd_id, uint64_t key);
 	void local_set_state(uint64_t thd_id, uint64_t key, WOUNDState value);
 
-	RdmaTxnTableNode * remote_get_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id);
+	char * remote_get_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id);
 	void remote_set_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTxnTableNode * value, uint64_t cor_id);
 #endif
 private:

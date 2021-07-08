@@ -244,9 +244,11 @@ bool rdma_one_side() {
 #endif
 //***********coroutine**********//
 	row_t * read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
+	// row_t * read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
     itemid_t * read_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t key, uint64_t cor_id);
 // #if CC_ALG == RDMA_MAAT
     RdmaTxnTableNode * read_remote_timetable(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset, uint64_t cor_id);
+	char * read_remote_txntable(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset, uint64_t cor_id);
 // #endif
 
     bool write_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *local_buf, uint64_t cor_id);

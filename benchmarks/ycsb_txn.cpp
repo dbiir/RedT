@@ -589,6 +589,8 @@ retry_lock:
 if(req->acctype == RD || req->acctype == WR){
 		uint64_t tts = get_timestamp();
         int retry_time = 0;
+		bool is_wound = false;
+		RdmaTxnTableNode * value = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
 retry_lock:
         uint64_t try_lock = -1;
 		row_t * test_row;
@@ -605,18 +607,19 @@ retry_lock:
 			test_row->lock_owner = txn->txn_id;			
 			assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
 		}
-		if(try_lock != 0 && retry_time <= 10){ // cas fail
+		if(try_lock != 0 && retry_time <= MAX_RETRY_TIME){ // cas fail
 			// printf("try_lock: %ld\n", retry_time);
 			WOUNDState state;
-			RdmaTxnTableNode * value;
+			char * local_buf;
 			if(test_row->lock_owner % g_node_cnt == g_node_id) {
 				state = rdma_txn_table.local_get_state(get_thd_id(), test_row->lock_owner);
 			} else {
-		    	value = rdma_txn_table.remote_get_state(yield, this, test_row->lock_owner, cor_id);
+		    	local_buf = rdma_txn_table.remote_get_state(yield, this, test_row->lock_owner, cor_id);
+				memcpy(value, local_buf, sizeof(RdmaTxnTableNode));
 				state = value->state;
 			}
 			// printf("read remote state:%ld", state);
-			if(tts <= try_lock && state != WOUND_COMMITTING && state != WOUND_ABORTING){  //wound
+			if(tts <= try_lock && state != WOUND_COMMITTING && state != WOUND_ABORTING && is_wound == false){  //wound
 			    
 				if(test_row->lock_owner % g_node_cnt == g_node_id) {
 					rdma_txn_table.local_set_state(get_thd_id(), test_row->lock_owner, WOUND_ABORTING);
@@ -624,10 +627,11 @@ retry_lock:
 				} else {
 					value->state = WOUND_ABORTING;
 					rdma_txn_table.remote_set_state(yield, this, test_row->lock_owner, value, cor_id);
-					mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+					// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				}
 				// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				is_wound = true;
 					goto retry_lock;
 				// num_atomic_retry++;
 				// total_num_atomic_retry++;
@@ -653,12 +657,14 @@ retry_lock:
 					goto retry_lock;			
 			}
 			
-		} else if(try_lock != 0 && retry_time > 10) {
+		} else if(try_lock != 0 && retry_time > MAX_RETRY_TIME) {
 			mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 			mem_allocator.free(m_item, sizeof(itemid_t));
+			mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 			rc = Abort;
 			return rc;
 		}       
+		if(value) mem_allocator.free(value, sizeof(RdmaTxnTableNode));
         access_t type = req->acctype;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
         return rc;	

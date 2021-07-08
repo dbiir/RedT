@@ -2328,6 +2328,63 @@ RdmaTxnTableNode * TxnManager::read_remote_timetable(yield_func_t &yield, uint64
     return test_row;
 }
 
+char * TxnManager::read_remote_txntable(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,uint64_t cor_id){
+	uint64_t operate_size = sizeof(RdmaTxnTableNode);
+
+    uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
+    char *local_buf = Rdma::get_row_client_memory(thd_id);
+
+	uint64_t starttime;
+	uint64_t endtime;
+	starttime = get_sys_clock();
+    auto res_s = rc_qp[target_server][thd_id]->send_normal(
+		{.op = IBV_WR_RDMA_READ,
+		.flags = IBV_SEND_SIGNALED,
+		.len = operate_size,
+		.wr_id = 0},
+		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(local_buf),
+		.remote_addr = remote_offset,
+		.imm_data = 0});
+	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+#if USE_COROUTINE
+	// h_thd->un_res_p.push(std::make_pair(target_server, thd_id));
+		
+	uint64_t waitcomp_time;
+	std::pair<int,ibv_wc> res_p;
+	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
+	do {
+		h_thd->start_wait_time = get_sys_clock();
+		h_thd->last_yield_time = get_sys_clock();
+		// printf("do\n");
+		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+		uint64_t yield_endtime = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+		INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - h_thd->last_yield_time);
+		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
+		waitcomp_time = get_sys_clock();
+		
+		INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
+		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+	} while (res_p.first == 0);
+	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
+
+#else
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+	endtime = get_sys_clock();
+	INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
+	INC_STATS(get_thd_id(), rdma_read_cnt, 1);
+	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+#endif
+
+    // RdmaTxnTableNode *test_row = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
+    // memcpy(test_row, local_buf, operate_size);
+
+    return local_buf;
+}
 itemid_t * TxnManager::read_remote_index(uint64_t target_server,uint64_t remote_offset,uint64_t key){
     uint64_t operate_size = sizeof(IndexInfo);
     uint64_t thd_id = get_thd_id();

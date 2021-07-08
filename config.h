@@ -27,7 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-#define USE_COROUTINE true
+#define USE_COROUTINE false
 #define MAX_SEND_SIZE 1
 /***********************************************/
 // DA Trans Creator
@@ -74,7 +74,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 3
+#define NODE_CNT 4
 #define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -277,6 +277,8 @@
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
 #define ROW_SET_LENGTH 30
 
+#define MAX_RETRY_TIME 100
+
 /***********************************************/
 // Logging
 /***********************************************/
@@ -304,7 +306,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 3145728
+#define SYNTH_TABLE_SIZE 4194304
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
