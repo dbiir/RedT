@@ -135,18 +135,18 @@ def ycsb_scaling():
     #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
     # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    algos = ['CALVIN']
+    algos = ['RDMA_CICADA']
     base_table_size=1048576
     # base_table_size=1048576*8
     #base_table_size=2097152*8
-    txn_write_perc = [0.2]
-    tup_write_perc = [0.2]
+    txn_write_perc = [0.5]
+    tup_write_perc = [0.5]
     load = [10000]
-    tcnt = [10]
+    tcnt = [24]
     ctcnt = [4]
     scnt = [1]
     rcnt = [1]
-    skew = [0.2]
+    skew = [0.5]
     #skew = [0.0,0.5,0.9]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT","SEND_THREAD_CNT","REM_THREAD_CNT","CLIENT_SEND_THREAD_CNT","CLIENT_REM_THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,cthr,sthr,rthr,sthr,rthr] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
@@ -158,7 +158,7 @@ def ycsb_scaling():
 def ycsb_scaling1():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
-    nnodes = [1,2]
+    nnodes = [1,2,3,4,5]
     algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
     base_table_size=1048576*8
     txn_write_perc = [0.5]
@@ -514,21 +514,21 @@ def ycsb_partitions_distr():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [4]
+    nnodes = [5]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     # nalgos=['MAAT','MVCC','NO_WAIT','WAIT_DIE']
     # nalgos=['RDMA_WAIT_DIE2']
     # nalgos=['WOOKONG']
      #nalgos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    nalgos=['RDMA_SILO']
-    npercpay=[0.0]
+    nalgos=['RDMA_CICADA']
+    npercpay=[1.0]
     # npercpay=[0.0]
-    wh=28
+    wh=32
     # wh=64
-    load = [200000]
-    tcnt = [28]
-    ctcnt = [1]
+    load = [20000]
+    tcnt = [10]
+    ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
 
@@ -917,7 +917,7 @@ configs = {
     "TPORT_TYPE":"IPC",
     "TPORT_PORT":"18000",
     "PART_CNT": "NODE_CNT",
-    "PART_PER_TXN": 2,
+    "PART_PER_TXN": 10,
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '0UL',
     "NETWORK_DELAY_TEST": 'false',

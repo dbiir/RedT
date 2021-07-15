@@ -146,7 +146,7 @@ RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
   RC send_remote_request();
 
   itemid_t* tpcc_read_remote_index(TPCCQuery * query);
-  RC send_remote_one_side_request(TPCCQuery * query,row_t *& row_local);
+  RC send_remote_one_side_request(yield_func_t &yield, TPCCQuery * query,row_t *& row_local, uint64_t cor_id);
 
   RC run_payment_0(yield_func_t &yield,uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
                    row_t*& r_wh_local,uint64_t cor_id);

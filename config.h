@@ -27,7 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-#define USE_COROUTINE false
+#define USE_COROUTINE true
 #define MAX_SEND_SIZE 1
 /***********************************************/
 // DA Trans Creator
@@ -74,7 +74,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 4
+#define NODE_CNT 2
 #define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -174,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_WOUND_WAIT
+#define CC_ALG RDMA_CICADA
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -275,7 +275,7 @@
 #define ATOMIC_WORD					false
 // [RDMA_MAAT]
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
-#define ROW_SET_LENGTH 30
+#define ROW_SET_LENGTH 100
 
 #define MAX_RETRY_TIME 100
 
@@ -306,13 +306,13 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 4194304
-#define ZIPF_THETA 0.2
-#define TXN_WRITE_PERC 0.2
-#define TUP_WRITE_PERC 0.2
+#define SYNTH_TABLE_SIZE 2097152
+#define ZIPF_THETA 0.5
+#define TXN_WRITE_PERC 0.5
+#define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 2
+#define PART_PER_TXN 10
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10

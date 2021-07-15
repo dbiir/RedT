@@ -52,7 +52,7 @@ bool Row_rdma_cicada::local_cas_lock(TxnManager * txnMng , uint64_t info, uint64
 
 RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn, row_t * local_row, uint64_t cor_id) {
 	uint64_t starttime = get_sys_clock();
-	
+	uint64_t retry_time = 0;
 	RC rc = RCOK;
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	//while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
@@ -80,6 +80,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					// if(!local_cas_lock(txn, 0, txn->get_txn_id())){
 					// 	return Abort;
 					// }
+					retry_time += 1;
 #if USE_COROUTINE
 					txn->h_thd->last_yield_time = get_sys_clock();
 					// printf("do\n");
@@ -98,6 +99,9 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					} else {
 						rc = RCOK;
 						version = _row->cicada_version[i].key;
+					}
+					if(retry_time > 150) {
+						rc = Abort;
 					}
 				}
 				//rc = Abort;
@@ -129,6 +133,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					// if(!local_cas_lock(txn, 0, txn->get_txn_id())){
 					// 	return Abort;
 					// }
+					retry_time += 1;
 #if USE_COROUTINE
 					txn->h_thd->last_yield_time = get_sys_clock();
 					// printf("do\n");
@@ -146,6 +151,9 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 					} else {
 						rc = RCOK;
 						version = _row->cicada_version[i].key;
+					}
+					if(retry_time > 150) {
+						rc = Abort;
 					}
 					// rc = Abort;
 				}

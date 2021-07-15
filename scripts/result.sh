@@ -260,16 +260,21 @@ do
     rm -rf ${DIS_FILE}
     touch ${DIS_FILE}
     touch ${DIS_FILE}
+    CPUFILE=cpu-${cc}
+    rm -rf ${CPUFILE}
+    touch ${CPUFILE}
     echo "根据测试，确定第2个循环体类型"
     #根据测试，确定第2个循环体类型
     ArgsType
     #根据测试，确定第2个循环体类型
+    num=0
     for arg in ${args[@]}
     do
         echo -n ${arg}" " >> ${TMPFILE}
         echo -n ${arg}" " >> ${CCLATFILE}
         echo -n ${arg}" " >> ${IDLEFILE}
         echo -n ${arg}" " >> ${DIS_FILE}
+        echo -n ${arg}" " >> ${CPUFILE}
         AS=''
         echo "根据测试，确定TMPN"
         #根据测试，确定TMPN
@@ -297,10 +302,14 @@ do
         addContent "<td>${tput}</td>"
         addContent "<td>${ar}</td>"
         addContent "<td>${dr}</td>"
+        echo $(cat ${RESULT_PATH}/cpu_usage_${num}/zhq_*_avg| awk '{sum+=$1}END{print "Sum = ",sum}') >> ${CPUFILE}
+        # echo "${cpu_avg}" >> ${CPUFILE}
+        let num++
     done
     python parse_trans_latency.py $LS >> ${LTFILE}
     mv ${DIS_FILE} ${RESULT_PATH}/
     mv ${TMPFILE} ${RESULT_PATH}/
+    mv ${CPUFILE} ${RESULT_PATH}/
     mv ${CCLATFILE} ${RESULT_PATH}/
     mv ${IDLEFILE} ${RESULT_PATH}/
     cp ${LTFILE} ${RESULT_PATH}/

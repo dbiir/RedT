@@ -162,6 +162,7 @@ for exp in exps:
                 os.system(cmd)
                 os.chdir('..')
                 cpu_usage_path=PATH + "/results/" + strnow + '/cpu_usage_' + str(cpu_usage_index)
+                # cpu_usage_avg_path = PATH + "/results/" + strnow + '/cpu_usage_avg'
                 os.mkdir(cpu_usage_path)
                 cpu_usage_index+=1
                 for m, n in zip(machines, range(len(machines))):

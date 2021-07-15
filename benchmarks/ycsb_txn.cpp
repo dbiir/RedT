@@ -924,7 +924,7 @@ retry_lock:
 
  
     ts_t ts = get_timestamp();
-
+	uint64_t retry_time = 0;
     row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 	assert(remote_row->get_primary_key() == req->key);
 
@@ -942,6 +942,7 @@ retry_lock:
 			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
 				rc = WAIT;
 				while(rc == WAIT && !simulation->is_done()) {
+					retry_time += 1;
 					mem_allocator.free(remote_row, sizeof(row_t));
                     remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 					assert(remote_row->get_primary_key() == req->key);
@@ -952,6 +953,9 @@ retry_lock:
 						rc = RCOK;
 						version = remote_row->cicada_version[i].key;
 						// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
+					}
+					if(retry_time > 200) {
+						rc = Abort;
 					}
 					// rc =Abort;	
 				}				
@@ -981,6 +985,7 @@ retry_lock:
 				// --todo !---pendind need wait //
 				rc = WAIT;
 				while(rc == WAIT && !simulation->is_done()) {
+					retry_time += 1;
 					mem_allocator.free(remote_row, sizeof(row_t));
 				    remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 					assert(remote_row->get_primary_key() == req->key);
@@ -991,6 +996,9 @@ retry_lock:
 						version = remote_row->cicada_version[i].key;
 						// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 						rc = RCOK;
+					}
+					if(retry_time > 200) {
+						rc = Abort;
 					}
 					// rc = Abort;
 				}

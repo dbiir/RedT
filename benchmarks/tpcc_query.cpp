@@ -156,7 +156,7 @@ BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
 	query->h_amount = URand(1, 5000);
   query->rbk = false;
 	double x = (double)(rand() % 10000) / 10000;
-	int y = URand(1, 100);
+	int y = URand(61, 100);
 
 	// if(x > g_mpr) {
 #ifdef NO_REMOTE

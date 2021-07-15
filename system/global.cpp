@@ -280,7 +280,7 @@ UInt64 g_his_recycle_len = HIS_RECYCLE_LEN;
 
 // CALVIN
 UInt32 g_seq_thread_cnt = SEQ_THREAD_CNT;
-UInt64 rdma_calvin_buffer_size = 100*1024*1024;
+UInt64 rdma_calvin_buffer_size = 200*1024*1024;
 
 // TICTOC
 uint32_t g_max_num_waits = MAX_NUM_WAITS;
