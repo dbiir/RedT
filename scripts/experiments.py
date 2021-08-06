@@ -130,7 +130,7 @@ def ycsb_scaling():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
-    nnodes = [2]
+    nnodes = [1,2,3,4,5]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
     # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
@@ -141,7 +141,7 @@ def ycsb_scaling():
     #base_table_size=2097152*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
-    load = [10000]
+    load = [20000]
     tcnt = [24]
     ctcnt = [4]
     scnt = [1]
@@ -514,20 +514,20 @@ def ycsb_partitions_distr():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [5]
+    nnodes = [4]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     # nalgos=['MAAT','MVCC','NO_WAIT','WAIT_DIE']
     # nalgos=['RDMA_WAIT_DIE2']
     # nalgos=['WOOKONG']
      #nalgos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    nalgos=['RDMA_CICADA']
-    npercpay=[1.0]
+    nalgos=['RDMA_TS1']
+    npercpay=[0.0]
     # npercpay=[0.0]
     wh=32
     # wh=64
     load = [20000]
-    tcnt = [10]
+    tcnt = [24]
     ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]

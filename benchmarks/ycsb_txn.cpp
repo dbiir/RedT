@@ -843,12 +843,17 @@ retry_lock:
 	assert(remote_row->get_primary_key() == req->key);
 
     if(req->acctype == RD) {
+		if(remote_row->ucreads_len >= row_set_length - 1 ) {
+            try_lock = cas_remote_content(yield,loc,m_item->offset,lock,0,cor_id);
+            mem_allocator.free(m_item, sizeof(itemid_t));
+            return Abort;
+        }
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			if(i >= row_set_length - 1) {
 				rc = Abort;
 				break;
 			}
-			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TXNTABLE_MAX) {
+			if(remote_row->uncommitted_writes[i] == 0) {
 				break;
 			}
 			uncommitted_writes.insert(remote_row->uncommitted_writes[i]);
@@ -864,19 +869,25 @@ retry_lock:
 			if(remote_row->uncommitted_reads[i] == get_txn_id()) {
 				break;
 			}
-			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TXNTABLE_MAX) {
+			if(remote_row->uncommitted_reads[i] == 0) {
+				remote_row->ucreads_len += 1;
 				remote_row->uncommitted_reads[i] = get_txn_id();
 				break;
 			}
 		}
 	}else if(req->acctype == WR) {
+		if(remote_row->ucwrites_len >= row_set_length - 1 ) {
+            try_lock = cas_remote_content(yield,loc,m_item->offset,lock,0,cor_id);
+            mem_allocator.free(m_item, sizeof(itemid_t));
+            return Abort;
+        }
 		for(uint64_t i = 0; i < row_set_length; i++) {
 
 			if(i >= row_set_length - 1) {
 				rc = Abort;
 				break;
 			}
-			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TXNTABLE_MAX) {
+			if(remote_row->uncommitted_reads[i] == 0) {
 				break;
 			}
 			uncommitted_reads.insert(remote_row->uncommitted_reads[i]);
@@ -894,9 +905,11 @@ retry_lock:
 				break;
 			}
 			if(remote_row->uncommitted_writes[i] == get_txn_id()) in_set = true;
-			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TXNTABLE_MAX) {
-				if(in_set == false)
-				remote_row->uncommitted_writes[i] = get_txn_id();
+			if(remote_row->uncommitted_writes[i] == 0) {
+				if(in_set == false) {
+					remote_row->ucwrites_len += 1;
+					remote_row->uncommitted_writes[i] = get_txn_id();
+				}
 				break;
 			}
 			uncommitted_writes_y.insert(remote_row->uncommitted_writes[i]);
@@ -954,7 +967,7 @@ retry_lock:
 						version = remote_row->cicada_version[i].key;
 						// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 					}
-					if(retry_time > 200) {
+					if(retry_time > MAX_RETRY_TIME) {
 						rc = Abort;
 					}
 					// rc =Abort;	
@@ -997,7 +1010,7 @@ retry_lock:
 						// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 						rc = RCOK;
 					}
-					if(retry_time > 200) {
+					if(retry_time > MAX_RETRY_TIME) {
 						rc = Abort;
 					}
 					// rc = Abort;

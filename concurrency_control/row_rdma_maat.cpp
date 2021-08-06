@@ -93,7 +93,10 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 	// Copy uncommitted writes
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last_write = _row->uncommitted_writes[i];
-		assert(i <= row_set_length - 1);
+		// assert(i <= row_set_length - 1);
+		if(i > row_set_length - 1) {
+			return Abort;
+		}
 		if(last_write == 0) {
 
 			break;
@@ -106,7 +109,10 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 	// Copy uncommitted reads
 	for(auto i = 0; i < row_set_length; i++) {
 		uint64_t last_read = _row->uncommitted_reads[i];
-		assert(i <= row_set_length - 1);
+		// assert(i <= row_set_length - 1);
+		if(i > row_set_length - 1) {
+			return Abort;
+		}
 		if(last_read == 0) {
 
 			break;
@@ -127,7 +133,10 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 	//Add to uncommitted reads (soft lock)
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last_read = _row->uncommitted_reads[i];
-		assert(i <= row_set_length - 1);
+		// assert(i <= row_set_length - 1);
+		if(i > row_set_length - 1) {
+			return Abort;
+		}
 		if(last_read == txn->get_txn_id()) {
 			break;
 		}
@@ -142,7 +151,10 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 	bool in_set = false;
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last_write = _row->uncommitted_writes[i];
-		assert(i <= row_set_length - 1);
+		// assert(i <= row_set_length - 1);
+		if(i > row_set_length - 1) {
+			return Abort;
+		}
 		if(last_write == txn->get_txn_id()) {
 			in_set = true;
 		}
@@ -169,15 +181,15 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 	RC rc = RCOK;
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
+	if(_row->ucreads_len >= row_set_length - 1) {
+        return Abort;
+    }
 #ifdef USE_CAS
 	//while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
     if(!local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
 		return Abort;
 	}
 #endif
-    if(_row->ucreads_len >= row_set_length - 1 && WORKLOAD == TPCC) {
-        return Abort;
-    }
 	INC_STATS(txn->get_thd_id(),mtx[30],get_sys_clock() - mtx_wait_starttime);
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - mtx_wait_starttime);
 	DEBUG("READ %ld -- %ld: lw %ld\n", txn->get_txn_id(), _row->get_primary_key(),
@@ -186,7 +198,10 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 	// Copy uncommitted writes
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last_write = _row->uncommitted_writes[i];
-		assert(i <= row_set_length - 1);
+		// assert(i <= row_set_length - 1);
+		if(i > row_set_length - 1) {
+			return Abort;
+		}
 		if(last_write == 0) {
 
 			break;
@@ -202,7 +217,10 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 	//Add to uncommitted reads (soft lock)
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last_read = _row->uncommitted_reads[i];
-		assert(i <= row_set_length - 1);
+		// assert(i <= row_set_length - 1);
+		if(i > row_set_length - 1) {
+			return Abort;
+		}
 		if(last_read == txn->get_txn_id()) {
 			break;
 		}
@@ -243,7 +261,10 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 	// Copy uncommitted reads
 	for(auto i = 0; i < row_set_length; i++) {
 		uint64_t last_read = _row->uncommitted_reads[i];
-		assert(i <= row_set_length - 1);
+		// assert(i <= row_set_length - 1);
+		if(i > row_set_length - 1) {
+			return Abort;
+		}
 		if(last_read == 0) {
 
 			break;
@@ -256,7 +277,11 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 	bool in_set = false;
 	for(auto i = 0; i < row_set_length; i++) {
 		uint64_t last_write = _row->uncommitted_writes[i];
-		assert(i <= row_set_length - 1);
+		// assert(i <= row_set_length - 1);
+
+		if(i > row_set_length - 1) {
+			return Abort;
+		}
 		if(last_write == txn->get_txn_id()) {
 			in_set = true;
 		}
@@ -291,7 +316,6 @@ void Row_rdma_maat::ucread_erase(uint64_t txn_id) {
 	
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last = _row->uncommitted_reads[i];
-		assert(i <= row_set_length - 1);
 		if(last == 0 || txn_id == 0) break;
 		if(last == txn_id) {
             _row->ucreads_len -= 1;
@@ -312,7 +336,7 @@ void Row_rdma_maat::ucwrite_erase(uint64_t txn_id) {
 	
 	for(uint64_t i = 0; i < row_set_length; i++) {
 		uint64_t last = _row->uncommitted_writes[i];
-		assert(i <= row_set_length - 1);
+		// assert(i <= row_set_length - 1);
 		if(last == 0) break;
 		if(last == txn_id) {
             _row->ucwrites_len -= 1;

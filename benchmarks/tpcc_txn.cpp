@@ -864,7 +864,7 @@ retry_lock:
 				rc = Abort;
 				break;
 			}
-			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TXNTABLE_MAX) {
+			if(remote_row->uncommitted_writes[i] == 0) {
 				break;
 			}
 			uncommitted_writes.insert(remote_row->uncommitted_writes[i]);
@@ -880,7 +880,7 @@ retry_lock:
 			if(remote_row->uncommitted_reads[i] == get_txn_id()) {
 				break;
 			}
-			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TXNTABLE_MAX) {
+			if(remote_row->uncommitted_reads[i] == 0) {
                 remote_row->ucreads_len += 1;
 				remote_row->uncommitted_reads[i] = get_txn_id();
 				break;
@@ -894,7 +894,7 @@ retry_lock:
 				rc = Abort;
 				break;
 			}
-			if(remote_row->uncommitted_reads[i] == 0 || remote_row->uncommitted_reads[i] > RDMA_TXNTABLE_MAX) {
+			if(remote_row->uncommitted_reads[i] == 0) {
 				break;
 			}
 			uncommitted_reads.insert(remote_row->uncommitted_reads[i]);
@@ -912,7 +912,7 @@ retry_lock:
 				break;
 			}
 			if(remote_row->uncommitted_writes[i] == get_txn_id()) in_set = true;
-			if(remote_row->uncommitted_writes[i] == 0 || remote_row->uncommitted_writes[i] > RDMA_TXNTABLE_MAX) {
+			if(remote_row->uncommitted_writes[i] == 0) {
 				if(in_set == false) {
                     remote_row->ucwrites_len += 1;
                     remote_row->uncommitted_writes[i] = get_txn_id();

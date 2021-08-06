@@ -401,7 +401,8 @@ RC RDMA_Maat::remote_abort(yield_func_t &yield, TxnManager * txnMng, Access * da
 		//ucread_erase(txn->get_txn_id());
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			uint64_t last = temp_row->uncommitted_reads[i];
-			assert(i < row_set_length - 1);
+			// assert(i < row_set_length - 1);
+			
 			if(last == 0 || txnMng->get_txn_id() == 0) break;
 			if(last == txnMng->get_txn_id()) {
 				if(temp_row->uncommitted_reads[i+1] == 0) {
@@ -424,7 +425,7 @@ RC RDMA_Maat::remote_abort(yield_func_t &yield, TxnManager * txnMng, Access * da
 	if(data->type == WR || WORKLOAD == TPCC) {
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			uint64_t last = temp_row->uncommitted_writes[i];
-			assert(i < row_set_length - 1);
+			// assert(i < row_set_length - 1);
 			if(last == 0) break;
 			if(last == txnMng->get_txn_id()) {
 				if(temp_row->uncommitted_writes[i+1] == 0) {
@@ -477,7 +478,7 @@ RC RDMA_Maat::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access * d
 		//ucread_erase(txn->get_txn_id());
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			uint64_t last = temp_row->uncommitted_reads[i];
-			assert(i < row_set_length - 1);
+			// assert(i < row_set_length - 1);
 			if(last == 0 || txnMng->get_txn_id() == 0) break;
 			if(last == txnMng->get_txn_id()) {
 				if(temp_row->uncommitted_reads[i+1] == 0) {
@@ -528,7 +529,7 @@ RC RDMA_Maat::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access * d
 		if (txn_commit_ts > temp_row->timestamp_last_write) temp_row->timestamp_last_write = txn_commit_ts;
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			uint64_t last = temp_row->uncommitted_writes[i];
-			assert(i < row_set_length - 1);
+			// assert(i < row_set_length - 1);
 			if(last == 0) break;
 			if(last == txnMng->get_txn_id()) {
 				if(temp_row->uncommitted_writes[i+1] == 0) {
@@ -783,7 +784,7 @@ RdmaTxnTableNode * RdmaTxnTable::remote_get_timeNode(yield_func_t &yield, TxnMan
 
 void RdmaTxnTable::remote_set_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTxnTableNode * value, uint64_t cor_id) {
 	uint64_t node_id = key % g_node_cnt;
-	assert(node_id != g_node_id);
+	// assert(node_id != g_node_id);
 	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	// todo: here we need to get the corresponding index
 	// uint64_t index_key = 0;
