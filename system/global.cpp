@@ -271,7 +271,7 @@ UInt64 rdma_index_size = (300*1024*1024L);
 
 // MAAT
 UInt64 rdma_txntable_size = 30*1024*1024;
-UInt64 row_set_length = ROW_SET_LENGTH;
+UInt64 row_set_length = floor(ROW_SET_LENGTH);
 
 // MVCC
 UInt64 g_max_read_req = MAX_READ_REQ;

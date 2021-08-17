@@ -444,6 +444,8 @@ void TxnManager::reset() {
 	uncommitted_writes.clear();
 	uncommitted_writes_y.clear();
 	uncommitted_reads.clear();
+	unread_set.clear();
+	unwrite_set.clear();
 #endif
 #if CC_ALG == RDMA_CICADA
 	uncommitted_set.clear();
@@ -480,7 +482,23 @@ void TxnManager::release() {
 	delete uncommitted_writes_y;
 	delete uncommitted_reads;
 #endif
-
+#if CC_ALG == MAAT
+	uncommitted_writes->clear();
+	uncommitted_writes_y->clear();
+	uncommitted_reads->clear();
+#endif
+#if CC_ALG == RDMA_MAAT
+	uncommitted_writes.clear();
+	uncommitted_writes_y.clear();
+	uncommitted_reads.clear();
+	unread_set.clear();
+	unwrite_set.clear();
+#endif
+#if CC_ALG == RDMA_CICADA
+	uncommitted_set.clear();
+	start_ts = 0;
+	version_num.clear();
+#endif
 #if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	calvin_locked_rows.release();
 #endif

@@ -298,6 +298,7 @@ RC RDMA_Maat::validate(yield_func_t &yield, TxnManager * txn, uint64_t cor_id) {
 	DEBUG("MAAT Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
 	//printf("MAAT Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
 	// sem_post(&_semaphore);
+	// rc = RCOK;
 	return rc;
 
 }
@@ -403,19 +404,14 @@ RC RDMA_Maat::remote_abort(yield_func_t &yield, TxnManager * txnMng, Access * da
 			uint64_t last = temp_row->uncommitted_reads[i];
 			// assert(i < row_set_length - 1);
 			
-			if(last == 0 || txnMng->get_txn_id() == 0) break;
+			if(txnMng->get_txn_id() == 0) break;
 			if(last == txnMng->get_txn_id()) {
-				if(temp_row->uncommitted_reads[i+1] == 0) {
-					temp_row->uncommitted_reads[i] = 0;
-					break;
-				}
-				for(uint64_t j = i; j < row_set_length; j++) {
-					if(temp_row->uncommitted_reads[j+1] == 0) break;
-					temp_row->uncommitted_reads[j] = temp_row->uncommitted_reads[j+1];
-				}
+				temp_row->ucreads_len -= 1;
+				temp_row->uncommitted_reads[i] = 0;
+				break;
 			}
 		}
-        temp_row->ucreads_len -= 1;
+        
 		temp_row->_tid_word = 0;
         operate_size = row_t::get_row_size(temp_row->tuple_size);
 		// memcpy(tmp_buf2, (char *)temp_row, operate_size);
@@ -426,19 +422,13 @@ RC RDMA_Maat::remote_abort(yield_func_t &yield, TxnManager * txnMng, Access * da
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			uint64_t last = temp_row->uncommitted_writes[i];
 			// assert(i < row_set_length - 1);
-			if(last == 0) break;
+			if(txnMng->get_txn_id() == 0) break;
 			if(last == txnMng->get_txn_id()) {
-				if(temp_row->uncommitted_writes[i+1] == 0) {
-					temp_row->uncommitted_writes[i] = 0;
-					break;
-				}
-				for(uint64_t j = i; j < row_set_length; j++) {
-					temp_row->uncommitted_writes[j] = temp_row->uncommitted_writes[j+1];
-					if(temp_row->uncommitted_writes[j+1] == 0) break;
-				}
+				temp_row->ucwrites_len -= 1;
+				temp_row->uncommitted_writes[i] = 0;
+				break;
 			}
-		}
-        temp_row->ucwrites_len -= 1;
+		} 
 		temp_row->_tid_word = 0;
         operate_size = row_t::get_row_size(temp_row->tuple_size);
 		// memcpy(tmp_buf2, (char *)temp_row, operate_size);
@@ -479,22 +469,17 @@ RC RDMA_Maat::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access * d
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			uint64_t last = temp_row->uncommitted_reads[i];
 			// assert(i < row_set_length - 1);
-			if(last == 0 || txnMng->get_txn_id() == 0) break;
+			if(txnMng->get_txn_id() == 0) break;
 			if(last == txnMng->get_txn_id()) {
-				if(temp_row->uncommitted_reads[i+1] == 0) {
-					temp_row->uncommitted_reads[i] = 0;
-					break;
-				}
-				for(uint64_t j = i; j < row_set_length; j++) {
-					if(temp_row->uncommitted_reads[j+1] == 0) break;
-					temp_row->uncommitted_reads[j] = temp_row->uncommitted_reads[j+1];
-				}
+				temp_row->ucreads_len -= 1;
+				temp_row->uncommitted_reads[i] = 0;
+				break;
 			}
 		}
-        temp_row->ucreads_len -= 1;
+        
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			if (temp_row->uncommitted_writes[i] == 0) {
-				break;
+				continue;
 			}
 			//printf("row->uncommitted_writes has txn: %u\n", _row->uncommitted_writes[i]);
 			//exit(0);
@@ -530,24 +515,19 @@ RC RDMA_Maat::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access * d
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			uint64_t last = temp_row->uncommitted_writes[i];
 			// assert(i < row_set_length - 1);
-			if(last == 0) break;
+			if(txnMng->get_txn_id() == 0) break;
 			if(last == txnMng->get_txn_id()) {
-				if(temp_row->uncommitted_writes[i+1] == 0) {
-					temp_row->uncommitted_writes[i] = 0;
-					break;
-				}
-				for(uint64_t j = i; j < row_set_length; j++) {
-					temp_row->uncommitted_writes[j] = temp_row->uncommitted_writes[j+1];
-					if(temp_row->uncommitted_writes[j+1] == 0) break;
-				}
+				temp_row->ucwrites_len -= 1;
+				temp_row->uncommitted_writes[i] = 0;
+				break;
 			}
 		}
-        temp_row->ucwrites_len -= 1;
+        // temp_row->ucwrites_len -= 1;
 		//temp_row->copy(data->data);
 		uint64_t lower = rdma_txn_table.local_get_lower(txnMng->get_thd_id(),txnMng->get_txn_id());
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			if (temp_row->uncommitted_writes[i] == 0) {
-				break;
+				continue;
 			}
 			if(txnMng->uncommitted_writes_y.count(temp_row->uncommitted_writes[i]) == 0) {
 				if(temp_row->uncommitted_writes[i] % g_node_cnt == g_node_id) {
@@ -571,7 +551,7 @@ RC RDMA_Maat::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access * d
 		}
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			if (temp_row->uncommitted_reads[i] == 0) {
-				break;
+				continue;
 			}
 			if(txnMng->uncommitted_reads.count(temp_row->uncommitted_reads[i]) == 0) {
 				if(temp_row->uncommitted_reads[i] % g_node_cnt == g_node_id) {

@@ -859,45 +859,37 @@ retry_lock:
             return Abort;
 
         }
-		for(uint64_t i = 0; i < row_set_length; i++) {
-			if(i >= row_set_length - 1) {
-				rc = Abort;
-				break;
-			}
+		for(uint64_t i = 0, j = 0; i < row_set_length && j < remote_row->ucwrites_len; i++) {
 			if(remote_row->uncommitted_writes[i] == 0) {
-				break;
-			}
-			uncommitted_writes.insert(remote_row->uncommitted_writes[i]);
+				continue;
+			} else {
+				uncommitted_writes.insert(remote_row->uncommitted_writes[i]);
+				j++;
+			}	
 		}
 		if(greatest_write_timestamp < remote_row->timestamp_last_write) {
 			greatest_write_timestamp = remote_row->timestamp_last_write;
 		}
 		for(uint64_t i = 0; i < row_set_length; i++) {
-			if(i >= row_set_length - 1) {
-				rc = Abort;
-				break;
-			}
-			if(remote_row->uncommitted_reads[i] == get_txn_id()) {
+			if(remote_row->uncommitted_reads[i] == get_txn_id() || unread_set.find(remote_row->get_primary_key()) == unread_set.end()) {
 				break;
 			}
 			if(remote_row->uncommitted_reads[i] == 0) {
-                remote_row->ucreads_len += 1;
+				remote_row->ucreads_len += 1;
+				unread_set.insert(remote_row->get_primary_key());
 				remote_row->uncommitted_reads[i] = get_txn_id();
 				break;
 			}
 		}
        
 	// }else if(type == WR) {
-		for(uint64_t i = 0; i < row_set_length; i++) {
-
-			if(i >= row_set_length - 1) {
-				rc = Abort;
-				break;
-			}
+		for(uint64_t i = 0, j = 0; i < row_set_length && j < remote_row->ucreads_len; i++) {
 			if(remote_row->uncommitted_reads[i] == 0) {
-				break;
+				continue;
+			} else {
+				uncommitted_reads.insert(remote_row->uncommitted_reads[i]);
+				j++;
 			}
-			uncommitted_reads.insert(remote_row->uncommitted_reads[i]);
 		}
 		if(greatest_write_timestamp < remote_row->timestamp_last_write) {
 			greatest_write_timestamp = remote_row->timestamp_last_write;
@@ -906,20 +898,23 @@ retry_lock:
 			greatest_read_timestamp = remote_row->timestamp_last_read;
 		}
 		bool in_set = false;
-		for(uint64_t i = 0; i < row_set_length; i++) {
-			if(i >= row_set_length - 1) {
-				rc = Abort;
-				break;
+		for(uint64_t i = 0, j = 0; i < row_set_length && j < remote_row->ucwrites_len; i++) {
+			if(remote_row->uncommitted_writes[i] == get_txn_id() || unwrite_set.find(remote_row->get_primary_key()) == unwrite_set.end()) {
+				in_set = true;
+				continue;
 			}
-			if(remote_row->uncommitted_writes[i] == get_txn_id()) in_set = true;
-			if(remote_row->uncommitted_writes[i] == 0) {
-				if(in_set == false) {
-                    remote_row->ucwrites_len += 1;
-                    remote_row->uncommitted_writes[i] = get_txn_id();
-                }
-				break;
+			if(remote_row->uncommitted_writes[i] == 0 && in_set == false) {
+				remote_row->ucwrites_len += 1;
+				unwrite_set.insert(remote_row->get_primary_key());
+				remote_row->uncommitted_writes[i] = get_txn_id();
+				in_set = true;
+				j++;
+				continue;
 			}
-			uncommitted_writes_y.insert(remote_row->uncommitted_writes[i]);
+			if(remote_row->uncommitted_writes[i] != 0) {
+				uncommitted_writes_y.insert(remote_row->uncommitted_writes[i]);
+				j++;
+			}
 		}
 	// }
     remote_row->_tid_word = 0;

@@ -360,6 +360,7 @@ void Stats_thd::clear() {
   maat_case3_cnt=0;
   maat_case4_cnt=0;
   maat_case5_cnt=0;
+  maat_case6_cnt=0;
   maat_range=0;
   maat_commit_cnt=0;
 
@@ -1144,13 +1145,14 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",maat_case3_cnt=%ld"
   ",maat_case4_cnt=%ld"
   ",maat_case5_cnt=%ld"
+  ",maat_case6_cnt=%ld"
   ",maat_range=%f"
   ",maat_commit_cnt=%ld"
   ",maat_commit_avg=%ld"
           ",maat_range_avg=%f",
           maat_validate_cnt, maat_validate_time / BILLION, maat_validate_avg / BILLION,
           maat_cs_wait_time / BILLION, maat_cs_wait_avg / BILLION, maat_case1_cnt, maat_case2_cnt,
-          maat_case3_cnt, maat_case4_cnt, maat_case5_cnt, maat_range / BILLION, maat_commit_cnt,
+          maat_case3_cnt, maat_case4_cnt, maat_case5_cnt, maat_case6_cnt, maat_range / BILLION, maat_commit_cnt,
           maat_commit_avg, maat_range_avg);
   // DTA
   double dta_range_avg = 0;
@@ -1698,6 +1700,7 @@ void Stats_thd::combine(Stats_thd * stats) {
   maat_case3_cnt+=stats->maat_case3_cnt;
   maat_case4_cnt+=stats->maat_case4_cnt;
   maat_case5_cnt+=stats->maat_case5_cnt;
+  maat_case6_cnt+=stats->maat_case6_cnt;
   maat_range+=stats->maat_range;
   maat_commit_cnt+=stats->maat_commit_cnt;
 

@@ -348,6 +348,8 @@ bool rdma_one_side() {
 	std::set<uint64_t> uncommitted_writes_y;
 	int             write_set[100];
     int*            read_set;
+	std::set<uint64_t> unread_set;
+	std::set<uint64_t> unwrite_set;
 #else
 	std::set<uint64_t> * uncommitted_reads;
 	std::set<uint64_t> * uncommitted_writes;

@@ -338,6 +338,8 @@ public:
   double maat_range;
   uint64_t maat_commit_cnt;
 
+  uint64_t maat_case6_cnt;
+
   // // SSI
   // uint64_t ssi_validate_cnt;
   // double ssi_validate_time;
