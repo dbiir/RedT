@@ -135,18 +135,18 @@ def ycsb_scaling():
     #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
     # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    algos = ['RDMA_MVCC','RDMA_TS1']
+    algos = ['RDMA_CICADA']
     base_table_size=1048576
     # base_table_size=1048576*8
-    #base_table_size=2097152*8
+    # base_table_size=2097152*8
     txn_write_perc = [0.2]
     tup_write_perc = [0.2]
     load = [200000]
-    tcnt = [24]
+    tcnt = [10]
     ctcnt = [4]
     scnt = [1]
     rcnt = [1]
-    skew = [0.6]
+    skew = [0.2]
     #skew = [0.0,0.5,0.9]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT","SEND_THREAD_CNT","REM_THREAD_CNT","CLIENT_SEND_THREAD_CNT","CLIENT_REM_THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,cthr,sthr,rthr,sthr,rthr] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
@@ -481,17 +481,17 @@ def isolation_levels():
 
 def ycsb_partitions():
     wl = 'YCSB'
-    nnodes = [16]
-    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
-    load = [10000,12000]
-    load = [10000]
-    nparts = [1,2,4,6,8,10,12,14,16]
-    base_table_size=2097152*8
-    txn_write_perc = [0.5]
-    tup_write_perc = [0.5]
-    tcnt = [4]
-    skew = [0.6]
-    rpq =  16
+    nnodes = [5]
+    algos=['RDMA_MAAT']
+    # load = [10000,12000]
+    load = [200000]
+    nparts = [1,2,3,4,5]
+    base_table_size=1048576*2
+    txn_write_perc = [0.2]
+    tup_write_perc = [0.2]
+    tcnt = [24]
+    skew = [0.3]
+    rpq =  10
     fmt = ["WORKLOAD","REQ_PER_QUERY","PART_PER_TXN","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
     exp = [[wl,rpq,p,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,1] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts)]
     return fmt,exp
@@ -514,20 +514,20 @@ def ycsb_partitions_distr():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [4,5]
+    nnodes = [5]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     # nalgos=['MAAT','MVCC','NO_WAIT','WAIT_DIE']
     # nalgos=['RDMA_WAIT_DIE2']
     # nalgos=['WOOKONG']
      #nalgos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    nalgos=['RDMA_CICADA','RDMA_MAAT','RDMA_SILO','RDMA_NO_WAIT','RDMA_MVCC']
-    npercpay=[0.0]
+    nalgos=['RDMA_SILO','RDMA_MVCC']
+    npercpay=[1.0]
     # npercpay=[0.0]
     wh=32
     # wh=64
     load = [200000]
-    tcnt = [24]
+    tcnt = [10]
     ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
@@ -900,8 +900,8 @@ experiment_map = {
 
 # Default values for variable configurations
 configs = {
-    "NODE_CNT" : 2,
-    "THREAD_CNT": 16,
+    "NODE_CNT" : 5,
+    "THREAD_CNT": 24,
     "REPLICA_CNT": 0,
     "REPLICA_TYPE": "AP",
     "REM_THREAD_CNT": 1,

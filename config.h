@@ -27,7 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-#define USE_COROUTINE true
+#define USE_COROUTINE false
 #define MAX_SEND_SIZE 1
 /***********************************************/
 // DA Trans Creator
@@ -74,8 +74,8 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 4
-#define THREAD_CNT 24
+#define NODE_CNT 5
+#define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 8
@@ -174,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_CICADA
+#define CC_ALG RDMA_MAAT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -331,7 +331,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH 128
+#define NUM_WH 160
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0
@@ -364,13 +364,9 @@ enum DATxnType {
   DA_SCAN
 };
 #define MAX_DA_TABLE_SIZE 10000
-
-// [RDMA_MAAT]
-#define ROW_SET_LENGTH int(ZIPF_THETA * 100 + 10)
-
 extern TPCCTxnType g_tpcc_txn_type;
 //#define TXN_TYPE          TPCC_ALL
-#define PERC_PAYMENT 0.0
+#define PERC_PAYMENT 1.0
 #define FIRSTNAME_MINLEN      8
 #define FIRSTNAME_LEN         16
 #define LASTNAME_LEN        16
@@ -408,6 +404,12 @@ enum PPSTxnType {
           PPS_UPDATEPART
           };
 
+// [RDMA_MAAT]
+#if WORKLOAD == YCSB
+#define ROW_SET_LENGTH int(ZIPF_THETA * 100 + 10)
+#else
+#define ROW_SET_LENGTH int(PERC_PAYMENT * 600 + 100)
+#endif
 /***********************************************/
 // DEBUG info
 /***********************************************/

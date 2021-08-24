@@ -317,6 +317,7 @@ RC RDMA_Maat::find_bound(TxnManager * txn) {
 	}
 	DEBUG("MAAT Bound %ld: %d [%lu,%lu] %lu\n", txn->get_txn_id(), rc, lower, upper,
 			txn->commit_timestamp);
+	// rc = RCOK;
 	return rc;
 }
 
