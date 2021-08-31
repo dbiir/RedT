@@ -100,7 +100,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 						rc = RCOK;
 						version = _row->cicada_version[i].key;
 					}
-					if(retry_time > MAX_RETRY_TIME) {
+					if(retry_time > 1) {
 						rc = Abort;
 					}
 				}
@@ -152,7 +152,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 						rc = RCOK;
 						version = _row->cicada_version[i].key;
 					}
-					if(retry_time > MAX_RETRY_TIME) {
+					if(retry_time > 1) {
 						rc = Abort;
 					}
 					// rc = Abort;

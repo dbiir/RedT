@@ -241,6 +241,7 @@ do
     addContent "<td colspan=\"3\">${arg}</td>"
 done
 addContent '</tr>'
+num=0
 for cc in ${CC[@]}
 do
     addContent '<tr>'
@@ -267,7 +268,7 @@ do
     #根据测试，确定第2个循环体类型
     ArgsType
     #根据测试，确定第2个循环体类型
-    num=0
+    
     for arg in ${args[@]}
     do
         echo -n ${arg}" " >> ${TMPFILE}
@@ -302,9 +303,9 @@ do
         addContent "<td>${tput}</td>"
         addContent "<td>${ar}</td>"
         addContent "<td>${dr}</td>"
-        echo $(cat ${RESULT_PATH}/cpu_usage_${num}/zhq_*_avg| awk '{sum+=$1}END{print "",sum}') >> ${CPUFILE}
-        let num++
+        echo $(cat ${RESULT_PATH}/cpu_usage_${num}/root_*_avg| awk '{sum+=$1}END{print "",sum}') >> ${CPUFILE}
     done
+    let num++
     python parse_trans_latency.py $LS >> ${LTFILE}
     mv ${DIS_FILE} ${RESULT_PATH}/
     mv ${TMPFILE} ${RESULT_PATH}/

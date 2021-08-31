@@ -871,7 +871,7 @@ retry_lock:
 			greatest_write_timestamp = remote_row->timestamp_last_write;
 		}
 		for(uint64_t i = 0; i < row_set_length; i++) {
-			if(remote_row->uncommitted_reads[i] == get_txn_id() || unread_set.find(remote_row->get_primary_key()) == unread_set.end()) {
+			if(remote_row->uncommitted_reads[i] == get_txn_id() || unread_set.find(remote_row->get_primary_key()) != unread_set.end()) {
 				break;
 			}
 			if(remote_row->uncommitted_reads[i] == 0) {
@@ -899,7 +899,7 @@ retry_lock:
 		}
 		bool in_set = false;
 		for(uint64_t i = 0, j = 0; i < row_set_length && j < remote_row->ucwrites_len; i++) {
-			if(remote_row->uncommitted_writes[i] == get_txn_id() || unwrite_set.find(remote_row->get_primary_key()) == unwrite_set.end()) {
+			if(remote_row->uncommitted_writes[i] == get_txn_id() || unwrite_set.find(remote_row->get_primary_key()) != unwrite_set.end()) {
 				in_set = true;
 				continue;
 			}

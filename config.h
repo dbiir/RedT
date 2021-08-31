@@ -74,7 +74,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 5
+#define NODE_CNT 1
 #define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -174,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_MAAT
+#define CC_ALG RDMA_SILO
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -276,7 +276,7 @@
 // [RDMA_MAAT]
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
 // #define ROW_SET_LENGTH 100
-#define MAX_RETRY_TIME 1
+#define MAX_RETRY_TIME 30
 
 /***********************************************/
 // Logging
@@ -331,7 +331,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH 160
+#define NUM_WH 32
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0
@@ -408,7 +408,7 @@ enum PPSTxnType {
 #if WORKLOAD == YCSB
 #define ROW_SET_LENGTH int(ZIPF_THETA * 100 + 10)
 #else
-#define ROW_SET_LENGTH int(PERC_PAYMENT * 600 + 100)
+#define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 100)
 #endif
 /***********************************************/
 // DEBUG info

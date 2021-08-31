@@ -862,7 +862,7 @@ retry_lock:
 			greatest_write_timestamp = remote_row->timestamp_last_write;
 		}
 		for(uint64_t i = 0; i < row_set_length; i++) {
-			if(remote_row->uncommitted_reads[i] == get_txn_id() || unread_set.find(remote_row->get_primary_key()) == unread_set.end()) {
+			if(remote_row->uncommitted_reads[i] == get_txn_id() || unread_set.find(remote_row->get_primary_key()) != unread_set.end()) {
 				break;
 			}
 			if(remote_row->uncommitted_reads[i] == 0) {
@@ -876,7 +876,7 @@ retry_lock:
 		if(remote_row->ucwrites_len >= row_set_length - 1 ) {
             try_lock = cas_remote_content(yield,loc,m_item->offset,lock,0,cor_id);
             mem_allocator.free(m_item, sizeof(itemid_t));
-			INC_STATS(get_thd_id(), maat_case5_cnt, 1);
+			INC_STATS(get_thd_id(), maat_case6_cnt, 1);
             return Abort;
         }
 		for(uint64_t i = 0, j = 0; i < row_set_length && j < remote_row->ucreads_len; i++) {
@@ -895,7 +895,7 @@ retry_lock:
 		}
 		bool in_set = false;
 		for(uint64_t i = 0, j = 0; i < row_set_length && j < remote_row->ucwrites_len; i++) {
-			if(remote_row->uncommitted_writes[i] == get_txn_id() || unwrite_set.find(remote_row->get_primary_key()) == unwrite_set.end()) {
+			if(remote_row->uncommitted_writes[i] == get_txn_id() || unwrite_set.find(remote_row->get_primary_key()) != unwrite_set.end()) {
 				in_set = true;
 				continue;
 			}
@@ -965,7 +965,7 @@ retry_lock:
 						version = remote_row->cicada_version[i].key;
 						// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 					}
-					if(retry_time > MAX_RETRY_TIME) {
+					if(retry_time > 1) {
 						rc = Abort;
 					}
 					// rc =Abort;	
@@ -1008,7 +1008,7 @@ retry_lock:
 						// printf("_row->version_cnt: %ld, cnt : %ld, the version is %ld\n",remote_row->version_cnt, cnt, version);
 						rc = RCOK;
 					}
-					if(retry_time > MAX_RETRY_TIME) {
+					if(retry_time > 1) {
 						rc = Abort;
 					}
 					// rc = Abort;

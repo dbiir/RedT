@@ -126,7 +126,7 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 
 	//Add to uncommitted reads (soft lock)
 	for(uint64_t i = 0; i < row_set_length; i++) {
-		if(_row->uncommitted_reads[i] == txn->get_txn_id() || txn->unread_set.find(_row->get_primary_key()) == txn->unread_set.end()) {
+		if(_row->uncommitted_reads[i] == txn->get_txn_id() || txn->unread_set.find(_row->get_primary_key()) != txn->unread_set.end()) {
 			break;
 		}
 		if(_row->uncommitted_reads[i] == 0) {
@@ -139,7 +139,7 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 	//Add to uncommitted writes (soft lock)
 	bool in_set = false;
 	for(auto i = 0, j = 0; i < row_set_length && j < _row->ucwrites_len; i++) {
-		if(_row->uncommitted_writes[i] == txn->get_txn_id() || txn->unwrite_set.find(_row->get_primary_key()) == txn->unwrite_set.end()) {
+		if(_row->uncommitted_writes[i] == txn->get_txn_id() || txn->unwrite_set.find(_row->get_primary_key()) != txn->unwrite_set.end()) {
 			in_set = true;
 			continue;
 		}
@@ -172,7 +172,7 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	if(_row->ucreads_len >= row_set_length - 1) {
-		INC_STATS(txn->get_thd_id(), maat_case4_cnt, 1);
+		INC_STATS(txn->get_thd_id(), maat_case6_cnt, 1);
         return Abort;
     }
 #ifdef USE_CAS
@@ -204,7 +204,7 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 
 	//Add to uncommitted reads (soft lock)
 	for(uint64_t i = 0; i < row_set_length; i++) {
-		if(_row->uncommitted_reads[i] == txn->get_txn_id() || txn->unread_set.find(_row->get_primary_key()) == txn->unread_set.end()) {
+		if(_row->uncommitted_reads[i] == txn->get_txn_id() || txn->unread_set.find(_row->get_primary_key()) != txn->unread_set.end()) {
 			break;
 		}
 		if(_row->uncommitted_reads[i] == 0) {
@@ -228,7 +228,7 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	if(_row->ucwrites_len >= row_set_length - 1) {
-		INC_STATS(txn->get_thd_id(), maat_case3_cnt, 1);
+		INC_STATS(txn->get_thd_id(), maat_case6_cnt, 1);
         return Abort;
     }
 #ifdef USE_CAS
@@ -263,7 +263,7 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 	// Copy uncommitted writes
 	bool in_set = false;
 	for(auto i = 0, j = 0; i < row_set_length && j < _row->ucwrites_len; i++) {
-		if(_row->uncommitted_writes[i] == txn->get_txn_id() || txn->unwrite_set.find(_row->get_primary_key()) == txn->unwrite_set.end()) {
+		if(_row->uncommitted_writes[i] == txn->get_txn_id() || txn->unwrite_set.find(_row->get_primary_key()) != txn->unwrite_set.end()) {
 			in_set = true;
 			continue;
 		}
