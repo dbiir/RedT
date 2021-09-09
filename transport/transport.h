@@ -143,16 +143,16 @@ class Transport {
     std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> send_handlers;
     std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> send_thread_handlers;
     // rdmaio::Arc<rdmaio::qp::RDMARC> send_qps[50];
-    rdma_send_qps send_qps[200];
-    rdma_send_qps sned_thread_qps[200];
+    rdma_send_qps send_qps[800];
+    rdma_send_qps sned_thread_qps[800];
     //-----------------recv------------------//
     std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> recv_handlers;
-    rdmaio::Arc<rdmaio::qp::Dummy> recv_qps[200];
-    rdmaio::Arc<rdmaio::qp::RecvEntries<RDMA_ENTRY_NUM>> recv_rss[200];
+    rdmaio::Arc<rdmaio::qp::Dummy> recv_qps[800];
+    rdmaio::Arc<rdmaio::qp::RecvEntries<RDMA_ENTRY_NUM>> recv_rss[800];
 
     std::vector<rdmaio::Arc<rdmaio::rmem::RegHandler>> recv_thread_handlers;
-    rdmaio::Arc<rdmaio::qp::Dummy> recv_thread_qps[200];
-    rdmaio::Arc<rdmaio::qp::RecvEntries<RDMA_ENTRY_NUM>> recv_thread_rss[200];
+    rdmaio::Arc<rdmaio::qp::Dummy> recv_thread_qps[800];
+    rdmaio::Arc<rdmaio::qp::RecvEntries<RDMA_ENTRY_NUM>> recv_thread_rss[800];
 
     pthread_mutex_t * latch;
     pthread_mutex_t * latch_send;

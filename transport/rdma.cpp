@@ -108,7 +108,7 @@ void * Rdma::client_qp(void *arg){
 
 	printf("address = %s\n",rdma_server_add[node_id].c_str());
 
-	if (cm_.wait_ready(1000000, 8) == IOCode::Timeout) RDMA_ASSERT(false) << "cm connect to server timeout";
+	if (cm_.wait_ready(1000000, 16) == IOCode::Timeout) RDMA_ASSERT(false) << "cm connect to server timeout";
 
 	uint64_t reg_nic_name = node_id;
 	uint64_t reg_mem_name = node_id;
@@ -124,15 +124,27 @@ void * Rdma::client_qp(void *arg){
 	remote_mr_attr[node_id] = std::get<1>(fetch_res.desc);
 	#if USE_COROUTINE
 		for(int thread_id = 0;thread_id < g_total_thread_cnt * (COROUTINE_CNT + 1); thread_id ++){
+		#if CC_ALG == RDMA_CALVIN
+			if (thread_id > g_thread_cnt * (COROUTINE_CNT + 1) && thread_id <= (g_total_thread_cnt - 2)* (COROUTINE_CNT + 1)) continue;
+		#else 
+			if (thread_id > g_thread_cnt * (COROUTINE_CNT + 1)) continue;
+		#endif
 	#else
-	for(int thread_id = 0;thread_id < g_total_thread_cnt ; thread_id ++){
+		for(int thread_id = 0;thread_id < g_total_thread_cnt ; thread_id ++){
+		#if CC_ALG == RDMA_CALVIN
+			if (thread_id > g_thread_cnt && thread_id <= g_total_thread_cnt - 2) continue;
+		#else 
+			if (thread_id > g_thread_cnt) continue;
+		#endif
 	#endif
 		
 		// pthread_mutex_lock( RDMA_QP_LATCH );
-		rc_qp[node_id][thread_id] = RDMARC::create(nic, QPConfig()).value();
+		Option<Arc<RDMARC>> qp2 = RDMARC::create(nic,QPConfig());
+		rc_qp[node_id][thread_id] = qp2.value();
+		// rc_qp[node_id][thread_id] = RDMARC::create(nic, QPConfig()).value();
 
 		string usename = pwd->pw_name;
-		string name = "client-qp" + usename + std::to_string(g_node_id) + std::to_string(node_id) + std::to_string(thread_id);
+		string name = "cl-qp" + std::to_string(g_node_id) + "b" +std::to_string(node_id) + "c" + std::to_string(thread_id);
 		qp_name[node_id][thread_id] = name;
 
 		// printf("qp_name = %s, rdma_server_port[node_id] = %d \n",qp_name[node_id][thread_id].c_str(),rdma_server_port[node_id]);
@@ -145,7 +157,7 @@ void * Rdma::client_qp(void *arg){
 		rc_qp[node_id][thread_id]->bind_local_mr(client_rm_handler->get_reg_attr().value());
 		// pthread_mutex_unlock( RDMA_QP_LATCH );
 	}
-	cm.push_back(cm_);
+	// cm.push_back(cm_);
 
 	printf("server %d QP connect to server %d\n",g_node_id,node_id);
 
@@ -282,7 +294,7 @@ void Rdma::init(){
 
 	server_qp(NULL);
 	printf("start wait\n");
-	sleep(5);
+	sleep(16);
 
 	for(node_id = 0; node_id < g_total_node_cnt; node_id++) {
 

@@ -265,7 +265,7 @@ UInt64 tuple_count = 0;
 UInt64 max_tuple_size = 0;
 pthread_mutex_t * RDMA_MEMORY_LATCH;
 
-UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
+UInt64 rdma_buffer_size = 5*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 300*(1024*1024L);
 UInt64 rdma_index_size = (300*1024*1024L);
 
@@ -280,7 +280,7 @@ UInt64 g_his_recycle_len = HIS_RECYCLE_LEN;
 
 // CALVIN
 UInt32 g_seq_thread_cnt = SEQ_THREAD_CNT;
-UInt64 rdma_calvin_buffer_size = 200*1024*1024;
+UInt64 rdma_calvin_buffer_size = 400*1024*1024;
 
 // TICTOC
 uint32_t g_max_num_waits = MAX_NUM_WAITS;

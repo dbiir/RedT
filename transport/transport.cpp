@@ -271,7 +271,7 @@ void Transport::create_server(uint64_t port, uint64_t dest_node_id) {
 	// RDMA_LOG(4) << "Reg_mem_name is " << reg_mem_name;
 	ctrl.registered_mrs.reg(reg_mem_name, handler);
 	ctrl.start_daemon();
-	sleep(15);
+	sleep(30);
 	// RDMA_LOG(4) << "Recv qp: " << "rdma_qp"+to_string(port);
 	auto recv_qp = ctrl.registered_qps.query("rdma_qp"+to_string(port)).value();
 	auto recv_rs = manager.reg_recv_entries.query("rdma_qp"+to_string(port)).value();
