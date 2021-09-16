@@ -704,7 +704,7 @@ retry_lock:
         uint64_t try_lock = -1;
 		row_t * test_row;
 		
-#if USE_DBPA
+#if USE_DBPAOR
 		test_row = cas_and_read_remote(yield,try_lock,loc,m_item->offset,m_item->offset,0,tts, cor_id);
 #else
         try_lock = cas_remote_content(yield,loc,m_item->offset,0,tts,cor_id);

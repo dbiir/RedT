@@ -1087,7 +1087,7 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 	for (int rid = row_cnt - 1; rid >= 0; rid --) {
 		cleanup_row(yield, rc,rid,remote_access,cor_id);  //return abort write row
 	}
-#if USE_DBPA == true && CC_ALG == RDMA_TS1 
+#if USE_DBPAOR == true && CC_ALG == RDMA_TS1 
 	starttime = get_sys_clock();
 	uint64_t endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
@@ -1095,7 +1095,6 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
             batch_unlock_remote(yield, cor_id, i, Abort, this, remote_access);
         }
     }
-#if USE_OR == true
     for(int i=0;i<g_node_cnt;i++){ //poll result
         if(remote_access[i].size() > 0){
         	//to do: add coroutine
@@ -1132,7 +1131,6 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
-#endif 
 #endif 
 #endif 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
@@ -1598,7 +1596,7 @@ void TxnManager::release_locks(yield_func_t &yield, RC rc, uint64_t cor_id) {
 	uint64_t timespan = (get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(), txn_cleanup_time,  timespan);
 }
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 row_t * TxnManager::cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock, uint64_t target_server, uint64_t cas_offset, uint64_t read_offset, uint64_t compare, uint64_t swap, uint64_t cor_id){
 	uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
 	uint64_t *local_buf1 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
@@ -1738,7 +1736,7 @@ void TxnManager::batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int l
 	//only one signaled request need to be polled
 	RDMA_ASSERT(dbres == IOCode::Ok);
 //not use outstanding requests here for RDMA_NO_WAIT
-#if USE_OR == false || CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT  //otherwise USE_OR is always true
     auto dbres1 = rc_qp[loc][thd_id]->wait_one_comp();
     RDMA_ASSERT(dbres1 == IOCode::Ok);       
 #endif
@@ -1790,7 +1788,7 @@ void TxnManager::batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int l
 #endif
 #endif
 
-#if USE_DBPA == true && CC_ALG == RDMA_SILO
+#if BATCH_INDEX_AND_READ
  void TxnManager::batch_read(yield_func_t &yield, BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin, uint64_t cor_id){
 	 vector<uint64_t> remote_index = remote_index_origin[loc];
 	 int count = 0;
@@ -1823,34 +1821,34 @@ void TxnManager::batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int l
 
  	 //only one signaled request need to be polled
 	 RDMA_ASSERT(dbres == IOCode::Ok);
-#if USE_OR == false
-	 auto dbres1 = rc_qp[loc][thd_id]->wait_one_comp();
-	 RDMA_ASSERT(dbres1 == IOCode::Ok);
+#if 0 //USE_OR is always true
+	//  auto dbres1 = rc_qp[loc][thd_id]->wait_one_comp();
+	//  RDMA_ASSERT(dbres1 == IOCode::Ok);
 	 
-	 for(int i=0;i<remote_index.size();i++){
-		if(rtype == R_INDEX){
-			char *local_buf = Rdma::get_index_client_memory(thd_id,count+i+1);
-			ycsb_request * req = ycsb_query->requests[remote_index[i]];
-	//		uint64_t index_key = req->key / g_node_cnt;
-	//		uint64_t index_addr = (index_key) * sizeof(IndexInfo);
-			assert(((IndexInfo*)local_buf)->key == req->key);
-			itemid_t* item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
+	//  for(int i=0;i<remote_index.size();i++){
+	// 	if(rtype == R_INDEX){
+	// 		char *local_buf = Rdma::get_index_client_memory(thd_id,count+i+1);
+	// 		ycsb_request * req = ycsb_query->requests[remote_index[i]];
+	// //		uint64_t index_key = req->key / g_node_cnt;
+	// //		uint64_t index_addr = (index_key) * sizeof(IndexInfo);
+	// 		assert(((IndexInfo*)local_buf)->key == req->key);
+	// 		itemid_t* item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
 
-			item->location = ((IndexInfo*)local_buf)->address;
-			item->type = ((IndexInfo*)local_buf)->type;
-			item->valid = ((IndexInfo*)local_buf)->valid;
-			item->offset = ((IndexInfo*)local_buf)->offset;
-			item->table_offset = ((IndexInfo*)local_buf)->table_offset;
-			reqId_index.insert(pair<int, itemid_t*>(remote_index[i],item));
-		}
-		else if(rtype == R_ROW){
-			uint64_t read_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-			char *local_buf = Rdma::get_row_client_memory(thd_id,count+i+1);
-			row_t *test_row = (row_t *)mem_allocator.alloc(read_size);
-    		memcpy(test_row, local_buf, read_size);
-			reqId_row.insert(pair<int, row_t*>(remote_index[i],test_row));
-		}
-	 }
+	// 		item->location = ((IndexInfo*)local_buf)->address;
+	// 		item->type = ((IndexInfo*)local_buf)->type;
+	// 		item->valid = ((IndexInfo*)local_buf)->valid;
+	// 		item->offset = ((IndexInfo*)local_buf)->offset;
+	// 		item->table_offset = ((IndexInfo*)local_buf)->table_offset;
+	// 		reqId_index.insert(pair<int, itemid_t*>(remote_index[i],item));
+	// 	}
+	// 	else if(rtype == R_ROW){
+	// 		uint64_t read_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
+	// 		char *local_buf = Rdma::get_row_client_memory(thd_id,count+i+1);
+	// 		row_t *test_row = (row_t *)mem_allocator.alloc(read_size);
+    // 		memcpy(test_row, local_buf, read_size);
+	// 		reqId_row.insert(pair<int, row_t*>(remote_index[i],test_row));
+	// 	}
+	//  }
 #endif
  }
  void TxnManager::get_batch_read(yield_func_t &yield, BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin, uint64_t cor_id){

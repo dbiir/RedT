@@ -58,7 +58,7 @@ void * rdma_mvcc::local_write_back(TxnManager * txnMng , uint64_t num){
 void * rdma_mvcc::remote_write_back(yield_func_t &yield,TxnManager * txnMng , uint64_t num , row_t * remote_row, uint64_t cor_id){
     uint64_t off = txnMng->txn->accesses[num]->offset;
  	uint64_t loc = txnMng->txn->accesses[num]->location;
-#if USE_DBPA
+#if USE_DBPAOR
     row_t *temp_row = remote_row;
 #else
     row_t *temp_row = txnMng->read_remote_row(yield, loc, off, cor_id);
@@ -322,7 +322,7 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
            uint64_t remote_offset = txn->accesses[num]->offset;
            uint64_t loc = txn->accesses[num]->location;
 	       uint64_t lock_num = txnMng->get_txn_id() + 1;
-#if USE_DBPA == true
+#if USE_DBPAOR == true
            if(loc != g_node_id) remote_access[loc].push_back(num);
            else{ //local
                abort_release_local_lock(txnMng,num);
@@ -341,14 +341,13 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
         //    assert(release_lock == lock_num);
 #endif
         }
-#if USE_DBPA == true
+#if USE_DBPAOR == true
         uint64_t starttime = get_sys_clock(), endtime;
         for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
             if(remote_access[i].size() > 0){
                 txnMng->batch_unlock_remote(yield, cor_id, i, Abort, txnMng, remote_access);
             }
         }
-#if USE_OR == true
         for(int i=0;i<g_node_cnt;i++){ //poll result
             if(remote_access[i].size() > 0){
             	//to do: add coroutine
@@ -386,7 +385,6 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
         INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
         DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
 #endif 
-#endif 
 #endif
      }
      else{ //COMMIT
@@ -396,7 +394,7 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
            uint64_t loc = txn->accesses[num]->location;
 	       uint64_t lock_num = txnMng->get_txn_id() + 1;
            row_t* remote_row = NULL;
-#if USE_DBPA == true
+#if USE_DBPAOR == true
             if(loc !=  g_node_id){ //remote
                 uint64_t try_lock;
                 remote_row = txnMng->cas_and_read_remote(yield, try_lock,loc,remote_offset,remote_offset,0,lock_num, cor_id);

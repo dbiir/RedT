@@ -386,7 +386,7 @@ RC RDMA_Maat::remote_abort(yield_func_t &yield, TxnManager * txnMng, Access * da
 	uint64_t lock = txnMng->get_txn_id() + 1;
 	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
 	
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 	uint64_t try_lock;
 	row_t * temp_row = txnMng->cas_and_read_remote(yield,try_lock,loc,off,off,0,lock,cor_id);
 #else
@@ -452,7 +452,7 @@ RC RDMA_Maat::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access * d
 	uint64_t lock = txnMng->get_txn_id() + 1;
 	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
 	uint64_t key;
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 	uint64_t try_lock;
 	row_t * temp_row = txnMng->cas_and_read_remote(yield,try_lock,loc,off,off,0,lock,cor_id);
 #else

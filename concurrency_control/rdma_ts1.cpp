@@ -184,7 +184,7 @@ void  RDMA_ts1::commit_write(yield_func_t &yield, TxnManager * txn , uint64_t nu
 // 	}
 
 // read_remote_row(txn, remote_row, loc, offset);
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 	if(type == XP){
 		// //batch set tid = 0 for remote abort write
 		// uint64_t* tid = (uint64_t*)mem_allocator.alloc(sizeof(uint64_t));
