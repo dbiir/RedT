@@ -161,10 +161,10 @@ for exp in exps:
                 print cmd
                 os.system(cmd)
                 os.chdir('..')
-                # cpu_usage_path=PATH + "/results/" + strnow + '/cpu_usage_' + str(cpu_usage_index)
-                # # cpu_usage_avg_path = PATH + "/results/" + strnow + '/cpu_usage_avg'
-                # os.mkdir(cpu_usage_path)
-                # cpu_usage_index+=1
+                cpu_usage_path=PATH + "/results/" + strnow + '/cpu_usage_' + str(cpu_usage_index)
+                # cpu_usage_avg_path = PATH + "/results/" + strnow + '/cpu_usage_avg'
+                os.mkdir(cpu_usage_path)
+                cpu_usage_index+=1
                 for m, n in zip(machines, range(len(machines))):
                     if cluster == 'istc':
                         cmd = 'scp {}.csail.mit.edu:/{}/results.out {}{}_{}.out'.format(m,uname,result_dir,n,output_f)
@@ -174,9 +174,9 @@ for exp in exps:
                         cmd = 'scp {}:/{}/dbresults{}.out results/{}/{}_{}.out'.format(m,uname,n,strnow,n,output_f)
                         print cmd
                         os.system(cmd)
-                        # cmd = 'scp {}:/tmp/{}* {}/'.format(m,uname2,cpu_usage_path)
-                        # print cmd
-                        # os.system(cmd)
+                        cmd = 'scp {}:/tmp/{}* {}/'.format(m,uname2,cpu_usage_path)
+                        print cmd
+                        os.system(cmd)
 
             else:
                 nnodes = cfgs["NODE_CNT"]

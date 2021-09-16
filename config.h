@@ -27,7 +27,7 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-#define USE_COROUTINE false
+#define USE_COROUTINE true
 #define MAX_SEND_SIZE 1
 /***********************************************/
 // DA Trans Creator
@@ -75,7 +75,7 @@
 // Simulation + Hardware
 /***********************************************/
 #define NODE_CNT 4
-#define THREAD_CNT 10
+#define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 2
@@ -118,7 +118,7 @@
 #define FIN_BY_TIME true
 #define MAX_TXN_IN_FLIGHT 10000
 
-#define SERVER_GENERATE_QUERIES true
+#define SERVER_GENERATE_QUERIES false
 
 /***********************************************/
 // Memory System
@@ -193,15 +193,15 @@
 // #define USE_RDMA CHANGE_MSG_QUEUE
 #define USE_RDMA CHANGE_TCP_ONLY
 #endif
-#define RDMA_BUFFER_SIZE (1<<25)
+#define RDMA_BUFFER_SIZE (1<<26)
 #define RDMA_CYC_QP_NUM (1<<10)
 #define RDMA_LOCAL_BUFFER_SIZE (10240)
 #define RDMA_BUFFER_ITEM_SIZE (1<<12)
 #define RDMA_USE_NIC_IDX 0
 #define RDMA_REG_MEM_NAME 73
 #define RDMA_CQ_NAME "rdma_channel"
-#define RDMA_ENTRY_NUM 8192U
-#define RDMA_SEND_COUNT (256)
+#define RDMA_ENTRY_NUM 6000U
+#define RDMA_SEND_COUNT (2048)
 
 #if USE_WORK_NUM_THREAD
   #define WORK_THREAD_NUM 1
@@ -275,7 +275,7 @@
 // [RDMA_MAAT]
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
 // #define ROW_SET_LENGTH 100
-#define MAX_RETRY_TIME 30
+#define MAX_RETRY_TIME 1
 
 /***********************************************/
 // Logging
@@ -405,7 +405,7 @@ enum PPSTxnType {
 
 // [RDMA_MAAT]
 #if WORKLOAD == YCSB
-#define ROW_SET_LENGTH int(ZIPF_THETA * 100 + 10)
+#define ROW_SET_LENGTH int(ZIPF_THETA * 400 + 10)
 #else
 #define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 50)
 #endif

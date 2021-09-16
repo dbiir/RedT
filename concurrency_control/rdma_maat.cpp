@@ -181,7 +181,7 @@ RC RDMA_Maat::validate(yield_func_t &yield, TxnManager * txn, uint64_t cor_id) {
 			mem_allocator.free(item, sizeof(RdmaTxnTableNode));
 		}
 	}
-	if(lower >= upper) {
+	if(lower > upper) {
 		// Abort
 		rdma_txn_table.local_set_state(txn->get_thd_id(),txn->get_txn_id(),MAAT_ABORTED);
 		rc = Abort;
@@ -307,7 +307,8 @@ RC RDMA_Maat::find_bound(TxnManager * txn) {
 	RC rc = RCOK;
 	uint64_t lower = rdma_txn_table.local_get_lower(txn->get_thd_id(),txn->get_txn_id());
 	uint64_t upper = rdma_txn_table.local_get_upper(txn->get_thd_id(),txn->get_txn_id());
-	if(lower >= upper) {
+	// printf("lower: %u upper: %u\n", lower, upper);
+	if(lower > upper) {
 		rdma_txn_table.local_set_state(txn->get_thd_id(),txn->get_txn_id(),MAAT_VALIDATED);
 		rc = Abort;
 	} else {
