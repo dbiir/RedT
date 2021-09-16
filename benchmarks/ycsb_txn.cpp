@@ -938,7 +938,7 @@ retry_lock:
 	uint64_t retry_time = 0;
     row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 	assert(remote_row->get_primary_key() == req->key);
-
+	rc = Abort;
     if(req->acctype == RD) {
 		assert(remote_row->version_cnt >= 0);
 		for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
