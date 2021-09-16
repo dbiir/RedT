@@ -187,7 +187,7 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
         }else{
         //remote
             remote_access[txn->accesses[read_set[i]]->location].push_back(read_set[i]);
-#if USE_DBPA == false
+#if USE_DBPAOR == false
             Access * access = txn->accesses[ read_set[i] ];
             remote_unlock(yield,txnMng, read_set[i],cor_id);
 #endif
@@ -202,14 +202,14 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
         }else{
         //remote
             remote_access[txn->accesses[txnMng->write_set[i]]->location].push_back(txnMng->write_set[i]);
-#if USE_DBPA == false
+#if USE_DBPAOR == false
             Access * access = txn->accesses[ txnMng->write_set[i] ];
             remote_write_and_unlock(yield,rc, txnMng, txnMng->write_set[i],cor_id);
 #endif
         }
     }
 
-#if USE_DBPA == true
+#if USE_DBPAOR == true
     starttime = get_sys_clock();
     uint64_t endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
@@ -217,7 +217,7 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
             txnMng->batch_unlock_remote(yield, cor_id, i, rc, txnMng, remote_access);
         }
     }
-#if USE_OR == true && CC_ALG != RDMA_NO_WAIT
+#if CC_ALG != RDMA_NO_WAIT
     for(int i=0;i<g_node_cnt;i++){ //poll result
         if(remote_access[i].size() > 0){
         	//to do: add coroutine

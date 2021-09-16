@@ -182,9 +182,8 @@
 #define DEBUG_PRINTF  false
 
 #if RDMA_ONE_SIDE 
-//OR can be used only when enable DB&PA, consider merge this two option when finish
-#define USE_DBPA true
-#define USE_OR true
+#define USE_DBPAOR false
+#define BATCH_INDEX_AND_READ false //keep this "false", a fail test for SILO
 #endif
 
 /***********************************************/

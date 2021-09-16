@@ -120,7 +120,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	
 	uint64_t starttime = get_sys_clock();
 
-#if USE_DBPA == true && CC_ALG == RDMA_SILO
+#if BATCH_INDEX_AND_READ
 	//batch read all index for remote access
 	ycsb_batch_read(yield,R_INDEX,cor_id);
 	//batch read all row for remote access
@@ -135,7 +135,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 		}  
 #endif
 	}
-#if USE_DBPA == true && CC_ALG == RDMA_SILO
+#if BATCH_INDEX_AND_READ
 	reqId_index.erase(reqId_index.begin(),reqId_index.end());
 	reqId_row.erase(reqId_row.begin(),reqId_row.end());
 #endif
@@ -202,7 +202,7 @@ bool YCSBTxnManager::is_local_request(uint64_t idx) {
   return GET_NODE_ID(_wl->key_to_part(((YCSBQuery*)query)->requests[idx]->key)) == g_node_id;
 }
 
-#if USE_DBPA == true && CC_ALG == RDMA_SILO
+#if BATCH_INDEX_AND_READ
 void YCSBTxnManager::ycsb_batch_read(yield_func_t &yield,BatchReadType rtype, uint64_t cor_id){
   	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	vector<vector<uint64_t>> remote_index(g_node_cnt);
@@ -220,13 +220,11 @@ void YCSBTxnManager::ycsb_batch_read(yield_func_t &yield,BatchReadType rtype, ui
 			batch_read(yield, rtype, i, remote_index, cor_id);
 		}
 	}
-#if USE_OR == true
 	for(int i=0;i<g_node_cnt;i++){
 		if(remote_index[i].size()>0){
 			get_batch_read(yield, rtype,i, remote_index, cor_id);
 		}
 	}
-#endif
  }
 #endif
 
@@ -251,7 +249,7 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
 	// get the index of row to be operated
 	
 	itemid_t * m_item;
-#if USE_DBPA == true && CC_ALG == RDMA_SILO
+#if BATCH_INDEX_AND_READ
 	m_item = reqId_index.find(next_record_id)->second;
 #else
     m_item = ycsb_read_remote_index(yield, req, cor_id);
@@ -277,7 +275,7 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
 		uint64_t tts = get_timestamp();
 
 		//read remote data
-#if USE_DBPA == true
+#if BATCH_INDEX_AND_READ
 		row_t * test_row = reqId_row.find(next_record_id)->second;
 #else
         row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
@@ -332,7 +330,7 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
 	else if(req->acctype == WR){
 		uint64_t lock = get_txn_id()+1;
 		uint64_t try_lock = -1;
-#if USE_DBPA
+#if USE_DBPAOR
 		test_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,0,lock,cor_id);
 		if(try_lock != 0){
 			INC_STATS(get_thd_id(), lock_fail, 1);
@@ -406,7 +404,7 @@ remote_atomic_retry_lock:
 				return Abort;
 			}
 			assert(new_lock_info!=0);
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 			uint64_t try_lock = -1;
 			test_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,lock_info,new_lock_info,cor_id);
 			if(try_lock != lock_info){ //CAS fail: Atomicity violated
@@ -437,7 +435,7 @@ remote_atomic_retry_lock:
 		else{ //写集元素直接CAS即可，不需要RDMA READ
 			lock_info = 0; //只有lock_info==0时才可以CAS，否则加写锁失败，Abort
 			new_lock_info = 3; //二进制11，即1个写锁
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 			uint64_t try_lock;
 			test_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,lock_info,new_lock_info, cor_id);
 			if(try_lock != lock_info){ //CAS fail: lock conflict. Ignore read content 
@@ -479,7 +477,7 @@ remote_atomic_retry_lock:
 #if CC_ALG == RDMA_NO_WAIT2
 if(req->acctype == RD || req->acctype == WR){
 		uint64_t tts = get_timestamp();
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 		//cas result
 		uint64_t try_lock;
 		//read result
@@ -500,7 +498,7 @@ if(req->acctype == RD || req->acctype == WR){
 #endif
 #endif
 
-#if USE_DBPA == false
+#if USE_DBPAOR == false
         uint64_t try_lock = -1;
         try_lock = cas_remote_content(yield,loc,m_item->offset,0,1,cor_id);
 
@@ -527,7 +525,7 @@ if(req->acctype == RD || req->acctype == WR){
 if(req->acctype == RD || req->acctype == WR){
 		uint64_t tts = get_timestamp();
 
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 retry_lock:
 		uint64_t try_lock;
 		row_t* test_row = cas_and_read_remote(yield,try_lock,loc,m_item->offset,m_item->offset,0,tts, cor_id);
@@ -552,7 +550,7 @@ retry_lock:
 		assert(test_row->get_primary_key() == req->key);
 #endif
 
-#if USE_DBPA == false 
+#if USE_DBPAOR == false 
 retry_lock:
         uint64_t try_lock = -1;
         try_lock = cas_remote_content(yield,loc,m_item->offset,0,tts,cor_id);
@@ -596,7 +594,7 @@ retry_lock:
         uint64_t try_lock = -1;
 		row_t * test_row;
 		
-#if USE_DBPA
+#if USE_DBPAOR
 		test_row = cas_and_read_remote(yield,try_lock,loc,m_item->offset,m_item->offset,0,tts, cor_id);
 #else
         try_lock = cas_remote_content(yield,loc,m_item->offset,0,tts,cor_id);
@@ -674,12 +672,10 @@ retry_lock:
 	return rc;
 #endif
 
-
-
 #if CC_ALG == RDMA_TS1
     
     ts_t ts = get_timestamp();
-#if USE_DBPA == true
+#if 1 //use double read
     row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 	assert(remote_row->get_primary_key() == req->key);
 	if(req->acctype == RD) {
@@ -697,6 +693,7 @@ retry_lock:
 				ts_t new_rts = ts;
 				ts_t cas_result;
 				uint64_t rts_offset = m_item->offset + sizeof(uint64_t)+sizeof(uint64_t)+sizeof(ts_t);
+#if USE_DBPAOR
 				row_t * second_row = cas_and_read_remote(yield,cas_result,loc,rts_offset,m_item->offset,old_rts,new_rts, cor_id);
 				if(cas_result!=old_rts){ //cas fail, atomicity violated
 					rc = Abort;
@@ -706,6 +703,18 @@ retry_lock:
 					mem_allocator.free(second_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 					return rc;
 				}
+#else  
+				cas_result = cas_remote_content(yield,loc,rts_offset,old_rts,new_rts, cor_id);
+				if(cas_result!=old_rts){ //cas fail
+					rc = Abort;
+					DEBUG_M("TxnManager::get_row(abort) access free\n");
+					mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+					mem_allocator.free(m_item, sizeof(itemid_t));
+					return rc;
+				}
+				//cas successs
+				row_t * second_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+#endif
 				//cas success, now do double read check
 				remote_row->rts = ts;
 				if(second_row->wts!=remote_row->wts || second_row->tid!=remote_row->tid){ //atomicity violated
@@ -734,6 +743,7 @@ retry_lock:
 			uint64_t new_tid = ts;
 			ts_t cas_result;
 			uint64_t tid_offset = m_item->offset + sizeof(uint64_t);
+#if USE_DBPAOR
 			row_t * second_row = cas_and_read_remote(yield,cas_result,loc,tid_offset,m_item->offset,old_tid,new_tid, cor_id);
 			if(cas_result!=old_tid){ //cas fail, atomicity violated
 				rc = Abort;
@@ -743,6 +753,18 @@ retry_lock:
 				mem_allocator.free(second_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 				return rc;
 			}
+#else
+			cas_result = cas_remote_content(yield,loc,tid_offset,old_tid,new_tid, cor_id);
+			if(cas_result!=old_tid){ //cas fail, atomicity violated
+				rc = Abort;
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+				mem_allocator.free(m_item, sizeof(itemid_t));
+				return rc;
+			}
+			//cas successs
+			row_t * second_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+#endif
 			//cas success, now do double read check
 			if(ts < second_row->rts || ts < second_row->wts){
 				rc = Abort;
@@ -824,7 +846,7 @@ retry_lock:
     ts_t ts = get_timestamp();
 
     uint64_t try_lock = -1;
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 	row_t * remote_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,0,lock,cor_id);
 	if(try_lock != 0) {
 		rc = Abort;

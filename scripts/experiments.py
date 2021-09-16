@@ -211,9 +211,8 @@ def ycsb_scaling_abort():
 def ycsb_skew():
     wl = 'YCSB'
     nnodes = [4]
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_WOUND_WAIT','RDMA_TS1','RDMA_WAIT_DIE2']
-    # algos=['RDMA_WAIT_DIE2']
-    algos=['NO_WAIT']
+     #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
+    algos=['RDMA_SILO']
     base_table_size=1048576
     #base_table_size=1048576*4    
     #base_table_size=2097152*8
@@ -222,7 +221,7 @@ def ycsb_skew():
     tup_write_perc = [0.2]
     load = [200000]
 
-    tcnt = [8]  #THREAD_CNT
+    tcnt = [10]  #THREAD_CNT
 
     #skew = [0.0,0.4,0.6,0.8,0.9]
     #skew = [0.2,0.6,0.85,0.95]

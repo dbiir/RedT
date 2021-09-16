@@ -311,21 +311,20 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 			} else{
 			//remote(release lock)
 				remote_access[loc].push_back(num);
-#if USE_DBPA == false
+#if USE_DBPAOR == false
                 uint64_t try_lock = txnMng->cas_remote_content(yield,loc,remote_offset,lock,0,cor_id);
                 // assert(try_lock == lock);
 #endif
 			}
 
 		}
-#if USE_DBPA == true
+#if USE_DBPAOR == true
     uint64_t starttime = get_sys_clock(), endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
         if(remote_access[i].size() > 0){
             txnMng->batch_unlock_remote(yield, cor_id, i, Abort, txnMng, remote_access);
         }
     }
-#if USE_OR == true
     for(int i=0;i<g_node_cnt;i++){ //poll result
         if(remote_access[i].size() > 0){
 		    //to do: add coroutine
@@ -362,7 +361,6 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 	INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
     INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
     DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
-#endif
 #endif 
 #endif
 	} 
@@ -384,7 +382,7 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 			}else{
 			//remote
 				remote_access[loc].push_back(num);
-#if USE_DBPA == false
+#if USE_DBPAOR == false
 				Access * access = txn->accesses[ num ];
 				remote_commit_write(yield,txnMng,num,access->data,time,cor_id);
                 uint64_t try_lock = txnMng->cas_remote_content(yield,loc,remote_offset,lock,0,cor_id);
@@ -392,14 +390,13 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 #endif
 			}
 		}
-#if USE_DBPA == true
+#if USE_DBPAOR == true
     uint64_t starttime = get_sys_clock(), endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
         if(remote_access[i].size() > 0){
             txnMng->batch_unlock_remote(yield, cor_id, i, RCOK, txnMng, remote_access,time);
         }
     }
-#if USE_OR == true
     for(int i=0;i<g_node_cnt;i++){ //poll result
         if(remote_access[i].size() > 0){
 		    //to do: add coroutine
@@ -437,7 +434,6 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
     INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
     DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
 #endif
-#endif 
 #endif
 
 	}

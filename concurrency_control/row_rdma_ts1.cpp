@@ -15,7 +15,7 @@ RC Row_rdma_ts1::access(yield_func_t &yield, TxnManager * txn, Access *access, a
 	RC rc;
 	uint64_t starttime = get_sys_clock();
 	ts_t ts = txn->get_timestamp();
-#if USE_DBPA == true //actually not DBPA here,but double read
+#if 1 //use double read, by default
 	//local read;
 	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 	memcpy(temp_row, _row, row_t::get_row_size(ROW_DEFAULT_SIZE));

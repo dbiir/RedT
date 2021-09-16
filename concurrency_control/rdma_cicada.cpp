@@ -234,7 +234,7 @@ RC RDMA_Cicada::remote_read_or_write(yield_func_t &yield, Access * data, TxnMana
 		uint64_t Rts = temp_row->cicada_version[txnMng->version_num[num] % HIS_CHAIN_NUM].Rts;
 		if (rc == RCOK && temp_row->cicada_version[txnMng->version_num[num] % HIS_CHAIN_NUM].Rts < txnMng->get_timestamp()) {
 			off = off + sizeof(uint64_t) * 2 + sizeof(RdmaCicadaVersion) * (txnMng->version_num[num] % HIS_CHAIN_NUM);
-#if USE_DBPA
+#if USE_DBPAOR
 			uint64_t try_lock;
 			row_t * temp_row2 = txnMng->cas_and_read_remote(yield, try_lock,loc,off,off,Rts,txnMng->get_timestamp(), cor_id);
 #else
@@ -263,7 +263,7 @@ RC RDMA_Cicada::remote_read_or_write(yield_func_t &yield, Access * data, TxnMana
 	}
 
 	if(data->type == WR && real_write == true) {
-#if USE_DBPA
+#if USE_DBPAOR
 		uint64_t try_lock;
 		row_t * temp_row = txnMng->cas_and_read_remote(yield, try_lock,loc,off,off,0,lock, cor_id);
 #else
@@ -352,13 +352,13 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
         		//release_remote_lock(txnMng,txnMng->write_set[i] );
 	            remote_access[txn->accesses[i->first]->location].push_back(i->first);
 	            remote_num[txn->accesses[i->first]->location].push_back(i->second);
-#if USE_DBPA == false
+#if USE_DBPAOR == false
 				rc = remote_abort(yield, txnMng, txn->accesses[i->first], i->second, cor_id);
 #endif
 
 			}
   		}
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 	uint64_t starttime = get_sys_clock(), endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch write back remote
         if(remote_access[i].size() > 0){
@@ -366,7 +366,6 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
             txnMng->batch_unlock_remote(yield, cor_id, i, Abort, txnMng, remote_access,temp_time,remote_num);
         }
     }
-#if USE_OR == true
     for(int i=0;i<g_node_cnt;i++){ //poll result
         if(remote_access[i].size() > 0){
         	//to do: add coroutine
@@ -404,7 +403,6 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
     INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
     DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
 #endif
-#endif 
 #endif
 	} else {
 	//commit
@@ -423,12 +421,12 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
 				//DEBUG("commit access txn %ld, off: %ld loc: %ld and key: %ld\n",txnMng->get_txn_id(), access->offset, access->location, access->data->get_primary_key());
 	            remote_access[txn->accesses[i->first]->location].push_back(i->first);
 	            remote_num[txn->accesses[i->first]->location].push_back(i->second);
-#if USE_DBPA == false
+#if USE_DBPAOR == false
 				rc =  remote_commit(yield, txnMng, txn->accesses[i->first], i->second, cor_id);
 #endif
 			}
   		}
-#if USE_DBPA == true
+#if USE_DBPAOR == true
 	uint64_t starttime = get_sys_clock(), endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch write back remote
         if(remote_access[i].size() > 0){
@@ -436,7 +434,6 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
             txnMng->batch_unlock_remote(yield, cor_id, i, RCOK, txnMng, remote_access,temp_time,remote_num);
         }
     }
-#if USE_OR == true
     for(int i=0;i<g_node_cnt;i++){ //poll result
         if(remote_access[i].size() > 0){
         	//to do: add coroutine
@@ -474,7 +471,6 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
     INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
     DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
 #endif
-#endif 
 #endif	  
 	}
 	for (uint64_t i = 0; i < txn->row_cnt; i++) {
