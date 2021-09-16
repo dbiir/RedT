@@ -620,7 +620,7 @@ uint64_t RdmaTxnTable::hash(uint64_t key) { return key % table_size; }
 
 void RdmaTxnTable::release(uint64_t thd_id, uint64_t key) {
 	//table[key]._lock = g_node_id;
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 #if CC_ALG == RDMA_MAAT
 	table[index].lower = 0;
 	table[index].upper = UINT64_MAX;
@@ -636,19 +636,20 @@ void RdmaTxnTable::release(uint64_t thd_id, uint64_t key) {
 #if CC_ALG == RDMA_WOUND_WAIT
 WOUNDState RdmaTxnTable::local_get_state(uint64_t thd_id, uint64_t key) {
 	WOUNDState state = WOUND_RUNNING;
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	state = table[index].state;   
+	// printf("index: %ld, key: %ld\n", index, table[index].key);
 	//table[key]._lock = 0;
 	return state;
 }
 void RdmaTxnTable::local_set_state(uint64_t thd_id, uint64_t key, WOUNDState value) {
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	table[index].state = value;
 }
 
 char * RdmaTxnTable::remote_get_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id) {
 	uint64_t node_id = key % g_node_cnt;
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	
 	// todo: here we need to get the corresponding index
 	// uint64_t index_key = 0;
@@ -664,7 +665,7 @@ char * RdmaTxnTable::remote_get_state(yield_func_t &yield, TxnManager *txnMng, u
 void RdmaTxnTable::remote_set_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTxnTableNode * value, uint64_t cor_id) {
 	uint64_t node_id = key % g_node_cnt;
 	assert(node_id != g_node_id);
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	// todo: here we need to get the corresponding index
 	// uint64_t index_key = 0;
 	uint64_t timenode_addr = (index) * sizeof(RdmaTxnTableNode) + (rdma_buffer_size - rdma_txntable_size);
@@ -686,7 +687,7 @@ void RdmaTxnTable::remote_set_state(yield_func_t &yield, TxnManager *txnMng, uin
 #endif
 #if CC_ALG == RDMA_MAAT
 uint64_t RdmaTxnTable::local_get_lower(uint64_t thd_id, uint64_t key) {
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	//table[key]._lock = g_node_id;
 	uint64_t value = table[index].lower;
 	//table[key]._lock = 0;
@@ -695,7 +696,7 @@ uint64_t RdmaTxnTable::local_get_lower(uint64_t thd_id, uint64_t key) {
 
 uint64_t RdmaTxnTable::local_get_upper(uint64_t thd_id, uint64_t key) {
 	//table[key]._lock = g_node_id;
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	uint64_t value = table[index].upper;
 	//table[key]._lock = 0;
 	return value;
@@ -704,14 +705,14 @@ uint64_t RdmaTxnTable::local_get_upper(uint64_t thd_id, uint64_t key) {
 
 void RdmaTxnTable::local_set_lower(uint64_t thd_id, uint64_t key, uint64_t value) {
 	//table[key]._lock = g_node_id;
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	table[index].lower = value;
 	//table[key]._lock = 0;
 }
 
 void RdmaTxnTable::local_set_upper(uint64_t thd_id, uint64_t key, uint64_t value) {
 	//table[key]._lock = g_node_id;
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	table[index].upper = value;
 	//table[key]._lock = 0;
 }
@@ -719,7 +720,7 @@ void RdmaTxnTable::local_set_upper(uint64_t thd_id, uint64_t key, uint64_t value
 MAATState RdmaTxnTable::local_get_state(uint64_t thd_id, uint64_t key) {
 	//table[key]._lock = g_node_id;
 	MAATState state = MAAT_ABORTED;
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	state = table[index].state;   
 	//table[key]._lock = 0;
 	return state;
@@ -727,7 +728,7 @@ MAATState RdmaTxnTable::local_get_state(uint64_t thd_id, uint64_t key) {
 
 void RdmaTxnTable::local_set_state(uint64_t thd_id, uint64_t key, MAATState value) {
 	//table[key]._lock = g_node_id;
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	table[index].state = value;
 	//table[key]._lock = 0;
 }
@@ -735,7 +736,7 @@ void RdmaTxnTable::local_set_state(uint64_t thd_id, uint64_t key, MAATState valu
 RdmaTxnTableNode * RdmaTxnTable::remote_get_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id) {
 	assert(key % g_node_cnt != g_node_id);
 	uint64_t node_id = key % g_node_cnt;
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	
 	// todo: here we need to get the corresponding index
 	// uint64_t index_key = 0;
@@ -767,7 +768,7 @@ RdmaTxnTableNode * RdmaTxnTable::remote_get_timeNode(yield_func_t &yield, TxnMan
 void RdmaTxnTable::remote_set_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTxnTableNode * value, uint64_t cor_id) {
 	uint64_t node_id = key % g_node_cnt;
 	// assert(node_id != g_node_id);
-	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	// todo: here we need to get the corresponding index
 	// uint64_t index_key = 0;
 	uint64_t timenode_addr = (index) * sizeof(RdmaTxnTableNode) + (rdma_buffer_size - rdma_txntable_size);

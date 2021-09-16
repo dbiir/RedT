@@ -75,6 +75,54 @@ class Optional final {
   std::unique_ptr<T> value_;
 };
 
+template <typename T>
+  Optional<T>::Optional() : has_value_(false), value_(nullptr) {}
+	template <typename T>
+  Optional<T>::Optional(const T& value) : has_value_(true), value_(new T(value)) {}
+	template <typename T>
+  Optional<T>::Optional(T&& value) : has_value_(true), value_(new T(std::forward<T>(value))) {}
+	template <typename T>
+  Optional<T>::Optional(const Optional<T>& o)
+      : has_value_(o.has_value_), value_(o.value_ ? new T(*o.value_) : nullptr) {}
+	template <typename T>
+  Optional<T>::Optional(Optional<T>&& o) = default;
+	template <typename T>
+  Optional<T>::~Optional() {}
+	template <typename T>
+  Optional<T>& Optional<T>::operator=(const Optional& o) {
+    has_value_ = o.has_value_;
+    value_ = o.value_ ? MakeUnique<T>(*o.value_) : nullptr;
+    return *this;
+  }
+	template <typename T>
+  Optional<T>& Optional<T>::operator=(Optional&&) = default;
+	template <typename T>
+  bool Optional<T>::HasValue() const { return has_value_; }
+	template <typename T>
+  void Optional<T>::Set(T&& value) {
+    value_ = MakeUnique<T>(std::move(value));
+    has_value_ = true;
+  }
+	template <typename T>
+  void Optional<T>::Set(const T& value) {
+    value_ = MakeUnique<T>(value);
+    has_value_ = true;
+  }
+	template <typename T>
+  T& Optional<T>::Get() {
+    if (!has_value_) {
+      throw "Empty Optional";
+    }
+    return *value_;
+  }
+	template <typename T>
+  const T& Optional<T>::Get() const {
+    if (!has_value_) {
+      throw "Empty Optional";
+    }
+    return *value_;
+  }
+
 class Action {
  public:
   enum class Type : char {

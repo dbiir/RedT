@@ -521,23 +521,23 @@ def ycsb_partitions_distr():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [4]
+    nnodes = [1,2,4,8,16]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     # nalgos=['MAAT','MVCC','NO_WAIT','WAIT_DIE']
     # nalgos=['RDMA_WAIT_DIE2']
     # nalgos=['RDMA_WOUND_WAIT']
-     #nalgos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
+    nalgos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
     # nalgos=['RDMA_SILO','RDMA_MVCC']
     # nalgos = ['RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WOUND_WAIT','RDMA_WAIT_DIE2']
-    nalgos = ['RDMA_WOUND_WAIT']
+    # nalgos = ['RDMA_WOUND_WAIT']
     # nalgos = ['RDMA_CICADA']
     # nalgos = ['RDMA_CALVIN']
-    npercpay=[1.0]
+    npercpay=[0.0]
     # npercpay=[0.0]
-    wh=16
+    wh=8
     # wh=64
-    load = [20000]
+    load = [200000]
     tcnt = [4]
     ctcnt = [2]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]

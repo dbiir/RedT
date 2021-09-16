@@ -96,7 +96,13 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	while(rc == RCOK && !is_done()) {
 		rc = run_txn_state(yield, cor_id);
 	}
-
+#if CC_ALG == RDMA_WOUND_WAIT
+        // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
+		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
+			// printf("read local WOUND_ABORTING:%ld\n", txn->txn_id);
+			rc = Abort;
+		}
+#endif
 	uint64_t curr_time = get_sys_clock();
 	txn_stats.process_time += curr_time - starttime;
 	txn_stats.process_time_short += curr_time - starttime;
@@ -670,6 +676,7 @@ retry_lock:
 			else{ //abort
 				DEBUG_M("TxnManager::get_row(abort) access free\n");
 				row_local = NULL;
+				// printf("WAIT_DIE DIE:%ld\n", get_txn_id());
 				txn->rc = Abort;
 			//	mem_allocator.free(m_item, sizeof(itemid_t));
 
@@ -738,6 +745,7 @@ retry_lock:
 					rdma_txn_table.remote_set_state(yield, this, test_row->lock_owner, value, cor_id);
 					// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				}
+				// printf("set WOUND_ABORTING:%ld\n", test_row->lock_owner);
 				// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 				is_wound = true;
@@ -753,7 +761,7 @@ retry_lock:
 				// row_local = NULL;
 				// txn->rc = Abort;
 				// mem_allocator.free(m_item, sizeof(itemid_t));
-
+				// printf("retry wait:%ld\n", test_row->lock_owner);
 				// return Abort;
 				num_atomic_retry++;
 				total_num_atomic_retry++;
@@ -1085,7 +1093,7 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 #if CC_ALG == RDMA_WOUND_WAIT
         // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
 		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
-			printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
+			// printf("read local WOUND_ABORTING:%ld\n", txn->txn_id);
 			rc = Abort;
 			return rc;
 		}

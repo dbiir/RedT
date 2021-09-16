@@ -74,8 +74,8 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 4
-#define THREAD_CNT 24
+#define NODE_CNT 16
+#define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 2
@@ -83,7 +83,7 @@
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
 #define CLIENT_NODE_CNT NODE_CNT
-#define CLIENT_THREAD_CNT 4
+#define CLIENT_THREAD_CNT 2
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
@@ -109,14 +109,14 @@
 // # of transactions to run for warmup
 #define WARMUP            0
 // YCSB or TPCC or PPS or DA
-#define WORKLOAD YCSB
+#define WORKLOAD TPCC
 // print the transaction latency distribution
 #define PRT_LAT_DISTR false
 #define STATS_ENABLE        true
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 10000
+#define MAX_TXN_IN_FLIGHT 200000
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -174,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_WOUND_WAIT
+#define CC_ALG RDMA_WAIT_DIE2
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -276,7 +276,7 @@
 // [RDMA_MAAT]
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
 // #define ROW_SET_LENGTH 100
-#define MAX_RETRY_TIME 1
+#define MAX_RETRY_TIME 30
 
 /***********************************************/
 // Logging
@@ -305,8 +305,8 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 4194304
-#define ZIPF_THETA 0.2
+#define SYNTH_TABLE_SIZE 65536
+#define ZIPF_THETA 0.3
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
@@ -331,7 +331,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH 32
+#define NUM_WH 128
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0

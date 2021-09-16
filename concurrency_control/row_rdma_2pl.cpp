@@ -173,6 +173,7 @@ local_retry_lock:
 				goto local_retry_lock;			
 			}	
 			else{ //abort
+                // printf("local WAIT_DIE DIE:%ld\n", txn->get_txn_id());
 				rc = Abort;
 			}
 		}
@@ -217,6 +218,7 @@ local_retry_lock:
 					rdma_txn_table.remote_set_state(yield, txn, _row->lock_owner, value, cor_id);
                     // mem_allocator.free(value, sizeof(RdmaTxnTableNode));
 				}
+                    // printf("set WOUND_ABORTING:%ld\n", _row->lock_owner);
                     is_wound = true;
 					goto local_retry_lock;	
                 
