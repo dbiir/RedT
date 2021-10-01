@@ -87,10 +87,10 @@ class RDMA_silo;
 #elif CC_ALG == RDMA_MVCC
 class rdma_mvcc;
 #endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
 class RDMA_2pl;
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 class RdmaTxnTable;
 #endif
 #if CC_ALG == RDMA_MAAT
@@ -171,10 +171,10 @@ extern RDMA_silo rsilo_man;
 #elif CC_ALG == RDMA_MVCC
 extern rdma_mvcc rmvcc_man;
 #endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
 extern RDMA_2pl r2pl_man;
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 extern RdmaTxnTable rdma_txn_table;
 #endif
 #if CC_ALG == RDMA_MAAT

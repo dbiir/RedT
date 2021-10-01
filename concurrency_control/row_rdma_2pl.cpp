@@ -8,7 +8,7 @@
 #include "row_rdma_2pl.h"
 #include "global.h"
 
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
 
 void Row_rdma_2pl::init(row_t * row){
 	_row = row;
@@ -46,7 +46,7 @@ bool Row_rdma_2pl::conflict_lock(uint64_t lock_info, lock_t l2, uint64_t& new_lo
 }
 
 RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row_t * row,uint64_t cor_id) {  //本地加锁
-	assert(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT);
+	assert(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT);
     RC rc;
 #if CC_ALG == RDMA_NO_WAIT
 atomic_retry_lock:
@@ -149,6 +149,69 @@ atomic_retry_lock:
     else    rc = Abort;  //加锁冲突
 */
 #endif
+#if CC_ALG == RDMA_WAIT_DIE
+    		//直接RDMA CAS加锁
+local_retry_lock:
+        uint64_t loc = g_node_id;
+        uint64_t try_lock = -1;
+        uint64_t lock_type = 0;
+		bool conflict = false;
+        uint64_t thd_id = txn->get_thd_id();
+		uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+		auto mr = client_rm_handler->get_reg_attr().value();
+        uint64_t tts = txn->get_timestamp();
+        try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txn->get_txn_id(),cor_id);
+        if(try_lock != 0) {
+            // printf("cas retry\n");
+            rc = Abort;
+            return rc;
+            goto local_retry_lock;
+        }
+        lock_type = _row->lock_type;
+        if(lock_type == 0) {
+            _row->lock_owner[0] = txn->get_txn_id();
+            _row->ts[0] = tts;
+            _row->lock_type = type == DLOCK_EX? 1:2;
+            _row->_tid_word = 0; 
+            rc = RCOK;
+        } else if(lock_type == 1 || type == DLOCK_EX) {
+            conflict = true;
+            if(conflict) {
+                uint64_t i = 0;
+                for(i = 0; i < LOCK_LENGTH; i++) {
+                    if((tts > _row->ts[i] && _row->ts[i] != 0)) {
+                        _row->_tid_word = 0;
+                        rc = Abort;
+                        return rc;
+                    }
+                    // if(_row->ts[0] == 0) break;
+                }
+                total_num_atomic_retry++;
+                txn->num_atomic_retry++;
+                if(txn->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txn->num_atomic_retry;
+                //sleep(1);
+                _row->_tid_word = 0;
+                goto local_retry_lock;	
+            }
+        } else {
+            uint64_t i = 0; 
+			for(i = 0; i < LOCK_LENGTH; i++) {
+				if(_row->ts[i] == 0) {
+					_row->ts[i] = tts;
+					_row->lock_owner[i] == txn->get_txn_id();
+					_row->lock_type = type == DLOCK_EX? 1:2;
+					_row->_tid_word = 0;
+                    rc = RCOK;
+                    break;
+				}
+			}
+            if(i == LOCK_LENGTH) {
+				_row->_tid_word = 0;
+                rc = Abort;
+                return rc;
+			}
+        }
+#endif
 #if CC_ALG == RDMA_WAIT_DIE2
     		//直接RDMA CAS加锁
 local_retry_lock:
@@ -161,6 +224,10 @@ local_retry_lock:
 		auto mr = client_rm_handler->get_reg_attr().value();
         uint64_t tts = txn->get_timestamp();
         try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,tts,cor_id);
+        if(try_lock == 0) {
+            _row->lock_owner = txn->get_txn_id();
+            rc = RCOK;
+        }
 		if(try_lock != 0){ //如果CAS失败
 			if(tts <= *tmp_buf2){  //wait
 #if DEBUG_PRINTF
@@ -182,6 +249,116 @@ local_retry_lock:
         }
 #endif
 #if CC_ALG == RDMA_WOUND_WAIT
+        uint64_t tts = txn->get_timestamp();
+        int retry_time = 0;
+        bool is_wound = false;
+        uint64_t loc = g_node_id;
+        RdmaTxnTableNode * value = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
+local_retry_lock:
+        uint64_t try_lock = -1;
+		uint64_t lock_type = 0;
+		bool canwait = true;
+		bool canwound = true;
+        try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txn->get_txn_id(),cor_id);
+        if(try_lock != 0) {
+            // printf("cas retry\n");
+            mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+            rc = Abort;
+            return rc;
+            goto local_retry_lock;
+        }
+        lock_type = _row->lock_type;
+		if(lock_type == 0) {
+			_row->lock_owner[0] = txn->get_txn_id();
+			_row->ts[0] = tts;
+			_row->lock_type = type == DLOCK_EX? 1:2;
+			_row->_tid_word = 0;
+            rc = RCOK;
+		} else if(lock_type == 1 || type == DLOCK_EX) {
+            uint64_t i = 0; 
+			for(i = 0; i < LOCK_LENGTH; i++) {
+				if((tts > _row->ts[i] && _row->ts[i] != 0)) {
+					canwound = false;
+				}
+				if((tts < _row->ts[i] && _row->ts[i] != 0)) {
+					canwait = false;
+				}
+			}
+            if(canwound == true) {
+				WOUNDState state;
+				char * local_buf;
+				for(int i = 0; i < LOCK_LENGTH; i++) {
+					if(_row->lock_owner[i] != 0) {
+						if(_row->lock_owner[i] % g_node_cnt == g_node_id) {
+							state = rdma_txn_table.local_get_state(txn->get_thd_id(), _row->lock_owner[i]);
+						} else {
+							local_buf = rdma_txn_table.remote_get_state(yield, txn, _row->lock_owner[i], cor_id);
+							memcpy(value, local_buf, sizeof(RdmaTxnTableNode));
+							state = value->state;
+						}
+						if(state != WOUND_COMMITTING && state != WOUND_ABORTING){  //wound
+							
+							if(_row->lock_owner[i] % g_node_cnt == g_node_id) {
+								rdma_txn_table.local_set_state(txn->get_thd_id(), _row->lock_owner[i], WOUND_ABORTING);
+
+							} else {
+								value->state = WOUND_ABORTING;
+								rdma_txn_table.remote_set_state(yield, txn, _row->lock_owner[i], value, cor_id);
+								// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+							}
+						}
+					}
+					// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+					_row->_tid_word = 0;
+					// mem_allocator.free(m_item, sizeof(itemid_t));
+					// rc = Abort;
+					// return rc;
+					goto local_retry_lock;
+					// num_atomic_retry++;
+					// total_num_atomic_retry++;
+					// if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;	
+					// //sleep(1);
+					// goto retry_lock;			
+				}	
+			}
+            if(canwait == true) {
+				txn->num_atomic_retry++;
+				total_num_atomic_retry++;
+				if(txn->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txn->num_atomic_retry;	
+				// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+				_row->_tid_word = 0;
+				// if(test_row->lock_owner % g_node_cnt != g_node_id)
+				// mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+				//sleep(1);
+					goto local_retry_lock;
+			}
+            if(canwait == false && canwound == false) {
+				_row->_tid_word = 0;
+				mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+				rc = Abort;
+				return rc;
+			}
+        } else {
+            uint64_t i = 0; 
+			for(i = 0; i < LOCK_LENGTH; i++) {
+				if(_row->ts[i] == 0) {
+					_row->ts[i] = tts;
+					_row->lock_owner[i] == txn->get_txn_id();
+					_row->lock_type =  type == DLOCK_EX? 1:2;
+					_row->_tid_word = 0;
+					rc = RCOK;
+					break;
+				}
+			}
+            if(i == LOCK_LENGTH) {
+				_row->_tid_word = 0;
+                rc = Abort;
+                return rc;
+			}
+        }
+        if(value) mem_allocator.free(value, sizeof(RdmaTxnTableNode));
+#endif
+#if CC_ALG == RDMA_WOUND_WAIT2
     		//直接RDMA CAS加锁 
         int retry_time = 0;
         bool is_wound = false;

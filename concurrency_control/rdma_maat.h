@@ -48,7 +48,7 @@ struct RdmaTxnTableNode{
 		_lock = 0;
 	}
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 	uint64_t _lock;
 	uint64_t key;
 	WOUNDState state;
@@ -78,7 +78,7 @@ public:
 	RdmaTxnTableNode * remote_get_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id);
 	void remote_set_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTxnTableNode * value, uint64_t cor_id);
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 	WOUNDState local_get_state(uint64_t thd_id, uint64_t key);
 	void local_set_state(uint64_t thd_id, uint64_t key, WOUNDState value);
 

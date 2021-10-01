@@ -93,8 +93,8 @@ RC Row_rdma_ts1::access(yield_func_t &yield, TxnManager * txn, Access *access, a
 #else
 	bool suc = false;
 	//validate lock suc
-	row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-	suc = rdmats_man.remote_try_lock(txn, temp_row, access->location, access->offset);
+	// row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+	suc = rdmats_man.remote_try_lock(txn, access->location, access->offset);
 	if (suc == false) {
 		rc = Abort;
 #if DEBUG_PRINTF
@@ -146,7 +146,7 @@ end:
 	uint64_t timespan = get_sys_clock() - starttime;
 	txn->txn_stats.cc_time += timespan;
 	txn->txn_stats.cc_time_short += timespan;
-	mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+	// mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return rc;
 #endif
 }

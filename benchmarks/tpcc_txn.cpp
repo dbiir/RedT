@@ -96,7 +96,7 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	while(rc == RCOK && !is_done()) {
 		rc = run_txn_state(yield, cor_id);
 	}
-#if CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2
         // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
 		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
 			// printf("read local WOUND_ABORTING:%ld\n", txn->txn_id);
@@ -686,7 +686,10 @@ retry_lock:
 
 	//	get remote row
 	    row_t * test_row = read_remote_row(yield,loc,remote_offset,cor_id);
-
+		if(try_lock == 0) {
+			test_row->lock_owner = txn->txn_id;			
+			assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
+		}
         if(g_wh_update)this->last_type = WR;
         else this->last_type == RD;
 
@@ -701,7 +704,7 @@ retry_lock:
 
 	return rc;
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2
 	if(type == RD || type == WR){
 		uint64_t tts = get_timestamp();
         int retry_time = 0;
@@ -789,10 +792,96 @@ retry_lock:
 	return rc;
 #endif
 #if CC_ALG == RDMA_TS1
-
-
     ts_t ts = get_timestamp();
+#if 1 //use double read by default
+    row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+	if(type == RD) {
+		if(ts < remote_row->wts || (ts > remote_row->tid && remote_row->tid != 0)){
+			rc = Abort;
+			DEBUG_M("TxnManager::get_row(abort) access free\n");
+			mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+	        mem_allocator.free(m_item, sizeof(itemid_t));
+			return rc;
+		} 
+		else {//CAS(old_rts, new_rts) and read again
+			rc = RCOK;
+			if (remote_row->rts < ts){ //if ">=", no need to CAS
+				ts_t old_rts = remote_row->rts;
+				ts_t new_rts = ts;
+				ts_t cas_result;
+				uint64_t rts_offset = m_item->offset + sizeof(uint64_t)+sizeof(uint64_t)+sizeof(ts_t);
+ 
+				cas_result = cas_remote_content(yield,loc,rts_offset,old_rts,new_rts, cor_id);
+				if(cas_result!=old_rts){ //cas fail
+					rc = Abort;
+					DEBUG_M("TxnManager::get_row(abort) access free\n");
+					mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+					mem_allocator.free(m_item, sizeof(itemid_t));
+					return rc;
+				}
+				//cas successs
+				row_t * second_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+				//cas success, now do double read check
+				remote_row->rts = ts;
+				if(second_row->wts!=remote_row->wts || second_row->tid!=remote_row->tid){ //atomicity violated
+					rc = Abort;
+					DEBUG_M("TxnManager::get_row(abort) access free\n");
+					mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+					mem_allocator.free(m_item, sizeof(itemid_t));
+					mem_allocator.free(second_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+					return rc;					
+				}
+				//read success
+				mem_allocator.free(second_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+			}
+		}
+	}
+	else if(type == WR) {
+		if (remote_row->tid != 0 || ts < remote_row->rts || ts < remote_row->wts){
+			rc = Abort;
+			DEBUG_M("TxnManager::get_row(abort) access free\n");
+			mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+	        mem_allocator.free(m_item, sizeof(itemid_t));
+			return rc;
+		} 
+		else {//CAS(old_tid, new_tid) and read again
+			uint64_t old_tid = 0;
+			uint64_t new_tid = ts;
+			ts_t cas_result;
+			uint64_t tid_offset = m_item->offset + sizeof(uint64_t);
 
+			cas_result = cas_remote_content(yield,loc,tid_offset,old_tid,new_tid, cor_id);
+			if(cas_result!=old_tid){ //cas fail, atomicity violated
+				rc = Abort;
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+				mem_allocator.free(m_item, sizeof(itemid_t));
+				return rc;
+			}
+			//cas successs
+			row_t * second_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+			//cas success, now do double read check
+			if(ts < second_row->rts || ts < second_row->wts){
+				rc = Abort;
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				//RDMA WRITE, SET tid = 0
+				uint64_t* temp_tid = (uint64_t *)mem_allocator.alloc(sizeof(uint64_t));
+				*temp_tid = 0;
+				assert(write_remote_row(yield, loc, sizeof(uint64_t),m_item->offset+sizeof(uint64_t),(char*)(temp_tid), cor_id)==true);
+				mem_allocator.free(temp_tid,sizeof(uint64_t));
+				mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+				mem_allocator.free(m_item, sizeof(itemid_t));
+				mem_allocator.free(second_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+				return rc;					
+			}
+			//read success
+			remote_row->tid = ts;
+			mem_allocator.free(second_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+		}
+	} else {
+		assert(false);
+	}
+#else
     uint64_t try_lock = -1;
     try_lock = cas_remote_content(yield,loc,m_item->offset,0,get_txn_id()+1,cor_id);
 	if(try_lock != 0) {
@@ -842,7 +931,7 @@ retry_lock:
         mem_allocator.free(m_item, sizeof(itemid_t));
 		return rc;
 	}
-
+#endif
     rc = preserve_access(row_local,m_item,remote_row,type,remote_row->get_primary_key(),loc);
 	
 	return rc;
@@ -1090,7 +1179,7 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
 	INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
-#if CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2
         // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
 		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
 			// printf("read local WOUND_ABORTING:%ld\n", txn->txn_id);

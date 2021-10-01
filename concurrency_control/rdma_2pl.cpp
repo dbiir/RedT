@@ -8,18 +8,86 @@
 #include "rdma_2pl.h"
 #include "row_rdma_2pl.h"
 
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
 void RDMA_2pl::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnManager * txnMng,uint64_t cor_id) {
 	//row->copy(data);  //copy access->data to access->orig_row
     //no need for last step:data = orig_row in local situation
+#if CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
+retry_unlock:
+    uint64_t lock_type;
+    uint64_t loc = g_node_id;
+    uint64_t try_lock = -1;
+    uint64_t tts = txnMng->get_timestamp();
+    try_lock = txnMng->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txnMng->get_txn_id(),cor_id);
+    if(try_lock != 0) {
+        // printf("cas retry\n");
+        goto retry_unlock;
+    }
+    uint64_t i = 0;
+    uint64_t lock_num = 0;
+    for(i = 0; i < LOCK_LENGTH; i++) {
+        if(row->ts[i] == tts) {
+            row->ts[i] = 0;
+            row->lock_owner[i] = 0;
+            if(row->lock_type == 1) {
+                row->lock_type = 0;
+            }
+        }
+        if(row->ts[i] != 0) {
+            lock_num += 1;
+        }
+    }
+    if(lock_num == 0) {
+        row->lock_type = 0;
+    }
+    row->_tid_word = 0;
+#else
     uint64_t lock_info = row->_tid_word;
     row->_tid_word = 0;
+#endif
 #if DEBUG_PRINTF
     printf("---thd：%lu, local lock succ,lock location: %u; %p, txn: %lu, old lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info);
 #endif
 }
 
 void RDMA_2pl::remote_write_and_unlock(yield_func_t &yield,RC rc, TxnManager * txnMng , uint64_t num,uint64_t cor_id){
+#if CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
+    Access *access = txnMng->txn->accesses[num];
+    uint64_t off = access->offset;
+    uint64_t loc = access->location;
+    uint64_t thd_id = txnMng->get_thd_id();
+    uint64_t operate_size = sizeof(uint64_t);
+    uint64_t tts = txnMng->get_timestamp();
+retry_remote_unlock:
+    uint64_t try_lock = -1;
+	uint64_t lock_type = 0;
+    try_lock = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),cor_id);
+    if(try_lock != 0) {
+        // printf("cas retry\n");
+        goto retry_remote_unlock;
+    }
+    row_t * test_row = txnMng->read_remote_row(yield,loc,off,cor_id);
+    uint64_t i = 0;
+    uint64_t lock_num = 0;
+    for(i = 0; i < LOCK_LENGTH; i++) {
+        if(test_row->ts[i] == tts) {
+            test_row->ts[i] = 0;
+            test_row->lock_owner[i] = 0;
+            if(test_row->lock_type == 1) {
+                test_row->lock_type = 0;
+            }
+        }
+        if(test_row->ts[i] != 0) {
+            lock_num += 1;
+        }
+    }
+    if(lock_num == 0) {
+        test_row->lock_type = 0;
+    }
+    test_row->_tid_word = 0;
+    assert(txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id) == true);
+	mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+#else
     Access *access = txnMng->txn->accesses[num];
     row_t *data = access->data;
     data->_tid_word = 0; //write data and unlock
@@ -49,6 +117,7 @@ void RDMA_2pl::remote_write_and_unlock(yield_func_t &yield,RC rc, TxnManager * t
 
 #if DEBUG_PRINTF 
     printf("---线程号：%lu, 远程解写锁成功，锁位置: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), orig_lock_info);
+#endif
 #endif
 }
 
@@ -91,8 +160,36 @@ retry_unlock:
 #if DEBUG_PRINTF
     printf("---线程号：%lu, 本地解读锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info, new_lock_info);
 #endif     
-
-#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
+#elif CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
+retry_unlock:
+    uint64_t lock_type;
+    uint64_t loc = g_node_id;
+    uint64_t try_lock = -1;
+    uint64_t tts = txnMng->get_timestamp();
+    try_lock = txnMng->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txnMng->get_txn_id(),cor_id);
+    if(try_lock != 0) {
+        // printf("cas retry\n");
+        goto retry_unlock;
+    }
+    uint64_t i = 0;
+    uint64_t lock_num = 0;
+    for(i = 0; i < LOCK_LENGTH; i++) {
+        if(row->ts[i] == tts) {
+            row->ts[i] = 0;
+            row->lock_owner[i] = 0;
+            if(row->lock_type == 1) {
+                row->lock_type = 0;
+            }
+        }
+        if(row->ts[i] != 0) {
+            lock_num += 1;
+        }
+    }
+    if(lock_num == 0) {
+        row->lock_type = 0;
+    }
+    row->_tid_word = 0;
+#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2
     assert(row->_tid_word != 0);
     row->_tid_word = 0;
 #if DEBUG_PRINTF
@@ -141,7 +238,43 @@ remote_retry_unlock:
     printf("---thd：%lu, remote release lock succ,lock location: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), *lock_info, new_lock_info);
 #endif
 	mem_allocator.free(lock_info, sizeof(uint64_t));
-#elif CC_ALG == RDMA_NO_WAIT2 ||  CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT
+#elif CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
+    Access *access = txnMng->txn->accesses[num];
+    uint64_t off = access->offset;
+    uint64_t loc = access->location;
+    uint64_t thd_id = txnMng->get_thd_id();
+    uint64_t operate_size = sizeof(uint64_t);
+    uint64_t tts = txnMng->get_timestamp();
+retry_remote_unlock:
+    uint64_t try_lock = -1;
+	uint64_t lock_type = 0;
+    try_lock = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),cor_id);
+    if(try_lock != 0) {
+        // printf("cas retry\n");
+        goto retry_remote_unlock;
+    }
+    row_t * test_row = txnMng->read_remote_row(yield,loc,off,cor_id);
+    uint64_t i = 0;
+    uint64_t lock_num = 0;
+    for(i = 0; i < LOCK_LENGTH; i++) {
+        if(test_row->ts[i] == tts) {
+            test_row->ts[i] = 0;
+            test_row->lock_owner[i] = 0;
+            if(test_row->lock_type == 1) {
+                test_row->lock_type = 0;
+            }
+        }
+        if(test_row->ts[i] != 0) {
+            lock_num += 1;
+        }
+    }
+    if(lock_num == 0) {
+        test_row->lock_type = 0;
+    }
+    test_row->_tid_word = 0;
+    assert(txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id) == true);
+	mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));	
+#elif CC_ALG == RDMA_NO_WAIT2 ||  CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2
     Access *access = txnMng->txn->accesses[num];
     uint64_t off = access->offset;
     uint64_t loc = access->location;
@@ -221,6 +354,7 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
     for(int i=0;i<g_node_cnt;i++){ //poll result
         if(remote_access[i].size() > 0){
         	//to do: add coroutine
+            INC_STATS(txnMng->get_thd_id(), worker_oneside_cnt, 1);
 #if USE_COROUTINE
 			uint64_t waitcomp_time;
 			std::pair<int,ibv_wc> dbres1;

@@ -53,49 +53,49 @@ bool  RDMA_ts1::remote_try_lock(TxnManager * txn, uint64_t loc, uint64_t off){
 	return result;
 }
 
-bool  RDMA_ts1::remote_try_lock(TxnManager * txn, row_t * temp_row, uint64_t loc, uint64_t off){
-    bool result = false;
-	uint64_t thd_id = txn->get_thd_id();
-	uint64_t lock = txn->get_txn_id()+1;
+// bool  RDMA_ts1::remote_try_lock(TxnManager * txn, row_t * temp_row, uint64_t loc, uint64_t off){
+//     bool result = false;
+// 	uint64_t thd_id = txn->get_thd_id();
+// 	uint64_t lock = txn->get_txn_id()+1;
 
-	uint64_t *local_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-	auto mr = client_rm_handler->get_reg_attr().value();
+// 	uint64_t *local_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+// 	auto mr = client_rm_handler->get_reg_attr().value();
 
-	rdmaio::qp::Op<> op;
-    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
-  	assert(op.set_payload(local_loc, sizeof(uint64_t), mr.key) == true);
-  	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+// 	rdmaio::qp::Op<> op;
+//     op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
+//   	assert(op.set_payload(local_loc, sizeof(uint64_t), mr.key) == true);
+//   	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
 
-	RDMA_ASSERT(res_s2 == IOCode::Ok);
-	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p2 == IOCode::Ok);
-	if (*local_loc == 0)
-		result = true;
+// 	RDMA_ASSERT(res_s2 == IOCode::Ok);
+// 	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+// 	RDMA_ASSERT(res_p2 == IOCode::Ok);
+// 	if (*local_loc == 0)
+// 		result = true;
 	
-	//check the lock 
-	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-	char *test_buf = Rdma::get_row_client_memory(thd_id);
-	memset(test_buf, 0, operate_size);
-	auto res_s = rc_qp[loc][thd_id]->send_normal(
-		{.op = IBV_WR_RDMA_READ,
-		.flags = IBV_SEND_SIGNALED,
-		.len = operate_size,
-		.wr_id = 0},
-		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
-		.remote_addr = off,
-		.imm_data = 0});
-	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
-	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-	memset(temp_row, 0, operate_size);
-	memcpy(temp_row, test_buf, operate_size);
-	if (temp_row->mutx == lock )
-		result = true;
-#if DEBUG_PRINTF
-	printf("[RDMA加锁后]事务号：%d，主键：%d，锁：%lu tid:%lu\n",txn->get_txn_id(),temp_row->get_primary_key(),temp_row->mutx, temp_row->tid);
-#endif
-	return result;
-}
+// 	//check the lock 
+// 	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
+// 	char *test_buf = Rdma::get_row_client_memory(thd_id);
+// 	memset(test_buf, 0, operate_size);
+// 	auto res_s = rc_qp[loc][thd_id]->send_normal(
+// 		{.op = IBV_WR_RDMA_READ,
+// 		.flags = IBV_SEND_SIGNALED,
+// 		.len = operate_size,
+// 		.wr_id = 0},
+// 		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
+// 		.remote_addr = off,
+// 		.imm_data = 0});
+// 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+// 	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
+// 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+// 	memset(temp_row, 0, operate_size);
+// 	memcpy(temp_row, test_buf, operate_size);
+// 	if (temp_row->mutx == lock )
+// 		result = true;
+// #if DEBUG_PRINTF
+// 	printf("[RDMA加锁后]事务号：%d，主键：%d，锁：%lu tid:%lu\n",txn->get_txn_id(),temp_row->get_primary_key(),temp_row->mutx, temp_row->tid);
+// #endif
+// 	return result;
+// }
 
 void RDMA_ts1::read_remote_row(TxnManager * txn, row_t * remote_row, uint64_t loc, uint64_t off){
 	uint64_t thd_id = txn->get_thd_id();

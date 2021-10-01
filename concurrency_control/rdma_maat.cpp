@@ -587,7 +587,7 @@ RC RDMA_Maat::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access * d
 
 
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_MAAT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_MAAT || CC_ALG == RDMA_WOUND_WAIT
 void RdmaTxnTable::init() {
 //table_size = g_inflight_max * g_node_cnt * 2 + 1;
 	table_size = (RDMA_TXNTABLE_MAX)*(sizeof(RdmaTxnTableNode)+1);
@@ -627,13 +627,13 @@ void RdmaTxnTable::release(uint64_t thd_id, uint64_t key) {
 	table[index].key = key;
 	table[index].state = MAAT_RUNNING;
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 	table[index].key = key;
 	table[index].state = WOUND_RUNNING;
 #endif
 	//table[key]._lock = 0;
 }
-#if CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 WOUNDState RdmaTxnTable::local_get_state(uint64_t thd_id, uint64_t key) {
 	WOUNDState state = WOUND_RUNNING;
 	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);

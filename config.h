@@ -78,11 +78,11 @@
 #define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 2
+#define COROUTINE_CNT 4
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
-#define CLIENT_NODE_CNT NODE_CNT
+#define CLIENT_NODE_CNT 1
 #define CLIENT_THREAD_CNT 2
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
@@ -109,16 +109,16 @@
 // # of transactions to run for warmup
 #define WARMUP            0
 // YCSB or TPCC or PPS or DA
-#define WORKLOAD TPCC
+#define WORKLOAD YCSB
 // print the transaction latency distribution
 #define PRT_LAT_DISTR false
 #define STATS_ENABLE        true
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 200000
+#define MAX_TXN_IN_FLIGHT 20000
 
-#define SERVER_GENERATE_QUERIES false
+#define SERVER_GENERATE_QUERIES true
 
 /***********************************************/
 // Memory System
@@ -182,14 +182,14 @@
 #define DEBUG_PRINTF  false
 
 #if RDMA_ONE_SIDE 
-#define USE_DBPAOR false
+#define USE_DBPAOR true
 #define BATCH_INDEX_AND_READ false //keep this "false", a fail test for SILO
 #endif
 
 /***********************************************/
 // USE RDMA
 /**********************************************/
-#if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || RDMA_TWO_SIDE == true
+#if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || RDMA_TWO_SIDE == true
 // #define USE_RDMA CHANGE_MSG_QUEUE
 #define USE_RDMA CHANGE_TCP_ONLY
 #endif
@@ -275,7 +275,8 @@
 // [RDMA_MAAT]
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
 // #define ROW_SET_LENGTH 100
-#define MAX_RETRY_TIME 30
+#define MAX_RETRY_TIME 2
+#define LOCK_LENGTH 10
 
 /***********************************************/
 // Logging
@@ -304,13 +305,13 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
-#define SYNTH_TABLE_SIZE 65536
-#define ZIPF_THETA 0.3
+#define SYNTH_TABLE_SIZE 4194304
+#define ZIPF_THETA 0.8
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 16
+#define PART_PER_TXN 1
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
@@ -330,7 +331,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH 128
+#define NUM_WH 32
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0
@@ -405,7 +406,7 @@ enum PPSTxnType {
 
 // [RDMA_MAAT]
 #if WORKLOAD == YCSB
-#define ROW_SET_LENGTH int(ZIPF_THETA * 400 + 10)
+#define ROW_SET_LENGTH int(ZIPF_THETA * 300 + 10)
 #else
 #define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 50)
 #endif
@@ -490,9 +491,11 @@ enum PPSTxnType {
 #define RDMA_CICADA 36
 #define RDMA_CALVIN 38
 #define RDMA_CNULL 37
-#define RDMA_WOUND_WAIT 39
+#define RDMA_WOUND_WAIT2 39
 #define CICADA  40
 #define WOUND_WAIT 41
+#define RDMA_WAIT_DIE 42
+#define RDMA_WOUND_WAIT 43
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

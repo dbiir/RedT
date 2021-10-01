@@ -351,6 +351,7 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
         for(int i=0;i<g_node_cnt;i++){ //poll result
             if(remote_access[i].size() > 0){
             	//to do: add coroutine
+                INC_STATS(txnMng->get_thd_id(), worker_oneside_cnt, 1);
 #if USE_COROUTINE
                 uint64_t waitcomp_time;
                 std::pair<int,ibv_wc> dbres1;

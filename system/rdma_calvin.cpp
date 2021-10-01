@@ -75,6 +75,7 @@ void sched_queue::write_entry(uint64_t thd_id, Message * msg, uint64_t loc) {
 		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
 		.remote_addr = off,
 		.imm_data = 0});
+	INC_STATS(thd_id, worker_oneside_cnt, 1);
 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
   	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
@@ -100,6 +101,7 @@ void sched_queue::write_rear(uint64_t thd_id, uint64_t loc) {
 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
   	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+	INC_STATS(thd_id, worker_oneside_cnt, 1);
 }
 
 void RDMA_calvin::init() {
@@ -139,7 +141,7 @@ void RDMA_calvin::read_remote_queue(uint64_t thd_id, sched_queue * temp_queue, u
 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
   	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-
+	INC_STATS(thd_id, worker_oneside_cnt, 1);
 	memcpy(temp_queue, test_buf, operate_size);
 }
 
@@ -161,7 +163,7 @@ uint64_t RDMA_calvin::read_remote_front(uint64_t thd_id, uint64_t loc) {
 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
   	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-	
+	INC_STATS(thd_id, worker_oneside_cnt, 1);
     return *test_buf;
 }
 

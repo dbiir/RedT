@@ -149,10 +149,17 @@ public:
         Row_rdma_silo * manager;
 	#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 		volatile uint64_t _tid_word; //RDMA_NO_WAIT2: only 0 or 1; RDMA_WAIT_DIE2: only 0 or ts
-		Row_rdma_2pl * manager;
-	#elif CC_ALG == RDMA_WOUND_WAIT
-		volatile uint64_t _tid_word; //RDMA_WOUND_WAIT: only 0 or ts
 		volatile uint64_t lock_owner; //解锁
+		Row_rdma_2pl * manager;
+	#elif CC_ALG == RDMA_WOUND_WAIT2
+		volatile uint64_t _tid_word; //RDMA_WOUND_WAIT2: only 0 or ts
+		volatile uint64_t lock_owner; //解锁
+		Row_rdma_2pl * manager;
+	#elif CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE
+		volatile uint64_t _tid_word;
+		volatile uint64_t lock_type;
+		volatile uint64_t ts[LOCK_LENGTH];
+		volatile uint64_t lock_owner[LOCK_LENGTH];
 		Row_rdma_2pl * manager;
 	#elif CC_ALG == RDMA_MAAT
 	    volatile uint64_t _tid_word;

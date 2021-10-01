@@ -304,9 +304,9 @@ do
         addContent "<td>${ar}</td>"
         addContent "<td>${dr}</td>"
         echo $(cat ${RESULT_PATH}/cpu_usage_${num}/root_*_avg| awk '{sum+=$1}END{print "",sum}') >> ${CPUFILE}
-        let num++
+        
     done
-    
+    let num++
     python parse_trans_latency.py $LS >> ${LTFILE}
     mv ${DIS_FILE} ${RESULT_PATH}/
     mv ${TMPFILE} ${RESULT_PATH}/
