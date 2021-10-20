@@ -377,15 +377,13 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
 #else
                 auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
                 RDMA_ASSERT(dbres1 == IOCode::Ok);
+                endtime = get_sys_clock();
+                INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
+                INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
+                DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
 #endif 
             }
         }
-#if !USE_COROUTINE
-        endtime = get_sys_clock();
-        INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
-        INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
-        DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
-#endif 
 #endif
      }
      else{ //COMMIT

@@ -174,7 +174,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_WAIT_DIE2
+#define CC_ALG RDMA_MAAT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -182,7 +182,7 @@
 #define DEBUG_PRINTF  false
 
 #if RDMA_ONE_SIDE 
-#define USE_DBPAOR true
+#define USE_DBPAOR false
 #define BATCH_INDEX_AND_READ false //keep this "false", a fail test for SILO
 #endif
 
@@ -311,7 +311,7 @@
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 1
+#define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
@@ -406,7 +406,7 @@ enum PPSTxnType {
 
 // [RDMA_MAAT]
 #if WORKLOAD == YCSB
-#define ROW_SET_LENGTH int(ZIPF_THETA * 300 + 10)
+#define ROW_SET_LENGTH int(ZIPF_THETA * 1000 + 10)
 #else
 #define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 50)
 #endif

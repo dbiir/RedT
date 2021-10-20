@@ -1136,15 +1136,13 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 #else
             auto dbres1 = rc_qp[i][get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
             RDMA_ASSERT(dbres1 == IOCode::Ok);
+			endtime = get_sys_clock();
+			INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+			INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+			DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif    
         }
     }
-#if !USE_COROUTINE
-	endtime = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
-	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
-#endif 
 #endif 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
     r2pl_man.finish(yield,rc,this,cor_id);
