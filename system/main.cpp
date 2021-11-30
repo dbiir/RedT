@@ -123,17 +123,6 @@ int main(int argc, char *argv[]) {
 	fflush(stdout);
 
     //item_index_size = item_index_size ;
-    wh_index_size = wh_index_size * (g_num_wh/g_node_cnt);
-    stock_index_size = stock_index_size * (g_num_wh/g_node_cnt);
-    dis_index_size = dis_index_size * (g_num_wh/g_node_cnt);
-    cust_index_size = cust_index_size * (g_num_wh/g_node_cnt);
-    cl_index_size = cl_index_size * (g_num_wh/g_node_cnt) ;
-    order_index_size = order_index_size * (g_num_wh/g_node_cnt);
-    ol_index_size = ol_index_size * (g_num_wh/g_node_cnt);
-
-    rdma_index_size = item_index_size + wh_index_size + stock_index_size + dis_index_size +
-                    + cust_index_size +  cl_index_size + order_index_size + ol_index_size 
-                    + (1024*1024L);
     
 	//register memeory
 	//prepare QP connection with rdma_global_buffer(as registry memory)
@@ -150,6 +139,17 @@ int main(int argc, char *argv[]) {
 			break;
 		case TPCC :
 			m_wl = new TPCCWorkload;
+			wh_index_size = wh_index_size * (g_num_wh/g_node_cnt);
+			stock_index_size = stock_index_size * (g_num_wh/g_node_cnt);
+			dis_index_size = dis_index_size * (g_num_wh/g_node_cnt);
+			cust_index_size = cust_index_size * (g_num_wh/g_node_cnt);
+			cl_index_size = cl_index_size * (g_num_wh/g_node_cnt) ;
+			order_index_size = order_index_size * (g_num_wh/g_node_cnt);
+			ol_index_size = ol_index_size * (g_num_wh/g_node_cnt);
+
+			rdma_index_size = item_index_size + wh_index_size + stock_index_size + dis_index_size +
+							+ cust_index_size +  cl_index_size + order_index_size + ol_index_size 
+							+ (1024*1024L);
 			break;
 		case PPS :
 			m_wl = new PPSWorkload;
