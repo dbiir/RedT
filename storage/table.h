@@ -47,6 +47,7 @@ public:
 
 	Catalog  		schema;
 	uint32_t        table_id;
+	// r2::Allocator	allocator;
 private:
 	char  	table_name[20];
 	char 			pad[CL_SIZE - sizeof(void *)*3 - sizeof(uint32_t)];
