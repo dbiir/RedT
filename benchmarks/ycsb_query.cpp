@@ -321,7 +321,7 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 	#ifdef NO_REMOTE
 		partition_id = home_partition_id;
 	#else
-		if ( FIRST_PART_LOCAL && rid == 0) {
+		if ( (FIRST_PART_LOCAL && rid == 0) || g_node_cnt == 1 ) {
 			partition_id = home_partition_id;
 		} else {
 			partition_id = mrand->next() % g_part_cnt;
@@ -334,6 +334,19 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 				}
 			}
 		}
+		// if ( (FIRST_PART_LOCAL && rid == 0) || g_node_cnt == 1 ) {
+		// 	partition_id = home_partition_id;
+		// } else {
+		// 	partition_id = mrand->next() % g_part_cnt;
+		// 	if(g_strict_ppt && g_part_per_txn <= g_part_cnt || partition_id == home_partition_id) {
+		// 		while ((partitions_accessed.size() < g_part_per_txn &&
+		// 						partitions_accessed.count(partition_id) > 0) ||
+		// 					 (partitions_accessed.size() == g_part_per_txn &&
+		// 						partitions_accessed.count(partition_id) == 0) || partition_id == home_partition_id) {
+		// 			partition_id = mrand->next() % g_part_cnt;
+		// 		}
+		// 	}
+		// }
 	#endif
 #endif
 		ycsb_request * req = (ycsb_request*) mem_allocator.alloc(sizeof(ycsb_request));

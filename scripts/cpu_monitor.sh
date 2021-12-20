@@ -1,4 +1,4 @@
-sleep 40
+sleep 60
 filename=/tmp/${1}_${2}
 echo > $filename
 for i in $(seq 1 30)
