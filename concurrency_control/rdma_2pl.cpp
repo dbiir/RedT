@@ -311,7 +311,6 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
 	}
     
     vector<vector<uint64_t>> remote_access(g_node_cnt);
-    //for read set element, release lock
     for (uint64_t i = 0; i < txn->row_cnt-txn->write_cnt; i++) {
         //local
         if(txn->accesses[read_set[i]]->location == g_node_id){

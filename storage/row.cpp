@@ -44,6 +44,8 @@
 #include "row_rdma_2pl.h"
 #include "row_rdma_ts1.h"
 #include "rdma_ts1.h"
+#include "row_rdma_ts.h"
+#include "rdma_ts.h"
 #include "mem_alloc.h"
 #include "manager.h"
 #include "wl.h"
@@ -113,6 +115,13 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 	tid = 0;
 	wts = 0;
 	rts = 0;
+#endif
+#if CC_ALG ==RDMA_TS
+	mutx = 0;
+	wts = 0;
+	rts = 0;
+	memset(ur, 0, sizeof(ur));
+	memset(up, 0, sizeof(ur));
 #endif
 #if CC_ALG == RDMA_MAAT
 
@@ -186,6 +195,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_rdma_maat *) mem_allocator.align_alloc(sizeof(Row_rdma_maat));
 #elif CC_ALG ==RDMA_TS1
   manager = (Row_rdma_ts1 *) mem_allocator.align_alloc(sizeof(Row_rdma_ts1));
+#elif CC_ALG ==RDMA_TS
+  manager = (Row_rdma_ts *) mem_allocator.align_alloc(sizeof(Row_rdma_ts));
 #elif CC_ALG == RDMA_CICADA
   manager = (Row_rdma_cicada *) mem_allocator.align_alloc(sizeof(Row_rdma_cicada));
 #elif CC_ALG == CICADA
@@ -366,17 +377,16 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 #endif
 
 #if CC_ALG == CNULL
-  uint64_t init_time = get_sys_clock();
+  	uint64_t init_time = get_sys_clock();
 	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), get_part_id());
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
 	rc = this->manager->access(type,txn);
 
-  uint64_t copy_time = get_sys_clock();
-	txn->cur_row->copy(this);
+  	uint64_t copy_time = get_sys_clock();
+	// txn->cur_row->copy(this);
 	access->data = txn->cur_row;
-	assert(rc == RCOK);
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #endif
@@ -523,7 +533,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 
 #endif
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
-  uint64_t init_time = get_sys_clock();
+  	uint64_t init_time = get_sys_clock();
 	//uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN) ? DLOCK_SH : DLOCK_EX; // ! this wrong !!
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
@@ -592,9 +602,9 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	}
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
-#elif CC_ALG ==RDMA_TS1
+#elif CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_TS
 	uint64_t init_time = get_sys_clock();
-	DEBUG_M("row_t::get_rowRDMA_TS1 alloc \n");
+	DEBUG_M("row_t::get_row RDMA_TS1 alloc \n");
 	// txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
     txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), this->get_part_id());
@@ -790,7 +800,7 @@ RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 // delete during history cleanup.
 // For TIMESTAMP, the row will be explicity deleted at the end of access().
 // (c.f. row_ts.cpp)
-#if CC_ALG ==RDMA_TS1
+#if CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_TS
 uint64_t row_t::return_row(yield_func_t &yield, access_t type, TxnManager *txn, Access *access, uint64_t cor_id) {
 #if MODE==NOCC_MODE || MODE==QRY_ONLY_MODE
 	return 0;
@@ -800,13 +810,13 @@ uint64_t row_t::return_row(yield_func_t &yield, access_t type, TxnManager *txn, 
 #endif
 	if (type == RD || type == SCAN) {
 		access->data->free_row();
-		DEBUG_M("row_t::return_rowRDMA_TS1 RD free \n");
+		DEBUG_M("row_t::return_row RDMA_TS1 RD free \n");
 		// mem_allocator.free(access->data, sizeof(row_t));
         mem_allocator.free(access->data, row_t::get_row_size(access->data->tuple_size));
 	}
 	else if (type == WR || type == XP) {
 #if DEBUG_PRINTF
-		printf("[return_row本地提交]事务号：%d，主键：%d\n",txn->get_txn_id(),this->get_primary_key());
+		// printf("[return_row本地提交]事务号：%d，主键：%d\n",txn->get_txn_id(),this->get_primary_key());
 #endif
 		RC rc =  this->manager->local_commit(yield, txn, access, type, cor_id);
 		assert(rc == RCOK);

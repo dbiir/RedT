@@ -72,10 +72,13 @@ public:
 	uint64_t    location;   //node id of server the data location
 	uint64_t    offset;
 #endif
-#if CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL
+#if CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_TS
 	uint64_t 	key;
     uint64_t	location;
 	uint64_t	offset;
+#endif
+#if CC_ALG == RDMA_TS1 
+	uint64_t	wid;
 #endif
 #if CC_ALG == CICADA
 	uint64_t	recordId;	//already readed record id
@@ -216,7 +219,7 @@ public:
 	void release_locks(yield_func_t &yield, RC rc, uint64_t cor_id);
 
 	bool rdma_one_side() {
-	if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT) return true;
+	if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 ||CC_ALG ==RDMA_TS || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT) return true;
 	else return false;
 	}
 
@@ -234,7 +237,7 @@ public:
     bool get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn);
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
      bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
-    RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
+    RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc,uint64_t wid = 0);
 #if USE_DBPAOR == true
 	void batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int loc, RC rc, TxnManager * txnMng , vector<vector<uint64_t>> remote_index_origin,ts_t time = 0, vector<vector<uint64_t>> remote_num = {{0}});
 	row_t * cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock, uint64_t target_server, uint64_t cas_offset, uint64_t read_offset, uint64_t compare, uint64_t swap, uint64_t cor_id);
@@ -303,6 +306,10 @@ public:
     int             write_set[100];
     int*            read_set;
 	int				num_atomic_retry; //num of txn atomic_retry
+#endif
+
+#if CC_ALG == RDMA_TS1
+	int             write_set[100];
 #endif
 
 #if CC_ALG == SILO || CC_ALG == RDMA_SILO

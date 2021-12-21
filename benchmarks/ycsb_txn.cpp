@@ -37,9 +37,11 @@
 #include "row_rdma_mvcc.h"
 #include "row_rdma_2pl.h"
 #include "row_rdma_ts1.h"
+#include "row_rdma_ts.h"
 #include "row_rdma_cicada.h"
 #include "rdma_mvcc.h"
 #include "rdma_ts1.h"
+#include "rdma_ts.h"
 #include "rdma_null.h"
 #include "mem_alloc.h"
 #include "query.h"
@@ -112,7 +114,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	if(IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
 		DEBUG("Running txn %ld\n",txn->txn_id);
 #if DEBUG_PRINTF
-		printf("[txn start]txn：%d，ts：%lu\n",txn->txn_id,get_timestamp());
+		// printf("[txn start]txn：%d，ts：%lu\n",txn->txn_id,get_timestamp());
 #endif
 		//query->print();
 		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));

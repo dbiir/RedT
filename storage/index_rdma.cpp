@@ -147,6 +147,8 @@ RC IndexRdma::index_insert(idx_key_t key, itemid_t * item, int part_id) {
 #else
     uint64_t index_key = key;
 #endif
+	uint64_t offset = (char*)(&index_info[index_key]) - rdma_global_buffer;
+	assert(offset < rdma_index_size);
 	index_info[index_key].key = key;
 	index_info[index_key].address = (row_t*)(item->location);
 	index_info[index_key].table_offset = (char*)table - rdma_global_buffer;

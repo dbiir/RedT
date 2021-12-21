@@ -259,7 +259,7 @@ int main(int argc, char *argv[]) {
 	rmaat_man.init();
 	printf("Done\n");
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
     printf("Initializing Txn Table... ");
 	fflush(stdout);
 	rdma_txn_table.init();

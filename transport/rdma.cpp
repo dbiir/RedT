@@ -88,7 +88,7 @@ uint64_t get_rm_id(uint64_t node_id,uint64_t thread_id){
 
 uint64_t Rdma::get_port(uint64_t node_id){
   uint64_t port_id = 0;
-  port_id = 7214 + node_id;
+  port_id = RDMA_TPORT + node_id;
   //port_id = TPORT_PORT + 344 + node_id;
   return port_id ;
 }
@@ -108,7 +108,7 @@ void * Rdma::client_qp(void *arg){
 
 	printf("address = %s\n",rdma_server_add[node_id].c_str());
 
-	if (cm_.wait_ready(1000000, 16) == IOCode::Timeout) RDMA_ASSERT(false) << "cm connect to server timeout";
+	if (cm_.wait_ready(10000000, 16) == IOCode::Timeout) RDMA_ASSERT(false) << "cm connect to server timeout";
 
 	uint64_t reg_nic_name = node_id;
 	uint64_t reg_mem_name = node_id;

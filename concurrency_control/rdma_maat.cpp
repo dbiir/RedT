@@ -584,10 +584,9 @@ RC RDMA_Maat::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access * d
 	mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return Abort;
 }
-
-
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_MAAT || CC_ALG == RDMA_WOUND_WAIT
+
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_MAAT || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
 void RdmaTxnTable::init() {
 //table_size = g_inflight_max * g_node_cnt * 2 + 1;
 	table_size = (RDMA_TXNTABLE_MAX)*(sizeof(RdmaTxnTableNode)+1);
@@ -608,15 +607,10 @@ void RdmaTxnTable::init() {
 uint64_t RdmaTxnTable::hash(uint64_t key) { return key % table_size; }
 
 
-// void RdmaTxnTable::init(uint64_t thd_id, uint64_t key) {
-// 	//table[key]._lock = g_node_id;
-// 	// printf("init table index: %ld\n", key);
-// 	table[key].lower = 0;
-// 	table[key].upper = UINT64_MAX;
-// 	table[key].key = key;
-// 	table[key].state = MAAT_RUNNING;
-// 	table[key]._lock = 0;
-// }
+void RdmaTxnTable::init(uint64_t thd_id, uint64_t key) {
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	table[index].init(key);
+}
 
 void RdmaTxnTable::release(uint64_t thd_id, uint64_t key) {
 	//table[key]._lock = g_node_id;
@@ -631,8 +625,13 @@ void RdmaTxnTable::release(uint64_t thd_id, uint64_t key) {
 	table[index].key = key;
 	table[index].state = WOUND_RUNNING;
 #endif
+#if CC_ALG == RDMA_TS
+	table[index].key = key;
+	table[index].state = TS_RUNNING;
+#endif
 	//table[key]._lock = 0;
 }
+
 #if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 WOUNDState RdmaTxnTable::local_get_state(uint64_t thd_id, uint64_t key) {
 	WOUNDState state = WOUND_RUNNING;
@@ -672,19 +671,106 @@ void RdmaTxnTable::remote_set_state(yield_func_t &yield, TxnManager *txnMng, uin
 	uint64_t timenode_size = sizeof(RdmaTxnTableNode);
 	// each thread uses only its own piece of client memory address
     uint64_t thd_id = txnMng->get_thd_id();
-    // uint64_t try_lock = txnMng->cas_remote_content(yield,node_id,timenode_addr,0,key,cor_id);
+ 
+    assert(txnMng->write_remote_index(yield,node_id,timenode_size,timenode_addr,(char *)value,cor_id) == true);
+}
+#endif
 
-	// //timetable读取失败
-	// if (try_lock != 0) {
-	// 	return;
-	// }
-    
-    // value->_lock = 0;
-	// ::memcpy(test_buf, (char *)value, timenode_size);
+
+#if CC_ALG == RDMA_TS
+TSState RdmaTxnTable::local_get_state(uint64_t thd_id, uint64_t key) {
+	TSState state = TS_RUNNING;
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	state = table[index].state;   
+	// printf("index: %ld, key: %ld\n", index, table[index].key);
+	//table[key]._lock = 0;
+	return state;
+}
+void RdmaTxnTable::local_set_state(uint64_t thd_id, uint64_t key, TSState value) {
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	table[index].state = value;
+}
+
+char * RdmaTxnTable::remote_get_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id) {
+	uint64_t node_id = key % g_node_cnt;
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	
+	// todo: here we need to get the corresponding index
+	// uint64_t index_key = 0;
+	// printf("init table index: %ld\n", key);
+	uint64_t timenode_addr = (index) * sizeof(RdmaTxnTableNode) + (rdma_buffer_size - rdma_txntable_size);
+	uint64_t timenode_size = sizeof(RdmaTxnTableNode);
+	// each thread uses only its own piece of client memory address
+    uint64_t thd_id = txnMng->get_thd_id();
+    char * item = txnMng->read_remote_txntable(yield,node_id,timenode_addr,cor_id);
+	// printf("WOUNDState:%ld\n", value);
+	return item; 
+}
+void RdmaTxnTable::remote_set_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTxnTableNode * value, uint64_t cor_id) {
+	uint64_t node_id = key % g_node_cnt;
+	assert(node_id != g_node_id);
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	// todo: here we need to get the corresponding index
+	// uint64_t index_key = 0;
+	uint64_t timenode_addr = (index) * sizeof(RdmaTxnTableNode) + (rdma_buffer_size - rdma_txntable_size);
+	uint64_t timenode_size = sizeof(RdmaTxnTableNode);
+	// each thread uses only its own piece of client memory address
+    uint64_t thd_id = txnMng->get_thd_id();
+    // uint64_t try_lock = txnMng->cas_remote_content(yield,node_id,timenode_addr,0,key,cor_id);
 
     assert(txnMng->write_remote_index(yield,node_id,timenode_size,timenode_addr,(char *)value,cor_id) == true);
 }
 #endif
+
+#if CC_ALG == RDMA_TS1
+TSState RdmaTxnTable::local_get_state(uint64_t thd_id, uint64_t key) {
+	TSState state = TS_RUNNING;
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;/
+	int i = 0;
+	for (i = 0; i < RDMA_TSSTATE_COUNT; i++) {
+		if (table[index].key[i] == key) break;
+	}
+	if (i == RDMA_TSSTATE_COUNT) return TS_ABORTING;
+	state = table[index].state[i];   
+	return state;
+}
+
+void RdmaTxnTable::local_set_state(uint64_t thd_id, uint64_t key, TSState value) {
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	uint64_t min_key = 0, min_idx = 0;
+	int i = 0;
+	for (i = 0; i < RDMA_TSSTATE_COUNT; i++) {
+		if (table[index].key[i] == key) break;
+	}
+	if (i == RDMA_TSSTATE_COUNT) return;
+	table[index].state[i] = value;
+}
+
+TSState RdmaTxnTable::remote_get_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id) {
+	uint64_t node_id = key % g_node_cnt;
+	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
+	
+	// todo: here we need to get the corresponding index
+	// uint64_t index_key = 0;
+	// printf("init table index: %ld\n", key);
+	uint64_t timenode_addr = (index) * sizeof(RdmaTxnTableNode) + (rdma_buffer_size - rdma_txntable_size);
+	uint64_t timenode_size = sizeof(RdmaTxnTableNode);
+	// each thread uses only its own piece of client memory address
+    uint64_t thd_id = txnMng->get_thd_id();
+    char * item = txnMng->read_remote_txntable(yield,node_id,timenode_addr,cor_id);
+	RdmaTxnTableNode* node = (RdmaTxnTableNode*)item;
+	int i = 0;
+	TSState state;
+	for (i = 0; i < RDMA_TSSTATE_COUNT; i++) {
+		if (node->key[i] == key) break;
+	}
+	if (i == RDMA_TSSTATE_COUNT) state = TS_ABORTING;
+	else state = node->state[i];  
+	mem_allocator.free(item,0);
+	return state; 
+}
+#endif
+
 #if CC_ALG == RDMA_MAAT
 uint64_t RdmaTxnTable::local_get_lower(uint64_t thd_id, uint64_t key) {
 	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
@@ -701,7 +787,6 @@ uint64_t RdmaTxnTable::local_get_upper(uint64_t thd_id, uint64_t key) {
 	//table[key]._lock = 0;
 	return value;
 }
-
 
 void RdmaTxnTable::local_set_lower(uint64_t thd_id, uint64_t key, uint64_t value) {
 	//table[key]._lock = g_node_id;

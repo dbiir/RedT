@@ -29,6 +29,7 @@
 #define USE_CAS
 #define USE_COROUTINE true
 #define MAX_SEND_SIZE 1
+
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -74,16 +75,16 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 16
-#define THREAD_CNT 4
+#define NODE_CNT 4
+#define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 4
+#define COROUTINE_CNT 8
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
 #define CLIENT_NODE_CNT 1
-#define CLIENT_THREAD_CNT 2
+#define CLIENT_THREAD_CNT 4
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
@@ -147,6 +148,7 @@
 #define TPORT_TYPE tcp
 #define TPORT_PORT 7000
 #define TPORT_TWOSIDE_PORT 13000
+#define RDMA_TPORT 8214
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -169,12 +171,13 @@
 /***********************************************/
 #define RDMA_ONE_SIDE true
 #define RDMA_TWO_SIDE true
+#define RDMA_ONE_CNT 35
 
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2,RDMA_TS1,RDMA_SILO,RDMA_MVCC,RDMA_MAAT,RDMA_CICADA
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_MAAT
+#define CC_ALG RDMA_TS
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -274,6 +277,8 @@
 #define ATOMIC_WORD					false
 // [RDMA_MAAT]
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
+// [RDMA_TS1]
+#define RDMA_TSSTATE_COUNT 5
 // #define ROW_SET_LENGTH 100
 #define MAX_RETRY_TIME 2
 #define LOCK_LENGTH 10
@@ -306,17 +311,17 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
 #define SYNTH_TABLE_SIZE 4194304
-#define ZIPF_THETA 0.8
-#define TXN_WRITE_PERC 0.2
-#define TUP_WRITE_PERC 0.2
+#define ZIPF_THETA 0.95
+#define TXN_WRITE_PERC 0.1
+#define TUP_WRITE_PERC 0.1
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 2
+#define PART_PER_TXN 4
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
-#define STRICT_PPT 0
+#define STRICT_PPT 1
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.
@@ -407,8 +412,10 @@ enum PPSTxnType {
 // [RDMA_MAAT]
 #if WORKLOAD == YCSB
 #define ROW_SET_LENGTH int(ZIPF_THETA * 1000 + 10)
+#define WAIT_QUEUE_LENGTH int(ZIPF_THETA * ZIPF_THETA * 100 + 3)
 #else
 #define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 50)
+#define WAIT_QUEUE_LENGTH int(PERC_PAYMENT * PERC_PAYMENT * 100 + 3)
 #endif
 /***********************************************/
 // DEBUG info
@@ -496,6 +503,7 @@ enum PPSTxnType {
 #define WOUND_WAIT 41
 #define RDMA_WAIT_DIE 42
 #define RDMA_WOUND_WAIT 43
+#define RDMA_TS 44
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
@@ -550,3 +558,4 @@ enum PPSTxnType {
 #define ENVIRONMENT_EC2 false
 
 #endif
+  

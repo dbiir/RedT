@@ -59,6 +59,7 @@
 #include "rdma_2pl.h"
 #include "rdma_maat.h"
 #include "rdma_ts1.h"
+#include "rdma_ts.h"
 #include "rdma_cicada.h"
 #include "rdma_calvin.h"
 #include "rdma_null.h"
@@ -107,7 +108,7 @@ rdma_mvcc rmvcc_man;
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
 RDMA_2pl r2pl_man;
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
 RdmaTxnTable rdma_txn_table;
 #endif
 #if CC_ALG == RDMA_MAAT
@@ -116,6 +117,9 @@ RdmaTxnTable rdma_txn_table;
 #endif
 #if CC_ALG == RDMA_TS1
 RDMA_ts1 rdmats_man;
+#endif
+#if CC_ALG == RDMA_TS
+RDMA_ts rdmats_man;
 #endif
 #if CC_ALG == RDMA_CICADA
 RDMA_Cicada rcicada_man;
@@ -265,9 +269,9 @@ UInt64 tuple_count = 0;
 UInt64 max_tuple_size = 0;
 pthread_mutex_t * RDMA_MEMORY_LATCH;
 
-UInt64 rdma_buffer_size = 8*(1024*1024*1024L);
-UInt64 client_rdma_buffer_size = 300*(1024*1024L);
-UInt64 rdma_index_size = (300*1024*1024L);
+UInt64 rdma_buffer_size = 20*(1024*1024*1024L);
+UInt64 client_rdma_buffer_size = 600*(1024*1024L);
+UInt64 rdma_index_size = (1024*1024*1024L);
 
 // MAAT
 UInt64 rdma_txntable_size = 30*1024*1024; //4*(1024*1024*1024L);//30*1024*1024;

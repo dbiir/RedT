@@ -5,6 +5,7 @@ class row_t;
 class RDMA_ts1 {
 public:
 	bool remote_try_lock(TxnManager * txn, uint64_t loc, uint64_t off);
+	RC validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_id);
 	//re-read to validate the lock
 	bool remote_try_lock(TxnManager * txn, row_t * temp_row, uint64_t loc, uint64_t off);
 	void read_remote_row(TxnManager * txn, row_t * remote_row, uint64_t loc, uint64_t off);

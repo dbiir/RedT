@@ -1310,7 +1310,13 @@ void Stats_thd::print(FILE * outf, bool prog) {
           ano_2_trans_write_skew_1, ano_2_trans_write_skew_2, ano_3_trans_write_skew_1,
           ano_3_trans_write_skew_2, ano_2_trans_read_skew, ano_3_trans_read_skew_1,
           ano_3_trans_read_skew_2, ano_4_trans_read_skew, ano_unknown);
-
+  fprintf(outf,
+          ",preqlen_over_cnt=%ld"
+          ",lock_retry_cnt=%ld"
+          ",read_retry_cnt=%ld"
+          ",write_retry_cnt=%ld",
+          preqlen_over_cnt, lock_retry_cnt, read_retry_cnt,
+          write_retry_cnt);
 
   // if (!prog) {
   //     last_start_commit_latency.quicksort(0,last_start_commit_latency.cnt-1);
