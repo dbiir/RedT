@@ -55,7 +55,7 @@
 #define SECOND 200 // Set the queue monitoring time.
 // #define THD_ID_QUEUE
 #define ONE_NODE_RECIEVE 0 // only node 0 will receive the txn query
-#define USE_WORK_NUM_THREAD false
+#define USE_WORK_NUM_THREAD true
 #if 1
 // #define LESS_DIS // Reduce the number of yCSB remote data to 1
 // #define LESS_DIS_NUM 0 // Reduce the number of yCSB remote data to 1
@@ -147,8 +147,8 @@
 /***********************************************/
 #define TPORT_TYPE tcp
 #define TPORT_PORT 7000
-#define TPORT_TWOSIDE_PORT 13000
-#define RDMA_TPORT 8214
+#define TPORT_TWOSIDE_PORT 15000
+#define RDMA_TPORT 9214
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -279,6 +279,10 @@
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
 // [RDMA_TS1]
 #define RDMA_TSSTATE_COUNT 5
+// [RDMA_TS1]
+#define USE_READ_WAIT_QUEUE false
+#define YIELD_WHEN_WAITING_READ false
+#define TS_RETRY_COUNT int(ZIPF_THETA * 20 + 1)
 // #define ROW_SET_LENGTH 100
 #define MAX_RETRY_TIME 2
 #define LOCK_LENGTH 10
@@ -311,9 +315,9 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
 #define SYNTH_TABLE_SIZE 4194304
-#define ZIPF_THETA 0.95
-#define TXN_WRITE_PERC 0.1
-#define TUP_WRITE_PERC 0.1
+#define ZIPF_THETA 0.0
+#define TXN_WRITE_PERC 0.2
+#define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
 #define PART_PER_TXN 4
@@ -550,8 +554,8 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 30 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false
