@@ -1016,7 +1016,7 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 		if (is_local) {
 			version = orig_r->return_row(yield, type, this, txn->accesses[rid], cor_id);
 		} else {
-			if(type == XP) remote_access[txn->accesses[rid]->location].push_back(rid);
+			remote_access[txn->accesses[rid]->location].push_back(rid);
 			rdmats_man.commit_write(yield, this, rid, type, cor_id);
 		}
 	} else {
@@ -1417,7 +1417,7 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 		access->orig_data->copy(row);
          for(int i = 0;i < this->txn->row_cnt;i++){
              if(txn->accesses[i]->type == WR)
-            printf("txn %ld orgin_d[%ld] table %ld",this->get_txn_id(),i,this->txn->accesses[i]->orig_data->table_idx);
+            // printf("txn %ld orgin_d[%ld] table %ld",this->get_txn_id(),i,this->txn->accesses[i]->orig_data->table_idx);
         }
 	}
 #endif
@@ -1598,7 +1598,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 					return Abort;
 				}
 				if(new_lock_info == 0){
-					printf("---thd：%lu, remote lock fail!!!!!!lock location: %lu; %p, txn: %lu, old lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
+					// printf("---thd：%lu, remote lock fail!!!!!!lock location: %lu; %p, txn: %lu, old lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
 				} 
 				assert(new_lock_info!=0);
 			} else {
@@ -1913,15 +1913,15 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 				mem_allocator.free(m_item, sizeof(itemid_t));
 				rc = Abort;
 				return rc;
-				goto retry_lock;	
-				printf("cas retry\n");
+				// goto retry_lock;	
+				// printf("cas retry\n");
 			}
 			row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 			lock_type = test_row->lock_type;
 			if(lock_type == 0) {
 				test_row->lock_owner[0] = txn->txn_id;
 				test_row->ts[0] = tts;
-				test_row->lock_ == RD? 2:1;
+				test_row->lock_type == RD? 2:1;
 				test_row->_tid_word = 0;
 				assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
 				rc = RCOK;
@@ -1942,7 +1942,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 						// if(test_row->ts[0] == 0) break;
 					}
 					num_atomic_retry++;
-					total_num_atomic_retry++;
+					// total_num_atomic_retry++;
 					if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
 					test_row->_tid_word = 0;
 					assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
@@ -1956,7 +1956,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 					if(test_row->ts[i] == 0) {
 						test_row->ts[i] = tts;
 						test_row->lock_owner[i] == txn->txn_id;
-						test_row->lock_ == RD? 2:1;
+						test_row->lock_type == RD? 2:1;
 						test_row->_tid_word = 0;
 						assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
 						rc = RCOK;
@@ -2330,9 +2330,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 		ts_t ts = get_timestamp();
 		uint64_t offset = m_item->offset;
 		uint64_t lock_num = get_txn_id() + 1;
-
-		// row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
-		// ts_t ts = get_timestamp();
+	
 		uint64_t try_lock;
 		int retry = 0;
 		retry_read:
@@ -2367,45 +2365,78 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 				for (int i = 0; i < WAIT_QUEUE_LENGTH; i++) {
 					if (_row->up[i].ts_ != 0 && !_row->up[i].commit_ && ts > _row->up[i].ts_) {
 						need_wait = true; 
+						printf("[need wait]current_txn:%ld,ts:%lu,wait for txn:%ld, ts:%lu, up size %ld\n",get_txn_id(),ts,_row->up[i].txn_id_,_row->up[i].ts_, _row->up_size);
 						break;
 					}
 				}
 			if (need_wait) {
 				_row->mutx = 0;
-				rdma_txn_table.local_set_state(get_thd_id(), get_txn_id(), TS_WAITING);
-				if (_row->ur_size == WAIT_QUEUE_LENGTH) {
-					rc = Abort;
-					INC_STATS(get_thd_id(),read_retry_cnt,1);
-					return rc;
-				}
-				else {
-					// int i = 0;
-					// for (i = 0; i < WAIT_QUEUE_LENGTH; i++) {
-					// 	if (_row->ur[i].ts_ == 0 && _row->ur[i].txn_id_ == 0) {
-					// 		break;
-					// 	}
-					// }
-					// _row->ur[i].ts_ = ts;
-					// _row->ur[i].txn_id_ = get_txn_id();
-					// _row->ur_size++;
+				if (USE_READ_WAIT_QUEUE) {
+					rdma_txn_table.local_set_state(get_thd_id(), get_txn_id(), TS_WAITING);
+					if (_row->ur_size == WAIT_QUEUE_LENGTH) {
+						rc = Abort;
+						INC_STATS(get_thd_id(),read_retry_cnt,1);
+						return rc;
+					}
+					else {
+						int i = 0;
+						for (i = 0; i < WAIT_QUEUE_LENGTH; i++) {
+							if (_row->ur[i].ts_ == 0 && _row->ur[i].txn_id_ == 0) {
+								break;
+							}
+						}
+						_row->ur[i].ts_ = ts;
+						_row->ur[i].txn_id_ = get_txn_id();
+						_row->ur_size++;
+						_row->mutx = 0;
+						assert(write_remote_row(yield,loc,operate_size,offset,(char*)remote_row,cor_id) == true);
+						mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+						// printf("[waiting]current_txn:%ld,retry:%ld\n",get_txn_id(),retry);
+						
+						uint64_t starttime = get_sys_clock();
+						rdma_txn_table.local_set_state(get_thd_id(), get_txn_id(),TS_WAITING);
+					#if USE_COROUTINE && YIELD_WHEN_WAITING_READ
+						uint64_t waitcomp_time;
+						std::pair<int,ibv_wc> dbres1;
+						INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
+						while (!simulation->is_done() && rdma_txn_table.local_get_state(get_thd_id(), get_txn_id()) == TS_WAITING) {
+							h_thd->start_wait_time = get_sys_clock();
+							h_thd->last_yield_time = get_sys_clock();
+							// printf("do\n");
+							yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+							uint64_t yield_endtime = get_sys_clock();
+							INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+							INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+							INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - h_thd->last_yield_time);
+							waitcomp_time = get_sys_clock();
+							
+							INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
+							INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+						}
+						h_thd->cor_process_starttime[cor_id] = get_sys_clock();
+					#else
+						while (!simulation->is_done() && rdma_txn_table.local_get_state(get_thd_id(), get_txn_id()) == TS_WAITING);
+						uint64_t endtime = get_sys_clock();
+						INC_STATS(get_thd_id(), worker_idle_time, endtime - starttime);
+						INC_STATS(get_thd_id(), worker_waitcomp_time, endtime - starttime);
+					#endif
+						goto retry_read;
+						// printf("[leave waiting]current_txn:%ld, wait_time:%ld\n",get_txn_id(),endtime-starttime);
+						// 
+					}
+				} else {
 					_row->mutx = 0;
 					assert(write_remote_row(yield,loc,operate_size,offset,(char*)remote_row,cor_id) == true);
-					mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-					// printf("[waiting]current_txn:%ld,retry:%ld\n",get_txn_id(),retry);
-					// uint64_t starttime = get_sys_clock();
-					// // rdma_txn_table.local_set_state(get_thd_id(), get_txn_id(),TS_WAITING);
-					// while (!simulation->is_done() && rdma_txn_table.local_get_state(get_thd_id(), get_txn_id()) == TS_WAITING);
-					// uint64_t endtime = get_sys_clock();
-					// printf("[leave waiting]current_txn:%ld, wait_time:%ld\n",get_txn_id(),endtime-starttime);
-					if (!simulation->is_done() && retry < 3){
+					if (!simulation->is_done() && retry < TS_RETRY_COUNT){
 						retry++;
 						goto retry_read;
 					} else {
 						rc = Abort;
 						INC_STATS(get_thd_id(),read_retry_cnt,1);
-						goto end;
+						return Abort;
 					}
 				}
+				
 				// goto retry_read;
 			} else if (_row->rts < ts){
 				_row->rts = ts;
@@ -2578,6 +2609,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 		row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 		// assert(remote_row->get_primary_key() == req->key);
 		rc = Abort;
+		uint64_t version;
 
 		if(type == RD) {
 			assert(remote_row->version_cnt >= 0);
@@ -2605,14 +2637,10 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 							version = remote_row->cicada_version[i].key;
 						}
 						if(retry_time > 1) {
-						//! TPCC: if(retry_time > 100) {
 							rc = Abort;
 						}
 					}				
 				} else {
-					//! if(remote_row->cicada_version[i].Wts > this->get_timestamp()) {
-					//! 	rc = Abort;
-					//! }
 					rc = RCOK;
 					version = remote_row->cicada_version[i].key;
 				}	
@@ -2645,17 +2673,12 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 							rc = RCOK;
 						}
 						if(retry_time > 1) {
-						//! TPCC: if(retry_time > 100) {
 							rc = Abort;
 						}
 					}
-				} else {
-					if(remote_row->cicada_version[i].Wts > this->get_timestamp() || remote_row->cicada_version[i].Rts > this->get_timestamp()) {
-						rc = Abort;
-					} else {		
+				} else {	
 						rc = RCOK;
 						version = remote_row->cicada_version[i].key;
-					}
 				}
 			}
 		}
@@ -3517,7 +3540,7 @@ bool TxnManager::loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint
     do{
         cas_result = cas_remote_content(yield,target_server,remote_offset,old_value,new_value,cor_id);
     }
-    while(cas_result != old_value && !simulation->is_done());
+    while(cas_result != old_value && cas_result != new_value && !simulation->is_done());
 
     return true;
 }
@@ -3877,7 +3900,7 @@ bool TxnManager::loop_cas_remote(uint64_t target_server,uint64_t remote_offset,u
     do{
         cas_result = cas_remote_content(target_server,remote_offset,old_value,new_value);
     }
-    while(cas_result != old_value && !simulation->is_done());
+    while(cas_result != old_value && cas_result != new_value && !simulation->is_done());
 
     return true;
 }

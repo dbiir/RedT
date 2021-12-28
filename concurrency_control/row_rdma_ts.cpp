@@ -43,38 +43,68 @@ retry_read:
 			for (int i = 0; i < WAIT_QUEUE_LENGTH; i++) {
 				if (_row->up[i].ts_ != 0 && !_row->up[i].commit_ && ts > _row->up[i].ts_) {
 					need_wait = true; 
+					// if (!simulation->is_warmup_done())
+						// printf("[warm need wait]current_txn:%ld,ts:%lu,wait for txn:%ld, ts:%lu, up size %ld\n",txn->get_txn_id(),ts,_row->up[i].txn_id_,_row->up[i].ts_, _row->up_size);
+					// else
+						// printf("[need wait]current_txn:%ld,ts:%lu,wait for txn:%ld, ts:%lu, up size %ld\n",txn->get_txn_id(),ts,_row->up[i].txn_id_,_row->up[i].ts_, _row->up_size);
 					break;
 				}
 			}
 		
 		if (need_wait) {
-			rdma_txn_table.local_set_state(txn->get_thd_id(), txn->get_txn_id(), TS_WAITING);
-			if (_row->ur_size == WAIT_QUEUE_LENGTH) {
-				rc = Abort;
-				INC_STATS(txn->get_thd_id(),read_retry_cnt,1);
-				goto end;
-			}
-			else {
-				// int i = 0;
-				// for (i = 0; i < WAIT_QUEUE_LENGTH; i++) {
-				// 	if (_row->ur[i].ts_ == 0 && _row->ur[i].txn_id_ == 0) {
-				// 		break;
-				// 	}
-				// }
-				// _row->ur[i].ts_ = ts;
-				// _row->ur[i].txn_id_ = txn->get_txn_id();
-				// // printf("[write ur]current_txn:%ld,idx:%lu,ur_ts:%lu,ur_txn:%ld\n",txn->get_txn_id(),_row->ur_size,_row->ur[_row->ur_size].ts_,_row->ur[_row->ur_size].txn_id_ );
-				// _row->ur_size++;
-				_row->mutx = 0;
-				// printf("[waiting]current_txn:%ld,retry:%ld\n",txn->get_txn_id(),retry);
+			if (USE_READ_WAIT_QUEUE) {
+				rdma_txn_table.local_set_state(txn->get_thd_id(), txn->get_txn_id(), TS_WAITING);
+				if (_row->ur_size == WAIT_QUEUE_LENGTH) {
+					rc = Abort;
+					INC_STATS(txn->get_thd_id(),read_retry_cnt,1);
+					goto end;
+				}
+				else {
+					int i = 0;
+					for (i = 0; i < WAIT_QUEUE_LENGTH; i++) {
+						if (_row->ur[i].ts_ == 0 && _row->ur[i].txn_id_ == 0) {
+							break;
+						}
+					}
+					_row->ur[i].ts_ = ts;
+					_row->ur[i].txn_id_ = txn->get_txn_id();
+					// printf("[write ur]current_txn:%ld,idx:%lu,ur_ts:%lu,ur_txn:%ld\n",txn->get_txn_id(),_row->ur_size,_row->ur[_row->ur_size].ts_,_row->ur[_row->ur_size].txn_id_ );
+					_row->ur_size++;
+					_row->mutx = 0;
+					// printf("[waiting]current_txn:%ld,retry:%ld\n",txn->get_txn_id(),retry);
 
-				// uint64_t starttime = get_sys_clock();
-				// while (!simulation->is_done() && rdma_txn_table.local_get_state(txn->get_thd_id(), txn->get_txn_id()) == TS_WAITING);
-				// uint64_t endtime = get_sys_clock();
-				// INC_STATS(txn->get_thd_id(), worker_idle_time, endtime - starttime);
-				// INC_STATS(txn->get_thd_id(), worker_waitcomp_time, endtime - starttime);
-				// printf("[leave waiting]current_txn:%ld, wait_time:%ld\n",txn->get_txn_id(),endtime-starttime);
-				if (!simulation->is_done() && retry < 3){
+					uint64_t starttime = get_sys_clock();
+				#if USE_COROUTINE && YIELD_WHEN_WAITING_READ
+					uint64_t waitcomp_time;
+					std::pair<int,ibv_wc> dbres1;
+					INC_STATS(txn->get_thd_id(), worker_process_time, get_sys_clock() - txn->h_thd->cor_process_starttime[cor_id]);
+					while (!simulation->is_done() && rdma_txn_table.local_get_state(txn->get_thd_id(), txn->get_txn_id()) == TS_WAITING) {
+						txn->h_thd->start_wait_time = get_sys_clock();
+						txn->h_thd->last_yield_time = get_sys_clock();
+						// printf("do\n");
+						yield(txn->h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+						uint64_t yield_endtime = get_sys_clock();
+						INC_STATS(txn->get_thd_id(), worker_yield_cnt, 1);
+						INC_STATS(txn->get_thd_id(), worker_yield_time, yield_endtime - txn->h_thd->last_yield_time);
+						INC_STATS(txn->get_thd_id(), worker_idle_time, yield_endtime - txn->h_thd->last_yield_time);
+						waitcomp_time = get_sys_clock();
+						
+						INC_STATS(txn->get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
+						INC_STATS(txn->get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+					}
+					txn->h_thd->cor_process_starttime[cor_id] = get_sys_clock();
+				#else
+					while (!simulation->is_done() && rdma_txn_table.local_get_state(txn->get_thd_id(), txn->get_txn_id()) == TS_WAITING);
+					uint64_t endtime = get_sys_clock();
+					INC_STATS(txn->get_thd_id(), worker_idle_time, endtime - starttime);
+					INC_STATS(txn->get_thd_id(), worker_waitcomp_time, endtime - starttime);
+				#endif
+					goto retry_read;
+					// printf("[leave waiting]current_txn:%ld, wait_time:%ld\n",txn->get_txn_id(),endtime-starttime);
+				}
+			} else {
+				_row->mutx = 0;
+				if (!simulation->is_done() && retry < TS_RETRY_COUNT){
 					retry++;
 					goto retry_read;
 				} else {
@@ -83,6 +113,7 @@ retry_read:
 					goto end;
 				}
 			}
+			
 		} else if (_row->rts < ts){
 			_row->rts = ts;
 		}
@@ -135,14 +166,20 @@ end:
 
 RC Row_rdma_ts::local_commit(yield_func_t &yield, TxnManager * txn, Access *access, access_t type, uint64_t cor_id) {
 	RC rc = RCOK;
+	uint64_t loc = g_node_id;
+	uint64_t new_lock_info = txn->get_txn_id()+1;
+	uint64_t lock_info = 0;
+	bool suc;
+	do {
+		suc = txn->cas_remote_content(yield,loc,(char*)_row - rdma_global_buffer,lock_info,new_lock_info,cor_id);
+	}while(new_lock_info != _row->mutx);
 
 	if (type == WR) {
-		//lock until success!
-    	assert(txn->loop_cas_remote(access->location,access->offset,0,txn->get_txn_id()+1) == true);//lock in loop
-		
 		Row_rdma_ts::commit_modify_row(yield, txn, _row, cor_id);
 		_row->mutx = 0;
-		// _row->up_size = 0;
+	} else {
+		Row_rdma_ts::abort_modify_row(yield, txn, _row, cor_id);
+		_row->mutx = 0;
 	}
 	access->data->free_row();
 	mem_allocator.free(access->data, row_t::get_row_size(access->data->tuple_size));
@@ -168,9 +205,13 @@ void Row_rdma_ts::commit_modify_row(yield_func_t &yield, TxnManager * txn, row_t
 			}
 		}
 	if (need_wait) {
-		for (int i = 0; i < _row->up_size; i++) {
+		for (int i = 0; i < WAIT_QUEUE_LENGTH; i++) {
 			if (_row->up[i].ts_ == ts) {
 				_row->up[i].commit_ = true;
+				// if (!simulation->is_warmup_done())
+					// printf("[warm clean up]current_txn:%ld,ts:%lu, up size %ld\n",txn->get_txn_id(),ts,_row->up[i].txn_id_,_row->up[i].ts_, _row->up_size);
+				// else
+					// printf("[clean up]current_txn:%ld,ts:%lu, up size %ld\n",txn->get_txn_id(),ts,_row->up[i].txn_id_,_row->up[i].ts_, _row->up_size);
 				break;
 			}
 		}
@@ -190,6 +231,10 @@ void Row_rdma_ts::commit_modify_row(yield_func_t &yield, TxnManager * txn, row_t
 		_row->up[i].txn_id_ = 0;
 		_row->up[i].commit_ = false;
 		_row->up_size--;
+		// if (!simulation->is_warmup_done())
+		// 	printf("[warm clean up]current_txn:%ld,ts:%lu, up size %ld\n",txn->get_txn_id(),ts,_row->up[i].txn_id_,_row->up[i].ts_, _row->up_size);
+		// else
+		// 	printf("[clean up]current_txn:%ld,ts:%lu, up size %ld\n",txn->get_txn_id(),ts,_row->up[i].txn_id_,_row->up[i].ts_, _row->up_size);
 	}
 	//debuffer pre_queue
 	uint64_t min_pts = -1;
@@ -205,12 +250,12 @@ void Row_rdma_ts::commit_modify_row(yield_func_t &yield, TxnManager * txn, row_t
 			if (_row->ur[i].ts_ < min_pts) {
 				if (_row->ur[i].txn_id_ % g_node_cnt == g_node_id) {
 					rdma_txn_table.local_set_state(txn->get_thd_id(), _row->ur[i].txn_id_, TS_RUNNING);
-					printf("[release local read txn]current_txn:%ld,release_txn:%ld,idx:%d,size:%d\n",txn->get_txn_id(),_row->ur[i].txn_id_,i,_row->ur_size);
+					// printf("[release local read txn]current_txn:%ld,release_txn:%ld,idx:%d,size:%d\n",txn->get_txn_id(),_row->ur[i].txn_id_,i,_row->ur_size);
 				} else {
 					RdmaTxnTableNode * value = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
 					value->init(_row->ur[i].txn_id_);
 					rdma_txn_table.remote_set_state(yield, txn, _row->ur[i].txn_id_, value, cor_id);
-					printf("[release remote read txn]current_txn:%ld,release_txn:%ld,idx:%d,size:%d\n",txn->get_txn_id(),_row->ur[i].txn_id_,i,_row->ur_size);
+					// printf("[release remote read txn]current_txn:%ld,release_txn:%ld,idx:%d,size:%d\n",txn->get_txn_id(),_row->ur[i].txn_id_,i,_row->ur_size);
 				}
 				_row->ur[i].ts_ = 0;
 				_row->ur[i].txn_id_ = 0;
@@ -229,7 +274,78 @@ void Row_rdma_ts::commit_modify_row(yield_func_t &yield, TxnManager * txn, row_t
 					youngest_txn = _row->up[i].txn_id_;
 					youngest_ts = _row->up[i].ts_;
 				}
-				printf("[release prewrite txn]current_txn:%ld,release_txn:%ld,idx:%d,size:%d\n",txn->get_txn_id(),_row->up[i].txn_id_,i,_row->up_size);
+				// printf("[release prewrite txn]current_txn:%ld,release_txn:%ld,idx:%d,size:%d\n",txn->get_txn_id(),_row->up[i].txn_id_,i,_row->up_size);
+				_row->up[i].ts_ = 0;
+				_row->up[i].txn_id_ = 0;
+				_row->up[i].commit_ = false;
+				_row->up_size--;
+			}
+		}
+		if (_row->rts < youngest_ts){
+			_row->rts = youngest_ts;
+		}
+		if (_row->wts < youngest_ts){
+			_row->wts = youngest_ts;
+		}
+	}
+}
+
+void Row_rdma_ts::abort_modify_row(yield_func_t &yield, TxnManager * txn, row_t* _row, uint64_t cor_id) {
+	bool need_wait = false;
+	ts_t ts = txn->get_timestamp();
+
+	int i = 0;
+	for (i = 0; i < WAIT_QUEUE_LENGTH; i++) {
+		if (_row->up[i].ts_ == ts) break;
+	}
+	_row->up[i].ts_ = 0;
+	_row->up[i].txn_id_ = 0;
+	_row->up[i].commit_ = false;
+	_row->up_size--;
+	// if (!simulation->is_warmup_done())
+	// 	printf("[warm abort clean up]current_txn:%ld,ts:%lu, up size %ld\n",txn->get_txn_id(),ts,_row->up[i].txn_id_,_row->up[i].ts_, _row->up_size);
+	// else
+	// 	printf("[abort clean up]current_txn:%ld,ts:%lu, up size %ld\n",txn->get_txn_id(),ts,_row->up[i].txn_id_,_row->up[i].ts_, _row->up_size);
+	
+	//debuffer pre_queue
+	uint64_t min_pts = -1;
+	if (_row->up_size > 0)
+		for (int i = 0; i < _row->up_size; i++) {
+			if (_row->up[i].commit_) continue;
+			min_pts = min_pts < _row->up[i].ts_ ? min_pts : _row->up[i].ts_;
+		}
+	//restart read_queue
+	uint64_t min_rts = -1;
+	if (_row->ur_size > 0)
+		for (int i = 0; i < WAIT_QUEUE_LENGTH; i++) {
+			if (_row->ur[i].ts_ < min_pts) {
+				if (_row->ur[i].txn_id_ % g_node_cnt == g_node_id) {
+					rdma_txn_table.local_set_state(txn->get_thd_id(), _row->ur[i].txn_id_, TS_RUNNING);
+					// printf("[release local read txn]current_txn:%ld,release_txn:%ld,idx:%d,size:%d\n",txn->get_txn_id(),_row->ur[i].txn_id_,i,_row->ur_size);
+				} else {
+					RdmaTxnTableNode * value = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
+					value->init(_row->ur[i].txn_id_);
+					rdma_txn_table.remote_set_state(yield, txn, _row->ur[i].txn_id_, value, cor_id);
+					// printf("[release remote read txn]current_txn:%ld,release_txn:%ld,idx:%d,size:%d\n",txn->get_txn_id(),_row->ur[i].txn_id_,i,_row->ur_size);
+				}
+				_row->ur[i].ts_ = 0;
+				_row->ur[i].txn_id_ = 0;
+				_row->ur_size--;
+			} else {
+				min_rts = min_rts < _row->ur[i].ts_ ? min_rts : _row->ur[i].ts_;
+			}
+		}
+
+	//todo: redo order
+	uint64_t youngest_txn = 0, youngest_ts = 0;
+	if (_row->up_size > 0) {
+		for (int i = 0; i < _row->up_size; i++) {
+			if (_row->up[i].commit_ && _row->up[i].ts_ < min_rts) {
+				if (youngest_ts > _row->up[i].ts_) {
+					youngest_txn = _row->up[i].txn_id_;
+					youngest_ts = _row->up[i].ts_;
+				}
+				// printf("[release prewrite txn]current_txn:%ld,release_txn:%ld,idx:%d,size:%d\n",txn->get_txn_id(),_row->up[i].txn_id_,i,_row->up_size);
 				_row->up[i].ts_ = 0;
 				_row->up[i].txn_id_ = 0;
 				_row->up[i].commit_ = false;

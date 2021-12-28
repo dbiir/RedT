@@ -365,6 +365,7 @@ void Transport::init() {
 	string path = get_path();
 	read_ifconfig(path.c_str());
 
+
 	latch = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init( latch, NULL );
 	latch_send = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));

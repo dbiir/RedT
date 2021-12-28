@@ -490,7 +490,7 @@ RC TPCCTxnManager::send_remote_one_side_request(yield_func_t &yield, TPCCQuery *
     uint64_t lock = get_txn_id() + 1;
 
     if(state == TPCC_PAYMENT0 && g_wh_update)type = WR;
-    else type == RD;
+    else type = RD;
 	rc = get_remote_row(yield, type, loc, m_item, row_local, cor_id);
 	mem_allocator.free(m_item, sizeof(itemid_t));
 	return rc;

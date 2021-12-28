@@ -1590,6 +1590,7 @@ RC WorkerNumThread::run() {
     INC_STATS(_thd_id,work_queue_dtx_cnt[i],dtx_size);
     i++;
     sleep(1);
+    printf("------------%d s-----------%s--\n", i, simulation->is_warmup_done()?"exec":"warm");
     // if(idle_starttime ==0)
     //   idle_starttime = get_sys_clock();
 

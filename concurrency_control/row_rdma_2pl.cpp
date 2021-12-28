@@ -163,9 +163,10 @@ local_retry_lock:
         try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txn->get_txn_id(),cor_id);
         if(try_lock != 0) {
             // printf("cas retry\n");
+            // total_num_atomic_retry++;
             rc = Abort;
             return rc;
-            goto local_retry_lock;
+            // goto local_retry_lock;
         }
         lock_type = _row->lock_type;
         if(lock_type == 0) {
@@ -186,8 +187,8 @@ local_retry_lock:
                     }
                     // if(_row->ts[0] == 0) break;
                 }
-                total_num_atomic_retry++;
-                txn->num_atomic_retry++;
+                // total_num_atomic_retry++;
+                // txn->num_atomic_retry++;
                 if(txn->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txn->num_atomic_retry;
                 //sleep(1);
                 _row->_tid_word = 0;
