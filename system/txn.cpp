@@ -1717,7 +1717,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 			if(lock_type == 0) {
 				test_row->lock_owner[0] = txn->txn_id;
 				test_row->ts[0] = tts;
-				test_row->lock_ == RD? 2:1;
+				test_row->lock_type == RD? 2:1;
 				test_row->_tid_word = 0;
 				assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
 				rc = RCOK;
@@ -1738,7 +1738,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 						// if(test_row->ts[0] == 0) break;
 					}
 					num_atomic_retry++;
-					total_num_atomic_retry++;
+					// total_num_atomic_retry++;
 					if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
 					test_row->_tid_word = 0;
 					assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
@@ -1752,7 +1752,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 					if(test_row->ts[i] == 0) {
 						test_row->ts[i] = tts;
 						test_row->lock_owner[i] == txn->txn_id;
-						test_row->lock_ == RD? 2:1;
+						test_row->lock_type == RD? 2:1;
 						test_row->_tid_word = 0;
 						assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
 						rc = RCOK;

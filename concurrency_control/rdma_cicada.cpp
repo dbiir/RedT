@@ -343,7 +343,7 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
 		//	return rc;
 		vector<vector<uint64_t>> remote_access(g_node_cnt);
 		vector<vector<uint64_t>> remote_num(g_node_cnt);
-		for (map<uint64_t, uint64_t>::iterator i=txnMng->uncommitted_set.begin(); i!=txnMng->uncommitted_set.end(); i++) {
+		for (unordered_map<uint64_t, uint64_t>::iterator i=txnMng->uncommitted_set.begin(); i!=txnMng->uncommitted_set.end(); i++) {
 			// printf("abort:%d:%d\n", i->first, i->second);
 			if(txn->accesses[i->first]->location == g_node_id){
 				rc = txn->accesses[i->first]->orig_row->manager->abort(i->second,txnMng);
@@ -408,7 +408,7 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
 		ts_t time = get_sys_clock();
 		vector<vector<uint64_t>> remote_access(g_node_cnt);
 		vector<vector<uint64_t>> remote_num(g_node_cnt);
-		for (map<uint64_t, uint64_t>::iterator i=txnMng->uncommitted_set.begin(); i!=txnMng->uncommitted_set.end(); i++) {
+		for (unordered_map<uint64_t, uint64_t>::iterator i=txnMng->uncommitted_set.begin(); i!=txnMng->uncommitted_set.end(); i++) {
 			// printf("commit%d:%d\n", i->first, i->second);
 			if(txn->accesses[i->first]->location == g_node_id){
 				// Access * access = txn->accesses[i->first];
