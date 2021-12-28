@@ -26,6 +26,7 @@
 #include "transport/message.h"
 #include "worker_thread.h"
 #include "routine.h"
+#include <unordered_map>
 //#include "wl.h"
 
 class Workload;
@@ -366,7 +367,7 @@ public:
 
 #if CC_ALG == RDMA_CICADA
 	uint64_t start_ts;
-	std::map<uint64_t, uint64_t> uncommitted_set;
+	std::unordered_map<uint64_t, uint64_t> uncommitted_set;
 	int write_set[100];
 	std::vector<uint64_t> version_num; 
 #endif

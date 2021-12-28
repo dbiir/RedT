@@ -84,7 +84,7 @@
 #define TAIL_DTL false
 #define SAVE_HISTROY_WITH_EMPTY_OPT false
 #define DYNAMIC_SEQ_LEN false
-
+#define ONLY_ONE_HOME false
 //InputActionSequenceCreator
 #define INPUT_FILE_PATH "./input.txt"
 
@@ -113,8 +113,8 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 4
-#define THREAD_CNT 24
+#define NODE_CNT 16
+#define THREAD_CNT 8
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 8
@@ -212,7 +212,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_TS
+#define CC_ALG RDMA_NO_WAIT2
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -348,15 +348,15 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 39321600
-#define ZIPF_THETA 0.6
+#define SYNTH_TABLE_SIZE 167771520
+#define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
 #define PART_PER_TXN 4
 #define PERC_MULTI_PART     MPR
-#define REQ_PER_QUERY 10
+#define REQ_PER_QUERY 16
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 1
@@ -449,8 +449,7 @@ enum PPSTxnType {
 
 // [RDMA_MAAT]
 #if WORKLOAD == YCSB
-#define ROW_SET_LENGTH int(ZIPF_THETA * 1000 + 10)
-#define WAIT_QUEUE_LENGTH int(ZIPF_THETA * ZIPF_THETA * 100 + 3)
+#define ROW_SET_LENGTH int(ZIPF_THETA * 50 + 10)
 #else
 #define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 50)
 #define WAIT_QUEUE_LENGTH int(PERC_PAYMENT * PERC_PAYMENT * 100 + 3)
