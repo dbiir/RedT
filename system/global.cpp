@@ -63,6 +63,7 @@
 #include "rdma_cicada.h"
 #include "rdma_calvin.h"
 #include "rdma_null.h"
+#include "rdma_dslr_no_wait.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -110,6 +111,9 @@ RDMA_2pl r2pl_man;
 #endif
 #if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
 RdmaTxnTable rdma_txn_table;
+#endif
+#if CC_ALG == RDMA_DSLR_NO_WAIT
+RDMA_dslr_no_wait dslr_man;
 #endif
 #if CC_ALG == RDMA_MAAT
 RDMA_Maat rmaat_man;

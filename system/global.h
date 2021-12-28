@@ -93,6 +93,9 @@ class RDMA_2pl;
 #if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || RDMA_TS
 class RdmaTxnTable;
 #endif
+#if CC_ALG == RDMA_DSLR_NO_WAIT
+class RDMA_dslr_no_wait;
+#endif
 #if CC_ALG == RDMA_MAAT
 class RDMA_Maat;
 class RdmaTxnTable;
@@ -179,6 +182,9 @@ extern RDMA_2pl r2pl_man;
 #endif
 #if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
 extern RdmaTxnTable rdma_txn_table;
+#endif
+#if CC_ALG == RDMA_DSLR_NO_WAIT
+extern  RDMA_dslr_no_wait dslr_man;
 #endif
 #if CC_ALG == RDMA_MAAT
 extern RDMA_Maat rmaat_man;
