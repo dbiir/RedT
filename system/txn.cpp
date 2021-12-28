@@ -2435,6 +2435,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 		row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 		// assert(remote_row->get_primary_key() == req->key);
 		rc = Abort;
+		uint64_t version;
 
 		if(type == RD) {
 			assert(remote_row->version_cnt >= 0);
@@ -2462,14 +2463,10 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 							version = remote_row->cicada_version[i].key;
 						}
 						if(retry_time > 1) {
-						//! TPCC: if(retry_time > 100) {
 							rc = Abort;
 						}
 					}				
 				} else {
-					//! if(remote_row->cicada_version[i].Wts > this->get_timestamp()) {
-					//! 	rc = Abort;
-					//! }
 					rc = RCOK;
 					version = remote_row->cicada_version[i].key;
 				}	
@@ -2502,17 +2499,12 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 							rc = RCOK;
 						}
 						if(retry_time > 1) {
-						//! TPCC: if(retry_time > 100) {
 							rc = Abort;
 						}
 					}
-				} else {
-					if(remote_row->cicada_version[i].Wts > this->get_timestamp() || remote_row->cicada_version[i].Rts > this->get_timestamp()) {
-						rc = Abort;
-					} else {		
+				} else {	
 						rc = RCOK;
 						version = remote_row->cicada_version[i].key;
-					}
 				}
 			}
 		}
