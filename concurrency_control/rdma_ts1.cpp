@@ -32,57 +32,6 @@ limitations under the License.
 
 #if CC_ALG == RDMA_TS1
 
-bool RDMA_ts1::remote_try_lock(TxnManager * txn, uint64_t loc, uint64_t off){
-    bool result = false;
-	uint64_t thd_id = txn->get_thd_id();
-	uint64_t lock = txn->get_txn_id()+1;
-
-	uint64_t *local_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-	auto mr = client_rm_handler->get_reg_attr().value();
-
-	rdmaio::qp::Op<> op;
-    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
-  	assert(op.set_payload(local_loc, sizeof(uint64_t), mr.key) == true);
-  	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
-
-	RDMA_ASSERT(res_s2 == IOCode::Ok);
-	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p2 == IOCode::Ok);
-	if (*local_loc == 0)
-		result = true;
-
-	return result;
-}
-
-void RDMA_ts1::read_remote_row(TxnManager * txn, row_t * remote_row, uint64_t loc, uint64_t off){
-	uint64_t thd_id = txn->get_thd_id();
-	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-	char *test_buf = Rdma::get_row_client_memory(thd_id);
-    memset(test_buf, 0, operate_size);
-
-	uint64_t starttime;
-	uint64_t endtime;
-	starttime = get_sys_clock();
-
-	auto res_s = rc_qp[loc][thd_id]->send_normal(
-		{.op = IBV_WR_RDMA_READ,
-		.flags = IBV_SEND_SIGNALED,
-		.len = operate_size,
-		.wr_id = 0},
-		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
-		.remote_addr = off,
-		.imm_data = 0});
-	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
-  	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-
-	endtime = get_sys_clock();
-
-	INC_STATS(txn->get_thd_id(), rdma_read_time, endtime-starttime);
-	INC_STATS(txn->get_thd_id(), rdma_read_cnt, 1);
-	memset(remote_row, 0, operate_size);
-	memcpy(remote_row, test_buf, operate_size);
-}
 
 void  RDMA_ts1::write_remote(yield_func_t &yield, RC rc, TxnManager * txn, Access * access, uint64_t cor_id) {
 	uint64_t off = access->offset;
@@ -217,11 +166,10 @@ void RDMA_ts1::finish(RC rc, TxnManager * txnMng){
     for (uint64_t i = 0; i < txn->row_cnt; i++) {
         if(txn->accesses[i]->location != g_node_id){
         //remote
-        // mem_allocator.free(txn->accesses[i]->data,0);
-        mem_allocator.free(txn->accesses[i]->orig_row,0);
-        // txn->accesses[i]->data = NULL;
-        txn->accesses[i]->orig_row = NULL;
-       
+			// mem_allocator.free(txn->accesses[i]->data,0);
+			mem_allocator.free(txn->accesses[i]->orig_row,0);
+			// txn->accesses[i]->data = NULL;
+			txn->accesses[i]->orig_row = NULL;
         }
     }
 }
