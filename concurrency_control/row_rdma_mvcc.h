@@ -36,26 +36,13 @@ public:
 	void init(row_t * row);
 	RC access(TxnManager * txn, Access *access, access_t type);
    // RdmaMVHis historyVer[HIS_CHAIN_NUM];
-    RC finish(RC rc,TxnManager * txnMng); 
-    void local_write_back(TxnManager * txnMng , int num);
-    void local_release_lock(TxnManager * txnMng , int num);
+   void local_write_back(TxnManager * txnMng , int num);
+   void local_release_lock(TxnManager * txnMng , int num);
 private:
  	pthread_mutex_t * latch;
 	bool blatch;
 
 	row_t * _row;
-
-	bool conflict(TsType type, ts_t ts);
-	void buffer_req(TsType type, TxnManager * txn);
-
-	void update_buffer(TxnManager * txn);
-	void insert_history( ts_t ts, row_t * row);
-
-  
- 
-
-	row_t * clear_history(TsType type, ts_t ts);
-
 	
 	uint64_t whis_len;
 	uint64_t rhis_len;

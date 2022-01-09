@@ -27,31 +27,6 @@ void Row_rdma_mvcc::init(row_t * row) {
 	_row = row;
 }
 
-row_t * Row_rdma_mvcc::clear_history(TsType type, ts_t ts) {
-
-}
-
-
-
-
-void Row_rdma_mvcc::buffer_req(TsType type, TxnManager *txn) {
-
-}
-
-
-void Row_rdma_mvcc::insert_history(ts_t ts, row_t *row) {
-	
-}
-
-bool Row_rdma_mvcc::conflict(TsType type, ts_t ts) {
-	// find the unique prewrite-read couple (prewrite before read)
-	// if no such couple found, no conflict.
-	// else
-	// 	 if exists writehis between them, NO conflict!!!!
-	// 	 else, CONFLICT!!!
-	
-	return true;
-}
 RC Row_rdma_mvcc::access(TxnManager * txn, Access *access, access_t type) {
 	RC rc = RCOK;
     if(type == RD){
@@ -63,11 +38,13 @@ RC Row_rdma_mvcc::access(TxnManager * txn, Access *access, access_t type) {
 		bool result = false;
 		result = txn->get_version(temp_row,&change_num,txn->txn);
 		if(result == false){//no proper version: Abort
+			// printf("local %ld no version\n",temp_row->get_primary_key());
 			rc = Abort;
 			return rc;
 		}
 		//check txn_id
 		if(temp_row->txn_id[change_num] != 0 && temp_row->txn_id[change_num] != txn->get_txn_id() + 1){
+			// printf("local %ld write by other %ld\n",temp_row->get_primary_key(),temp_row->txn_id[change_num]);
 			rc = Abort;
 			return rc;
 		}
@@ -77,6 +54,7 @@ RC Row_rdma_mvcc::access(TxnManager * txn, Access *access, access_t type) {
 		uint64_t rts_offset = access->offset + 2*sizeof(uint64_t) + HIS_CHAIN_NUM*sizeof(uint64_t) + version*sizeof(uint64_t);
 		uint64_t cas_result = txn->cas_remote_content(access->location,rts_offset,old_rts,new_rts);//lock
 		if(cas_result!=old_rts){ //CAS fail, atomicity violated
+			// printf("local %ld rts update failed old %ld now %ld new %ld\n",temp_row->get_primary_key(), old_rts, cas_result, new_rts);
 			rc = Abort;
 			return rc;			
 		}
@@ -93,6 +71,7 @@ RC Row_rdma_mvcc::access(TxnManager * txn, Access *access, access_t type) {
 		uint64_t try_lock = -1;
 		try_lock = txn->cas_remote_content(access->location,access->offset,0,lock);//lock
 		if(try_lock != 0){
+			// printf("local %ld lock failed other %ld me %ld\n",_row->get_primary_key(), try_lock, lock);
 			rc = Abort;
 			return rc;
 		}
@@ -105,6 +84,7 @@ RC Row_rdma_mvcc::access(TxnManager * txn, Access *access, access_t type) {
 			//local unlock and Abort
 			_row->_tid_word = 0;
 			mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
+			// printf("local %ld write by other other %ld (write op)\n", temp_row->get_primary_key(), temp_row->txn_id[version]);
 			rc = Abort;
 			return rc;
 		}
@@ -117,7 +97,7 @@ RC Row_rdma_mvcc::access(TxnManager * txn, Access *access, access_t type) {
         temp_row->txn_id[version] = txn->get_txn_id() + 1;
 		temp_row->rts[version] = txn->get_timestamp();
 		temp_row->_tid_word = 0;
-
+		// printf("local %ld write %ld\n",temp_row->get_primary_key(),temp_row->txn_id[version]);
 		txn->cur_row->copy(temp_row);
 		mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 		rc = RCOK;
@@ -171,11 +151,4 @@ void Row_rdma_mvcc::local_release_lock(TxnManager * txnMng , int num){
 	RDMA_ASSERT(res_p2 == IOCode::Ok);
 }
 
-RC Row_rdma_mvcc::finish(RC rc,TxnManager * txnMng){
-    
-}
-
-void Row_rdma_mvcc::update_buffer(TxnManager * txn) {
-	
-}
 #endif

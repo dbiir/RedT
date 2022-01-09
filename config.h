@@ -43,7 +43,7 @@
   #define RDMA_TWO_SIDE true
   #define USE_COROUTINE false
   #define USE_DBPAOR false
-#elif RDMA_SIT == SIT_COROUTINE
+#elif RDMA_SIT == SIT_COROUTINE //|| CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE
   #define RDMA_ONE_SIDE true
   #define RDMA_TWO_SIDE true
   #define USE_COROUTINE true
@@ -154,7 +154,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 20000
+#define MAX_TXN_IN_FLIGHT 10000
 
 #define SERVER_GENERATE_QUERIES true
 
@@ -211,7 +211,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_DSLR_NO_WAIT
+#define CC_ALG RDMA_CICADA
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -452,9 +452,10 @@ enum PPSTxnType {
 #if WORKLOAD == YCSB
 #define ROW_SET_LENGTH int(ZIPF_THETA * 50 + 10)
 #else
-#define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 50)
 #define WAIT_QUEUE_LENGTH int(PERC_PAYMENT * PERC_PAYMENT * 100 + 3)
+#define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 30)
 #endif
+#define MAAT_CAS true
 /***********************************************/
 // DEBUG info
 /***********************************************/

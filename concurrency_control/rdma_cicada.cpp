@@ -60,12 +60,7 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
 			}
 		}
 	}
-	// for(uint64_t i = 0; i < txn->row_cnt - txn->write_cnt; i++) {
-	// 	//if (txn->accesses[ txnMng->write_set[i] ]->orig_row->cicada_version[txnMng->version_num[txnMng->write_set[i] ]].Wts != 0)
-	// 	// printf("read:%d:wts:%d\n ", read_set[i], txn->accesses[ read_set[i] ]->orig_row->cicada_version[txnMng->version_num[read_set[i]]].Wts);
 
-	// 	//printf("%d\n", txnMng->get_timestamp());
-	// }
 	timespan = get_sys_clock() - start_time;
 	txnMng->txn_stats.cc_block_time += timespan;
 	txnMng->txn_stats.cc_block_time_short += timespan;
@@ -78,7 +73,9 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
 		// printf("%d\n", txn->accesses[txnMng->write_set[i]]->location);
         if(txn->accesses[txnMng->write_set[j]]->location == g_node_id){
             access = txn->accesses[ txnMng->write_set[j] ];
-			access->orig_row->manager->local_cas_lock(txnMng, 0, txnMng->get_txn_id());
+			if (access->orig_row->manager->local_cas_lock(txnMng, 0, txnMng->get_txn_id()) == false) {
+				return Abort;
+			}
 			for(int cnt = access->orig_row->version_cnt; cnt >= access->orig_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 				int i = cnt % HIS_CHAIN_NUM;
 				if(access->orig_row->cicada_version[i].state == Cicada_ABORTED) {
@@ -106,7 +103,8 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
 					break;
 				}
 			}
-			access->orig_row->manager->local_cas_lock(txnMng, txnMng->get_txn_id(), 0);
+			// access->orig_row->manager->local_cas_lock(txnMng, txnMng->get_txn_id(), 0);
+			access->orig_row->_tid_word = 0;
         }else{
         //remote
             access = txn->accesses[ txnMng->write_set[j] ];
@@ -121,15 +119,17 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
         if(txn->accesses[read_set[j]]->location == g_node_id){
             access = txn->accesses[ read_set[j] ];
 			// access->orig_row->manager->local_cas_lock(txnMng, 0, txnMng->get_txn_id());
+			if (access->orig_row->manager->local_cas_lock(txnMng, 0, txnMng->get_txn_id()) == false) {
+				return Abort;
+			}
             for(int cnt = access->orig_row->version_cnt ; cnt >= access->orig_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 				int i = cnt % HIS_CHAIN_NUM;
 				if(access->orig_row->cicada_version[i].state == Cicada_ABORTED) {
 					continue;
 				}
 				if(access->orig_row->cicada_version[i].Wts > txnMng->get_timestamp()) {
-					rc = Abort;
 					INC_STATS(txnMng->get_thd_id(), cicada_case3_cnt, 1);
-					break;
+					continue;
 				}
 				// printf("version:%d : num:%d: cor_id:%ld\n", access->orig_row->cicada_version[i].key, txnMng->version_num[read_set[i]], cor_id);
 				if(access->orig_row->cicada_version[i].key >= txnMng->version_num[read_set[j]]) {
@@ -143,6 +143,7 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
 					break;
 				}
 			}
+			access->orig_row->_tid_word = 0;
 			// access->orig_row->manager->local_cas_lock(txnMng, txnMng->get_txn_id(), 0);
         }else{
         //remote
@@ -156,6 +157,9 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
         //local
         if(txn->accesses[txnMng->write_set[j]]->location == g_node_id){
             access = txn->accesses[ txnMng->write_set[j] ];
+			// if (access->orig_row->manager->local_cas_lock(txnMng, 0, txnMng->get_txn_id()) == false) {
+			// 	return Abort;
+			// }
 			for(int cnt = access->orig_row->version_cnt ; cnt >= access->orig_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 				int i = cnt % HIS_CHAIN_NUM;
 				if (access->orig_row->cicada_version[i].state == Cicada_ABORTED) {
@@ -179,6 +183,7 @@ RC RDMA_Cicada::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_
 					break;
 				}
 			}
+			// access->orig_row->_tid_word = 0;
         }else{
         //remote
             access = txn->accesses[ txnMng->write_set[j] ];
@@ -214,15 +219,15 @@ RC RDMA_Cicada::remote_read_or_write(yield_func_t &yield, Access * data, TxnMana
 		for(int cnt = temp_row->version_cnt; cnt >= temp_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(temp_row->cicada_version[i].state == Cicada_ABORTED) {
-				rc = Abort;
+				// rc = Abort;
 				continue;
 			}
 			if(temp_row->cicada_version[i].Wts > txnMng->get_timestamp()) {
-				rc = Abort;
-				break;
+				// rc = Abort;
+				continue;
 			}
 			// printf("%d : %d\n", temp_row->cicada_version[i].key, txnMng->version_num[num]);
-			if(temp_row->cicada_version[i].key >= txnMng->version_num[num] ){
+			if(temp_row->cicada_version[i].key == txnMng->version_num[num] ){
 				rc = RCOK;
 				// temp_row->cicada_version[i].Rts = txnMng->get_timestamp();
 				break;
@@ -234,13 +239,24 @@ RC RDMA_Cicada::remote_read_or_write(yield_func_t &yield, Access * data, TxnMana
 		uint64_t Rts = temp_row->cicada_version[txnMng->version_num[num] % HIS_CHAIN_NUM].Rts;
 		if (rc == RCOK && temp_row->cicada_version[txnMng->version_num[num] % HIS_CHAIN_NUM].Rts < txnMng->get_timestamp()) {
 			off = off + sizeof(uint64_t) * 2 + sizeof(RdmaCicadaVersion) * (txnMng->version_num[num] % HIS_CHAIN_NUM);
-#if USE_DBPAOR
+		#if USE_DBPAOR
 			uint64_t try_lock;
 			row_t * temp_row2 = txnMng->cas_and_read_remote(yield, try_lock,loc,off,off,Rts,txnMng->get_timestamp(), cor_id);
-#else
+			if (try_lock != Rts) {
+				mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				// printf("rdma_cicada.cpp:255 abort due to rts update %ld, need %ld, new data %ld," ,try_lock, Rts, txnMng->get_timestamp());
+				mem_allocator.free(temp_row2, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				return Abort;
+			}
+		#else
 			uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,Rts, txnMng->get_timestamp(),cor_id);
+			if (try_lock != Rts) {
+				mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+				// printf("rdma_cicada.cpp:255 abort due to rts update %ld, need %ld, new data %ld," try_lock, Rts, txnMng->get_timestamp());
+				return Abort;
+			}
 			row_t *temp_row2 = txnMng->read_remote_row(yield,loc,off,cor_id);
-#endif
+		#endif
 			// for(int cnt = temp_row2->version_cnt; cnt >= temp_row2->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			// 	int i = cnt % HIS_CHAIN_NUM;
 			// 	if(temp_row2->cicada_version[i].Wts > txnMng->get_timestamp() || temp_row2->cicada_version[i].state == Cicada_ABORTED) {
@@ -263,13 +279,20 @@ RC RDMA_Cicada::remote_read_or_write(yield_func_t &yield, Access * data, TxnMana
 	}
 
 	if(data->type == WR && real_write == true) {
-#if USE_DBPAOR
+		#if USE_DBPAOR
 		uint64_t try_lock;
 		row_t * temp_row = txnMng->cas_and_read_remote(yield, try_lock,loc,off,off,0,lock, cor_id);
-#else
+		if (try_lock != 0) {
+			return Abort;
+		}
+		#else
 	    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,0,lock,cor_id);
+		if (try_lock != 0) {
+			mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+			return Abort;
+		}
 		row_t * temp_row = txnMng->read_remote_row(yield,loc,off,cor_id);
-#endif
+		#endif
 		assert(temp_row->get_primary_key() == data->data->get_primary_key());
 		for(int cnt = temp_row->version_cnt; cnt >= temp_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
@@ -352,9 +375,9 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
         		//release_remote_lock(txnMng,txnMng->write_set[i] );
 	            remote_access[txn->accesses[i->first]->location].push_back(i->first);
 	            remote_num[txn->accesses[i->first]->location].push_back(i->second);
-#if USE_DBPAOR == false
+		#if USE_DBPAOR == false
 				rc = remote_abort(yield, txnMng, txn->accesses[i->first], i->second, cor_id);
-#endif
+		#endif
 
 			}
   		}
@@ -370,7 +393,7 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
         if(remote_access[i].size() > 0){
         	//to do: add coroutine
 			INC_STATS(txnMng->get_thd_id(), worker_oneside_cnt, 1);
-#if USE_COROUTINE
+		#if USE_COROUTINE
 			uint64_t waitcomp_time;
 			std::pair<int,ibv_wc> dbres1;
 			INC_STATS(txnMng->get_thd_id(), worker_process_time, get_sys_clock() - txnMng->h_thd->cor_process_starttime[cor_id]);
@@ -392,14 +415,14 @@ RDMA_Cicada::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t c
 			} while (dbres1.first == 0);
 			txnMng->h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 			// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-#else
+		#else
             auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
             RDMA_ASSERT(dbres1 == IOCode::Ok);
 			endtime = get_sys_clock();
 			INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
 			INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
 			DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
-#endif     
+		#endif     
         }
     }
 #endif
@@ -499,7 +522,11 @@ RC RDMA_Cicada::remote_abort(yield_func_t &yield, TxnManager * txnMng, Access * 
 	uint64_t loc = data->location;
 
 	off = off + sizeof(uint64_t) * 4 + sizeof(RdmaCicadaVersion) * (num % HIS_CHAIN_NUM);
-    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,Cicada_PENDING, Cicada_ABORTED,cor_id);
+    CicadaState try_lock = Cicada_ABORTED;
+	while(!simulation->is_done() && try_lock != Cicada_PENDING) {
+		uint64_t result = txnMng->cas_remote_content(yield,loc,off,(uint64_t)Cicada_PENDING, (uint64_t)Cicada_ABORTED,cor_id);
+		try_lock = (CicadaState) result;
+	}
 	return Abort;
 }
 
@@ -512,9 +539,12 @@ RC RDMA_Cicada::remote_commit(yield_func_t &yield, TxnManager * txnMng, Access *
 	uint64_t off = data->offset;
 	uint64_t loc = data->location;
 	off = off + sizeof(uint64_t) * 4 + sizeof(RdmaCicadaVersion) * (num % HIS_CHAIN_NUM);
-    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,Cicada_PENDING, Cicada_COMMITTED,cor_id);
-    
-	return Abort;
+    CicadaState try_lock = Cicada_COMMITTED;
+	while(!simulation->is_done() && try_lock != Cicada_PENDING) {
+		uint64_t result = txnMng->cas_remote_content(yield,loc,off,(uint64_t)Cicada_PENDING, (uint64_t)Cicada_COMMITTED,cor_id);
+		try_lock = (CicadaState) result;
+	}
+	return RCOK;
 }
 
 #endif

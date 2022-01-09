@@ -21,7 +21,7 @@ retry_unlock:
     try_lock = txnMng->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txnMng->get_txn_id(),cor_id);
     if(try_lock != 0) {
         // printf("cas retry\n");
-        goto retry_unlock;
+        if (!simulation->is_done()) goto retry_unlock;
     }
     uint64_t i = 0;
     uint64_t lock_num = 0;
@@ -64,7 +64,7 @@ retry_remote_unlock:
     try_lock = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),cor_id);
     if(try_lock != 0) {
         // printf("cas retry\n");
-        goto retry_remote_unlock;
+        if (!simulation->is_done()) goto retry_remote_unlock;
     }
     row_t * test_row = txnMng->read_remote_row(yield,loc,off,cor_id);
     uint64_t i = 0;
@@ -140,23 +140,23 @@ retry_unlock:
     assert(lock_num > 0); //already locked
 
     //RDMA CAS，not use local CAS
-        uint64_t loc = g_node_id;
-        uint64_t thd_id = txnMng->get_thd_id();
-        uint64_t off = (char*)row - rdma_global_buffer;
+    uint64_t loc = g_node_id;
+    uint64_t thd_id = txnMng->get_thd_id();
+    uint64_t off = (char*)row - rdma_global_buffer;
 
-        uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,lock_info,new_lock_info,cor_id);
+    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,lock_info,new_lock_info,cor_id);
 
-		if(try_lock != lock_info){
+    if(try_lock != lock_info){
         //atomicity is destroyed
         txnMng->num_atomic_retry++;
         total_num_atomic_retry++;
         if(txnMng->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txnMng->num_atomic_retry;
 
-#if DEBUG_PRINTF
+    #if DEBUG_PRINTF
         printf("---retry_unlock read set element\n");
-#endif
-        goto retry_unlock;
-        }
+    #endif
+        if (!simulation->is_done()) goto retry_unlock;
+    }
 #if DEBUG_PRINTF
     printf("---线程号：%lu, 本地解读锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info, new_lock_info);
 #endif     
@@ -169,7 +169,7 @@ retry_unlock:
     try_lock = txnMng->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txnMng->get_txn_id(),cor_id);
     if(try_lock != 0) {
         // printf("cas retry\n");
-        goto retry_unlock;
+        if (!simulation->is_done()) goto retry_unlock;
     }
     uint64_t i = 0;
     uint64_t lock_num = 0;
@@ -190,7 +190,7 @@ retry_unlock:
     }
     row->_tid_word = 0;
 #elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2
-    assert(row->_tid_word != 0);
+    // assert(row->_tid_word != 0);
     row->_tid_word = 0;
 #if DEBUG_PRINTF
     printf("---线程号：%lu, 本地解读锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: 1, new_lock_info: 0\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id());
@@ -232,7 +232,7 @@ remote_retry_unlock:
         printf("---remote_retry_unlock read set element\n");
 #endif
         *lock_info = try_lock;
-        goto remote_retry_unlock;
+        if (!simulation->is_done()) goto remote_retry_unlock;
     }
 #if DEBUG_PRINTF
     printf("---thd：%lu, remote release lock succ,lock location: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), *lock_info, new_lock_info);
@@ -251,7 +251,7 @@ retry_remote_unlock:
     try_lock = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),cor_id);
     if(try_lock != 0) {
         // printf("cas retry\n");
-        goto retry_remote_unlock;
+        if (!simulation->is_done()) goto retry_remote_unlock;
     }
     row_t * test_row = txnMng->read_remote_row(yield,loc,off,cor_id);
     uint64_t i = 0;
@@ -319,10 +319,10 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
         }else{
         //remote
             remote_access[txn->accesses[read_set[i]]->location].push_back(read_set[i]);
-#if USE_DBPAOR == false
+        #if USE_DBPAOR == false || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE
             Access * access = txn->accesses[ read_set[i] ];
             remote_unlock(yield,txnMng, read_set[i],cor_id);
-#endif
+        #endif
         }
     }
     //for write set element,write back and release lock
@@ -334,14 +334,14 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
         }else{
         //remote
             remote_access[txn->accesses[txnMng->write_set[i]]->location].push_back(txnMng->write_set[i]);
-#if USE_DBPAOR == false
+        #if USE_DBPAOR == false || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE
             Access * access = txn->accesses[ txnMng->write_set[i] ];
             remote_write_and_unlock(yield,rc, txnMng, txnMng->write_set[i],cor_id);
-#endif
+        #endif
         }
     }
 
-#if USE_DBPAOR == true
+#if USE_DBPAOR == true && CC_ALG != RDMA_WOUND_WAIT && CC_ALG != RDMA_WAIT_DIE
     starttime = get_sys_clock();
     uint64_t endtime;
     for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
@@ -349,12 +349,12 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
             txnMng->batch_unlock_remote(yield, cor_id, i, rc, txnMng, remote_access);
         }
     }
-#if CC_ALG != RDMA_NO_WAIT
+    #if CC_ALG != RDMA_NO_WAIT
     for(int i=0;i<g_node_cnt;i++){ //poll result
         if(remote_access[i].size() > 0){
         	//to do: add coroutine
             INC_STATS(txnMng->get_thd_id(), worker_oneside_cnt, 1);
-#if USE_COROUTINE
+        #if USE_COROUTINE
 			uint64_t waitcomp_time;
 			std::pair<int,ibv_wc> dbres1;
 			INC_STATS(txnMng->get_thd_id(), worker_process_time, get_sys_clock() - txnMng->h_thd->cor_process_starttime[cor_id]);
@@ -376,7 +376,7 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
 			} while (dbres1.first == 0);
 			txnMng->h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 			// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-#else  
+            #else  
             
             auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
             RDMA_ASSERT(dbres1 == IOCode::Ok);  
@@ -384,10 +384,10 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
             INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
             INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
             DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
-#endif     
+        #endif     
         }
     }
-#endif 
+    #endif 
 #endif
 
     uint64_t timespan = get_sys_clock() - starttime;

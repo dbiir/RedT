@@ -118,7 +118,8 @@ for exp in exps:
                 else:
                     assert(False)
 
-                machines = machines_[:(cfgs["NODE_CNT"]+1)]
+                # machines = machines_[:(cfgs["NODE_CNT"]+1)]
+                machines = machines_[:(cfgs["NODE_CNT"]+cfgs["CLIENT_NODE_CNT"])]
                 with open("ifconfig.txt", 'w') as f_ifcfg:
                     for m in machines:
                         f_ifcfg.write(m + "\n")
@@ -204,7 +205,7 @@ for exp in exps:
 
     tcnt = []
     for e in experiments:
-        tcnt.append(e[-8])
+        tcnt.append(e[-2])
     tcnt = sorted(list(set(tcnt)))
 
     cocnt = []
@@ -276,6 +277,8 @@ for exp in exps:
         cmd='./result.sh -a tpcc_stress_ctx -n {} -c {} -l {} -C {} -t {} --ft {} --tt {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in ld]), ','.join([str(x) for x in ccnt]), strnow, ','.join(fromtimelist), ','.join(totimelist))
     elif 'ycsb_thread' in exp:
         cmd='./result.sh -a ycsb_thread -n {} -c {} -t {} -T {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in tcnt]))
+    elif 'tpcc_thread' in exp:
+        cmd='./result.sh -a tpcc_thread -n {} -c {} -t {} -T {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in tcnt]))
     elif 'ycsb_partitions' in exp:
         cmd='./result.sh -a ycsb_partitions -n {} -c {} -t {} -P {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in part]))
     elif 'ycsb_coroutine' in exp:

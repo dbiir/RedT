@@ -489,9 +489,10 @@ RC TPCCTxnManager::send_remote_one_side_request(yield_func_t &yield, TPCCQuery *
     uint64_t version = 0;
     uint64_t lock = get_txn_id() + 1;
 
-    if(g_wh_update)type = WR;
+    if (g_wh_update) type = WR;
     else type = RD;
 	rc = get_remote_row(yield, type, loc, m_item, row_local, cor_id);
+	query->partitions_touched.add_unique(GET_PART_ID(0,loc));
 	// mem_allocator.free(m_item, sizeof(itemid_t));
 	return rc;
 }
