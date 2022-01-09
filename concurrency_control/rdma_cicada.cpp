@@ -227,7 +227,7 @@ RC RDMA_Cicada::remote_read_or_write(yield_func_t &yield, Access * data, TxnMana
 				continue;
 			}
 			// printf("%d : %d\n", temp_row->cicada_version[i].key, txnMng->version_num[num]);
-			if(temp_row->cicada_version[i].key == txnMng->version_num[num] ){
+			if(temp_row->cicada_version[i].key >= txnMng->version_num[num] ){
 				rc = RCOK;
 				// temp_row->cicada_version[i].Rts = txnMng->get_timestamp();
 				break;
@@ -283,17 +283,18 @@ RC RDMA_Cicada::remote_read_or_write(yield_func_t &yield, Access * data, TxnMana
 		uint64_t try_lock;
 		row_t * temp_row = txnMng->cas_and_read_remote(yield, try_lock,loc,off,off,0,lock, cor_id);
 		if (try_lock != 0) {
+			mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 			return Abort;
 		}
 		#else
 	    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,0,lock,cor_id);
 		if (try_lock != 0) {
-			mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+			// mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 			return Abort;
 		}
 		row_t * temp_row = txnMng->read_remote_row(yield,loc,off,cor_id);
 		#endif
-		assert(temp_row->get_primary_key() == data->data->get_primary_key());
+		assert(temp_row->get_primary_key() >= data->data->get_primary_key());
 		for(int cnt = temp_row->version_cnt; cnt >= temp_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if (temp_row->cicada_version[i].state == Cicada_ABORTED) {
