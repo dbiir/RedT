@@ -362,7 +362,7 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 		// 		}
 		// 	}
 		// }
-	#endif
+	// #endif
 #endif
 		ycsb_request * req = (ycsb_request*) mem_allocator.alloc(sizeof(ycsb_request));
 		if (r_twr < g_txn_read_perc || r < g_tup_read_perc)
