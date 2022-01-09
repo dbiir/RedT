@@ -296,6 +296,8 @@ uint32_t g_max_num_waits = MAX_NUM_WAITS;
 double g_mpr = MPR;
 double g_mpitem = MPIR;
 
+uint64_t count_max = 32768;
+
 // PPS (Product-Part-Supplier)
 UInt32 g_max_parts_per = MAX_PPS_PARTS_PER;
 UInt32 g_max_part_key = MAX_PPS_PART_KEY;

@@ -39,8 +39,22 @@ void RDMA_dslr_no_wait::remote_unlock(yield_func_t &yield,RC rc,TxnManager * txn
     uint64_t reset_from = read_row->_reset_from, try_lock;
     bool success = false;
     int cas_num = 0;
+    // if (reset_from > 0) {
+    //     success = txnMng->loop_cas_remote(yield,loc,off,reset_from,0,cor_id);
+    // }
+    uint64_t reset_times = 0;
     if (reset_from > 0) {
-        success = txnMng->loop_cas_remote(yield,loc,off,reset_from,0,cor_id);
+        while(!simulation->is_done()){
+            try_lock = txnMng->cas_remote_content(yield,loc,off,reset_from,0,cor_id);
+            reset_times ++;
+            if (try_lock == reset_from) break;
+            uint64_t read_lock2 = txnMng->get_part_num(try_lock,1);
+            uint64_t write_lock2 = txnMng->get_part_num(try_lock,2);
+            uint64_t read_num2 = txnMng->get_part_num(try_lock,3);
+            uint64_t write_num2 = txnMng->get_part_num(try_lock,4);
+            if (write_num2 < count_max && read_num2 < count_max) break;
+            // if(reset_times > 50)printf("52:try to reset read_lock %ld write_lock %ld read_num %ld, write_num %ld, reset_from %ld\n",read_lock2,write_lock2,read_num2,write_num2,reset_from);
+        }
     }
     uint64_t reset_from_address = off + sizeof(uint64_t);
     try_lock = txnMng->cas_remote_content(yield,loc,reset_from_address,reset_from,0,cor_id);
@@ -75,9 +89,24 @@ void RDMA_dslr_no_wait::unlock(yield_func_t &yield,RC rc,row_t * row , TxnManage
     // uint64_t reset_write_num = txnMng->get_part_num(new_faa_result,4);
     // printf("try to release %ld read lock ns:%ld, nx:%ld, maxs:%ld, maxx:%ld, now:ns:%ld, nx:%ld, maxs:%ld, maxx:%ld add_value:%ld\n",row->get_primary_key(), new_read_lock, new_write_lock, new_read_num, new_write_num, reset_read_lock, reset_write_lock, reset_read_num, reset_write_num,add_value);
 
+    // if (reset_from > 0) {
+    //     success = txnMng->loop_cas_remote(yield,loc,off,reset_from,0,cor_id);
+    // }
+    uint64_t reset_times = 0;
     if (reset_from > 0) {
-        success = txnMng->loop_cas_remote(yield,loc,off,reset_from,0,cor_id);
+        while(!simulation->is_done()){
+            reset_times++;
+            try_lock = txnMng->cas_remote_content(yield,loc,off,reset_from,0,cor_id);
+            if (try_lock == reset_from) break;
+            uint64_t read_lock2 = txnMng->get_part_num(try_lock,1);
+            uint64_t write_lock2 = txnMng->get_part_num(try_lock,2);
+            uint64_t read_num2 = txnMng->get_part_num(try_lock,3);
+            uint64_t write_num2 = txnMng->get_part_num(try_lock,4);
+            if (write_num2 < count_max && read_num2 < count_max) break;
+            // if(reset_times > 50)printf("102:try to reset read_lock %ld write_lock %ld read_num %ld, write_num %ld, reset_from %ld\n",read_lock2,write_lock2,read_num2,write_num2,reset_from);
+        }
     }
+    // printf("[109]process overflow success\n");
     uint64_t reset_from_address = off + sizeof(uint64_t);
     try_lock = txnMng->cas_remote_content(yield,loc,reset_from_address,reset_from,0,cor_id);
     // assert(try_lock == 0 && _row->_reset_from == reset_from);
@@ -109,8 +138,22 @@ void RDMA_dslr_no_wait::write_and_unlock(yield_func_t &yield,RC rc, row_t * row,
     // uint64_t reset_write_num = txnMng->get_part_num(new_faa_result,4);
     // printf("try to release %ld write lock ns:%ld, nx:%ld, maxs:%ld, maxx:%ld, now:ns:%ld, nx:%ld, maxs:%ld, maxx:%ld\n",row->get_primary_key(), new_read_lock, new_write_lock, new_read_num, new_write_num, reset_read_lock, reset_write_lock, reset_read_num, reset_write_num);
 
+    // if (reset_from > 0) {
+    //     success = txnMng->loop_cas_remote(yield,loc,off,reset_from,0,cor_id);
+    // }
+    uint64_t reset_times = 0;
     if (reset_from > 0) {
-        success = txnMng->loop_cas_remote(yield,loc,off,reset_from,0,cor_id);
+        while(!simulation->is_done()){
+            reset_times ++;
+            try_lock = txnMng->cas_remote_content(yield,loc,off,reset_from,0,cor_id);
+            if (try_lock == reset_from) break;
+            uint64_t read_lock2 = txnMng->get_part_num(try_lock,1);
+            uint64_t write_lock2 = txnMng->get_part_num(try_lock,2);
+            uint64_t read_num2 = txnMng->get_part_num(try_lock,3);
+            uint64_t write_num2 = txnMng->get_part_num(try_lock,4);
+            if (write_num2 < count_max && read_num2 < count_max) break;
+            // if(reset_times > 50)printf("148:try to reset read_lock %ld write_lock %ld read_num %ld, write_num %ld, reset_from %ld\n",read_lock2,write_lock2,read_num2,write_num2,reset_from);
+        }
     }
     uint64_t reset_from_address = off + sizeof(uint64_t);
     try_lock = txnMng->cas_remote_content(yield,loc,reset_from_address,reset_from,0,cor_id);
@@ -154,8 +197,22 @@ void RDMA_dslr_no_wait::remote_write_and_unlock(yield_func_t &yield,RC rc, TxnMa
     uint64_t reset_from = read_row->_reset_from, try_lock;
     bool success = false;
     int cas_num = 0;
+    // if (reset_from > 0) {
+    //     success = txnMng->loop_cas_remote(yield,loc,off,reset_from,0,cor_id);
+    // }
+    uint64_t reset_times = 0;
     if (reset_from > 0) {
-        success = txnMng->loop_cas_remote(yield,loc,off,reset_from,0,cor_id);
+        while(!simulation->is_done()){
+            reset_times ++;
+            try_lock = txnMng->cas_remote_content(yield,loc,off,reset_from,0,cor_id);
+            if (try_lock == reset_from) break;
+            uint64_t read_lock2 = txnMng->get_part_num(try_lock,1);
+            uint64_t write_lock2 = txnMng->get_part_num(try_lock,2);
+            uint64_t read_num2 = txnMng->get_part_num(try_lock,3);
+            uint64_t write_num2 = txnMng->get_part_num(try_lock,4);
+            if (write_num2 < count_max && read_num2 < count_max) break;
+            // if(reset_times > 50)printf("205:try to reset read_lock %ld write_lock %ld read_num %ld, write_num %ld, reset_from %ld\n",read_lock2,write_lock2,read_num2,write_num2,reset_from);
+        }
     }
     uint64_t reset_from_address = off + sizeof(uint64_t);
     try_lock = txnMng->cas_remote_content(yield,loc,reset_from_address,reset_from,0,cor_id);

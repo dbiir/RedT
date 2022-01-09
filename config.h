@@ -112,11 +112,11 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 16
-#define THREAD_CNT 8
+#define NODE_CNT 4
+#define THREAD_CNT 40
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 8
+#define COROUTINE_CNT 4
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
@@ -147,7 +147,7 @@
 // # of transactions to run for warmup
 #define WARMUP            0
 // YCSB or TPCC or PPS or DA
-#define WORKLOAD YCSB
+#define WORKLOAD TPCC
 // print the transaction latency distribution
 #define PRT_LAT_DISTR false
 #define STATS_ENABLE        true
@@ -320,7 +320,7 @@
 #define MAX_RETRY_TIME 2
 #define LOCK_LENGTH 10
 // [RDMA_DSLR]
-#define DSLR_MAX_RETRY_TIME 5
+#define DSLR_MAX_RETRY_TIME 50
 
 /***********************************************/
 // Logging
@@ -349,18 +349,18 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 167771520
-#define ZIPF_THETA 0.2
+#define SYNTH_TABLE_SIZE 65536
+#define ZIPF_THETA 0.3
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 2
+#define PART_PER_TXN 4
 #define PERC_MULTI_PART     MPR
-#define REQ_PER_QUERY 16
+#define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
-#define STRICT_PPT 0
+#define STRICT_PPT 1
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.
@@ -375,7 +375,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH 32
+#define NUM_WH 160
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0

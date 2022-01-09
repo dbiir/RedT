@@ -1696,8 +1696,73 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 			}
 			else if(type == WR)add_value = -1;
 			faa_result = faa_remote_content(yield,loc,remote_address,add_value,cor_id);
-			mem_allocator.free(m_item, sizeof(itemid_t));
-			return Abort;
+			// mem_allocator.free(m_item, sizeof(itemid_t));
+			// return Abort;
+
+     #if 1
+            uint64_t wait = rand() % 4;
+            if (wait != 0) return Abort;//random abort
+
+            //reset lock to zero 
+            int repeat_num = 0;
+			row_t * reset_row = read_remote_row(yield,loc,remote_address,cor_id);
+            uint64_t resetlock = reset_row->_reset_from;
+			mem_allocator.free(reset_row,  row_t::get_row_size(ROW_DEFAULT_SIZE));
+            uint64_t cas_result = 0;
+            if(resetlock != 0){
+                while(!simulation->is_done()){
+                    cas_result = cas_remote_content(yield,loc,remote_address,resetlock,0,cor_id);
+                    repeat_num ++;
+                    uint64_t new_read_lock = get_part_num(cas_result,1);
+                    uint64_t new_write_lock = get_part_num(cas_result,2);
+                    uint64_t new_read_num = get_part_num(cas_result,3);
+                    uint64_t new_write_num = get_part_num(cas_result,4);
+                    if(cas_result == resetlock || cas_result == 0 ||
+                        new_read_num < count_max && new_write_num < count_max) {
+                    // printf("[87]process overflow success\n");
+                        uint64_t reset_from_address = remote_address + sizeof(uint64_t);
+                        try_lock = cas_remote_content(yield,loc,reset_from_address,reset_from,0,cor_id);
+                        return Abort;
+                }
+                    
+                if(repeat_num < DSLR_MAX_RETRY_TIME)continue;
+
+
+                // uint64_t expect_read_lock = get_part_num(resetlock,1);
+                // uint64_t expect_write_lock = get_part_num(resetlock,2);
+                // uint64_t expect_read_num = get_part_num(resetlock,3);
+                // uint64_t expect_write_num = get_part_num(resetlock,4);
+                // printf("[117]current lock:new_read_lock = %ld, new_write_lock = %ld, new_read_num = %ld, new_write_num = %ld; ****reset lock: expect_read_lock = %ld, expect_write_lock = %ld, expect_read_num = %ld, expect_write_num = %ld\n",new_read_lock,new_write_lock,new_read_num,new_write_num,expect_read_lock,expect_write_lock,expect_read_num,expect_write_num);
+
+                if(new_read_lock == read_lock || new_write_lock == write_lock){
+                    //detect deadlock
+                    if((new_read_lock == count_max && new_read_num == count_max &&type == RD) || (new_write_lock == count_max && new_write_num == count_max && type == WR)){
+                        continue;
+                    }
+                    if((new_read_lock > count_max && new_read_num == new_read_lock &&type == RD) || (new_write_lock > count_max && new_write_num == new_write_lock && type == WR)){
+                        resetlock = (new_read_lock<<48)|(new_write_lock<<32)|(new_read_num<<16)|(new_write_num);
+                        continue;
+                    }
+                    uint64_t new_lock;
+                    if(type == RD){
+                        new_read_lock = read_num + 1;
+                        new_lock = (new_read_lock<<48)|(write_num<<32)|(new_read_num<<16)|(new_write_num);
+                    }else if(type == WR){
+                        new_write_lock = write_num + 1;
+                        new_lock = (read_num<<48)|(new_write_lock<<32)|(new_read_num<<16)|(new_write_num);
+                    }
+
+                    uint64_t new_result = 0;
+                    new_result = cas_remote_content(yield,loc,remote_address,cas_result,new_lock,cor_id);
+                    // if(new_result == cas_result){//release deadlock
+                    //     return Abort;
+                    // }else{//release fail, retry
+                    // }
+                }//if(deadlock)
+            }//while true
+        }
+    #endif
+
 		}// else if(write_num >= count_max || read_num >= count_max)
 			
 		//case 2:get lock
