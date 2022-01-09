@@ -1405,15 +1405,15 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT)
 	if (type == WR) {
 		uint64_t part_id = row->get_part_id();
-	//printf("alloc 10 %ld\n",get_txn_id());
-	DEBUG_M("TxnManager::get_row_post_wait row_t alloc\n")
-	row_pool.get(get_thd_id(),access->orig_data);
+		//printf("alloc 10 %ld\n",get_txn_id());
+		DEBUG_M("TxnManager::get_row_post_wait row_t alloc\n")
+		row_pool.get(get_thd_id(),access->orig_data);
 		access->orig_data->init(row->get_table(), part_id, 0);
 		access->orig_data->copy(row);
-         for(int i = 0;i < this->txn->row_cnt;i++){
-             if(txn->accesses[i]->type == WR)
-            // printf("txn %ld orgin_d[%ld] table %ld",this->get_txn_id(),i,this->txn->accesses[i]->orig_data->table_idx);
-        }
+		// for(int i = 0;i < this->txn->row_cnt;i++){
+		// 	if(txn->accesses[i]->type == WR)
+        //     // printf("txn %ld orgin_d[%ld] table %ld",this->get_txn_id(),i,this->txn->accesses[i]->orig_data->table_idx);
+        // }
 	}
 #endif
 
