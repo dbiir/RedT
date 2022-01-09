@@ -179,6 +179,9 @@ ArgsType() {
     elif [[ "${TEST_TYPE}" == 'ycsb_thread' ]]
     then
         args=("${THREAD[@]}")
+    elif [[ "${TEST_TYPE}" == 'tpcc_thread' ]]
+    then
+        args=("${THREAD[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_partitions' ]]
     then
         args=("${PART[@]}")
@@ -211,6 +214,9 @@ FileName() {
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _CT-${CT}_TIF-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_thread' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _T-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'tpcc_thread' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _T-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_partitions' ]]
