@@ -43,7 +43,7 @@
   #define RDMA_TWO_SIDE true
   #define USE_COROUTINE false
   #define USE_DBPAOR false
-#elif RDMA_SIT == SIT_COROUTINE
+#elif RDMA_SIT == SIT_COROUTINE //|| CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE
   #define RDMA_ONE_SIDE true
   #define RDMA_TWO_SIDE true
   #define USE_COROUTINE true
@@ -65,8 +65,8 @@
 
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
-
 #define MAX_SEND_SIZE 1
+
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -92,7 +92,7 @@
 #define SECOND 200 // Set the queue monitoring time.
 // #define THD_ID_QUEUE
 #define ONE_NODE_RECIEVE 0 // only node 0 will receive the txn query
-#define USE_WORK_NUM_THREAD false
+#define USE_WORK_NUM_THREAD true
 #if 1
 // #define LESS_DIS // Reduce the number of yCSB remote data to 1
 // #define LESS_DIS_NUM 0 // Reduce the number of yCSB remote data to 1
@@ -112,7 +112,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 3
+#define NODE_CNT 4
 #define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -184,7 +184,8 @@
 /***********************************************/
 #define TPORT_TYPE tcp
 #define TPORT_PORT 7000
-#define TPORT_TWOSIDE_PORT 13000
+#define TPORT_TWOSIDE_PORT 15000
+#define RDMA_TPORT 9214
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -206,12 +207,11 @@
 // Concurrency Control
 /***********************************************/
 
-
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2,RDMA_TS1,RDMA_SILO,RDMA_MVCC,RDMA_MAAT,RDMA_CICADA
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_SILO
+#define CC_ALG RDMA_WOUND_WAIT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -310,9 +310,17 @@
 #define ATOMIC_WORD					false
 // [RDMA_MAAT]
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
+// [RDMA_TS1]
+#define RDMA_TSSTATE_COUNT 5
+// [RDMA_TS1]
+#define USE_READ_WAIT_QUEUE false
+#define YIELD_WHEN_WAITING_READ false
+#define TS_RETRY_COUNT int(ZIPF_THETA * 20 + 1)
 // #define ROW_SET_LENGTH 100
 #define MAX_RETRY_TIME 2
 #define LOCK_LENGTH 10
+// [RDMA_DSLR]
+#define DSLR_MAX_RETRY_TIME 50
 
 /***********************************************/
 // Logging
@@ -347,7 +355,7 @@
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 2
+#define PART_PER_TXN 4
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
@@ -444,11 +452,13 @@ enum PPSTxnType {
 #if WORKLOAD == YCSB
 #define ROW_SET_LENGTH int(ZIPF_THETA * 50 + 10)
 #else
-#define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 50)
+#define WAIT_QUEUE_LENGTH int(PERC_PAYMENT * PERC_PAYMENT * 100 + 3)
+#define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 30)
 #endif
  
 #define HOT_VALUE 10000
 #define MOCC_MAX_RETRY_COUNT 5
+#define MAAT_CAS true
 /***********************************************/
 // DEBUG info
 /***********************************************/
@@ -537,6 +547,8 @@ enum PPSTxnType {
 #define RDMA_WAIT_DIE 42
 #define RDMA_WOUND_WAIT 43
 #define RDMA_MOCC 44
+#define RDMA_TS 46
+#define RDMA_DSLR_NO_WAIT 45
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2
@@ -579,15 +591,17 @@ enum PPSTxnType {
 // Stats and timeout
 #define BILLION 1000000000UL // in ns => 1 second
 #define MILLION 1000000UL // in ns => 1 second
+#define USECONDE 1000UL //us
 #define STAT_ARR_SIZE 1024
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 30 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false
 #define ENVIRONMENT_EC2 false
 
 #endif
+  

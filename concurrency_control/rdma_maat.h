@@ -30,6 +30,14 @@ enum WOUNDState {
   WOUND_COMMITTING,
   WOUND_ABORTING
 };
+
+enum TSState {
+  TS_RUNNING = 0,
+  TS_WAITING,
+  TS_COMMITTING,
+  TS_ABORTING,
+  TS_NULL
+};
 struct RdmaTxnTableNode{
 #if CC_ALG == RDMA_MAAT
 	uint64_t _lock;
@@ -60,6 +68,36 @@ struct RdmaTxnTableNode{
 		_lock = 0;
 	}
 #endif
+#if CC_ALG == RDMA_TS
+	uint64_t _lock;
+	uint64_t key;
+	TSState state;
+
+	void init(uint64_t key) {
+		// printf("init table index: %ld\n", key);
+		this->key = key;
+		state = TS_RUNNING;
+		_lock = 0;
+	}
+#endif
+#if CC_ALG == RDMA_TS1
+	uint64_t _lock;
+	uint64_t key[RDMA_TSSTATE_COUNT];
+	// uint64_t txn_id[RDMA_TSSTATE_COUNT];
+	TSState state[RDMA_TSSTATE_COUNT];
+
+	void init(uint64_t key_) {
+		uint64_t min_key = 0, min_idx = 0;
+		for (int i = 0; i < RDMA_TSSTATE_COUNT; i++) {
+			if (key[i] < min_key) {
+				min_key = key[i];
+				min_idx = i;
+			}
+		}
+		key[min_idx] = key_;
+		state[min_idx] = TS_RUNNING;
+	}
+#endif
 };
 
 class RdmaTxnTable {
@@ -68,22 +106,37 @@ public:
 	void init(uint64_t thd_id, uint64_t key);
 	void release(uint64_t thd_id, uint64_t key);
 #if CC_ALG == RDMA_MAAT
-	uint64_t local_get_lower(uint64_t thd_id, uint64_t key);
-	uint64_t local_get_upper(uint64_t thd_id, uint64_t key);
-	MAATState local_get_state(uint64_t thd_id, uint64_t key);
-	void local_set_lower(uint64_t thd_id, uint64_t key, uint64_t value);
-	void local_set_upper(uint64_t thd_id, uint64_t key, uint64_t value);
-	void local_set_state(uint64_t thd_id, uint64_t key, MAATState value);
-
+	uint64_t local_get_lower(uint64_t key);
+	uint64_t local_get_upper(uint64_t key);
+	MAATState local_get_state(uint64_t key);
+	bool local_set_lower(TxnManager *txnMng, uint64_t key, uint64_t value);
+	bool local_set_upper(TxnManager *txnMng, uint64_t key, uint64_t value);
+	bool local_set_state(TxnManager *txnMng, uint64_t key, MAATState value);
+	bool local_cas_timeNode(yield_func_t &yield,TxnManager *txnMng, uint64_t key, uint64_t cor_id);
+	void local_release_timeNode(TxnManager *txnMng, uint64_t key);
 	RdmaTxnTableNode * remote_get_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id);
-	void remote_set_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTxnTableNode * value, uint64_t cor_id);
+	bool remote_set_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTxnTableNode * value, uint64_t cor_id);
+	bool remote_cas_timeNode(yield_func_t &yield,TxnManager *txnMng, uint64_t key, uint64_t cor_id);
+	bool remote_release_timeNode(yield_func_t &yield,TxnManager *txnMng, uint64_t key, uint64_t cor_id);
 #endif
 #if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 	WOUNDState local_get_state(uint64_t thd_id, uint64_t key);
-	void local_set_state(uint64_t thd_id, uint64_t key, WOUNDState value);
+	bool local_set_state(TxnManager *txnMng, uint64_t thd_id, uint64_t key, WOUNDState value);
+
+	char * remote_get_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id);
+	bool remote_set_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, WOUNDState value, uint64_t cor_id);
+#endif
+#if CC_ALG == RDMA_TS
+	TSState local_get_state(uint64_t thd_id, uint64_t key);
+	void local_set_state(uint64_t thd_id, uint64_t key, TSState value);
 
 	char * remote_get_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id);
 	void remote_set_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, RdmaTxnTableNode * value, uint64_t cor_id);
+#endif
+#if CC_ALG == RDMA_TS1
+	TSState local_get_state(uint64_t thd_id, uint64_t key);
+	void local_set_state(uint64_t thd_id, uint64_t key, TSState value);
+	TSState remote_get_state(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id);
 #endif
 private:
 	// hash table
@@ -95,15 +148,6 @@ private:
 #if CC_ALG == RDMA_MAAT
 
 class TxnManager;
-
-// enum MAATState {
-//   MAAT_RUNNING = 0,
-//   MAAT_VALIDATED,
-//   MAAT_COMMITTED,
-//   MAAT_ABORTED
-// };
-
-
 
 class RDMA_Maat {
 public:
@@ -118,11 +162,6 @@ public:
 private:
 	sem_t 	_semaphore;
 };
-
-
-
-
-
 #endif
 
 #endif

@@ -40,19 +40,29 @@ void Row_rdma_maat::init(row_t * row) {
 
 bool Row_rdma_maat::local_cas_lock(TxnManager * txnMng , uint64_t info, uint64_t new_info){
    // INC_STATS(txnMng->get_thd_id(), cas_cnt, 1);
+	uint64_t starttime;
+	uint64_t endtime;
+	starttime = get_sys_clock();
     uint64_t loc = g_node_id;
-        uint64_t thd_id = txnMng->get_thd_id();
-		uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-		auto mr = client_rm_handler->get_reg_attr().value();
+	uint64_t thd_id = txnMng->get_thd_id();
+	uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+	auto mr = client_rm_handler->get_reg_attr().value();
 
-		rdmaio::qp::Op<> op;
-		op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)_row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(info,new_info);
-		assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
-		auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
+	rdmaio::qp::Op<> op;
+	op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + (char*)_row - rdma_global_buffer), remote_mr_attr[loc].key).set_cas(info,new_info);
+	assert(op.set_payload(tmp_buf2, sizeof(uint64_t), mr.key) == true);
+	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
 
-		RDMA_ASSERT(res_s2 == IOCode::Ok);
-		auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-		RDMA_ASSERT(res_p2 == IOCode::Ok);
+	RDMA_ASSERT(res_s2 == IOCode::Ok);
+	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p2 == IOCode::Ok);
+	INC_STATS(txnMng->get_thd_id(), worker_oneside_cnt, 1);
+	endtime = get_sys_clock();
+	// INC_STATS(txnMng->get_thd_id(), rdma_cas_time, endtime-starttime);
+	// INC_STATS(txnMng->get_thd_id(), rdma_cas_cnt, 1);
+	INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
+	DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
+	INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
     if(*tmp_buf2 != info) return false;
     return true;
   // return 0;
@@ -126,7 +136,7 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 
 	//Add to uncommitted reads (soft lock)
 	for(uint64_t i = 0; i < row_set_length; i++) {
-		if(_row->uncommitted_reads[i] == txn->get_txn_id() || txn->unread_set.find(_row->get_primary_key()) != txn->unread_set.end()) {
+		if(_row->uncommitted_reads[i] == txn->get_txn_id() || txn->unread_set.find(_row->get_primary_key()) != txn->unread_set.end()) {//!notice
 			break;
 		}
 		if(_row->uncommitted_reads[i] == 0) {
@@ -140,7 +150,7 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 	bool in_set = false;
 	for(auto i = 0, j = 0; i < row_set_length && j < _row->ucwrites_len; i++) {
 		if(_row->uncommitted_writes[i] == txn->get_txn_id() || txn->unwrite_set.find(_row->get_primary_key()) != txn->unwrite_set.end()) {
-			in_set = true;
+			in_set = true;//!notice
 			continue;
 		}
 		if(_row->uncommitted_writes[i] == 0 && in_set == false) {
@@ -152,7 +162,7 @@ RC Row_rdma_maat::read_and_prewrite(TxnManager * txn) {
 			break;
 		}
 		if(_row->uncommitted_writes[i] != 0) {
-			txn->uncommitted_writes_y.insert(_row->uncommitted_writes[i]);
+			// txn->uncommitted_writes_y.insert(_row->uncommitted_writes[i]);
 			j++;
 		}
 		DEBUG("    UW %ld -- %ld: %ld\n",txn->get_txn_id(),_row->get_primary_key(),_row->uncommitted_writes[i]);
@@ -217,7 +227,8 @@ RC Row_rdma_maat::read(TxnManager * txn) {
 
 #ifdef USE_CAS
 	//ATOM_CAS(_row->_tid_word,1,0);
-	local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+	// local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+	_row->_tid_word = 0;
 #endif
 	return rc;
 }
@@ -283,7 +294,8 @@ RC Row_rdma_maat::prewrite(TxnManager * txn) {
 	}
 #ifdef USE_CAS
 	//ATOM_CAS(_row->_tid_word,1,0);
-	local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+	// local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+	_row->_tid_word = 0;
 #endif
 	return rc;
 }
@@ -342,7 +354,8 @@ RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
 #endif
 #ifdef USE_CAS
 	//ATOM_CAS(_row->_tid_word,1,0);
-	local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+	// local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+	_row->_tid_word = 0;
 #endif
 	return Abort;
 }
@@ -350,6 +363,7 @@ RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
 RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, row_t * data, uint64_t cor_id) {
 	//printf("the first txn will commit %d\n", txn->get_txn_id());
 	uint64_t mtx_wait_starttime = get_sys_clock();
+	RC rc = RCOK;
 #ifdef USE_CAS
 	//while (!ATOM_CAS(_row->_tid_word, 0, 1)) {
 	if(!local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
@@ -361,12 +375,9 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
 			_row->get_primary_key());
 
 #if WORKLOAD == TPCC
-//#if 0
-	if(txn->get_commit_timestamp() >  _row->timestamp_last_read)
-	_row->timestamp_last_read = txn->get_commit_timestamp();
+	if(txn->get_commit_timestamp() >  _row->timestamp_last_read)_row->timestamp_last_read = txn->get_commit_timestamp();
 	ucread_erase(txn->get_txn_id());
-	if(txn->get_commit_timestamp() >  _row->timestamp_last_write)
-	_row->timestamp_last_write = txn->get_commit_timestamp();
+	if(txn->get_commit_timestamp() >  _row->timestamp_last_write)_row->timestamp_last_write = txn->get_commit_timestamp();
 	ucwrite_erase(txn->get_txn_id());
 	// Apply write to DB
 	write(data);
@@ -383,12 +394,26 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
         else {
             if(txn->uncommitted_writes.count(_row->uncommitted_writes[i]) == 0) {
                 if(_row->uncommitted_writes[i] % g_node_cnt == g_node_id) {
-                    uint64_t it_lower = rdma_txn_table.local_get_lower(txn->get_thd_id(),_row->uncommitted_writes[i]);
+				#if MAAT_CAS
+					if(!rdma_txn_table.local_cas_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id) ) {
+						rc = Abort;
+						
+					}
+				#endif
+                    uint64_t it_lower = rdma_txn_table.local_get_lower(_row->uncommitted_writes[i]);
                     if(it_lower <= txn_commit_ts) {
-                        rdma_txn_table.local_set_lower(txn->get_thd_id(),_row->uncommitted_writes[i],txn_commit_ts+1);
+                        rdma_txn_table.local_set_lower(txn,_row->uncommitted_writes[i],txn_commit_ts+1);
                         
                     }
+				#if MAAT_CAS
+					rdma_txn_table.local_release_timeNode(txn, _row->uncommitted_writes[i]);
+				#endif
                 } else {
+				#if MAAT_CAS
+					if(!rdma_txn_table.remote_cas_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id)) {
+						rc = Abort;
+					}
+				#endif
                     RdmaTxnTableNode* item = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
                     item = rdma_txn_table.remote_get_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id);
                     uint64_t it_lower = item->lower;
@@ -398,24 +423,40 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
                         rdma_txn_table.remote_set_timeNode(yield, txn, _row->uncommitted_writes[i], item, cor_id);
                     }
                     mem_allocator.free(item, sizeof(RdmaTxnTableNode));
+				#if MAAT_CAS
+					rdma_txn_table.remote_release_timeNode(yield, txn,  _row->uncommitted_writes[i], cor_id);
+				#endif
                 }
                 DEBUG("MAAT forward val set lower %ld: %lu\n",_row->uncommitted_writes[i],txn_commit_ts+1);
             } 
         }
     }
 
-	uint64_t lower = rdma_txn_table.local_get_lower(txn->get_thd_id(),txn->get_txn_id());
+	uint64_t lower = rdma_txn_table.local_get_lower(txn->get_txn_id());
     for(uint64_t i = 0; i < row_set_length; i++) {
         if (_row->uncommitted_writes[i] == 0) {
             continue;
         }
         if(txn->uncommitted_writes_y.count(_row->uncommitted_writes[i]) == 0) {
             if(_row->uncommitted_writes[i] % g_node_cnt == g_node_id) {
-                uint64_t it_upper = rdma_txn_table.local_get_upper(txn->get_thd_id(),_row->uncommitted_writes[i]);
+			#if MAAT_CAS
+				if(!rdma_txn_table.local_cas_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id)) {
+					rc = Abort;
+				}
+			#endif
+                uint64_t it_upper = rdma_txn_table.local_get_upper(_row->uncommitted_writes[i]);
                 if(it_upper >= txn_commit_ts) {
-                    rdma_txn_table.local_set_upper(txn->get_thd_id(),_row->uncommitted_writes[i],txn_commit_ts-1);
+                    rdma_txn_table.local_set_upper(txn,_row->uncommitted_writes[i],txn_commit_ts-1);
                 }
+			#if MAAT_CAS
+				rdma_txn_table.local_release_timeNode(txn, _row->uncommitted_writes[i]);
+			#endif
             } else {
+			#if MAAT_CAS
+				if(!rdma_txn_table.remote_cas_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id)) {
+					rc = Abort;
+				}
+			#endif
                 RdmaTxnTableNode* item = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
                 item = rdma_txn_table.remote_get_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id);
                 uint64_t it_upper = item->upper;
@@ -425,6 +466,9 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
                     rdma_txn_table.remote_set_timeNode(yield, txn, _row->uncommitted_writes[i], item, cor_id);
                 }
                 mem_allocator.free(item, sizeof(RdmaTxnTableNode));
+			#if MAAT_CAS
+				rdma_txn_table.remote_release_timeNode(yield, txn,  _row->uncommitted_writes[i], cor_id);
+			#endif
             }
             DEBUG("MAAT forward val set upper %ld: %lu\n",_row->uncommitted_writes[i],txn_commit_ts -1);
         } 
@@ -434,15 +478,26 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
         if (_row->uncommitted_reads[i] == 0) {
             continue;
         } else {
-
-        
             if(txn->uncommitted_reads.count(_row->uncommitted_reads[i]) == 0) {
                 if(_row->uncommitted_reads[i] % g_node_cnt == g_node_id) {
-                    uint64_t it_upper = rdma_txn_table.local_get_upper(txn->get_thd_id(),_row->uncommitted_reads[i]);
+				#if MAAT_CAS
+					if(!rdma_txn_table.local_cas_timeNode(yield, txn, _row->uncommitted_reads[i], cor_id)) {
+						rc = Abort;
+					}
+				#endif
+                    uint64_t it_upper = rdma_txn_table.local_get_upper(_row->uncommitted_reads[i]);
                     if(it_upper >= lower) {
-                        rdma_txn_table.local_set_upper(txn->get_thd_id(),_row->uncommitted_reads[i],lower-1);
+                        rdma_txn_table.local_set_upper(txn,_row->uncommitted_reads[i],lower-1);
                     }
+				#if MAAT_CAS
+					rdma_txn_table.local_release_timeNode(txn, _row->uncommitted_reads[i]);
+				#endif
                 } else {
+				#if MAAT_CAS
+					if(!rdma_txn_table.remote_cas_timeNode(yield, txn, _row->uncommitted_reads[i], cor_id)) {
+						rc = Abort;
+					}
+				#endif
                     RdmaTxnTableNode* item = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
                     item = rdma_txn_table.remote_get_timeNode(yield, txn, _row->uncommitted_reads[i], cor_id);
                     uint64_t it_upper = item->upper;
@@ -452,6 +507,9 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
                         rdma_txn_table.remote_set_timeNode(yield, txn, _row->uncommitted_reads[i], item, cor_id);
                     }
                     mem_allocator.free(item, sizeof(RdmaTxnTableNode));
+				#if MAAT_CAS
+					rdma_txn_table.remote_release_timeNode(yield, txn,  _row->uncommitted_reads[i], cor_id);
+				#endif
                 }
                 DEBUG("MAAT forward val set upper %ld: %lu\n",_row->uncommitted_reads[i],lower -1);
             } 
@@ -475,12 +533,25 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
 			else {
 				if(txn->uncommitted_writes.count(_row->uncommitted_writes[i]) == 0) {
 					if(_row->uncommitted_writes[i] % g_node_cnt == g_node_id) {
-						uint64_t it_lower = rdma_txn_table.local_get_lower(txn->get_thd_id(),_row->uncommitted_writes[i]);
+					#if MAAT_CAS
+						if(!rdma_txn_table.local_cas_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id) && !simulation->is_done()) {
+							rc = Abort;
+						}
+					#endif
+						uint64_t it_lower = rdma_txn_table.local_get_lower(_row->uncommitted_writes[i]);
 						if(it_lower <= txn_commit_ts) {
-							rdma_txn_table.local_set_lower(txn->get_thd_id(),_row->uncommitted_writes[i],txn_commit_ts+1);
+							rdma_txn_table.local_set_lower(txn,_row->uncommitted_writes[i],txn_commit_ts+1);
 							
 						}
+					#if MAAT_CAS
+						rdma_txn_table.local_release_timeNode(txn, _row->uncommitted_writes[i]);
+					#endif
 					} else {
+					#if MAAT_CAS
+						if(!rdma_txn_table.remote_cas_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id)) {
+							rc = Abort;
+						}
+					#endif
 						RdmaTxnTableNode* item = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
 						item = rdma_txn_table.remote_get_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id);
 						uint64_t it_lower = item->lower;
@@ -490,6 +561,9 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
 							rdma_txn_table.remote_set_timeNode(yield, txn, _row->uncommitted_writes[i], item, cor_id);
 						}
 						mem_allocator.free(item, sizeof(RdmaTxnTableNode));
+					#if MAAT_CAS
+						rdma_txn_table.remote_release_timeNode(yield, txn,  _row->uncommitted_writes[i], cor_id);
+					#endif
 					}
 					DEBUG("MAAT forward val set lower %ld: %lu\n",_row->uncommitted_writes[i],txn_commit_ts+1);
 				} 
@@ -509,18 +583,31 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
 		ucwrite_erase(txn->get_txn_id());
 		// Apply write to DB
 		write(data);
-		uint64_t lower = rdma_txn_table.local_get_lower(txn->get_thd_id(),txn->get_txn_id());
+		uint64_t lower = rdma_txn_table.local_get_lower(txn->get_txn_id());
 		for(uint64_t i = 0; i < row_set_length; i++) {
 			if (_row->uncommitted_writes[i] == 0) {
 				continue;
 			}
 			if(txn->uncommitted_writes_y.count(_row->uncommitted_writes[i]) == 0) {
 				if(_row->uncommitted_writes[i] % g_node_cnt == g_node_id) {
-					uint64_t it_upper = rdma_txn_table.local_get_upper(txn->get_thd_id(),_row->uncommitted_writes[i]);
-					if(it_upper >= txn_commit_ts) {
-						rdma_txn_table.local_set_upper(txn->get_thd_id(),_row->uncommitted_writes[i],txn_commit_ts-1);
+				#if MAAT_CAS
+					if(!rdma_txn_table.local_cas_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id)) {
+						rc = Abort;
 					}
+				#endif
+					uint64_t it_upper = rdma_txn_table.local_get_upper(_row->uncommitted_writes[i]);
+					if(it_upper >= txn_commit_ts) {
+						rdma_txn_table.local_set_upper(txn,_row->uncommitted_writes[i],txn_commit_ts-1);
+					}
+				#if MAAT_CAS
+					rdma_txn_table.local_release_timeNode(txn, _row->uncommitted_writes[i]);
+				#endif
 				} else {
+				#if MAAT_CAS
+					if(!rdma_txn_table.remote_cas_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id)) {
+						rc = Abort;
+					}
+				#endif
 					RdmaTxnTableNode* item = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
 					item = rdma_txn_table.remote_get_timeNode(yield, txn, _row->uncommitted_writes[i], cor_id);
 					uint64_t it_upper = item->upper;
@@ -530,6 +617,9 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
 						rdma_txn_table.remote_set_timeNode(yield, txn, _row->uncommitted_writes[i], item, cor_id);
 					}
 					mem_allocator.free(item, sizeof(RdmaTxnTableNode));
+				#if MAAT_CAS
+					rdma_txn_table.remote_release_timeNode(yield, txn,  _row->uncommitted_writes[i], cor_id);
+				#endif
 				}
 				DEBUG("MAAT forward val set upper %ld: %lu\n",_row->uncommitted_writes[i],txn_commit_ts -1);
 			} 
@@ -540,11 +630,24 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
 			} else {
 				if(txn->uncommitted_reads.count(_row->uncommitted_reads[i]) == 0) {
 					if(_row->uncommitted_reads[i] % g_node_cnt == g_node_id) {
-						uint64_t it_upper = rdma_txn_table.local_get_upper(txn->get_thd_id(),_row->uncommitted_reads[i]);
-						if(it_upper >= lower) {
-							rdma_txn_table.local_set_upper(txn->get_thd_id(),_row->uncommitted_reads[i],lower-1);
+					#if MAAT_CAS
+						if(!rdma_txn_table.local_cas_timeNode(yield, txn, _row->uncommitted_reads[i], cor_id)) {
+							rc = Abort;
 						}
+					#endif
+						uint64_t it_upper = rdma_txn_table.local_get_upper(_row->uncommitted_reads[i]);
+						if(it_upper >= lower) {
+							rdma_txn_table.local_set_upper(txn,_row->uncommitted_reads[i],lower-1);
+						}
+					#if MAAT_CAS
+						rdma_txn_table.local_release_timeNode(txn, _row->uncommitted_reads[i]);
+					#endif
 					} else {
+					#if MAAT_CAS
+						if(!rdma_txn_table.remote_cas_timeNode(yield, txn, _row->uncommitted_reads[i], cor_id)) {
+							rc = Abort;
+						}
+					#endif
 						RdmaTxnTableNode* item = (RdmaTxnTableNode *)mem_allocator.alloc(sizeof(RdmaTxnTableNode));
 						item = rdma_txn_table.remote_get_timeNode(yield, txn, _row->uncommitted_reads[i], cor_id);
 						uint64_t it_upper = item->upper;
@@ -554,6 +657,9 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
 							rdma_txn_table.remote_set_timeNode(yield, txn, _row->uncommitted_reads[i], item, cor_id);
 						}
 						mem_allocator.free(item, sizeof(RdmaTxnTableNode));
+					#if MAAT_CAS
+						rdma_txn_table.remote_release_timeNode(yield, txn,  _row->uncommitted_reads[i], cor_id);
+					#endif
 					}
 					DEBUG("MAAT forward val set upper %ld: %lu\n",_row->uncommitted_reads[i],lower -1);
 				} 
@@ -564,9 +670,10 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
 	#endif
 #ifdef USE_CAS
 	//ATOM_CAS(_row->_tid_word,1,0);
-	local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+	// local_cas_lock(txn, txn->get_txn_id() + 1, 0);
+	_row->_tid_word = 0;
 #endif
-	 return RCOK;
+	 return rc;
 }
 
 void Row_rdma_maat::write(row_t* data) { _row->copy(data); }

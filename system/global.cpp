@@ -60,9 +60,11 @@
 #include "rdma_2pl.h"
 #include "rdma_maat.h"
 #include "rdma_ts1.h"
+#include "rdma_ts.h"
 #include "rdma_cicada.h"
 #include "rdma_calvin.h"
 #include "rdma_null.h"
+#include "rdma_dslr_no_wait.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -110,8 +112,11 @@ rdma_mvcc rmvcc_man;
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
 RDMA_2pl r2pl_man;
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
 RdmaTxnTable rdma_txn_table;
+#endif
+#if CC_ALG == RDMA_DSLR_NO_WAIT
+RDMA_dslr_no_wait dslr_man;
 #endif
 #if CC_ALG == RDMA_MAAT
 RDMA_Maat rmaat_man;
@@ -119,6 +124,9 @@ RdmaTxnTable rdma_txn_table;
 #endif
 #if CC_ALG == RDMA_TS1
 RDMA_ts1 rdmats_man;
+#endif
+#if CC_ALG == RDMA_TS
+RDMA_ts rdmats_man;
 #endif
 #if CC_ALG == RDMA_CICADA
 RDMA_Cicada rcicada_man;
@@ -290,6 +298,8 @@ uint32_t g_max_num_waits = MAX_NUM_WAITS;
 
 double g_mpr = MPR;
 double g_mpitem = MPIR;
+
+uint64_t count_max = 32768;
 
 // PPS (Product-Part-Supplier)
 UInt32 g_max_parts_per = MAX_PPS_PARTS_PER;

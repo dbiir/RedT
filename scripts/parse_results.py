@@ -44,6 +44,10 @@ if 'read_retry_cnt' in summary:
     d = sum(summary['read_retry_cnt'])
 if 'avg_trans_total_run_time' in summary:
     e = sum(summary['avg_trans_total_run_time']) 
+if 'remote_txn_cnt' in summary:
+    g = sum(summary['remote_txn_cnt']) 
+if 'txn_cnt' in summary:
+    h = sum(summary['txn_cnt']) 
 if 'worker_oneside_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
     f = sum(summary['worker_oneside_cnt']) / (sum(summary['total_txn_commit_cnt']) + sum(summary['total_txn_abort_cnt']))
-print a, b, c, d, e, f
+print a, b, f, g / h

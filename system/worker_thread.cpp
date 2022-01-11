@@ -1228,6 +1228,9 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   assert(time_table.get_state(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == MAAT_RUNNING);
   #endif
 #endif
+#if CC_ALG == RDMA_TS1 || CC_ALG == RDMA_TS
+  rdma_txn_table.init(get_thd_id(),txn_id);
+#endif
 #if CC_ALG == WOOKONG
   txn_table.update_min_ts(get_thd_id(),txn_id,0,cor_txn_man[cor_id]->get_timestamp());
   wkdb_time_table.init(get_thd_id(),cor_txn_man[cor_id]->get_txn_id(), cor_txn_man[cor_id]->get_timestamp());
@@ -1329,19 +1332,19 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
         simulation->seconds_from_start(get_sys_clock()), txn_man->txn_stats.starttime);
   }
     // Get new timestamps
-    if(is_cc_new_timestamp()) {
-    #if WORKLOAD==DA //mvcc use timestamp
-      if(da_stamp_tab.count(txn_man->get_txn_id())==0)
-      {
-        da_stamp_tab[txn_man->get_txn_id()]=get_next_ts();
-        txn_man->set_timestamp(da_stamp_tab[txn_man->get_txn_id()]);
-      }
-      else
-        txn_man->set_timestamp(da_stamp_tab[txn_man->get_txn_id()]);
-    #else
-      txn_man->set_timestamp(get_next_ts());
-    #endif
+  if(is_cc_new_timestamp()) {
+  #if WORKLOAD==DA //mvcc use timestamp
+    if(da_stamp_tab.count(txn_man->get_txn_id())==0)
+    {
+      da_stamp_tab[txn_man->get_txn_id()]=get_next_ts();
+      txn_man->set_timestamp(da_stamp_tab[txn_man->get_txn_id()]);
     }
+    else
+      txn_man->set_timestamp(da_stamp_tab[txn_man->get_txn_id()]);
+  #else
+    txn_man->set_timestamp(get_next_ts());
+  #endif
+  }
 
 #if CC_ALG == MVCC|| CC_ALG == WSI || CC_ALG == SSI
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
@@ -1505,7 +1508,7 @@ RC WorkerThread::process_calvin_rtxn(yield_func_t &yield, Message * msg, uint64_
 }
 
 bool WorkerThread::is_cc_new_timestamp() {
-  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == RDMA_MVCC || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == CICADA);
+  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == RDMA_MVCC || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == CICADA || CC_ALG ==RDMA_TS);
 }
 
 ts_t WorkerThread::get_next_ts() {
@@ -1587,6 +1590,7 @@ RC WorkerNumThread::run() {
     INC_STATS(_thd_id,work_queue_dtx_cnt[i],dtx_size);
     i++;
     sleep(1);
+    printf("------------%d s-----------%s--\n", i, simulation->is_warmup_done()?"exec":"warm");
     // if(idle_starttime ==0)
     //   idle_starttime = get_sys_clock();
 

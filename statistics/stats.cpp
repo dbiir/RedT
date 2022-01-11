@@ -126,6 +126,12 @@ void Stats_thd::clear() {
   read_retry_cnt=0;
   write_retry_cnt=0;
 
+  //dslr
+  jump_abort = 0;
+  deadlock_abort = 0;
+  overflow_abort = 0;
+  process_overflow = 0;
+
   // Breakdown
   ts_alloc_time=0;
   abort_time=0;
@@ -1311,7 +1317,19 @@ void Stats_thd::print(FILE * outf, bool prog) {
           ano_2_trans_write_skew_1, ano_2_trans_write_skew_2, ano_3_trans_write_skew_1,
           ano_3_trans_write_skew_2, ano_2_trans_read_skew, ano_3_trans_read_skew_1,
           ano_3_trans_read_skew_2, ano_4_trans_read_skew, ano_unknown);
+  fprintf(outf,
+          ",preqlen_over_cnt=%ld"
+          ",lock_retry_cnt=%ld"
+          ",read_retry_cnt=%ld"
+          ",write_retry_cnt=%ld",
+          preqlen_over_cnt, lock_retry_cnt, read_retry_cnt,
+          write_retry_cnt);
 
+    fprintf(outf,
+        ",jump_abort = %ld"
+        ",deadlock_abort = %ld"
+        ",overflow_abort = %ld"
+        ",process_overflow = %ld",jump_abort,deadlock_abort,overflow_abort,process_overflow);
 
   // if (!prog) {
   //     last_start_commit_latency.quicksort(0,last_start_commit_latency.cnt-1);
@@ -1477,6 +1495,11 @@ void Stats_thd::combine(Stats_thd * stats) {
   lock_retry_cnt+=stats->lock_retry_cnt;
   read_retry_cnt+=stats->read_retry_cnt;
   write_retry_cnt+=stats->write_retry_cnt;
+
+  jump_abort+=stats->jump_abort;
+  deadlock_abort+=stats->deadlock_abort;
+  overflow_abort+=stats->overflow_abort;
+  process_overflow+=stats->process_overflow;
 
   // Breakdown
   ts_alloc_time+=stats->ts_alloc_time;

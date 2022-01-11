@@ -92,8 +92,11 @@ class rdma_mvcc;
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
 class RDMA_2pl;
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || RDMA_TS
 class RdmaTxnTable;
+#endif
+#if CC_ALG == RDMA_DSLR_NO_WAIT
+class RDMA_dslr_no_wait;
 #endif
 #if CC_ALG == RDMA_MAAT
 class RDMA_Maat;
@@ -101,6 +104,9 @@ class RdmaTxnTable;
 #endif
 #if CC_ALG == RDMA_TS1
 class RDMA_ts1;
+#endif
+#if CC_ALG == RDMA_TS
+class RDMA_ts;
 #endif
 #if CC_ALG == RDMA_CICADA
 class RDMA_Cicada;
@@ -178,8 +184,11 @@ extern rdma_mvcc rmvcc_man;
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
 extern RDMA_2pl r2pl_man;
 #endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
 extern RdmaTxnTable rdma_txn_table;
+#endif
+#if CC_ALG == RDMA_DSLR_NO_WAIT
+extern  RDMA_dslr_no_wait dslr_man;
 #endif
 #if CC_ALG == RDMA_MAAT
 extern RDMA_Maat rmaat_man;
@@ -187,6 +196,9 @@ extern RdmaTxnTable rdma_txn_table;
 #endif
 #if CC_ALG ==RDMA_TS1
 extern RDMA_ts1 rdmats_man;
+#endif
+#if CC_ALG ==RDMA_TS
+extern RDMA_ts rdmats_man;
 #endif
 #if CC_ALG == RDMA_CICADA
 extern RDMA_Cicada rcicada_man;
@@ -343,6 +355,7 @@ extern UInt64 g_max_read_req;
 extern UInt64 g_max_pre_req;
 extern UInt64 g_his_recycle_len;
 
+extern uint64_t count_max;
 // YCSB
 extern UInt32 g_cc_alg;
 extern ts_t g_query_intvl;

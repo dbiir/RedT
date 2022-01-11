@@ -41,7 +41,7 @@ void * rdma_mvcc::local_write_back(TxnManager * txnMng , uint64_t num){
 
     //the version to be unlocked by txn_id
     int release_ver = txnMng->txn->accesses[num]->old_version_num % HIS_CHAIN_NUM;
-    
+    // printf("local %ld write commit %ld\n",temp_row->get_primary_key(),temp_row->txn_id[version_change]);
     // 3.writes the new version, RTS, start_ts, end_ts, txn-id, etc. by ONE SIDE WRITE, and unlocks the previous version's txn-id by setting it to 0
     temp_row->version_num = temp_row->version_num +1;
 
@@ -49,9 +49,10 @@ void * rdma_mvcc::local_write_back(TxnManager * txnMng , uint64_t num){
     temp_row->rts[version_change] = txnMng->txn->timestamp;
     temp_row->start_ts[version_change] = txnMng->txn->timestamp;
     temp_row->end_ts[version_change] = UINT64_MAX;
-
+    
     temp_row->txn_id[release_ver] = 0;
     temp_row->end_ts[release_ver] = txnMng->txn->timestamp;
+    
     temp_row->_tid_word = 0;//release lock
 }
 
@@ -74,7 +75,7 @@ void * rdma_mvcc::remote_write_back(yield_func_t &yield,TxnManager * txnMng , ui
 
     //the version to be unlocked by txn_id
     int release_ver = txnMng->txn->accesses[num]->old_version_num % HIS_CHAIN_NUM;
-    
+    // printf("remote %ld write commit %ld\n",temp_row->get_primary_key(),temp_row->txn_id[version_change]);
     // 3.writes the new version, RTS, start_ts, end_ts, txn-id, etc. by ONE SIDE WRITE, and unlocks the previous version's txn-id by setting it to 0
     temp_row->version_num = temp_row->version_num +1;
 
@@ -82,12 +83,13 @@ void * rdma_mvcc::remote_write_back(yield_func_t &yield,TxnManager * txnMng , ui
     temp_row->rts[version_change] = txnMng->txn->timestamp;
     temp_row->start_ts[version_change] = txnMng->txn->timestamp;
     temp_row->end_ts[version_change] = UINT64_MAX;
-
+    
     temp_row->txn_id[release_ver] = 0;
     temp_row->end_ts[release_ver] = txnMng->txn->timestamp;
 
     temp_row->_tid_word = 0;//release lock
-//write back
+    
+    //write back
     Transaction *txn = txnMng->txn;
 	uint64_t thd_id = txnMng->get_thd_id();
 	uint64_t lock = txnMng->get_txn_id() + 1;
@@ -99,186 +101,15 @@ void * rdma_mvcc::remote_write_back(yield_func_t &yield,TxnManager * txnMng , ui
 
     mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 }
-/*
-RC rdma_mvcc::validate_local(TxnManager * txnMng){
-    RC rc = RCOK;
-    //sort the read and write sets
-    Transaction *txn = txnMng->txn;
-    uint64_t wr_cnt = txn->write_cnt;
 
-	int wr = 0; 
-  	//int read_set[10];
-	int read_set[txn->row_cnt - txn->write_cnt];
-	int rd = 0;
-    for (uint64_t rid = 0; rid < txn->row_cnt; rid ++) {
-		if (txn->accesses[rid]->type == WR)
-			txnMng->write_set[wr ++] = rid;
-		else
-			read_set[rd ++] = rid;
-	}
-
-    int  i = 0;
-    for(i = 0;i < txn->row_cnt;i ++ ){
-        uint64_t thd_id = txnMng->get_thd_id();
-        uint64_t loc = txn->accesses[i]->location;
-        uint64_t remote_offset = txn->accesses[i]->offset;
-        uint64_t lock_num = txnMng->get_txn_id() + 1;
-        if(txn->accesses[i]->location == g_node_id){//local data
-            //lock
-            // assert(txnMng->loop_cas_remote(loc,remote_offset,0,lock_num) == true);
-            if(txnMng->cas_remote_content(yield, loc, remote_offset, 0, lock_num, cor_id) != 0){
-                rc = Abort;
-                goto cas_fail_break;
-            }
-
-            if(txn->accesses[i]->type == RD){
-                 //ff the version's txn-id is not 0 and is not equal to the current transaction, the current transaction is rolled back
-                row_t *temp_row = txn->accesses[i]->orig_row;
-
-                uint64_t change_num = 0;
-                bool result = false;
-                result = get_version(temp_row,&change_num,txn);
-                
-                if(result == false){//no suitable version
-                    INC_STATS(txnMng->get_thd_id(), result_false, 1);
-                    // printf("rdam_mvcc:377 version_num = %ld , txn_id = %ld %ld %ld %ld \n",temp_row->version_num, temp_row->txn_id[0],temp_row->txn_id[1],temp_row->txn_id[2],temp_row->txn_id[3]);
-                    rc = Abort;
-                }
-                else{//check txn_id
-                    if(temp_row->txn_id[change_num] != 0 && temp_row->txn_id[change_num] != txnMng->get_txn_id() + 1){
-                        INC_STATS(txnMng->get_thd_id(), result_false, 1);
-                        // printf("【rdma_mvcc:356】version_num = %ld , txn_id = %ld %ld %ld %ld \n",temp_row->version_num, temp_row->txn_id[0],temp_row->txn_id[1],temp_row->txn_id[2],temp_row->txn_id[3]);
-                        rc = Abort;//version does not qualify
-                    }
-                    else{
-                        //in other cases, write a modified version of the RTS unilaterally and unlock it
-                        //uint64_t version = (temp_row->version_num)%HIS_CHAIN_NUM;
-                        uint64_t version = change_num;
-                        temp_row->rts[version] = txn->timestamp;
-                        //temp_row->_tid_word = 0;
-                        //Stores read data into a read set(should but not)
-                    }
-                }
-            }
-            else if(txn->accesses[i]->type == WR){
-                row_t * temp_row = txn->accesses[i]->orig_row;  
-                uint64_t version = (temp_row->version_num)%HIS_CHAIN_NUM;
-                if(temp_row->txn_id[version] != 0 && temp_row->txn_id[version] != txnMng->get_txn_id() + 1){
-                    INC_STATS(txnMng->get_thd_id(), ts_error, 1);
-                    // printf("【rdma_mvcc:322】version_num = %ld , txn_id = %ld %ld %ld %ld \n",temp_row->version_num, temp_row->txn_id[0],temp_row->txn_id[1],temp_row->txn_id[2],temp_row->txn_id[3]);
-                    rc = Abort;
-                }
-                else if(txn->timestamp <= temp_row->rts[version]){
-                    INC_STATS(txnMng->get_thd_id(), ts_error, 1);
-                    // printf("【rdma_mvcc:327】txn->timestamp = %ld temp_row->rts[%ld] = %ld \n",txn->timestamp,version,temp_row->rts[version]);
-                    rc = Abort;
-                }
-                else{
-                    //in other cases, write a modified version of the RTS unilaterally and unlock it
-                    temp_row->txn_id[version] = txnMng->get_txn_id() + 1;
-                    temp_row->rts[version] = txn->timestamp;
-                  //temp_row->version_num = temp_row->version_num + 1;
-                   //temp_row->_tid_word = 0;//release lock
-
-                }
-           }
-            // remote_release_lock(txnMng,i);//release lock
-	        // uint64_t lock_num = txnMng->get_txn_id() + 1;
-            uint64_t release_lock = txnMng->cas_remote_content(yield,loc,remote_offset,lock_num,0,cor_id);
-            assert(release_lock == lock_num);
-        }
-        else{ //remote data
-            //lock in loop
-            //assert(txnMng->loop_cas_remote(loc,remote_offset,0,lock_num) == true);
-            if(txnMng->cas_remote_content(yield,loc,remote_offset,0,lock_num,cor_id) != 0){
-                rc = Abort;
-                goto cas_fail_break;
-            }
-
-            bool write_back = false;
-
-            row_t *temp_row = txn->accesses[i]->orig_row;
-            uint64_t old_lock = temp_row->_tid_word;
-            uint64_t operate_size = row_t::get_row_size(temp_row->tuple_size);
-            if(txn->accesses[i]->type == RD){
-                //get target version
-              
-                uint64_t change_num = 0;
-                bool result = false;
-                result = get_version(temp_row,&change_num,txn);
-
-                if(result == false){//no proper version
-                    INC_STATS(txnMng->get_thd_id(), result_false, 1);
-                    rc = Abort;
-                }
-                else{//check txn_id
-                    if(temp_row->txn_id[change_num] != 0 && temp_row->txn_id[change_num] != txnMng->get_txn_id() + 1){
-                        INC_STATS(txnMng->get_thd_id(), result_false, 1);
-                        rc = Abort;//version dont match condition
-                    }
-                    else{
-                        //uint64_t version = (temp_row->version_num)%HIS_CHAIN_NUM;
-                        uint64_t version = change_num;
-                        temp_row->rts[version] = txn->timestamp;
-                        temp_row->_tid_word = 0;
-
-                        // char *test_buf = Rdma::get_row_client_memory(thd_id);
-                        // memcpy(test_buf, (char*)temp_row, operate_size);
-
-                        assert(txnMng->write_remote_row(yield,loc,operate_size,remote_offset,(char*)temp_row,cor_id)==true);
-                        write_back = true;       
-                        //Stores read data into a read set(should but not)
-
-                    }
-                }
-                
-            }
-            else if(txn->accesses[i]->type == WR){
-                uint64_t version = (temp_row->version_num)%HIS_CHAIN_NUM;
-                if(temp_row->txn_id[version] != 0 && temp_row->txn_id[version] != txnMng->get_txn_id() + 1){
-                    INC_STATS(txnMng->get_thd_id(), ts_error, 1);
-                    rc = Abort;
-                }else if(txn->timestamp <= temp_row->rts[version]){
-                    INC_STATS(txnMng->get_thd_id(), ts_error, 1);
-                    rc = Abort;
-                }else{
-                    //in other cases, write a modified version of the RTS unilaterally and unlock it
-                    temp_row->txn_id[version] = txnMng->get_txn_id() + 1;
-                    temp_row->rts[version] = txn->timestamp;
-                    //temp_row->version_num = temp_row->version_num + 1;
-                    temp_row->_tid_word = 0;//release lock
-
-                    // char *test_buf = Rdma::get_row_client_memory(thd_id);
-                    // memcpy(test_buf, (char*)temp_row, operate_size);
-
-                    assert(txnMng->write_remote_row(yield,loc,operate_size,remote_offset,(char*)temp_row,cor_id)==true);
-                    write_back = true;
-              
-                }
-            }
-
-             //rlease lock
-            if(write_back == false){
-                uint64_t release_lock = -1;
-                release_lock = txnMng->cas_remote_content(yield,loc,remote_offset,lock_num,0,cor_id);
-
-                // assert(release_lock == lock_num);
-            }
-
-        }
-cas_fail_break:
-    if(rc == Abort)break;
-   }
-
-    return rc;
-}
-*/
 void * rdma_mvcc::abort_release_local_lock(TxnManager * txnMng , uint64_t num){
         Transaction *txn = txnMng->txn;
         row_t * temp_row = txn->accesses[num]->orig_row;
         int version = txn->accesses[num]->old_version_num % HIS_CHAIN_NUM ;//version be locked
         //int version = temp_row->version_num % HIS_CHAIN_NUM;
+        // printf("local %ld write abort %ld\n",temp_row->get_primary_key(),temp_row->txn_id[version]);
         temp_row->txn_id[version] = 0;
+        
 }
 
 void * rdma_mvcc::abort_release_remote_lock(yield_func_t &yield, TxnManager * txnMng , uint64_t num, uint64_t cor_id){
@@ -286,6 +117,7 @@ void * rdma_mvcc::abort_release_remote_lock(yield_func_t &yield, TxnManager * tx
         row_t * temp_row = txn->accesses[num]->orig_row;
         int version = txn->accesses[num]->old_version_num % HIS_CHAIN_NUM ;//version be locked
         //int version = temp_row->version_num % HIS_CHAIN_NUM;
+        // printf("remote %ld write abort %ld\n",temp_row->get_primary_key(),temp_row->txn_id[version]);
         temp_row->txn_id[version] = 0;
 
         uint64_t off = txn->accesses[num]->offset;
@@ -316,20 +148,20 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
     uint64_t wr_cnt = txn->write_cnt;
 
     vector<vector<uint64_t>> remote_access(g_node_cnt);
-     if(rc == Abort){
+    if(rc == Abort){
         for (uint64_t i = 0; i < wr_cnt; i++) {
            uint64_t num = txnMng->write_set[i];
            uint64_t remote_offset = txn->accesses[num]->offset;
            uint64_t loc = txn->accesses[num]->location;
 	       uint64_t lock_num = txnMng->get_txn_id() + 1;
-#if USE_DBPAOR == true
+        #if USE_DBPAOR == true
            if(loc != g_node_id) remote_access[loc].push_back(num);
            else{ //local
                abort_release_local_lock(txnMng,num);
            }
-#else
+        #else
            //lock in loop
-        //    assert(txnMng->loop_cas_remote(yield,loc,remote_offset,0,lock_num,cor_id) == true);
+            // assert(txnMng->loop_cas_remote(yield,loc,remote_offset,0,lock_num,cor_id) == true);
 
            //release lock
            if(txn->accesses[num]->location == g_node_id){
@@ -339,9 +171,9 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
            }
         //    uint64_t release_lock = txnMng->cas_remote_content(yield,loc,remote_offset,lock_num,0,cor_id);
         //    assert(release_lock == lock_num);
-#endif
+        #endif
         }
-#if USE_DBPAOR == true
+        #if USE_DBPAOR == true
         uint64_t starttime = get_sys_clock(), endtime;
         for(int i=0;i<g_node_cnt;i++){ //for the same node, batch unlock remote
             if(remote_access[i].size() > 0){
@@ -352,7 +184,7 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
             if(remote_access[i].size() > 0){
             	//to do: add coroutine
                 INC_STATS(txnMng->get_thd_id(), worker_oneside_cnt, 1);
-#if USE_COROUTINE
+            #if USE_COROUTINE
                 uint64_t waitcomp_time;
                 std::pair<int,ibv_wc> dbres1;
                 INC_STATS(txnMng->get_thd_id(), worker_process_time, get_sys_clock() - txnMng->h_thd->cor_process_starttime[cor_id]);
@@ -374,26 +206,26 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
                 } while (dbres1.first == 0);
                 txnMng->h_thd->cor_process_starttime[cor_id] = get_sys_clock();
                 // RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-#else
+            #else
                 auto dbres1 = rc_qp[i][txnMng->get_thd_id() + cor_id * g_thread_cnt]->wait_one_comp();
                 RDMA_ASSERT(dbres1 == IOCode::Ok);
                 endtime = get_sys_clock();
                 INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
                 INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
                 DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
-#endif 
+            #endif 
             }
         }
-#endif
-     }
-     else{ //COMMIT
+        #endif
+    }
+    else{ //COMMIT
        for (uint64_t i = 0; i < wr_cnt; i++) {
            uint64_t num = txnMng->write_set[i];
            uint64_t remote_offset = txn->accesses[num]->offset;
            uint64_t loc = txn->accesses[num]->location;
 	       uint64_t lock_num = txnMng->get_txn_id() + 1;
            row_t* remote_row = NULL;
-#if USE_DBPAOR == true
+        #if USE_DBPAOR == true
             if(loc !=  g_node_id){ //remote
                 uint64_t try_lock;
                 remote_row = txnMng->cas_and_read_remote(yield, try_lock,loc,remote_offset,remote_offset,0,lock_num, cor_id);
@@ -405,10 +237,10 @@ RC rdma_mvcc::finish(yield_func_t &yield, RC rc,TxnManager * txnMng, uint64_t co
             else{ //local
                 assert(txnMng->loop_cas_remote(loc,remote_offset,0,lock_num) == true);
             }
-#else
+        #else
            //lock in loop
            assert(txnMng->loop_cas_remote(yield,loc,remote_offset,0,lock_num,cor_id) == true);
-#endif
+        #endif
 
            if(txn->accesses[num]->location == g_node_id){//local
                 local_write_back(txnMng, num);

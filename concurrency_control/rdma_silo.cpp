@@ -85,16 +85,16 @@ RC RDMA_silo::validate_rdma_silo(yield_func_t &yield, TxnManager * txnMng, uint6
 			}
 		}
 	}
-	while (!done) {
-		txnMng->num_locks = 0;
-		for (uint64_t i = 0; i < wr_cnt; i++) {
+	txnMng->num_locks = 0;
+	for (uint64_t i = 0; i < wr_cnt; i++) {
+		while (!done) {
 			if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){//lock in local
 				row_t * row = txn->accesses[ txnMng->write_set[i] ]->orig_row;
 				if (!row->manager->try_lock(yield, txnMng,txnMng->write_set[i], cor_id))
 				{
 					INC_STATS(txnMng->get_thd_id(), local_try_lock_fail_abort, 1); //17%
 					INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
-					break;
+					continue;
 				}
 				DEBUG("silo %ld write lock row %ld \n", txnMng->get_txn_id(), row->get_primary_key());
 				if (!row->manager->assert_lock(txnMng->get_txn_id())) {
@@ -104,8 +104,10 @@ RC RDMA_silo::validate_rdma_silo(yield_func_t &yield, TxnManager * txnMng, uint6
 					INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
 					rc = Abort;
 					return rc;
-				} else
-				txnMng->num_locks ++;
+				} else {
+					done = true;
+					txnMng->num_locks ++;
+				}
 			}
 			else{//lock remote
 				row_t * row = txn->accesses[ txnMng->write_set[i] ]->orig_row;
@@ -129,16 +131,8 @@ RC RDMA_silo::validate_rdma_silo(yield_func_t &yield, TxnManager * txnMng, uint6
 				// 	rc = Abort;
 				// 	return rc;
 				// }
+				done = true;
 			}
-		}
-		if (txnMng->num_locks == wr_cnt) {
-			DEBUG("TRY LOCK true %ld\n", txnMng->get_txn_id());
-			done = true;
-		} else {
-			INC_STATS(txnMng->get_thd_id(), cnt_unequal_abort, 1);
-			INC_STATS(txnMng->get_thd_id(), valid_abort_cnt, 1);
-			rc = Abort;
-			return rc;
 		}
 	}
 
