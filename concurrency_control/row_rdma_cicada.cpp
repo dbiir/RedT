@@ -72,17 +72,69 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 	DEBUG("READ %ld -- %ld\n", txn->get_txn_id(), _row->get_primary_key());
 	uint64_t version = 0;	
 	if(type == RD) {
-		for(int cnt = _row->version_cnt; cnt >= _row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
-			int i = cnt % HIS_CHAIN_NUM;
+	#if 0
+		uint64_t max_version = 0, max_wts = 0;
+		for(int i = 0; i < HIS_CHAIN_NUM; i++) {
 			if(_row->cicada_version[i].state == Cicada_ABORTED) {
 				continue;
 			}
 			if(_row->cicada_version[i].Wts > txn->get_timestamp()) {
 				continue;
 			}
+			if(_row->cicada_version[i].Wts > max_wts) {
+				max_wts = _row->cicada_version[i].Wts;
+				max_version = _row->cicada_version[i].key;
+			}
+		}
+		int i = max_version % HIS_CHAIN_NUM;
+		if(_row->cicada_version[i].state == Cicada_PENDING) {
+			rc = WAIT;
+			while(rc == WAIT && !simulation->is_done()) {
+				// local_cas_lock(txn, txn->get_txn_id(), 0);
+				// if(!local_cas_lock(txn, 0, txn->get_txn_id())){
+				// 	return Abort;
+				// }
+				retry_time += 1;
+			#if USE_COROUTINE
+				txn->h_thd->last_yield_time = get_sys_clock();
+				INC_STATS(txn->get_thd_id(), worker_process_time, get_sys_clock() - txn->h_thd->cor_process_starttime[cor_id]);
+				// printf("do\n");
+				yield(txn->h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+				uint64_t yield_endtime = get_sys_clock();
+				INC_STATS(txn->get_thd_id(), worker_yield_cnt, 1);
+				INC_STATS(txn->get_thd_id(), worker_yield_time, yield_endtime - txn->h_thd->last_yield_time);
+				INC_STATS(txn->get_thd_id(), worker_idle_time, yield_endtime - txn->h_thd->last_yield_time);
+				INC_STATS(txn->get_thd_id(), worker_proto_wait_time, yield_endtime - txn->h_thd->last_yield_time);
+				txn->h_thd->cor_process_starttime[cor_id] = get_sys_clock();
+			#endif
+				if(_row->cicada_version[i].state == Cicada_PENDING) {
+					rc = WAIT;
+				} else if (_row->cicada_version[i].state == Cicada_ABORTED) {
+					rc = Abort;
+				} else {
+					rc = RCOK;
+					version = _row->cicada_version[i].key;
+				}
+				if(retry_time > 1) {
+					rc = Abort;
+				}
+			}
+		} else {
+			rc = RCOK;
+			version = _row->cicada_version[i].key;
+		}
+	#else
+		bool find = false;
+		for(int cnt = _row->version_cnt; cnt >= _row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
+			int i = cnt % HIS_CHAIN_NUM;
+			if(_row->cicada_version[i].state == Cicada_ABORTED) {
+				continue;
+			}
+			if(_row->cicada_version[i].Wts > txn->get_timestamp()) {
+				// printf("l large version:%d state:%d Wts:%lu: txnts:%lu\n", cnt, _row->cicada_version[i].state, _row->cicada_version[i].Wts, txn->get_timestamp());
+				continue;
+			}
 			if(_row->cicada_version[i].state == Cicada_PENDING) {
-				// --todo !---pendind need wait //
-				
 				rc = WAIT;
 				while(rc == WAIT && !simulation->is_done()) {
 					// local_cas_lock(txn, txn->get_txn_id(), 0);
@@ -108,20 +160,79 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 						break;
 					} else {
 						rc = RCOK;
+						find = true;
 						version = _row->cicada_version[i].key;
 					}
-					if(retry_time > 1) {
+					if(retry_time > CICADA_MAX_RETRY_TIME) {
 						rc = Abort;
+						// printf("l find row %ld version and failed:%d state:%d Wts:%lu: txnts:%lu\n", _row->get_primary_key(), cnt, _row->cicada_version[i].state, _row->cicada_version[i].Wts, txn->get_timestamp());
+						INC_STATS(txn->get_thd_id(), cicada_case5_cnt, 1);
 					}
 				}
 			} else {
 				rc = RCOK;
+				find = true;
 				version = _row->cicada_version[i].key;
 			}
-			if (rc == RCOK || rc == Abort) break;
+			if (find || rc == Abort) break;
 		}
+	#endif
 	} else if(type == WR) {
 		assert(_row->version_cnt >= 0);
+	#if 0
+		uint64_t max_version = 0, max_wts = 0;
+		for(int i = 0; i < HIS_CHAIN_NUM; i++) {
+			if(_row->cicada_version[i].state == Cicada_ABORTED) {
+				continue;
+			}
+			if(_row->cicada_version[i].Wts > txn->get_timestamp() || _row->cicada_version[i].Rts > txn->get_timestamp()) {
+				rc = Abort;
+				break;
+			}
+			if(_row->cicada_version[i].Wts > max_wts) {
+				max_wts = _row->cicada_version[i].Wts;
+				max_version = _row->cicada_version[i].key;
+			}
+		}
+		int i = max_version % HIS_CHAIN_NUM;
+		if(_row->cicada_version[i].state == Cicada_PENDING) {
+			rc = WAIT;
+			while(rc == WAIT && !simulation->is_done()) {
+				retry_time += 1;
+			#if USE_COROUTINE
+				txn->h_thd->last_yield_time = get_sys_clock();
+				INC_STATS(txn->get_thd_id(), worker_process_time, get_sys_clock() - txn->h_thd->cor_process_starttime[cor_id]);
+				// printf("do\n");
+				yield(txn->h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+				uint64_t yield_endtime = get_sys_clock();
+				INC_STATS(txn->get_thd_id(), worker_yield_cnt, 1);
+				INC_STATS(txn->get_thd_id(), worker_yield_time, yield_endtime - txn->h_thd->last_yield_time);
+				INC_STATS(txn->get_thd_id(), worker_idle_time, yield_endtime - txn->h_thd->last_yield_time);
+				INC_STATS(txn->get_thd_id(), worker_proto_wait_time, yield_endtime - txn->h_thd->last_yield_time);
+				txn->h_thd->cor_process_starttime[cor_id] = get_sys_clock();
+			#endif
+				if(_row->cicada_version[i].state == Cicada_PENDING) {
+					rc = WAIT;
+				} else if (_row->cicada_version[i].state == Cicada_ABORTED) {
+					rc = Abort;
+				} else {
+					rc = RCOK;
+					version = _row->cicada_version[i].key;
+				}
+				if(retry_time > 1) {
+					rc = Abort;
+				}
+			}
+		} else {
+			if(_row->cicada_version[i].Wts > txn->get_timestamp() || _row->cicada_version[i].Rts > txn->get_timestamp()) {
+				rc = Abort;
+			} else {
+				rc = RCOK;
+				version = _row->cicada_version[i].key;
+			}
+		}
+	#else
+		bool find = false;
 		for(int cnt = _row->version_cnt; cnt >= _row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 			int i = cnt % HIS_CHAIN_NUM;
 			if(_row->cicada_version[i].state == Cicada_ABORTED) {
@@ -129,6 +240,7 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 			}
 			if(_row->cicada_version[i].Wts > txn->get_timestamp() || _row->cicada_version[i].Rts > txn->get_timestamp()) {
 				rc = Abort;
+				INC_STATS(txn->get_thd_id(), cicada_case6_cnt, 1);
 				break;
 			}
 			if(_row->cicada_version[i].state == Cicada_PENDING) {
@@ -159,22 +271,22 @@ RC Row_rdma_cicada::access(yield_func_t &yield ,access_t type, TxnManager * txn,
 						break;
 					} else {
 						rc = RCOK;
+						find = true;
 						version = _row->cicada_version[i].key;
 					}
 					if(retry_time > 1) {
 						rc = Abort;
+						INC_STATS(txn->get_thd_id(), cicada_case6_cnt, 1);
 					}
 				}
 			} else {
-				if(_row->cicada_version[i].Wts > txn->get_timestamp() || _row->cicada_version[i].Rts > txn->get_timestamp()) {
-					rc = Abort;
-				} else {
-					rc = RCOK;
-					version = _row->cicada_version[i].key;
-				}
+				rc = RCOK;
+				find = true;
+				version = _row->cicada_version[i].key;
 			}
-			if (rc == RCOK || rc == Abort) break;
+			if (find || rc == Abort) break;
 		}
+	#endif
 	}
 	txn->version_num.push_back(version);
 	uint64_t timespan = get_sys_clock() - starttime;

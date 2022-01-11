@@ -2740,15 +2740,57 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 
 		if(type == RD) {
 			assert(remote_row->version_cnt >= 0);
+		#if 0
+			uint64_t max_version = 0, max_wts = 0;
+			for(int i = 0; i < HIS_CHAIN_NUM; i++) {
+				if(remote_row->cicada_version[i].state == Cicada_ABORTED) {
+					continue;
+				}
+				if(remote_row->cicada_version[i].Wts > this->get_timestamp()) {
+					continue;
+				}
+				if(remote_row->cicada_version[i].Wts > max_wts) {
+					max_wts = remote_row->cicada_version[i].Wts;
+					max_version = remote_row->cicada_version[i].key;
+				}
+			}
+			int i = max_version % HIS_CHAIN_NUM;
+			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
+				rc = WAIT;
+				while(rc == WAIT && !simulation->is_done()) {
+					retry_time += 1;
+					mem_allocator.free(remote_row, sizeof(row_t));
+					remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+					// assert(remote_row->get_primary_key() == req->key);
+
+					if(remote_row->cicada_version[i].state == Cicada_PENDING) {
+						rc = WAIT;
+					} else if (remote_row->cicada_version[i].state == Cicada_ABORTED){
+						rc = Abort;
+					} else {
+						rc = RCOK;
+						version = remote_row->cicada_version[i].key;
+					}
+					if(retry_time > 1) {
+						rc = Abort;
+					}
+				}			
+			} else {
+				rc = RCOK;
+				version = remote_row->cicada_version[i].key;
+			}
+		#else
+		bool find = false;
 			for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 				int i = cnt % HIS_CHAIN_NUM;
 				if(remote_row->cicada_version[i].state == Cicada_ABORTED) {
 					continue;
 				}
 				if(remote_row->cicada_version[i].Wts > this->get_timestamp()) {
-					rc = Abort;
-					break;
+					// printf("r large version:%d state:%d Wts:%lu: txnts:%lu\n", cnt, remote_row->cicada_version[i].state, remote_row->cicada_version[i].Wts, this->get_timestamp());
+					continue;
 				}
+				// printf("r find version:%d state:%d Wts:%ld: txnts:%ld\n", cnt, remote_row->cicada_version[i].state, remote_row->cicada_version[i].Wts, this->get_timestamp());
 				if(remote_row->cicada_version[i].state == Cicada_PENDING) {
 					rc = WAIT;
 					while(rc == WAIT && !simulation->is_done()) {
@@ -2759,22 +2801,71 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 
 						if(remote_row->cicada_version[i].state == Cicada_PENDING) {
 							rc = WAIT;
+						} else if (remote_row->cicada_version[i].state == Cicada_ABORTED) {
+							break;
 						} else {
 							rc = RCOK;
+							find = true;
 							version = remote_row->cicada_version[i].key;
 						}
-						if(retry_time > 1) {
+						if(retry_time > CICADA_MAX_RETRY_TIME) {
 							rc = Abort;
+							// printf("r find row %ld version and failed:%d state:%d Wts:%lu: txnts:%lu\n",remote_row->get_primary_key(),  cnt, remote_row->cicada_version[i].state, remote_row->cicada_version[i].Wts, this->get_timestamp());
+							INC_STATS(this->get_thd_id(), cicada_case5_cnt, 1);
 						}
 					}				
 				} else {
 					rc = RCOK;
+					find = true;
 					version = remote_row->cicada_version[i].key;
 				}	
+				if (find || rc == Abort) break;
 			}
+		#endif
 		}
 		if(type == WR) {
+		#if 0
 			assert(remote_row->version_cnt >= 0);
+			uint64_t max_version = 0, max_wts = 0;
+			for(int i = 0; i < HIS_CHAIN_NUM; i++) {
+				if(remote_row->cicada_version[i].state == Cicada_ABORTED) {
+					continue;
+				}
+				if(remote_row->cicada_version[i].Wts > this->get_timestamp() || remote_row->cicada_version[i].Rts > this->get_timestamp()) {
+					rc = Abort;
+					break;
+				}
+				if(remote_row->cicada_version[i].Wts > max_wts) {
+					max_wts = remote_row->cicada_version[i].Wts;
+					max_version = remote_row->cicada_version[i].key;
+				}
+			}
+			int i = max_version % HIS_CHAIN_NUM;
+			if(remote_row->cicada_version[i].state == Cicada_PENDING) {
+				rc = WAIT;
+				while(rc == WAIT && !simulation->is_done()) {
+					retry_time += 1;
+					mem_allocator.free(remote_row, sizeof(row_t));
+					remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+
+					if(remote_row->cicada_version[i].state == Cicada_PENDING) {
+						rc = WAIT;
+					} else if (remote_row->cicada_version[i].state == Cicada_ABORTED){
+						rc = Abort;
+					} else {
+						rc = RCOK;
+						version = remote_row->cicada_version[i].key;
+					}
+					if(retry_time > 1) {
+						rc = Abort;
+					}
+				}
+			} else {	
+				rc = RCOK;
+				version = remote_row->cicada_version[i].key;
+			}
+		#else
+			bool find = false;
 			for(int cnt = remote_row->version_cnt; cnt >= remote_row->version_cnt - HIS_CHAIN_NUM && cnt >= 0; cnt--) {
 				int i = cnt % HIS_CHAIN_NUM;
 				if(remote_row->cicada_version[i].state == Cicada_ABORTED) {
@@ -2782,6 +2873,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 				}
 				if(remote_row->cicada_version[i].Wts > this->get_timestamp() || remote_row->cicada_version[i].Rts > this->get_timestamp()) {
 					rc = Abort;
+					INC_STATS(this->get_thd_id(), cicada_case6_cnt, 1);
 					break;
 				}
 				if(remote_row->cicada_version[i].state == Cicada_PENDING) {
@@ -2798,16 +2890,21 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 						} else {
 							version = remote_row->cicada_version[i].key;
 							rc = RCOK;
+							find = true;
 						}
 						if(retry_time > 1) {
 							rc = Abort;
+							INC_STATS(this->get_thd_id(), cicada_case6_cnt, 1);
 						}
 					}
 				} else {	
-						rc = RCOK;
-						version = remote_row->cicada_version[i].key;
+					rc = RCOK;
+					find = true;
+					version = remote_row->cicada_version[i].key;
 				}
+				if (find || rc == Abort) break;
 			}
+		#endif
 		}
 		if(rc == Abort) {
 			mem_allocator.free(m_item, sizeof(itemid_t));
@@ -3134,7 +3231,7 @@ void TxnManager::batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int l
 #if CC_ALG == RDMA_CICADA
 			vector<uint64_t> remote_num_current = remote_num[loc];
 			operate_size = sizeof(uint64_t);
-			CicadaState *temp_state = (CicadaState *)mem_allocator.alloc(sizeof(CicadaState));
+			CicadaState *temp_state = (CicadaState *)mem_allocator.alloc(sizeof(uint64_t));
 			if(rc == Abort) *temp_state = Cicada_ABORTED;
 			else *temp_state = Cicada_COMMITTED;
             memcpy(local_buf, (char*)(temp_state), operate_size);

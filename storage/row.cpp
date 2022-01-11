@@ -145,6 +145,7 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 		cicada_version[i].init(i, 0, 0);
 	}
 	cicada_version[0].state = Cicada_COMMITTED;
+	cicada_version[0].Wts = 1; 
 	version_cnt = 0;
 	_tid_word = 0;
 #endif
