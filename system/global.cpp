@@ -55,6 +55,7 @@
 #include "wkdb.h"
 #include "tictoc.h"
 #include "rdma_silo.h"
+#include "rdma_mocc.h"
 #include "rdma_mvcc.h"
 #include "rdma_2pl.h"
 #include "rdma_maat.h"
@@ -101,6 +102,8 @@ Transport tport_man;
 Rdma rdma_man;
 #if CC_ALG == RDMA_SILO
 RDMA_silo rsilo_man;
+#elif CC_ALG == RDMA_MOCC
+RDMA_mocc rmocc_man;
 #elif CC_ALG == RDMA_MVCC
 rdma_mvcc rmvcc_man;
 #endif
@@ -265,7 +268,7 @@ UInt64 tuple_count = 0;
 UInt64 max_tuple_size = 0;
 pthread_mutex_t * RDMA_MEMORY_LATCH;
 
-UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
+UInt64 rdma_buffer_size = 20*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 600*(1024*1024L);
 UInt64 rdma_index_size = (1024*1024*1024L);
 

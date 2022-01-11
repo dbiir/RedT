@@ -84,6 +84,8 @@ class Transport;
 class Rdma;
 #if CC_ALG == RDMA_SILO
 class RDMA_silo;
+#elif CC_ALG == RDMA_MOCC
+class RDMA_mocc;
 #elif CC_ALG == RDMA_MVCC
 class rdma_mvcc;
 #endif
@@ -168,6 +170,8 @@ extern Transport tport_man;
 extern Rdma rdma_man;
 #if CC_ALG == RDMA_SILO
 extern RDMA_silo rsilo_man;
+#elif CC_ALG == RDMA_MOCC
+extern RDMA_mocc rmocc_man;
 #elif CC_ALG == RDMA_MVCC
 extern rdma_mvcc rmvcc_man;
 #endif

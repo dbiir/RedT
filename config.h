@@ -27,7 +27,7 @@
 #define SIT_COROUTINE   3
 #define SIT_DBPA        4
 #define SIT_ALL         5
-#define RDMA_SIT SIT_ALL
+#define RDMA_SIT 3
 #if RDMA_SIT == SIT_TCP
   #define RDMA_ONE_SIDE false
   #define RDMA_TWO_SIDE false
@@ -112,8 +112,8 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define NODE_CNT 16
-#define THREAD_CNT 8
+#define NODE_CNT 3
+#define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -121,7 +121,7 @@
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
 #define CLIENT_NODE_CNT 1
-#define CLIENT_THREAD_CNT 4
+#define CLIENT_THREAD_CNT 2
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
@@ -154,7 +154,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 20000
+#define MAX_TXN_IN_FLIGHT 200000
 
 #define SERVER_GENERATE_QUERIES true
 
@@ -184,7 +184,7 @@
 /***********************************************/
 #define TPORT_TYPE tcp
 #define TPORT_PORT 7000
-#define TPORT_TWOSIDE_PORT 11000
+#define TPORT_TWOSIDE_PORT 13000
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -211,7 +211,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_NO_WAIT2
+#define CC_ALG RDMA_SILO
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -225,7 +225,7 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-#if (CC_ALG == RDMA_MAAT || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || RDMA_TWO_SIDE == true) && RDMA_SIT != 0
+#if (CC_ALG == RDMA_MAAT || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_MOCC || RDMA_TWO_SIDE == true) && RDMA_SIT != 0
 // #define USE_RDMA CHANGE_MSG_QUEUE
 #define USE_RDMA CHANGE_TCP_ONLY
 #endif
@@ -341,7 +341,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 167771520
+#define SYNTH_TABLE_SIZE 31457280
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
@@ -349,7 +349,7 @@
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR
-#define REQ_PER_QUERY 16
+#define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 1
@@ -446,6 +446,9 @@ enum PPSTxnType {
 #else
 #define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 50)
 #endif
+ 
+#define HOT_VALUE 10000
+#define MOCC_MAX_RETRY_COUNT 5
 /***********************************************/
 // DEBUG info
 /***********************************************/
@@ -533,6 +536,7 @@ enum PPSTxnType {
 #define WOUND_WAIT 41
 #define RDMA_WAIT_DIE 42
 #define RDMA_WOUND_WAIT 43
+#define RDMA_MOCC 44
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

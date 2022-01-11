@@ -64,6 +64,7 @@ class Row_si;
 class Row_null;
 class Row_silo;
 class Row_rdma_silo;
+class Row_rdma_mocc;
 class Row_rdma_mvcc;
 class rdma_mvcc;
 class Row_rdma_2pl;
@@ -147,6 +148,15 @@ public:
         volatile uint64_t	_tid_word;  //lcok info ：txn_id
         ts_t 			timestamp;
         Row_rdma_silo * manager;
+	#elif CC_ALG == RDMA_MOCC
+		volatile uint64_t	_tid_word;
+		volatile uint64_t	is_hot;
+		volatile uint64_t 	lock_type;
+		volatile uint64_t 	ts[LOCK_LENGTH];
+		volatile uint64_t 	lock_owner[LOCK_LENGTH];
+		// volatile uint64_t 	conflict_num;
+		ts_t				timestamp;
+		Row_rdma_mocc * manager;
 	#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 		volatile uint64_t _tid_word; //RDMA_NO_WAIT2: only 0 or 1; RDMA_WAIT_DIE2: only 0 or ts
 		volatile uint64_t lock_owner; //解锁

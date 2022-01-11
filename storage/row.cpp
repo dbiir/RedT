@@ -43,6 +43,7 @@
 #include "row_rdma_mvcc.h"
 #include "row_rdma_2pl.h"
 #include "row_rdma_ts1.h"
+#include "row_rdma_mocc.h"
 #include "rdma_ts1.h"
 #include "mem_alloc.h"
 #include "manager.h"
@@ -81,8 +82,18 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 	#endif
 #endif
 #if CC_ALG == RDMA_SILO
-  _tid_word = 0;
-  timestamp = 0;
+	_tid_word = 0;
+	timestamp = 0;
+#endif
+#if CC_ALG == RDMA_MOCC
+	_tid_word = 0;
+  	timestamp = 0;
+	lock_type = 0;
+	is_hot = 0;
+    for(int i = 0; i < LOCK_LENGTH; i++) {
+		ts[i] = 0;
+		lock_owner[i] = 0;
+	}
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 	_tid_word = 0;
@@ -177,6 +188,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_silo *) mem_allocator.align_alloc(sizeof(Row_silo));
 #elif CC_ALG == RDMA_SILO
   manager = (Row_rdma_silo *) mem_allocator.align_alloc(sizeof(Row_rdma_silo));
+#elif CC_ALG == RDMA_MOCC
+  manager = (Row_rdma_mocc *) mem_allocator.align_alloc(sizeof(Row_rdma_mocc));
 #elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
   manager = (Row_rdma_2pl *) mem_allocator.align_alloc(sizeof(Row_rdma_2pl));
 #elif CC_ALG == RDMA_MVCC
@@ -536,6 +549,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	if (rc == RCOK) {
 		access->data = this;
 	} else if (rc == Abort) {
+		// total_num_atomic_retry++;
 	} else if (rc == WAIT) {
 		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT);
 	}
@@ -679,7 +693,21 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
   	access->data = txn->cur_row;
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
+#elif CC_ALG == RDMA_MOCC
+	// like OCC, tictoc also makes a local copy for each read/write
+ 	uint64_t init_time = get_sys_clock();
+ 	DEBUG_M("row_t::get_row SILO alloc \n");
+	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
+	txn->cur_row->init(get_table(), get_part_id());
+	TsType ts_type = (type == RD)? R_REQ : P_REQ;
+    INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
+	rc = this->manager->access(yield, txn, ts_type, txn->cur_row, cor_id);
+
+  	uint64_t copy_time = get_sys_clock();
+  	access->data = txn->cur_row;
+  	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+	goto end;
 #elif CC_ALG == RDMA_MVCC
    // rc = this->manager->access(txn, type, txn->cur_row);
    txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
@@ -961,7 +989,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		this->copy(row);
 	}
 	return 0;
-#elif CC_ALG == SILO || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC
+#elif CC_ALG == SILO || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_MOCC
 	assert (row != NULL);
 	row->free_row();
   DEBUG_M("row_t::return_row XP free \n");

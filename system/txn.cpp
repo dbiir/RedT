@@ -52,6 +52,7 @@
 #include "manager.h"
 #include "row_rdma_2pl.h"
 #include "rdma_silo.h"
+#include "rdma_mocc.h"
 #include "rdma_mvcc.h"
 #include "rdma_2pl.h"
 #include "rdma_maat.h"
@@ -390,7 +391,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 #if CC_ALG == DLI_MVCC || CC_ALG == DLI_MVCC_OCC
 	is_abort = nullptr;
 #endif
-#if CC_ALG == SILO
+#if CC_ALG == SILO || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MOCC
 	_pre_abort = (g_params["pre_abort"] == "true");
 	if (g_params["validation_lock"] == "no-wait")
 		_validation_no_wait = true;
@@ -456,7 +457,9 @@ void TxnManager::reset() {
 	start_ts = 0;
 	version_num.clear();
 #endif
-
+#if CC_ALG == RDMA_MOCC
+	lock_set.clear();
+#endif
 #if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 	phase = CALVIN_RW_ANALYSIS;
 	locking_done = false;
@@ -499,6 +502,9 @@ void TxnManager::release() {
 	uncommitted_reads.clear();
 	unread_set.clear();
 	unwrite_set.clear();
+#endif
+#if CC_ALG == RDMA_MOCC
+	lock_set.clear();
 #endif
 #if CC_ALG == RDMA_CICADA
 	uncommitted_set.clear();
@@ -645,7 +651,7 @@ RC TxnManager::start_abort(yield_func_t &yield, uint64_t cor_id) {
 	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     INC_STATS(get_thd_id(), trans_prepare_count, 1);
 	//RDMA_SILO:keep message or not
-	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2  && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
+	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2  && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT && CC_ALG != RDMA_MOCC) {
 		send_finish_messages();
 		abort(yield, cor_id);
 		return Abort;
@@ -689,7 +695,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 			rdma_txn_table.local_set_state(get_thd_id(),txn->txn_id, WOUND_COMMITTING);
 		}
 #endif
-	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT  && CC_ALG != RDMA_CICADA && CC_ALG !=RDMA_TS1 && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
+	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT  && CC_ALG != RDMA_CICADA && CC_ALG !=RDMA_TS1 && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT && CC_ALG != RDMA_MOCC) {
 		if(CC_ALG == TICTOC) {
 			rc = validate(yield, cor_id);
 			if (rc != Abort) {
@@ -736,7 +742,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		else {
 			txn->rc = Abort;
 			DEBUG("%ld start_abort\n",get_txn_id());
-			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO &&  CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WOUND_WAIT && CC_ALG != RDMA_WAIT_DIE) {
+			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO &&  CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WOUND_WAIT && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_MOCC) {
 				send_finish_messages();
 				abort(yield, cor_id);
 				rc = Abort;
@@ -942,7 +948,7 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 #if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
 #if ISOLATION_LEVEL != READ_UNCOMMITTED
 	row_t * orig_r = txn->accesses[rid]->orig_row;
-#if CC_ALG == RDMA_SILO
+#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MOCC
   if (txn->accesses[rid]->location == g_node_id) {
     if (ROLL_BACK && type == XP &&
         (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
@@ -1068,6 +1074,10 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 //TODO-relase lock
 #if CC_ALG == RDMA_SILO
     rsilo_man.finish(yield,rc,this, cor_id);
+#endif
+
+#if CC_ALG == RDMA_MOCC
+	rmocc_man.finish(yield,rc,this, cor_id);
 #endif
 
 #if CC_ALG == RDMA_CNULL
@@ -1292,7 +1302,11 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	access->timestamp = row->timestamp;
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
-
+#if CC_ALG == RDMA_MOCC
+	access->timestamp = row->timestamp;
+	access->location = g_node_id;
+	access->offset = (char*)row - rdma_global_buffer;
+#endif
 #if CC_ALG == RDMA_MVCC
    access->offset = (char*)row - rdma_global_buffer;
    access->old_version_num = row->version_num;
@@ -1402,7 +1416,9 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 #if CC_ALG == RDMA_SILO
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
-
+#if CC_ALG == RDMA_MOCC
+	access->offset = (char*)row - rdma_global_buffer;
+#endif
 #if CC_ALG == RDMA_MVCC
    access->offset = (char*)row - rdma_global_buffer;
    access->old_version_num = row->version_num;
@@ -1430,7 +1446,107 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 		}
 		return rc;
 	#endif
+	#if CC_ALG == RDMA_MOCC
+		if(type == RD || type == WR){
+			uint64_t tts = get_timestamp();
+			RC rc = RCOK;
+			row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+			if(test_row->is_hot > HOT_VALUE * 10) {
+				test_row->is_hot = 0;
+			}
+			if (test_row->is_hot > HOT_VALUE) {
+			retry_lock:
+				uint64_t try_lock = -1;
+				uint64_t lock_type = 0;
+				bool conflict = false;
+				bool canwait = true;
+				try_lock = cas_remote_content(yield, loc, m_item->offset, 0, txn->txn_id, cor_id);
+				if(try_lock != 0) {
+					mem_allocator.free(m_item, sizeof(itemid_t));
+					rc = Abort;
+					return rc;
+					// goto retry_lock;	
+					// printf("cas retry\n");
+				}
+				row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+				// assert(test_row->get_primary_key() == req->key);
+				//! test_row->is_hot++;
 
+				lock_type = test_row->lock_type;
+				if(lock_type == 0) {
+					test_row->lock_owner[0] = txn->txn_id;
+					test_row->ts[0] = tts;
+					test_row->lock_type == RD? 2:1;
+					test_row->_tid_word = 0;
+					lock_set.insert(test_row->get_primary_key());
+					num_locks++;
+					assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
+					rc = RCOK;
+				} else if(lock_type == 1 || type == WR) {
+					conflict = true;
+					if(conflict) {
+						uint64_t i = 0; 
+						for(i = 0; i < LOCK_LENGTH; i++) {
+							if((tts > test_row->ts[i] && test_row->ts[i] != 0)) {
+								canwait = false;
+								test_row->_tid_word = 0;
+								test_row->is_hot++;
+								assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
+								mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+								mem_allocator.free(m_item, sizeof(itemid_t));
+								rc = Abort;
+								return rc;
+							}
+							// if(test_row->ts[0] == 0) break;
+						}
+						// total_num_atomic_retry++;
+						test_row->_tid_word = 0;
+						assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
+						mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));	
+						if (!simulation->is_done()) goto retry_lock;
+						else {
+							DEBUG_M("TxnManager::get_row(abort) access free\n");
+							row_local = NULL;
+							test_row->is_hot++;
+							txn->rc = Abort;
+							mem_allocator.free(m_item, sizeof(itemid_t));
+							mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+							return Abort; //原子性被破坏，CAS失败	
+						}
+					}
+				} else {
+					uint64_t i = 0; 
+					for(i = 0; i < LOCK_LENGTH; i++) {
+						if(test_row->ts[i] == 0) {
+							test_row->ts[i] = tts;
+							test_row->lock_owner[i] == txn->txn_id;
+							test_row->lock_type == RD? 2:1;
+							lock_set.insert(test_row->get_primary_key());
+							num_locks++;
+							test_row->_tid_word = 0;
+							assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
+							rc = RCOK;
+							break;
+						}
+					}
+					if(i == LOCK_LENGTH) {
+						test_row->_tid_word = 0;
+						test_row->is_hot++;
+						assert(write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id) == true);
+						mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+						mem_allocator.free(m_item, sizeof(itemid_t));
+						rc = Abort;
+						return rc;
+					}
+				}
+			}
+			rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+		} else {
+			assert(false);
+		}
+		rc = RCOK;
+		return rc;
+	#endif
 	#if CC_ALG == RDMA_MVCC
 		row_t * test_row;
 		if(type == RD){
@@ -1709,8 +1825,8 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 				mem_allocator.free(m_item, sizeof(itemid_t));
 				rc = Abort;
 				return rc;
-				goto retry_lock;	
-				printf("cas retry\n");
+				// goto retry_lock;	
+				// printf("cas retry\n");
 			}
 			row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
 			lock_type = test_row->lock_type;
@@ -2331,7 +2447,7 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
 			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO &&
 			CC_ALG != RDMA_SILO && CC_ALG != RDMA_MVCC && CC_ALG != RDMA_MAAT && 
-			CC_ALG != RDMA_CICADA && CC_ALG != CICADA) {
+			CC_ALG != RDMA_CICADA && CC_ALG != CICADA && CC_ALG != RDMA_MOCC) {
 		return RCOK; //no validate in NO_WAIT
 	}
 	RC rc = RCOK;
@@ -2413,7 +2529,17 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
     }
   }
 #endif
-
+#if CC_ALG == RDMA_MOCC
+  if(CC_ALG == RDMA_MOCC && rc == RCOK) {
+    rc = rmocc_man.validate_rdma_mocc(yield, this, cor_id);
+	// rc = RCOK;
+    if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
+      _cur_tid ++;
+      commit_timestamp = _cur_tid;
+      DEBUG("Validate success: %ld, cts: %ld \n", get_txn_id(), commit_timestamp);
+    }
+  }
+#endif
 #if CC_ALG == RDMA_MVCC
     //rc = rmvcc_man.lock_row(this);
     // if(CC_ALG == RDMA_MVCC && rc == RCOK){
@@ -2533,7 +2659,7 @@ row_t * TxnManager::cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock,
     memcpy(test_row, local_buf2, read_size);
     return test_row;
 }
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_SILO || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_SILO || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_MOCC
 void TxnManager::batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int loc, RC rc, TxnManager * txnMng , vector<vector<uint64_t>> remote_index_origin, ts_t time,vector<vector<uint64_t>> remote_num){
 	vector<uint64_t> remote_access_noorder = remote_index_origin[loc];
 	//when USE_OR==true, use count to avoid overlap write
@@ -2563,9 +2689,9 @@ void TxnManager::batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int l
             if(rc != Abort) operate_size = row_t::get_row_size(data->tuple_size);
             else operate_size = sizeof(uint64_t);
             char *local_buf = Rdma::get_row_client_memory(thd_id,count+i+1);
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_SILO || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_SILO || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_MOCC
             data->_tid_word = 0; //write data and unlock
-#if CC_ALG == RDMA_SILO
+#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MOCC
 			data->timestamp = time;
 #endif
 #if CC_ALG == RDMA_WOUND_WAIT2
@@ -3401,6 +3527,55 @@ bool TxnManager::get_version(row_t * temp_row,uint64_t * change_num,Transaction 
     return result;
 }
 #endif
+uint64_t TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t cor_id){
+    
+    rdmaio::qp::Op<> op;
+    uint64_t thd_id = get_thd_id() + cor_id * g_total_thread_cnt;
+    uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+    auto mr = client_rm_handler->get_reg_attr().value();
+    
+    uint64_t starttime;
+	uint64_t endtime;
+	starttime = get_sys_clock();
+
+    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[target_server].buf + remote_offset), remote_mr_attr[target_server].key).set_fetch_add(1);
+    assert(op.set_payload(local_buf, sizeof(uint64_t), mr.key) == true);
+    auto res_s2 = op.execute(rc_qp[target_server][thd_id], IBV_SEND_SIGNALED);
+
+    RDMA_ASSERT(res_s2 == IOCode::Ok);
+	INC_STATS(get_thd_id(), worker_oneside_cnt, 1);
+#if USE_COROUTINE
+	uint64_t waitcomp_time;
+	std::pair<int,ibv_wc> res_p;
+	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
+	do {
+		h_thd->start_wait_time = get_sys_clock();
+		h_thd->last_yield_time = get_sys_clock();
+		// printf("do\n");
+		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+		uint64_t yield_endtime = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+		INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - h_thd->last_yield_time);
+		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
+		waitcomp_time = get_sys_clock();
+		
+		INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
+		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+	} while (res_p.first == 0);
+	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
+
+#else
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+    endtime = get_sys_clock();
+	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+#endif
+
+    return *local_buf;
+}
 
 uint64_t TxnManager::cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value ){
     
@@ -3458,7 +3633,7 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
 
     access->type = type;
 
-#if CC_ALG == RDMA_SILO
+#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MOCC
     access->orig_row = test_row;
 	access->tid = last_tid;
 	access->timestamp = test_row->timestamp;

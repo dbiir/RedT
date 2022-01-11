@@ -60,7 +60,7 @@ public:
 	ts_t 		tid;
 	// ts_t 		epoch;
 #endif
-#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC
+#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_MOCC
     uint64_t 	key;
 	ts_t 		tid;
 	ts_t		timestamp;
@@ -217,7 +217,7 @@ public:
 	void release_locks(yield_func_t &yield, RC rc, uint64_t cor_id);
 
 	bool rdma_one_side() {
-	if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT) return true;
+	if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_MOCC) return true;
 	else return false;
 	}
 
@@ -234,6 +234,7 @@ public:
 
     bool get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn);
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
+	uint64_t faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t cor_id);
      bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
 #if USE_DBPAOR == true
@@ -293,12 +294,15 @@ public:
 	bool send_RQRY_RSP;
 
 
-#if CC_ALG == RDMA_SILO
+#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MOCC
 	ts_t 			last_tid;
     ts_t            max_tid;
 	uint64_t        num_locks;
     int             write_set[100];
     int*            read_set;
+#endif
+#if CC_ALG == RDMA_MOCC
+	std::set<uint64_t> lock_set;
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
     int             write_set[100];
@@ -311,6 +315,12 @@ public:
 	bool 			_validation_no_wait;
 	ts_t 			_cur_tid;
 	RC				validate_silo();
+#endif
+#if CC_ALG == RDMA_MOCC
+	bool 			_pre_abort;
+	bool 			_validation_no_wait;
+	ts_t 			_cur_tid;
+	// RC				validate_silo();
 #endif
 #if CC_ALG == WOUND_WAIT
 	TxnStatus		txn_state;
