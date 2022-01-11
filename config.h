@@ -116,7 +116,7 @@
 #define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 4
+#define COROUTINE_CNT 8
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
@@ -211,7 +211,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_WOUND_WAIT
+#define CC_ALG RDMA_CICADA
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -321,6 +321,7 @@
 #define LOCK_LENGTH 10
 // [RDMA_DSLR]
 #define DSLR_MAX_RETRY_TIME 50
+#define CICADA_MAX_RETRY_TIME 50
 
 /***********************************************/
 // Logging
@@ -337,7 +338,7 @@
 // max number of rows touched per transaction
 #define MAX_ROW_PER_TXN       64
 #define QUERY_INTVL         1UL
-#define MAX_TXN_PER_PART 100000
+#define MAX_TXN_PER_PART 10000
 #define FIRST_PART_LOCAL      true
 #define MAX_TUPLE_SIZE        1024 // in bytes
 #define GEN_BY_MPR false
@@ -349,13 +350,13 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 31457280
+#define SYNTH_TABLE_SIZE 41943040
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 4
+#define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
@@ -596,7 +597,7 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 30 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
 #define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
 
 #define SEED 0
