@@ -400,7 +400,7 @@ RDMA_Maat::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 		for (uint64_t i = 0; i < txnMng->get_access_cnt(); i++) {
 			//local
 			if(txn->accesses[i]->location == g_node_id){
-				rc = txn->accesses[i]->orig_row->manager->abort(txn->accesses[i]->type,txnMng);
+				rc = txn->accesses[i]->orig_row->manager->abort(yield, txn->accesses[i]->type,txnMng,cor_id);
 			} else{
 			//remote
 				rc = remote_abort(yield, txnMng, txn->accesses[i], cor_id);

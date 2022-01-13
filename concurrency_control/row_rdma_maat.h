@@ -26,7 +26,7 @@ public:
   RC read_and_prewrite(TxnManager * txn);
   RC read(TxnManager * txn);
   RC prewrite(TxnManager * txn);
-  RC abort(access_t type, TxnManager * txn);
+  RC abort(yield_func_t &yield, access_t type, TxnManager * txn, uint64_t cor_id);
   RC commit(yield_func_t &yield, access_t type, TxnManager * txn, row_t * data, uint64_t cor_id);
   void write(row_t * data);
   void ucread_erase(uint64_t txn_id);

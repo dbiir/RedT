@@ -330,12 +330,20 @@ void Row_rdma_maat::ucwrite_erase(uint64_t txn_id) {
 		}
 	}
 }
-RC Row_rdma_maat::abort(access_t type, TxnManager * txn) {
+RC Row_rdma_maat::abort(yield_func_t &yield, access_t type, TxnManager * txn, uint64_t cor_id) {
 	uint64_t mtx_wait_starttime = get_sys_clock();
 #ifdef USE_CAS
 	// while(!simulation->is_done() && !local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
-	// 	// total_num_atomic_retry++;
+	// 	total_num_atomic_retry++;
 	// }
+	uint64_t off = (char*)_row - rdma_global_buffer;
+	uint64_t loc = g_node_id;
+	uint64_t thd_id = txn->get_thd_id();
+	uint64_t lock = txn->get_txn_id() + 1;
+	while(!simulation->is_done() && !txn->cas_remote_content(yield, loc,off,0,lock, cor_id)) {
+	// local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
+		total_num_atomic_retry++;
+	}
 #endif
 	INC_STATS(txn->get_thd_id(),mtx[32],get_sys_clock() - mtx_wait_starttime);
 	DEBUG("Maat Abort %ld: %d -- %ld\n",txn->get_txn_id(),type,_row->get_primary_key());
@@ -366,9 +374,14 @@ RC Row_rdma_maat::commit(yield_func_t &yield, access_t type, TxnManager * txn, r
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	RC rc = RCOK;
 #ifdef USE_CAS
-	// while(!simulation->is_done() && !local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
-	// 	// total_num_atomic_retry++;
-	// }
+	uint64_t off = (char*)_row - rdma_global_buffer;
+	uint64_t loc = g_node_id;
+	uint64_t thd_id = txn->get_thd_id();
+	uint64_t lock = txn->get_txn_id() + 1;
+	while(!simulation->is_done() && !txn->cas_remote_content(yield, loc,off,0,lock, cor_id)) {
+	// local_cas_lock(txn, 0, txn->get_txn_id() + 1)){
+		total_num_atomic_retry++;
+	}
 #endif
 	INC_STATS(txn->get_thd_id(),mtx[33],get_sys_clock() - mtx_wait_starttime);
 	DEBUG("Maat Commit %ld: %d,%lu -- %ld\n", txn->get_txn_id(), type, txn->get_commit_timestamp(),
