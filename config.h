@@ -27,7 +27,7 @@
 #define SIT_COROUTINE   3
 #define SIT_DBPA        4
 #define SIT_ALL         5
-#define RDMA_SIT SIT_ALL
+#define RDMA_SIT SIT_COROUTINE
 #if RDMA_SIT == SIT_TCP
   #define RDMA_ONE_SIDE false
   #define RDMA_TWO_SIDE false
@@ -83,7 +83,7 @@
 #define TAIL_DTL false
 #define SAVE_HISTROY_WITH_EMPTY_OPT false
 #define DYNAMIC_SEQ_LEN false
-#define ONLY_ONE_HOME true
+#define ONLY_ONE_HOME false
 //InputActionSequenceCreator
 #define INPUT_FILE_PATH "./input.txt"
 
@@ -116,12 +116,12 @@
 #define THREAD_CNT 8
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 8
+#define COROUTINE_CNT 4
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
 #define CLIENT_NODE_CNT 1
-#define CLIENT_THREAD_CNT 4
+#define CLIENT_THREAD_CNT 2
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
@@ -310,6 +310,8 @@
 #define ATOMIC_WORD					false
 // [RDMA_MAAT]
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
+#define COMMIT_ADJUST false
+#define MAAT_NODES_COUNT 2
 // [RDMA_TS1]
 #define RDMA_TSSTATE_COUNT 5
 // [RDMA_TS1]
@@ -351,14 +353,14 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 62914560
-#define ZIPF_THETA 0.2
+#define ZIPF_THETA 0.8
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR
-#define REQ_PER_QUERY 15
+#define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 1
