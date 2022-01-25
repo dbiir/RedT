@@ -424,7 +424,7 @@ def ycsb_scaling_coroutine():
     # algos = ['RDMA_WAIT_DIE']
     # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT','RDMA_CICADA']
     # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT']
-    algos = ['RDMA_CICADA']
+    algos = ['RDMA_MOCC']
     # algos = ['RDMA_WOUND_WAIT2']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
