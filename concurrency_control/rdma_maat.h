@@ -38,23 +38,49 @@ enum TSState {
   TS_ABORTING,
   TS_NULL
 };
-struct RdmaTxnTableNode{
-#if CC_ALG == RDMA_MAAT
-	uint64_t _lock;
+struct MAATTableNode {
 	uint64_t lower;
 	uint64_t upper;
 	uint64_t key;
 	MAATState state;
-
-
-	void init(uint64_t key) {
+};
+struct RdmaTxnTableNode{
+#if CC_ALG == RDMA_MAAT
+	uint64_t _lock;
+	MAATTableNode nodes[MAAT_NODES_COUNT];
+	uint64_t index;
+	
+	void init() {
 		// printf("init table index: %ld\n", key);
-		lower = 0;
-		upper = UINT64_MAX;
-		this->key = 0;
-		state = MAAT_RUNNING;
+		for (uint64_t i = 0; i < MAAT_NODES_COUNT; i++) {
+			nodes[i].lower = 0;
+			nodes[i].upper = UINT64_MAX;
+			nodes[i].key = 0;
+			nodes[i].state = MAAT_RUNNING;
+			// nodes[i]._lock = 0;
+		}
+		index = 0;
 		_lock = 0;
 	}
+	void init(uint64_t key) {
+		nodes[index % MAAT_NODES_COUNT].lower = 0;
+		nodes[index % MAAT_NODES_COUNT].upper = UINT64_MAX;
+		nodes[index % MAAT_NODES_COUNT].key = key;
+		nodes[index % MAAT_NODES_COUNT].state = MAAT_RUNNING;
+		// nodes[index % MAAT_NODES_COUNT]._lock = 0;
+		// printf("%lu init %ld: [%lu,%lu]\n",key,nodes[index % MAAT_NODES_COUNT].key,nodes[index % MAAT_NODES_COUNT].lower,nodes[index % MAAT_NODES_COUNT].upper);
+		index ++;
+	}
+	void release(uint64_t key) {
+		for (uint64_t i = 0; i < MAAT_NODES_COUNT; i++) {
+			if (nodes[i].key != key)continue;
+			nodes[i].lower = 0;
+			nodes[i].upper = UINT64_MAX;
+			nodes[i].key = 0;
+			nodes[i].state = MAAT_RUNNING;
+			// nodes[i]._lock = 0;
+		}
+	}	
 #endif
 #if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 	uint64_t _lock;
@@ -106,12 +132,22 @@ public:
 	void init(uint64_t thd_id, uint64_t key);
 	void release(uint64_t thd_id, uint64_t key);
 #if CC_ALG == RDMA_MAAT
+	bool local_is_key(uint64_t key);
 	uint64_t local_get_lower(uint64_t key);
 	uint64_t local_get_upper(uint64_t key);
 	MAATState local_get_state(uint64_t key);
 	bool local_set_lower(TxnManager *txnMng, uint64_t key, uint64_t value);
 	bool local_set_upper(TxnManager *txnMng, uint64_t key, uint64_t value);
 	bool local_set_state(TxnManager *txnMng, uint64_t key, MAATState value);
+
+	bool remote_is_key(RdmaTxnTableNode * root,uint64_t key);
+	uint64_t remote_get_lower(RdmaTxnTableNode * root,uint64_t key);
+	uint64_t remote_get_upper(RdmaTxnTableNode * root,uint64_t key);
+	MAATState remote_get_state(RdmaTxnTableNode * root,uint64_t key);
+	bool remote_set_lower(RdmaTxnTableNode * root, uint64_t key, uint64_t value);
+	bool remote_set_upper(RdmaTxnTableNode * root, uint64_t key, uint64_t value);
+	bool remote_set_state(RdmaTxnTableNode * root, uint64_t key, MAATState value);
+
 	bool local_cas_timeNode(yield_func_t &yield,TxnManager *txnMng, uint64_t key, uint64_t cor_id);
 	void local_release_timeNode(TxnManager *txnMng, uint64_t key);
 	RdmaTxnTableNode * remote_get_timeNode(yield_func_t &yield, TxnManager *txnMng, uint64_t key, uint64_t cor_id);

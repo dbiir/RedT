@@ -116,7 +116,7 @@
 #define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 8
+#define COROUTINE_CNT 4
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
@@ -310,6 +310,8 @@
 #define ATOMIC_WORD					false
 // [RDMA_MAAT]
 #define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
+#define COMMIT_ADJUST false
+#define MAAT_NODES_COUNT 2
 // [RDMA_TS1]
 #define RDMA_TSSTATE_COUNT 5
 // [RDMA_TS1]
