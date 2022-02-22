@@ -1,16 +1,16 @@
-python run_experiments.py -e -c vcloud ycsb_scaling
+# python run_experiments.py -e -c vcloud ycsb_scaling
 #python run_experiments.py -e -c vcloud tpcc_stress1
 #sleep 10
 
 
-python run_experiments.py -e -c vcloud ycsb_scaling
-sleep 10
-python run_experiments.py -e -c vcloud ycsb_scaling1
-sleep 10
-python run_experiments.py -e -c vcloud ycsb_scaling2
-sleep 10
-python run_experiments.py -e -c vcloud tpcc_scaling
-sleep 10
+# python run_experiments.py -e -c vcloud ycsb_scaling
+# sleep 10
+# python run_experiments.py -e -c vcloud ycsb_scaling1
+# sleep 10
+# python run_experiments.py -e -c vcloud ycsb_scaling2
+# sleep 10
+# python run_experiments.py -e -c vcloud tpcc_scaling
+# sleep 10
 # python run_experiments.py -e -c vcloud ycsb_skew
 # sleep 10
 #cd ../draw
@@ -25,20 +25,19 @@ sleep 10
 #python run_experiments.py -e -c vcloud ycsb_stress5
 #sleep 30
 
-#python run_experiments.py -e -c vcloud ycsb_skew
-#sleep 30
-#python run_experiments.py -e -c vcloud ycsb_scaling
-#sleep 30
-#python run_experiments.py -e -c vcloud ycsb_scaling1
-#sleep 30
-#python run_experiments.py -e -c vcloud tpcc_scaling1
-#sleep 30
-#python run_experiments.py -e -c vcloud tpcc_scaling2
-#sleep 30
-#python run_experiments.py -e -c vcloud tpcc_scaling3
-#sleep 30
-#python run_experiments.py -e -c vcloud ycsb_writes
-#sleep 30
+python run_experiments.py -e -c vcloud ycsb_scaling_tcp
+sleep 30
+python run_experiments.py -e -c vcloud ycsb_scaling_two_sided
+sleep 30
+python run_experiments.py -e -c vcloud ycsb_scaling_one_sided
+sleep 30
+python run_experiments.py -e -c vcloud ycsb_scaling_coroutine
+sleep 30
+python run_experiments.py -e -c vcloud ycsb_scaling_dbpa
+sleep 30
+python run_experiments.py -e -c vcloud ycsb_scaling_all
+sleep 30
+sleep 30
 
 # neworder
 #python run_experiments.py -e -c vcloud tpcc_stress1

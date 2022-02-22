@@ -287,6 +287,9 @@ bool RDMA_mocc::validate_rw_remote(yield_func_t &yield, TxnManager * txn , uint6
 	if(temp_row->timestamp != txn->txn->accesses[num]->timestamp){
 		succ = false;
 		// uint64_t res = txn->faa_remote_content(yield, target_server, remote_offset + sizeof(uint64_t), cor_id);
+		uint64_t add_value = 1;
+		uint64_t faa_result = 0;
+		faa_result = txn->faa_remote_content(yield, target_server, remote_offset + sizeof(uint64_t) * 3, add_value,cor_id);//TODO - check faa result? 
 	}
 
 	mem_allocator.free(temp_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
