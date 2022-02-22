@@ -1819,12 +1819,18 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 			//             (read_lock|write_lock|read_num|write_num) to 0 
 			reset_from = (count_max<<48)|(write_num<<32)|(count_max<<16)|(write_num);
         	try_lock = cas_remote_content(yield,loc,reset_from_address,0,reset_from,cor_id);
-        	assert(try_lock == 0);
+        	// assert(try_lock == 0);
+			// if (try_lock != 0) {
+			// 	printf("reset_from %ld", try_lock);
+			// }
 		}
 		else if((write_num == count_max -1) && (type == WR)){
 			reset_from = (read_num<<48)||(count_max<<32)||(read_num<<16)||(count_max);
 			try_lock = cas_remote_content(yield,loc,reset_from_address,0,reset_from,cor_id);
-        	assert(try_lock == 0);
+        	// assert(try_lock == 0);
+			// if (try_lock != 0) {
+			// 	printf("reset_from %ld", try_lock);
+			// }
 		}
 		//case 1 :process lock overflow
 		else if(write_num >= count_max || read_num >= count_max){
@@ -1982,7 +1988,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 								success = loop_cas_remote(yield,loc,remote_address,reset_from,0,cor_id);
 							}
 							try_lock = cas_remote_content(yield,loc,reset_from_address,reset_from,0,cor_id);
-							assert(try_lock == 0);
+							// assert(try_lock == 0);
 						}//if overflow
 						// uint64_t reset_read_lock = get_part_num(new_lock,1);
 						// uint64_t reset_write_lock = get_part_num(new_lock,2);

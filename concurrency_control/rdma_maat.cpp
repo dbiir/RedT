@@ -797,7 +797,7 @@ WOUNDState RdmaTxnTable::local_get_state(uint64_t thd_id, uint64_t key) {
 	//table[key]._lock = 0;
 	return state;
 }
-bool RdmaTxnTable::local_set_state(TxnManager *txnMng, uint64_t key, WOUNDState value) {
+bool RdmaTxnTable::local_set_state(TxnManager *txnMng, uint64_t thd_id, uint64_t key, WOUNDState value) {
 	uint64_t node_id = key % g_node_cnt;
 	uint64_t index = get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);//key;//get_cor_id_from_txn_id(key) * g_thread_cnt + get_thd_id_from_txn_id(key);
 	uint64_t timenode_addr = (char*)(&table[index]) - rdma_global_buffer + sizeof(uint64_t) * 2;
@@ -832,7 +832,7 @@ bool RdmaTxnTable::remote_set_state(yield_func_t &yield, TxnManager *txnMng, uin
 	// each thread uses only its own piece of client memory address
     uint64_t thd_id = txnMng->get_thd_id();
  
-    assert(txnMng->write_remote_row(yield,node_id,timenode_size,timenode_addr,(char *)value,cor_id) == true);
+    assert(txnMng->write_remote_row(yield,node_id,timenode_size,timenode_addr,(char *)&value,cor_id) == true);
 	return true;
 }
 #endif
