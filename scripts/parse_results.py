@@ -36,7 +36,8 @@ a, b, c, d, f = 0, 0, 0, 0, 0
 if 'tput' in summary:
     a = sum(summary['tput'])
 if 'total_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
-    b = summary['total_txn_abort_cnt'][0] / (summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0])
+    b = sum(summary['total_txn_abort_cnt']) / (sum(summary['total_txn_commit_cnt']) + sum(summary['total_txn_abort_cnt']))
+    #b = summary['total_txn_abort_cnt'][0] / (summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0])
 if 'lock_retry_cnt' in summary:
     c = sum(summary['lock_retry_cnt'])
 if 'read_retry_cnt' in summary:

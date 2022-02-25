@@ -78,6 +78,10 @@ void BaseQuery::init() {
   partitions.init(g_part_cnt);
   DEBUG_M("BaseQuery::init array partitions_touched\n");
   partitions_touched.init(g_part_cnt);
+  DEBUG_M("BaseQuery::init array centers\n");
+  centers.init(g_center_cnt);
+  DEBUG_M("BaseQuery::init array centers_touched\n");
+  centers_touched.init(g_center_cnt);
   DEBUG_M("BaseQuery::init array active_nodes\n");
   active_nodes.init(g_node_cnt);
   DEBUG_M("BaseQuery::init array participant_nodes\n");
@@ -87,6 +91,8 @@ void BaseQuery::init() {
 void BaseQuery::clear() { 
   partitions.clear();
   partitions_touched.clear();
+  centers.clear();
+  centers_touched.clear();
   active_nodes.clear();
   participant_nodes.clear();
 } 
@@ -94,6 +100,8 @@ void BaseQuery::clear() {
 void BaseQuery::release() { 
   partitions.release();
   partitions_touched.release();
+  centers.release();
+  centers_touched.release();
   active_nodes.release();
   participant_nodes.release();
 } 

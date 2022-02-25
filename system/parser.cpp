@@ -180,6 +180,7 @@ void parser(int argc, char * argv[]) {
     }
 	}
   g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_work_thread_cnt;
+  g_center_id = g_node_id % g_center_cnt;
 #if LOGGING
   g_total_thread_cnt += g_logger_thread_cnt; // logger thread
 #endif
@@ -215,6 +216,7 @@ void parser(int argc, char * argv[]) {
 			printf("g_abort_penalty %ld\n",g_abort_penalty);
 			printf("g_zipf_theta %f\n",g_zipf_theta );
 			printf("g_node_id %d\n",g_node_id );
+      printf("g_center_id %d\n", g_center_id);
 			printf("g_client_rem_thread_cnt %d\n",g_client_rem_thread_cnt );
 			printf("g_client_send_thread_cnt %d\n",g_client_send_thread_cnt );
 			printf("g_max_txn_per_part %d\n",g_max_txn_per_part );

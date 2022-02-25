@@ -40,6 +40,8 @@ public:
     // Prevent unnecessary remote messages
     Array<uint64_t> partitions;
     Array<uint64_t> partitions_touched;
+    Array<uint64_t> centers;
+    Array<uint64_t> centers_touched;
     Array<uint64_t> active_nodes;
     Array<uint64_t> participant_nodes;
 

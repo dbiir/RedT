@@ -1043,7 +1043,21 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 #if USE_RDMA == CHANGE_MSG_QUEUE
     tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->return_id, Message::create_message(txn_man,RQRY_RSP));
 #else
+#if PARAL_SUBTXN == true && CENTER_MASTER == true
+    rc  = txn_man->validate(yield, cor_id);
+    txn_man->set_rc(rc);
+#if USE_RDMA == CHANGE_MSG_QUEUE
+    tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RACK_PREP));
+#else
+    msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+#endif
+
+    if(rc == Abort) {
+      txn_man->abort(yield, cor_id);
+    }
+#else
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),txn_man->return_id);
+#endif
 #endif
   }
   return rc;

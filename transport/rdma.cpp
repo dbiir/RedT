@@ -294,7 +294,7 @@ void Rdma::init(){
 
 	server_qp(NULL);
 	printf("start wait\n");
-	sleep(16);
+	sleep(10);
 
 	for(node_id = 0; node_id < g_total_node_cnt; node_id++) {
 

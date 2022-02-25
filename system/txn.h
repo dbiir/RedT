@@ -272,7 +272,7 @@ bool rdma_one_side() {
 	// [HSTORE, HSTORE_SPEC]
 	int volatile    ready_part;
 	int volatile    ready_ulk;
-
+	std::map<uint64_t, uint64_t> center_master;
 #if CC_ALG == SILO
 	ts_t 			last_tid;
     ts_t            max_tid;
@@ -297,6 +297,8 @@ bool rdma_one_side() {
 	uint64_t        num_locks;
     int             write_set[100];
     int*            read_set;
+	// RC              find_tid_silo(ts_t max_tid);
+    // RC              finish(RC rc);
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
     int             write_set[100];

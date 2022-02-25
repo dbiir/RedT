@@ -415,7 +415,6 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	registed_ = false;
 	txn_ready = true;
 	twopl_wait_start = 0;
-
 	txn_stats.init();
 }
 
@@ -468,7 +467,7 @@ void TxnManager::reset() {
 	assert(txn);
 	assert(query);
 	txn->reset(get_thd_id());
-
+	center_master.clear();
 	// Stats
 	txn_stats.reset();
 }
@@ -574,7 +573,7 @@ RC TxnManager::abort(yield_func_t &yield, uint64_t cor_id) {
 	DEBUG("Abort %ld\n",get_txn_id());
 	//printf("Abort %ld\n",get_txn_id());
 	txn->rc = Abort;
-	INC_STATS(get_thd_id(),total_txn_abort_cnt,1);
+	INC_STATS(get_thd_id(),total_txn_abort_cnt, 1);
 	txn_stats.abort_cnt++;
 	if(IS_LOCAL(get_txn_id())) {
 	    INC_STATS(get_thd_id(), local_txn_abort_cnt, 1);
@@ -645,7 +644,11 @@ RC TxnManager::start_abort(yield_func_t &yield, uint64_t cor_id) {
 	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     INC_STATS(get_thd_id(), trans_prepare_count, 1);
 	//RDMA_SILO:keep message or not
-	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2  && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
+#if CENTER_MASTER == true
+    if(query->centers_touched.size() > 1 && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2  && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
+#else
+	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2  && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
+#endif
 		send_finish_messages();
 		abort(yield, cor_id);
 		return Abort;
@@ -689,7 +692,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 			rdma_txn_table.local_set_state(get_thd_id(),txn->txn_id, WOUND_COMMITTING);
 		}
 #endif
-	if(is_multi_part() && CC_ALG != RDMA_SILO && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT  && CC_ALG != RDMA_CICADA && CC_ALG !=RDMA_TS1 && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
+	if(is_multi_part() && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT  && CC_ALG != RDMA_CICADA && CC_ALG !=RDMA_TS1 && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
 		if(CC_ALG == TICTOC) {
 			rc = validate(yield, cor_id);
 			if (rc != Abort) {
@@ -697,7 +700,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 				rc = WAIT_REM;
 			}
 		} else if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == DLI_BASE ||
-				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA) {
+				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA || CC_ALG == RDMA_SILO) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;
@@ -748,10 +751,26 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 }
 #endif
 void TxnManager::send_prepare_messages() {
+#if PARAL_SUBTXN == true && CENTER_MASTER == true
+	{
+#elif CENTER_MASTER == true
+	rsp_cnt = query->centers_touched.size() - 1;	
+	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
+	for(uint64_t i = 0; i < query->centers_touched.size(); i++) {
+		if(this->center_master[query->centers_touched[i]] == g_node_id || query->centers_touched[i] == g_center_id) {
+			continue;
+ 	    }
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), this->center_master[query->centers_touched[i]]), Message::create_message(this, RPREPARE));
+#else
+		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),
+											this->center_master[query->centers_touched[i]]);
+#endif
+#else
 	rsp_cnt = query->partitions_touched.size() - 1;
 	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
 	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
-	if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) {
+		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id || GET_CENTER_ID(query->partitions_touched[i]) == g_center_id) {
 		continue;
 	}
 #if USE_RDMA == CHANGE_MSG_QUEUE
@@ -760,15 +779,32 @@ void TxnManager::send_prepare_messages() {
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),
 											GET_NODE_ID(query->partitions_touched[i]));
 #endif
+#endif
 	}
 }
 
 void TxnManager::send_finish_messages() {
+#if CENTER_MASTER == true
+	rsp_cnt = query->centers_touched.size() - 1;	
+	assert(IS_LOCAL(get_txn_id()));
+	DEBUG("%ld Send FINISH messages to %d\n",get_txn_id(),rsp_cnt);
+	for(uint64_t i = 0; i < query->centers_touched.size(); i++) {
+		if(this->center_master[query->centers_touched[i]] == g_node_id || query->centers_touched[i] == g_center_id) {
+			continue;
+    }
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), this->center_master[query->centers_touched[i]]), Message::create_message(this, RFIN));
+#else
+		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN),
+											this->center_master[query->centers_touched[i]]);
+#endif
+#else
 	rsp_cnt = query->partitions_touched.size() - 1;
+
 	assert(IS_LOCAL(get_txn_id()));
 	DEBUG("%ld Send FINISH messages to %d\n",get_txn_id(),rsp_cnt);
 	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
-		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) {
+		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id || GET_CENTER_ID(query->partitions_touched[i]) == g_center_id) {
 			continue;
     }
 #if USE_RDMA == CHANGE_MSG_QUEUE
@@ -776,6 +812,7 @@ void TxnManager::send_finish_messages() {
 #else
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN),
 											GET_NODE_ID(query->partitions_touched[i]));
+#endif
 #endif
 	}
 }
@@ -795,7 +832,11 @@ int TxnManager::received_response(RC rc) {
 bool TxnManager::waiting_for_response() { return rsp_cnt > 0; }
 
 bool TxnManager::is_multi_part() {
+#if CENTER_MASTER == true
+	return query->centers_touched.size() > 1;
+#else
 	return query->partitions_touched.size() > 1;
+#endif
 	//return query->partitions.size() > 1;
 }
 
@@ -1289,6 +1330,7 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	access->offset = (char*)row - rdma_global_buffer;
 #endif
 #if CC_ALG == RDMA_SILO
+	access->tid = last_tid;
 	access->timestamp = row->timestamp;
 	access->offset = (char*)row - rdma_global_buffer;
 #endif

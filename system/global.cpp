@@ -198,7 +198,9 @@ double g_data_perc = DATA_PERC;
 double g_access_perc = ACCESS_PERC;
 bool g_prt_lat_distr = PRT_LAT_DISTR;
 UInt32 g_node_id = 0;
+UInt32 g_center_id = 0;
 UInt32 g_node_cnt = NODE_CNT;
+UInt32 g_center_cnt = CENTER_CNT;
 UInt32 g_part_cnt = PART_CNT;
 UInt32 g_virtual_part_cnt = VIRTUAL_PART_CNT;
 UInt32 g_core_cnt = CORE_CNT;
@@ -265,7 +267,7 @@ UInt64 tuple_count = 0;
 UInt64 max_tuple_size = 0;
 pthread_mutex_t * RDMA_MEMORY_LATCH;
 
-UInt64 rdma_buffer_size = 8*(1024*1024*1024L);
+UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 300*(1024*1024L);
 UInt64 rdma_index_size = (300*1024*1024L);
 

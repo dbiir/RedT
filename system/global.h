@@ -281,6 +281,8 @@ extern bool g_mem_pad;
 extern bool g_prt_lat_distr;
 extern UInt32 g_node_id;
 extern UInt32 g_node_cnt;
+extern UInt32 g_center_id;
+extern UInt32 g_center_cnt;
 extern UInt32 g_part_cnt;
 extern UInt32 g_virtual_part_cnt;
 extern UInt32 g_core_cnt;
@@ -508,6 +510,7 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 
 #define GET_THREAD_ID(id)	(id % g_thread_cnt)
 #define GET_NODE_ID(id)	(id % g_node_cnt)
+#define GET_CENTER_ID(id) (id % g_node_cnt % g_center_cnt)
 #define GET_PART_ID(t,n)	(n)
 #define GET_PART_ID_FROM_IDX(idx)	(g_node_id + idx * g_node_cnt)
 #define GET_PART_ID_IDX(p)	(p / g_node_cnt)

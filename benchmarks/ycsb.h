@@ -86,14 +86,17 @@ private:
   RC run_ycsb_0(yield_func_t &yield,ycsb_request * req,row_t *& row_local,uint64_t cor_id);
   RC run_ycsb_1(access_t acctype, row_t * row_local);
   RC run_ycsb(yield_func_t &yield,uint64_t cor_id);
-  bool is_done() ;
-  bool is_local_request(uint64_t idx) ;
-  RC send_remote_request() ;
+  bool is_done();
+  bool is_local_request(uint64_t idx);
+  RC send_remote_request();
+  RC send_remote_subtxn();
 
   row_t * row;
 	YCSBWorkload * _wl;
 	YCSBRemTxnType state;
   uint64_t next_record_id;
+  uint64_t remote_next_center_id;
+  vector<vector<uint64_t>> remote_center{g_center_cnt};
 };
 
 #endif

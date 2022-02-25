@@ -61,6 +61,10 @@ void YCSBTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 void YCSBTxnManager::reset() {
   state = YCSB_0;
   next_record_id = 0;
+  remote_next_center_id = 0;
+  for(int i = 0; i < g_center_cnt; i++) {
+	remote_center[i].clear();
+  }
   TxnManager::reset();
 }
 
@@ -116,6 +120,10 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 		//query->print();
 		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
+		query->centers_touched.add_unique(g_center_id);
+#if PARAL_SUBTXN
+		rc = send_remote_subtxn();
+#endif
 	}
 	
 	uint64_t starttime = get_sys_clock();
@@ -157,8 +165,9 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 			rc = start_commit(yield, cor_id);
 		}
-		else if(rc == Abort)
-		rc = start_abort(yield, cor_id);
+		else if(rc == Abort) {
+			rc = start_abort(yield, cor_id);
+		}
 	} else if(rc == Abort){
 		rc = abort(yield, cor_id);
 	}
@@ -1312,33 +1321,92 @@ retry_lock:
 
 }
 
+RC YCSBTxnManager::send_remote_subtxn() {
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	uint64_t next_id = 0;
+	
+	RC rc = RCOK;
+	for(int i = 0; i < ycsb_query->requests.size(); i++) {
+		ycsb_request * req = ycsb_query->requests[i];
+		uint64_t node_id = GET_NODE_ID(req->key);
+		uint64_t center_id = GET_CENTER_ID(req->key);
+		ycsb_query->centers_touched.add_unique(center_id);
+		ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id));
+		// if(center_id != g_center_id) {
+			if(this->center_master.find(center_id) == this->center_master.end()) {
+				this->center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id));
+			}
+			remote_center[center_id].push_back(i);
+		// }
+	}
+	rsp_cnt = query->centers_touched.size() - 1;
+	for(int i = 0; i < g_center_cnt; i++) {
+		if(remote_center[i].size() > 0 && i != g_center_id) {//向所有数据中心的master发消息
+			remote_next_center_id = i;
+			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),this->center_master[i]);
+		}
+	}
+	return rc;
+}
 
 RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
+	uint64_t dest_center_id = GET_CENTER_ID(ycsb_query->requests[next_record_id]->key);
+	ycsb_query->centers_touched.add_unique(dest_center_id);
+	// if(ycsb_query->centers_touched.get)
 	ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,dest_node_id));
+	if(this->center_master.find(dest_center_id) == this->center_master.end()) {
+		this->center_master.insert(pair<uint64_t, uint64_t>(dest_center_id, dest_node_id));
+	}
+#if CENTER_MASTER == true
+#if USE_RDMA == CHANGE_MSG_QUEUE
+	tport_man.rdma_thd_send_msg(get_thd_id(), this->center_master[dest_center_id], Message::create_message(this,RQRY));
+#else
+    // DEBUG("ycsb send remote request %ld, %ld\n",txn->txn_id,txn->batch_id);
+    msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),this->center_master[dest_center_id]);
+#endif
+#else
 #if USE_RDMA == CHANGE_MSG_QUEUE
 	tport_man.rdma_thd_send_msg(get_thd_id(), dest_node_id, Message::create_message(this,RQRY));
 #else
     // DEBUG("ycsb send remote request %ld, %ld\n",txn->txn_id,txn->batch_id);
     msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),dest_node_id);
 #endif
-
+#endif
 	return WAIT_REM;
 }
 
 void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	//msg->requests.init(ycsb_query->requests.size());
+    
+#if PARAL_SUBTXN == true && CENTER_MASTER == true
+	uint64_t remote_center_id = remote_next_center_id;
+	uint64_t record_id = remote_center[remote_center_id][0];
+	uint64_t index = 0;
+	while(index < remote_center[remote_center_id].size()) {
+		YCSBQuery::copy_request_to_msg(ycsb_query,msg,record_id);
+		index++;
+		record_id = remote_center[remote_center_id][index];
+	}
+#else
+	uint64_t dest_center_id = GET_CENTER_ID(ycsb_query->requests[next_record_id]->key);
 	uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
-	#if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
+#if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
 	while (next_record_id < ycsb_query->requests.size() && GET_NODE_ID(ycsb_query->requests[next_record_id]->key) == dest_node_id) {
-	#else
+#else
+#if CENTER_MASTER == true
+    while (next_record_id < ycsb_query->requests.size() && !is_local_request(next_record_id) &&
+			GET_CENTER_ID(ycsb_query->requests[next_record_id]->key) == dest_center_id) {
+#else
 	while (next_record_id < ycsb_query->requests.size() && !is_local_request(next_record_id) &&
 			GET_NODE_ID(ycsb_query->requests[next_record_id]->key) == dest_node_id) {
-	#endif
+#endif
+#endif
 		YCSBQuery::copy_request_to_msg(ycsb_query,msg,next_record_id++);
 	}
+#endif
 }
 
 
@@ -1347,7 +1415,7 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	ycsb_request * req = ycsb_query->requests[next_record_id];
 	uint64_t part_id = _wl->key_to_part( req->key );
   	bool loc = GET_NODE_ID(part_id) == g_node_id;
-	
+	uint32_t center_id = GET_CENTER_ID(part_id);
 	RC rc = RCOK;
 	switch (state) {
 	case YCSB_0 :
@@ -1359,11 +1427,16 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 #endif
 		if(loc) {
 			rc = run_ycsb_0(yield,req,row,cor_id);
-		} else if (rdma_one_side()) {
-			// printf("%ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
+		} else if (rdma_one_side() && center_id == g_center_id) {
+			// printf("LOCAL CENTER: %ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
 			rc = send_remote_one_side_request(yield, req, row, cor_id);
 		} else {
+			// printf("REMOTE CENTER: %ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
+#if PARAL_SUBTXN == true && CENTER_MASTER == true
+			rc = RCOK;
+#else
 			rc = send_remote_request();
+#endif
 		}
 #if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 		}
