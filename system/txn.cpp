@@ -2426,14 +2426,14 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 		ts_t ts = get_timestamp();
 
 		row_t * remote_row = read_remote_row(yield,loc,m_item->offset,cor_id);
-		uint64_t wid = 0;
+		uint64_t* wid = (uint64_t*)mem_allocator.alloc(sizeof(uint64_t)*CASCADING_LENGTH);
 		// assert(remote_row->get_primary_key() == req->key);
 		if(type == RD) {
 			if(ts < remote_row->wts){
 				rc = Abort;
-				#if DEBUG_PRINTF
-				printf("[change read wts failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
-				#endif
+				// #if DEBUG_PRINTF
+				// printf("[change read wts failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
+				// #endif
 				mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 				mem_allocator.free(m_item, sizeof(itemid_t));
 				return rc;
@@ -2444,7 +2444,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 					ts_t old_rts = remote_row->rts;
 					ts_t new_rts = ts;
 					ts_t cas_result;
-					uint64_t rts_offset = m_item->offset + sizeof(uint64_t)+sizeof(uint64_t)+sizeof(ts_t);
+					uint64_t rts_offset = m_item->offset + sizeof(uint64_t)+sizeof(uint64_t)*CASCADING_LENGTH+sizeof(ts_t);
 		#if USE_DBPAOR
 					row_t * second_row = cas_and_read_remote(yield,cas_result,loc,rts_offset,m_item->offset,old_rts,new_rts, cor_id);
 					if(cas_result!=old_rts){ //cas fail, atomicity violated
@@ -2459,9 +2459,9 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 					cas_result = cas_remote_content(yield,loc,rts_offset,old_rts,new_rts, cor_id);
 					if(cas_result!=old_rts){ //cas fail
 						rc = Abort;
-						#if DEBUG_PRINTF
-						printf("[remote change rts failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
-						#endif
+						// #if DEBUG_PRINTF
+						// printf("[remote change rts failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
+						// #endif
 						mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 						mem_allocator.free(m_item, sizeof(itemid_t));
 						return rc;
@@ -2471,11 +2471,15 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 		#endif
 					//cas success, now do double read check
 					remote_row->rts = ts;
-					if(second_row->wts!=remote_row->wts || second_row->tid!=remote_row->tid){ //atomicity violated
+					bool diff = false;
+					for (int i = 0; i < CASCADING_LENGTH; i++) {
+						if (second_row->tid[i]!=remote_row->tid[i]) {diff = true; break;}
+					}
+					if(second_row->wts!=remote_row->wts || diff){ //atomicity violated
 						rc = Abort;
-						#if DEBUG_PRINTF
-						printf("[remote change rts failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
-						#endif
+						// #if DEBUG_PRINTF
+						// printf("[remote change rts failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
+						// #endif
 						DEBUG_M("TxnManager::get_row(abort) access free\n");
 						mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 						mem_allocator.free(m_item, sizeof(itemid_t));
@@ -2490,9 +2494,9 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 		else if(type == WR) {
 			if (ts < remote_row->rts){
 				rc = Abort;
-				#if DEBUG_PRINTF
-				printf("[remote write rts failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
-				#endif
+				// #if DEBUG_PRINTF
+				// printf("[remote write rts failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
+				// #endif
 				DEBUG_M("TxnManager::get_row(abort) access free\n");
 				mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 				mem_allocator.free(m_item, sizeof(itemid_t));
@@ -2500,15 +2504,15 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 			} else if (ts < remote_row->wts) {
 				goto end;
 			}
-			else {//CAS(old_tid, new_tid) and read again
-				uint64_t old_tid = 0;
-				uint64_t new_tid = get_txn_id() + 1;
+			else {//CAS(old_mutx, new_mutx) and read again
+				uint64_t old_mutx = 0;
+				uint64_t new_mutx = get_txn_id() + 1;
 				ts_t cas_result;
-				// uint64_t tid_offset = m_item->offset + sizeof(uint64_t);
-				uint64_t tid_offset = m_item->offset;
+				// uint64_t mutx_offset = m_item->offset + sizeof(uint64_t);
+				uint64_t mutx_offset = m_item->offset;
 		#if USE_DBPAOR
-				row_t * second_row = cas_and_read_remote(yield,cas_result,loc,tid_offset,m_item->offset,old_tid,new_tid, cor_id);
-				if(cas_result!=old_tid){ //cas fail, atomicity violated
+				row_t * second_row = cas_and_read_remote(yield,cas_result,loc,mutx_offset,m_item->offset,old_mutx,new_mutx, cor_id);
+				if(cas_result!=old_mutx){ //cas fail, atomicity violated
 					rc = Abort;
 					#if DEBUG_PRINTF
 					printf("[remote lock failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),second_row->get_primary_key(),second_row->mutx,second_row->tid,second_row->rts,second_row->wts);
@@ -2520,8 +2524,8 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 					return rc;
 				}
 		#else
-				cas_result = cas_remote_content(yield,loc,tid_offset,old_tid,new_tid, cor_id);
-				if(cas_result!=old_tid){ //cas fail, atomicity violated
+				cas_result = cas_remote_content(yield,loc,mutx_offset,old_mutx,new_mutx, cor_id);
+				if(cas_result!=old_mutx){ //cas fail, atomicity violated
 					rc = Abort;
 					#if DEBUG_PRINTF
 					printf("[remote lock failed]txn:%ld, lock:%lu\n",get_txn_id(),cas_result);
@@ -2536,14 +2540,14 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 		#endif
 				if(ts < second_row->rts){
 					rc = Abort;
-					#if DEBUG_PRINTF
-					printf("[remote write rts failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),second_row->get_primary_key(),second_row->mutx,second_row->tid,second_row->rts,second_row->wts);
-					#endif
+					// #if DEBUG_PRINTF
+					// printf("[remote write rts failed]txn:%ld, key:%ld, lock:%lu, tid:%lu, rts:%lu, wts:%lu\n",get_txn_id(),second_row->get_primary_key(),second_row->mutx,second_row->tid,second_row->rts,second_row->wts);
+					// #endif
 					DEBUG_M("TxnManager::get_row(abort) access free\n");
-					//RDMA WRITE, SET tid = 0
+					//RDMA WRITE, SET mutx = 0
 					uint64_t* temp_tid = (uint64_t *)mem_allocator.alloc(sizeof(uint64_t));
 					*temp_tid = 0;
-					assert(write_remote_row(loc, sizeof(uint64_t),tid_offset,(char*)(temp_tid))==true);
+					assert(write_remote_row(loc, sizeof(uint64_t),mutx_offset,(char*)(temp_tid))==true);
 					mem_allocator.free(temp_tid,sizeof(uint64_t));
 					mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 					mem_allocator.free(m_item, sizeof(itemid_t));
@@ -2553,16 +2557,22 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 				if (ts < second_row->wts) {
 					uint64_t* temp_tid = (uint64_t *)mem_allocator.alloc(sizeof(uint64_t));
 					*temp_tid = 0;
-					assert(write_remote_row(loc, sizeof(uint64_t),tid_offset,(char*)(temp_tid))==true);
+					assert(write_remote_row(loc, sizeof(uint64_t),mutx_offset,(char*)(temp_tid))==true);
 					goto end;
 				}
 				//read success
-				wid = second_row->tid;
+				for (int i = 0; i < CASCADING_LENGTH; i++) {
+					wid[i] = second_row->tid[i];
+				}
+				
 				second_row->mutx = 0;
-				second_row->tid = get_txn_id();
+				// second_row->tid = get_txn_id();
+				for (int i = 0; i < CASCADING_LENGTH; i++) {
+					if (second_row->tid[i]==0) {second_row->tid[i] = get_txn_id(); break;}
+				}
 				second_row->wts = ts, second_row->rts = ts;
 				uint64_t operate_size = row_t::get_row_size(second_row->tuple_size);
-				assert(write_remote_row(loc, operate_size, tid_offset,(char*)(second_row))==true);
+				assert(write_remote_row(loc, operate_size, mutx_offset,(char*)(second_row))==true);
 				mem_allocator.free(second_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 			}
 		} else {
@@ -2571,7 +2581,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 	end:
 		rc = RCOK;
 		rc = preserve_access(row_local,m_item,remote_row,type,remote_row->get_primary_key(),loc,wid);
-		
+		mem_allocator.free(wid, sizeof(uint64_t)*CASCADING_LENGTH);
 		return rc;
 	#endif	
 
@@ -4312,7 +4322,7 @@ bool TxnManager::loop_cas_remote(uint64_t target_server,uint64_t remote_offset,u
     return true;
 }
 
-RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc,uint64_t wid){
+RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc,uint64_t* wid){
     Access * access = NULL;
 	access_pool.get(get_thd_id(),access);
 
@@ -4354,7 +4364,9 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
 #endif
 
 #if CC_ALG == RDMA_TS1
-	access->wid = wid;
+	for (int i = 0; i < CASCADING_LENGTH; i++) {
+		access->wid[i] = wid[i];
+	}
 #endif
 
 #if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA

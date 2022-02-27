@@ -79,7 +79,7 @@ public:
 	uint64_t	offset;
 #endif
 #if CC_ALG == RDMA_TS1 
-	uint64_t	wid;
+	uint64_t	wid[LOCK_LENGTH];
 #endif
 #if CC_ALG == CICADA
 	uint64_t	recordId;	//already readed record id
@@ -240,7 +240,7 @@ public:
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
 	uint64_t faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t cor_id);
      bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
-    RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc,uint64_t wid = 0);
+    RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc,uint64_t *wid = NULL);
 #if USE_DBPAOR == true
 	void batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int loc, RC rc, TxnManager * txnMng , vector<vector<uint64_t>> remote_index_origin,ts_t time = 0, vector<vector<uint64_t>> remote_num = {{0}});
 	row_t * cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock, uint64_t target_server, uint64_t cas_offset, uint64_t read_offset, uint64_t compare, uint64_t swap, uint64_t cor_id);

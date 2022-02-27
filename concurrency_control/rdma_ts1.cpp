@@ -76,19 +76,22 @@ RC RDMA_ts1::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_id)
 			read_set[cur_rd_idx ++] = rid;
 	}
 	for (uint64_t i = 0; i < wr_cnt; i++) {
-		uint64_t wid = txn->accesses[txnMng->write_set[i]]->wid;
-		TSState state;
-	retry:
-		if(wid % g_node_cnt == g_node_id) {
-			state = rdma_txn_table.local_get_state(txnMng->get_thd_id(), wid);
-		} else {
-			state = rdma_txn_table.remote_get_state(yield, txnMng, wid, cor_id);
+		for (uint64_t j = 0; j < CASCADING_LENGTH; j++) {
+			uint64_t wid = txn->accesses[txnMng->write_set[i]]->wid[j];
+			if (wid == 0) continue;
+			TSState state;
+		retry:
+			if(wid % g_node_cnt == g_node_id) {
+				state = rdma_txn_table.local_get_state(txnMng->get_thd_id(), wid);
+			} else {
+				state = rdma_txn_table.remote_get_state(yield, txnMng, wid, cor_id);
+			}
+			if (state == TS_RUNNING) goto retry;
+			if (state == TS_ABORTING) {
+				// printf("[级联回滚]事务号:%ld, 级联事务: %ld\n",txnMng->get_txn_id(),wid);
+				return Abort;
+			} 
 		}
-		if (state == TS_RUNNING) goto retry;
-		if (state == TS_ABORTING) {
-			// printf("[级联回滚]事务号:%ld, 级联事务: %ld\n",txnMng->get_txn_id(),wid);
-			return Abort;
-		} 
 	}
 	return RCOK;
 }
@@ -108,10 +111,26 @@ void  RDMA_ts1::commit_write(yield_func_t &yield, TxnManager * txn , uint64_t nu
 	
 #if USE_DBPAOR == true
 	if(type == XP){
-		// //batch set tid = 0 for remote abort write
-		// uint64_t* tid = (uint64_t*)mem_allocator.alloc(sizeof(uint64_t));
-		// *tid = 0;
-		// txn->write_remote_row(loc, sizeof(uint64_t),offset+sizeof(uint64_t),(char*)tid);
+		uint64_t try_lock;
+		row_t* remote_row = txn->cas_and_read_remote(yield,try_lock,loc,offset,offset,0,lock_num,cor_id);
+		while(try_lock!=0){ //lock fail
+			mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+			remote_row = txn->cas_and_read_remote(yield,try_lock,loc,offset,offset,0,lock_num,cor_id);
+		}
+		ts_t ts = txn->get_timestamp();
+		// remote_row->tid = access->wid;
+		bool clean = false;
+		for (int i = 0; i < CASCADING_LENGTH; i++) {
+			if (remote_row->tid[i] == txn->get_txn_id()) clean = true;
+			if (clean && remote_row->tid[i]!=0) {
+				remote_row->tid[i] = 0;
+			}
+		}
+		remote_row->mutx = 0;
+		memcpy(row, remote_row, row_t::get_row_size(remote_row->tuple_size));
+		write_remote(yield,RCOK,txn,access,cor_id);
+		mem_allocator.free(row, row_t::get_row_size(access->data->tuple_size));
+		mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	else if(type == WR){
 		uint64_t try_lock;
@@ -122,7 +141,18 @@ void  RDMA_ts1::commit_write(yield_func_t &yield, TxnManager * txn , uint64_t nu
 		}
 		//update wts, tid and unlock
 		if(remote_row->wts < ts) remote_row->wts = ts;
-		remote_row->tid = 0;
+		int i = 0;
+		for (i = 0; i < CASCADING_LENGTH; i++) {
+			if (remote_row->tid[i] == txn->get_txn_id()) break;
+		}
+		for (; i < CASCADING_LENGTH; i ++) {
+			if (i + 1 < CASCADING_LENGTH && remote_row->tid[i + 1] != 0) {
+				remote_row->tid[i] = remote_row->tid[i+1];
+			}
+			if (i + 1 == CASCADING_LENGTH) {
+				remote_row->tid[i] = 0;
+			}
+		}
 		remote_row->mutx = 0;
 
 		memcpy(row, remote_row, row_t::get_row_size(remote_row->tuple_size));
@@ -138,14 +168,34 @@ void  RDMA_ts1::commit_write(yield_func_t &yield, TxnManager * txn , uint64_t nu
 	row_t *remote_row = txn->read_remote_row(yield,loc,offset,cor_id);
 
 	if (type == XP) {
-		remote_row->tid = 0;
+		bool clean = false;
+		for (int i = 0; i < CASCADING_LENGTH; i++) {
+			if (remote_row->tid[i] == txn->get_txn_id()) clean = true;
+			if (clean && remote_row->tid[i]!=0) {
+				remote_row->tid[i] = 0;
+			}
+		}
+		ts_t ts = txn->get_timestamp();
+		// _row->tid = access->wid;
+		remote_row->mutx = 0;
 	}
 	else if (type == WR) {
 #if DEBUG_PRINTF
 		// printf("[远程写提交]事务号：%d，主键：%d，锁：%d,tid:%lu,rts:%lu,wts:%lu\n",txn->get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
 #endif
 		if(remote_row->wts < ts) remote_row->wts = ts;
-		remote_row->tid = 0;
+		int i = 0;
+		for (i = 0; i < CASCADING_LENGTH; i++) {
+			if (remote_row->tid[i] == txn->get_txn_id()) break;
+		}
+		for (; i < CASCADING_LENGTH; i ++) {
+			if (i + 1 < CASCADING_LENGTH && remote_row->tid[i + 1] != 0) {
+				remote_row->tid[i] = remote_row->tid[i+1];
+			}
+			if (i + 1 == CASCADING_LENGTH) {
+				remote_row->tid[i] = 0;
+			}
+		}
 	}else {
 		assert(false);
 	}

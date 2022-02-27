@@ -27,7 +27,7 @@
 #define SIT_COROUTINE   3
 #define SIT_DBPA        4
 #define SIT_ALL         5
-#define RDMA_SIT 3
+#define RDMA_SIT 2
 #if RDMA_SIT == SIT_TCP
   #define RDMA_ONE_SIDE false
   #define RDMA_TWO_SIDE false
@@ -116,7 +116,7 @@
 #define THREAD_CNT 24
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 4
+#define COROUTINE_CNT 8
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
@@ -211,7 +211,7 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_MOCC
+#define CC_ALG RDMA_TS1
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -318,6 +318,7 @@
 #define USE_READ_WAIT_QUEUE false
 #define YIELD_WHEN_WAITING_READ false
 #define TS_RETRY_COUNT int(ZIPF_THETA * 20 + 1)
+#define CASCADING_LENGTH 10
 // #define ROW_SET_LENGTH 100
 #define MAX_RETRY_TIME 2
 #define LOCK_LENGTH 10
@@ -358,7 +359,7 @@
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 2
+#define PART_PER_TXN 10
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
