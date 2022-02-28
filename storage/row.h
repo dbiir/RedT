@@ -209,7 +209,7 @@ public:
 		Row_cicada * manager;
 	#elif CC_ALG == RDMA_TS1
 		volatile uint64_t	mutx;
-		volatile uint64_t	tid[LOCK_LENGTH];
+		volatile uint64_t	tid[CASCADING_LENGTH];
 		ts_t wts;
     	ts_t rts;
 		Row_rdma_ts1 * manager;

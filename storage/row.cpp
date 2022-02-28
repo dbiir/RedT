@@ -128,7 +128,7 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 #endif
 #if CC_ALG ==RDMA_TS1
 	mutx = 0;
-	for(int i = 0; i < LOCK_LENGTH; i++) {
+	for(int i = 0; i < CASCADING_LENGTH; i++) {
 		tid[i] = 0;
 	}
 	wts = 0;
