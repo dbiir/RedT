@@ -222,7 +222,7 @@ void row_t::set_value(int id, void * ptr) {
 	// table* table = get_table();
 	int datasize = get_schema()->get_field_size(id);
 	int pos = get_schema()->get_field_index(id);
-	DEBUG("set_value pos %d datasize %d -- %lx\n", pos, datasize, (uint64_t)this);
+	// DEBUG("set_value pos %d datasize %d -- %lx\n", pos, datasize, (uint64_t)this);
 #if SIM_FULL_ROW
 	memcpy( &data[pos], ptr, datasize);
 #else

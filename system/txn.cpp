@@ -280,7 +280,7 @@ void Transaction::init() {
 	txn_id = UINT64_MAX;
 	batch_id = UINT64_MAX;
 	DEBUG_M("Transaction::init array insert_rows\n");
-	insert_rows.init(g_max_items_per_txn + 10);
+	insert_rows.init(g_max_items_per_txn + 80);
 	DEBUG_M("Transaction::reset array accesses\n");
 	accesses.init(MAX_ROW_PER_TXN);
 

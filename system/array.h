@@ -78,6 +78,7 @@ public:
   void add(T item){
     assert(count < capacity);
     items[count] = item;
+    // printf("%ld\n",count);
     ++count;
   }
 

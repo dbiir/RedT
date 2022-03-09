@@ -526,7 +526,7 @@ def ycsb_partitions_distr():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [1,2,4,8,16]
+    nnodes = [4]
     # nnodes = [8,16]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
@@ -537,15 +537,15 @@ def tpcc_scaling():
     # nalgos=['RDMA_SILO','RDMA_MVCC']
     # nalgos = ['RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WOUND_WAIT2','RDMA_WAIT_DIE2']
     # nalgos = ['RDMA_TS1']
-    nalgos = ['RDMA_WOUND_WAIT2']
+    nalgos = ['RDMA_SILO']
     # nalgos = ['RDMA_CALVIN']
-    npercpay=[1.0]
+    npercpay=[0.0]
     # npercpay=[0.0]
     wh=16
     # wh=64
-    load = [20000]
+    load = [10000]
     tcnt = [4]
-    ctcnt = [2]
+    ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
 
@@ -934,7 +934,7 @@ configs = {
     "TPORT_TYPE":"IPC",
     "TPORT_PORT":"18000",
     "PART_CNT": "NODE_CNT",
-    "PART_PER_TXN": 3,
+    "PART_PER_TXN": 4,
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '0UL',
     "NETWORK_DELAY_TEST": 'false',
