@@ -297,14 +297,14 @@ void AccessPool::get(uint64_t thd_id, Access *& item) {
   item->orig_wts = 0;
   item->locked = false;
   #endif
-  #if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC
+  #if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_MOCC
   item->location = g_node_id;
   item->key = 0;
   item->tid = 0;
   item->test_row = NULL;
   item->offset = 0;
   #endif
-  #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
+  #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT|| CC_ALG == RDMA_DSLR_NO_WAIT
   item->location = g_node_id;
   item->offset = 0;
   #endif

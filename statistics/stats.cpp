@@ -126,6 +126,12 @@ void Stats_thd::clear() {
   read_retry_cnt=0;
   write_retry_cnt=0;
 
+  //dslr
+  jump_abort = 0;
+  deadlock_abort = 0;
+  overflow_abort = 0;
+  process_overflow = 0;
+
   // Breakdown
   ts_alloc_time=0;
   abort_time=0;
@@ -611,6 +617,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",total_txn_commit_cnt=%ld"
   ",local_txn_commit_cnt=%ld"
   ",remote_txn_commit_cnt=%ld"
+  ",total_num_atomic_retry=%ld"
   ",total_txn_abort_cnt=%ld"
           ",positive_txn_abort_cnt=%ld"
   ",unique_txn_abort_cnt=%ld"
@@ -629,7 +636,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",parts_touched=%ld"
           ",avg_parts_touched=%f",
           tput, txn_cnt, remote_txn_cnt, local_txn_cnt, local_txn_start_cnt, total_txn_commit_cnt,
-          local_txn_commit_cnt, remote_txn_commit_cnt, total_txn_abort_cnt,positive_txn_abort_cnt, unique_txn_abort_cnt,
+          local_txn_commit_cnt, remote_txn_commit_cnt, total_num_atomic_retry, total_txn_abort_cnt,positive_txn_abort_cnt, unique_txn_abort_cnt,
           local_txn_abort_cnt, remote_txn_abort_cnt, txn_run_time / BILLION,
           txn_run_avg_time / BILLION, multi_part_txn_cnt, multi_part_txn_run_time / BILLION,
           multi_part_txn_avg_time / BILLION, single_part_txn_cnt,
@@ -1310,7 +1317,19 @@ void Stats_thd::print(FILE * outf, bool prog) {
           ano_2_trans_write_skew_1, ano_2_trans_write_skew_2, ano_3_trans_write_skew_1,
           ano_3_trans_write_skew_2, ano_2_trans_read_skew, ano_3_trans_read_skew_1,
           ano_3_trans_read_skew_2, ano_4_trans_read_skew, ano_unknown);
+  fprintf(outf,
+          ",preqlen_over_cnt=%ld"
+          ",lock_retry_cnt=%ld"
+          ",read_retry_cnt=%ld"
+          ",write_retry_cnt=%ld",
+          preqlen_over_cnt, lock_retry_cnt, read_retry_cnt,
+          write_retry_cnt);
 
+    fprintf(outf,
+        ",jump_abort = %ld"
+        ",deadlock_abort = %ld"
+        ",overflow_abort = %ld"
+        ",process_overflow = %ld",jump_abort,deadlock_abort,overflow_abort,process_overflow);
 
   // if (!prog) {
   //     last_start_commit_latency.quicksort(0,last_start_commit_latency.cnt-1);
@@ -1476,6 +1495,11 @@ void Stats_thd::combine(Stats_thd * stats) {
   lock_retry_cnt+=stats->lock_retry_cnt;
   read_retry_cnt+=stats->read_retry_cnt;
   write_retry_cnt+=stats->write_retry_cnt;
+
+  jump_abort+=stats->jump_abort;
+  deadlock_abort+=stats->deadlock_abort;
+  overflow_abort+=stats->overflow_abort;
+  process_overflow+=stats->process_overflow;
 
   // Breakdown
   ts_alloc_time+=stats->ts_alloc_time;

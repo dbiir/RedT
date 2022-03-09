@@ -104,6 +104,13 @@ public:
   uint64_t lock_retry_cnt;
   uint64_t read_retry_cnt;
   uint64_t write_retry_cnt;
+
+  //dslr
+  uint64_t jump_abort;
+  uint64_t deadlock_abort;
+  uint64_t overflow_abort;
+  uint64_t process_overflow;
+
   // Transaction stats
   double txn_total_process_time;
   double txn_process_time;

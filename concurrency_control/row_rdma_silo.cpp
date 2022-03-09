@@ -13,7 +13,7 @@ void
 Row_rdma_silo::init(row_t * row)
 {
 	_row = row;
-	_tid_word = 0;
+	// _tid_word = 0;
 	timestamp = 0;
 }
 

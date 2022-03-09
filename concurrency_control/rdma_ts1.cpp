@@ -28,104 +28,10 @@ limitations under the License.
 #include "src/sshed.hh"
 #include "transport.h"
 #include "qps/op.hh"
+#include "rdma_maat.h"
 
 #if CC_ALG == RDMA_TS1
 
-bool  RDMA_ts1::remote_try_lock(TxnManager * txn, uint64_t loc, uint64_t off){
-    bool result = false;
-	uint64_t thd_id = txn->get_thd_id();
-	uint64_t lock = txn->get_txn_id()+1;
-
-	uint64_t *local_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-	auto mr = client_rm_handler->get_reg_attr().value();
-
-	rdmaio::qp::Op<> op;
-    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
-  	assert(op.set_payload(local_loc, sizeof(uint64_t), mr.key) == true);
-  	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
-
-	RDMA_ASSERT(res_s2 == IOCode::Ok);
-	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p2 == IOCode::Ok);
-	if (*local_loc == 0)
-		result = true;
-
-	return result;
-}
-
-// bool  RDMA_ts1::remote_try_lock(TxnManager * txn, row_t * temp_row, uint64_t loc, uint64_t off){
-//     bool result = false;
-// 	uint64_t thd_id = txn->get_thd_id();
-// 	uint64_t lock = txn->get_txn_id()+1;
-
-// 	uint64_t *local_loc = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-// 	auto mr = client_rm_handler->get_reg_attr().value();
-
-// 	rdmaio::qp::Op<> op;
-//     op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[loc].buf + off), remote_mr_attr[loc].key).set_cas(0, lock);
-//   	assert(op.set_payload(local_loc, sizeof(uint64_t), mr.key) == true);
-//   	auto res_s2 = op.execute(rc_qp[loc][thd_id], IBV_SEND_SIGNALED);
-
-// 	RDMA_ASSERT(res_s2 == IOCode::Ok);
-// 	auto res_p2 = rc_qp[loc][thd_id]->wait_one_comp();
-// 	RDMA_ASSERT(res_p2 == IOCode::Ok);
-// 	if (*local_loc == 0)
-// 		result = true;
-	
-// 	//check the lock 
-// 	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-// 	char *test_buf = Rdma::get_row_client_memory(thd_id);
-// 	memset(test_buf, 0, operate_size);
-// 	auto res_s = rc_qp[loc][thd_id]->send_normal(
-// 		{.op = IBV_WR_RDMA_READ,
-// 		.flags = IBV_SEND_SIGNALED,
-// 		.len = operate_size,
-// 		.wr_id = 0},
-// 		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
-// 		.remote_addr = off,
-// 		.imm_data = 0});
-// 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
-// 	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
-// 	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-// 	memset(temp_row, 0, operate_size);
-// 	memcpy(temp_row, test_buf, operate_size);
-// 	if (temp_row->mutx == lock )
-// 		result = true;
-// #if DEBUG_PRINTF
-// 	printf("[RDMA加锁后]事务号：%d，主键：%d，锁：%lu tid:%lu\n",txn->get_txn_id(),temp_row->get_primary_key(),temp_row->mutx, temp_row->tid);
-// #endif
-// 	return result;
-// }
-
-void RDMA_ts1::read_remote_row(TxnManager * txn, row_t * remote_row, uint64_t loc, uint64_t off){
-	uint64_t thd_id = txn->get_thd_id();
-	uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
-	char *test_buf = Rdma::get_row_client_memory(thd_id);
-    memset(test_buf, 0, operate_size);
-
-	uint64_t starttime;
-	uint64_t endtime;
-	starttime = get_sys_clock();
-
-	auto res_s = rc_qp[loc][thd_id]->send_normal(
-		{.op = IBV_WR_RDMA_READ,
-		.flags = IBV_SEND_SIGNALED,
-		.len = operate_size,
-		.wr_id = 0},
-		{.local_addr = reinterpret_cast<rdmaio::RMem::raw_ptr_t>(test_buf),
-		.remote_addr = off,
-		.imm_data = 0});
-	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
-  	auto res_p = rc_qp[loc][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-
-	endtime = get_sys_clock();
-
-	INC_STATS(txn->get_thd_id(), rdma_read_time, endtime-starttime);
-	INC_STATS(txn->get_thd_id(), rdma_read_cnt, 1);
-	memset(remote_row, 0, operate_size);
-	memcpy(remote_row, test_buf, operate_size);
-}
 
 void  RDMA_ts1::write_remote(yield_func_t &yield, RC rc, TxnManager * txn, Access * access, uint64_t cor_id) {
 	uint64_t off = access->offset;
@@ -137,7 +43,7 @@ void  RDMA_ts1::write_remote(yield_func_t &yield, RC rc, TxnManager * txn, Acces
 		operate_size = sizeof(uint64_t);
 
 #if DEBUG_PRINTF
-	printf("[远程写的传入数据]rc:%d,事务号：%d，主键：%d，锁：%lu，tid：%lu,rts：%lu,wts：%lu\n",rc,txn->get_txn_id(),access->data->get_primary_key(),access->data->mutx,access->data->tid,access->data->rts,access->data->wts);
+	// printf("[远程写的传入数据]rc:%d,事务号：%d，主键：%d，锁：%lu，tid：%lu,rts：%lu,wts：%lu\n",rc,txn->get_txn_id(),access->data->get_primary_key(),access->data->mutx,access->data->tid,access->data->rts,access->data->wts);
 #endif
 
     txn->write_remote_row(yield,loc,operate_size,off,(char*)access->data,cor_id);
@@ -146,14 +52,48 @@ void  RDMA_ts1::write_remote(yield_func_t &yield, RC rc, TxnManager * txn, Acces
     // memcpy(local_loc, (char*)access->data, operate_size);
 
 #if DEBUG_PRINTF
-if(access->type == WR){
+// if(access->type == WR){
 	
-    row_t *temp_row = txn->read_remote_row(loc,off);
-	printf("[远程写入后再次读]事务号：%d，主键：%d，锁：%lu，tid：%lu,rts：%lu,wts：%lu\n",txn->get_txn_id(),temp_row->get_primary_key(),temp_row->mutx,temp_row->tid,temp_row->rts,temp_row->wts);
-	mem_allocator.free(temp_row,sizeof(ROW_DEFAULT_SIZE));
-}
+//     row_t *temp_row = txn->read_remote_row(loc,off);
+// 	printf("[远程写入后再次读]事务号：%d，主键：%d，锁：%lu，tid：%lu,rts：%lu,wts：%lu\n",txn->get_txn_id(),temp_row->get_primary_key(),temp_row->mutx,temp_row->tid,temp_row->rts,temp_row->wts);
+// 	mem_allocator.free(temp_row,sizeof(ROW_DEFAULT_SIZE));
+// }
 #endif
+}
 
+RC RDMA_ts1::validate(yield_func_t &yield, TxnManager * txnMng, uint64_t cor_id) {
+	Transaction *txn = txnMng->txn;
+	uint64_t wr_cnt = txn->write_cnt;
+
+	int cur_wr_idx = 0;
+  	//int read_set[10];
+	int read_set[txn->row_cnt - txn->write_cnt];
+	int cur_rd_idx = 0;
+	for (uint64_t rid = 0; rid < txn->row_cnt; rid ++) {
+		if (txn->accesses[rid]->type == WR)
+			txnMng->write_set[cur_wr_idx ++] = rid;
+		else
+			read_set[cur_rd_idx ++] = rid;
+	}
+	for (uint64_t i = 0; i < wr_cnt; i++) {
+		for (uint64_t j = 0; j < CASCADING_LENGTH; j++) {
+			uint64_t wid = txn->accesses[txnMng->write_set[i]]->wid[j];
+			if (wid == 0) continue;
+			TSState state;
+		retry:
+			if(wid % g_node_cnt == g_node_id) {
+				state = rdma_txn_table.local_get_state(txnMng->get_thd_id(), wid);
+			} else {
+				state = rdma_txn_table.remote_get_state(yield, txnMng, wid, cor_id);
+			}
+			if (state == TS_RUNNING) goto retry;
+			if (state == TS_ABORTING) {
+				// printf("[级联回滚]事务号:%ld, 级联事务: %ld\n",txnMng->get_txn_id(),wid);
+				return Abort;
+			} 
+		}
+	}
+	return RCOK;
 }
  
 void  RDMA_ts1::commit_write(yield_func_t &yield, TxnManager * txn , uint64_t num , access_t type, uint64_t cor_id){
@@ -168,28 +108,29 @@ void  RDMA_ts1::commit_write(yield_func_t &yield, TxnManager * txn , uint64_t nu
     // row_t *remote_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
     // row_t *remote_row = Rdma::get_row_client_memory(txn->get_thd_id());
 	ts_t ts = txn->get_timestamp();
-	//validate lock suc
-	// row_t *temp_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-
-// 	bool suc = false;
-// 	//lock row
-// 	suc = remote_try_lock(txn, temp_row, loc, offset);
-
-// 	while(suc == false){
-// 		INC_STATS(txn->get_thd_id(),lock_retry_cnt,1);
-// #if DEBUG_PRINTF
-// 		printf("远程提交 lock retry！事务号：%ld,主键：%ld\n",txn->get_txn_id(),row->get_primary_key());
-// #endif
-// 		suc = remote_try_lock(txn, temp_row, loc, offset);
-// 	}
-
-// read_remote_row(txn, remote_row, loc, offset);
+	
 #if USE_DBPAOR == true
 	if(type == XP){
-		// //batch set tid = 0 for remote abort write
-		// uint64_t* tid = (uint64_t*)mem_allocator.alloc(sizeof(uint64_t));
-		// *tid = 0;
-		// txn->write_remote_row(loc, sizeof(uint64_t),offset+sizeof(uint64_t),(char*)tid);
+		uint64_t try_lock;
+		row_t* remote_row = txn->cas_and_read_remote(yield,try_lock,loc,offset,offset,0,lock_num,cor_id);
+		while(try_lock!=0){ //lock fail
+			mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+			remote_row = txn->cas_and_read_remote(yield,try_lock,loc,offset,offset,0,lock_num,cor_id);
+		}
+		ts_t ts = txn->get_timestamp();
+		// remote_row->tid = access->wid;
+		bool clean = false;
+		for (int i = 0; i < CASCADING_LENGTH; i++) {
+			if (remote_row->tid[i] == txn->get_txn_id()) clean = true;
+			if (clean && remote_row->tid[i]!=0) {
+				remote_row->tid[i] = 0;
+			}
+		}
+		remote_row->mutx = 0;
+		memcpy(row, remote_row, row_t::get_row_size(remote_row->tuple_size));
+		write_remote(yield,RCOK,txn,access,cor_id);
+		mem_allocator.free(row, row_t::get_row_size(access->data->tuple_size));
+		mem_allocator.free(remote_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
 	}
 	else if(type == WR){
 		uint64_t try_lock;
@@ -200,7 +141,18 @@ void  RDMA_ts1::commit_write(yield_func_t &yield, TxnManager * txn , uint64_t nu
 		}
 		//update wts, tid and unlock
 		if(remote_row->wts < ts) remote_row->wts = ts;
-		remote_row->tid = 0;
+		int i = 0;
+		for (i = 0; i < CASCADING_LENGTH; i++) {
+			if (remote_row->tid[i] == txn->get_txn_id()) break;
+		}
+		for (; i < CASCADING_LENGTH; i ++) {
+			if (i + 1 < CASCADING_LENGTH && remote_row->tid[i + 1] != 0) {
+				remote_row->tid[i] = remote_row->tid[i+1];
+			}
+			if (i + 1 == CASCADING_LENGTH) {
+				remote_row->tid[i] = 0;
+			}
+		}
 		remote_row->mutx = 0;
 
 		memcpy(row, remote_row, row_t::get_row_size(remote_row->tuple_size));
@@ -216,14 +168,34 @@ void  RDMA_ts1::commit_write(yield_func_t &yield, TxnManager * txn , uint64_t nu
 	row_t *remote_row = txn->read_remote_row(yield,loc,offset,cor_id);
 
 	if (type == XP) {
-		remote_row->tid = 0;
+		bool clean = false;
+		for (int i = 0; i < CASCADING_LENGTH; i++) {
+			if (remote_row->tid[i] == txn->get_txn_id()) clean = true;
+			if (clean && remote_row->tid[i]!=0) {
+				remote_row->tid[i] = 0;
+			}
+		}
+		ts_t ts = txn->get_timestamp();
+		// _row->tid = access->wid;
+		remote_row->mutx = 0;
 	}
 	else if (type == WR) {
 #if DEBUG_PRINTF
-		printf("[远程写提交]事务号：%d，主键：%d，锁：%d,tid:%lu,rts:%lu,wts:%lu\n",txn->get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
+		// printf("[远程写提交]事务号：%d，主键：%d，锁：%d,tid:%lu,rts:%lu,wts:%lu\n",txn->get_txn_id(),remote_row->get_primary_key(),remote_row->mutx,remote_row->tid,remote_row->rts,remote_row->wts);
 #endif
 		if(remote_row->wts < ts) remote_row->wts = ts;
-		remote_row->tid = 0;
+		int i = 0;
+		for (i = 0; i < CASCADING_LENGTH; i++) {
+			if (remote_row->tid[i] == txn->get_txn_id()) break;
+		}
+		for (; i < CASCADING_LENGTH; i ++) {
+			if (i + 1 < CASCADING_LENGTH && remote_row->tid[i + 1] != 0) {
+				remote_row->tid[i] = remote_row->tid[i+1];
+			}
+			if (i + 1 == CASCADING_LENGTH) {
+				remote_row->tid[i] = 0;
+			}
+		}
 	}else {
 		assert(false);
 	}
@@ -244,11 +216,10 @@ void RDMA_ts1::finish(RC rc, TxnManager * txnMng){
     for (uint64_t i = 0; i < txn->row_cnt; i++) {
         if(txn->accesses[i]->location != g_node_id){
         //remote
-        // mem_allocator.free(txn->accesses[i]->data,0);
-        mem_allocator.free(txn->accesses[i]->orig_row,0);
-        // txn->accesses[i]->data = NULL;
-        txn->accesses[i]->orig_row = NULL;
-       
+			// mem_allocator.free(txn->accesses[i]->data,0);
+			mem_allocator.free(txn->accesses[i]->orig_row,0);
+			// txn->accesses[i]->data = NULL;
+			txn->accesses[i]->orig_row = NULL;
         }
     }
 }
