@@ -51,6 +51,7 @@
 #include "transport.h"
 #include "qps/op.hh"
 #include "stats.h"
+#include "log_rdma.h"
 
 void YCSBTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	TxnManager::init(thd_id, h_wl);
@@ -156,8 +157,8 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time += curr_time - starttime;
 	txn_stats.process_time_short += curr_time - starttime;
 	txn_stats.wait_starttime = get_sys_clock();
-//RDMA_SILO:logic?
-	if(IS_LOCAL(get_txn_id())) {  //for one-side rdma, must be local
+
+	if(IS_LOCAL(get_txn_id())) {  
 		if(is_done() && rc == RCOK) {
 			// printf("a txn is done\n");
 #if CC_ALG == WOUND_WAIT
@@ -250,7 +251,11 @@ itemid_t* YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_reque
 
 	//get corresponding index
   // uint64_t index_key = 0;
+#if USE_REPLICA
+	uint64_t index_key = req->key;
+#else
 	uint64_t index_key = req->key / g_node_cnt;
+#endif
 	uint64_t index_addr = (index_key) * sizeof(IndexInfo);
 	uint64_t index_size = sizeof(IndexInfo);
 
@@ -1328,8 +1333,9 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	RC rc = RCOK;
 	for(int i = 0; i < ycsb_query->requests.size(); i++) {
 		ycsb_request * req = ycsb_query->requests[i];
-		uint64_t node_id = GET_NODE_ID(req->key);
-		uint64_t center_id = GET_CENTER_ID(req->key);
+		uint64_t part_id = _wl->key_to_part(req->key);
+		uint64_t node_id = GET_NODE_ID(part_id);
+		uint64_t center_id = GET_CENTER_ID(node_id);
 		ycsb_query->centers_touched.add_unique(center_id);
 		ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id));
 		// if(center_id != g_center_id) {
@@ -1351,8 +1357,10 @@ RC YCSBTxnManager::send_remote_subtxn() {
 
 RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
-	uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
-	uint64_t dest_center_id = GET_CENTER_ID(ycsb_query->requests[next_record_id]->key);
+
+	uint64_t dest_part_id = _wl->key_to_part(ycsb_query->requests[next_record_id]->key);
+	uint64_t dest_node_id = GET_NODE_ID(dest_part_id);
+	uint64_t dest_center_id = GET_CENTER_ID(dest_node_id);
 	ycsb_query->centers_touched.add_unique(dest_center_id);
 	// if(ycsb_query->centers_touched.get)
 	ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,dest_node_id));
@@ -1382,6 +1390,12 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 	//msg->requests.init(ycsb_query->requests.size());
     
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
+#if USE_REPLICA
+	//copy all query
+    for(int i = 0; i < ycsb_query->requests.size();i++) {
+		YCSBQuery::copy_request_to_msg(ycsb_query,msg,i);
+	}
+#else
 	uint64_t remote_center_id = remote_next_center_id;
 	uint64_t record_id = remote_center[remote_center_id][0];
 	uint64_t index = 0;
@@ -1390,18 +1404,20 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 		index++;
 		record_id = remote_center[remote_center_id][index];
 	}
+#endif
 #else
-	uint64_t dest_center_id = GET_CENTER_ID(ycsb_query->requests[next_record_id]->key);
-	uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
+	uint64_t dest_part_id = _wl->key_to_part(ycsb_query->requests[next_record_id]->key);
+	uint64_t dest_node_id = GET_NODE_ID(dest_part_id);
+	uint64_t dest_center_id = GET_CENTER_ID(dest_node_id);
 #if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
-	while (next_record_id < ycsb_query->requests.size() && GET_NODE_ID(ycsb_query->requests[next_record_id]->key) == dest_node_id) {
+	while (next_record_id < ycsb_query->requests.size() && GET_NODE_ID(_wl->key_to_part(ycsb_query->requests[next_record_id]->key)) == dest_node_id) {
 #else
 #if CENTER_MASTER == true
     while (next_record_id < ycsb_query->requests.size() && !is_local_request(next_record_id) &&
-			GET_CENTER_ID(ycsb_query->requests[next_record_id]->key) == dest_center_id) {
+			GET_CENTER_ID(GET_NODE_ID(_wl->key_to_part(ycsb_query->requests[next_record_id]->key))) == dest_center_id) {
 #else
 	while (next_record_id < ycsb_query->requests.size() && !is_local_request(next_record_id) &&
-			GET_NODE_ID(ycsb_query->requests[next_record_id]->key) == dest_node_id) {
+			GET_NODE_ID(_wl->key_to_part(ycsb_query->requests[next_record_id]->key)) == dest_node_id) {
 #endif
 #endif
 		YCSBQuery::copy_request_to_msg(ycsb_query,msg,next_record_id++);
@@ -1414,8 +1430,9 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	ycsb_request * req = ycsb_query->requests[next_record_id];
 	uint64_t part_id = _wl->key_to_part( req->key );
-  	bool loc = GET_NODE_ID(part_id) == g_node_id;
-	uint32_t center_id = GET_CENTER_ID(part_id);
+	uint64_t node_id = GET_NODE_ID(part_id);
+	uint32_t center_id = GET_CENTER_ID(node_id);
+  	bool is_local = node_id == g_node_id;
 	RC rc = RCOK;
 	switch (state) {
 	case YCSB_0 :
@@ -1425,7 +1442,7 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			rc = Abort;
 		} else {
 #endif
-		if(loc) {
+		if(is_local) {
 			rc = run_ycsb_0(yield,req,row,cor_id);
 		} else if (rdma_one_side() && center_id == g_center_id) {
 			// printf("LOCAL CENTER: %ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
@@ -1445,7 +1462,11 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	case YCSB_1 :
 		//read local row,for message queue by TCP/IP,write set has actually been written in this point,
 		//but for rdma, it was written in local, the remote data will actually be written when COMMIT
-		rc = run_ycsb_1(req->acctype,row);  
+		if(center_id == g_center_id){
+			rc = run_ycsb_1(req->acctype,row);  
+		}else{
+			rc = RCOK;
+		}
 		break;
 	case YCSB_FIN :
 		state = YCSB_FIN;

@@ -178,6 +178,11 @@ public:
 	Workload * h_wl;
 
 	virtual RC      run_txn(yield_func_t &yield, uint64_t cor_id) = 0;
+#if USE_REPLICA
+	RC 		redo_log(yield_func_t &yield, RC status, uint64_t cor_id);
+#endif
+
+
 	virtual RC      run_txn_post_wait() = 0;
 	virtual RC      run_calvin_txn(yield_func_t &yield,uint64_t cor_id) = 0;
 	virtual RC      acquire_locks() = 0;
@@ -232,7 +237,7 @@ bool rdma_one_side() {
 
     bool get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn);
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
-     bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
+	bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
 #if USE_DBPAOR == true
 	void batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int loc, RC rc, TxnManager * txnMng , vector<vector<uint64_t>> remote_index_origin,ts_t time = 0, vector<vector<uint64_t>> remote_num = {{0}});
@@ -243,19 +248,26 @@ bool rdma_one_side() {
 	void get_batch_read(yield_func_t &yield, BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin, uint64_t cor_id);
 #endif
 //***********coroutine**********//
+
 	row_t * read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
-	// row_t * read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
     itemid_t * read_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t key, uint64_t cor_id);
+	uint64_t read_remote_log_head(yield_func_t &yield, uint64_t target_server, uint64_t cor_id);
+	void read_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t operate_size, char* local_buf, uint64_t cor_id);
+
 // #if CC_ALG == RDMA_MAAT
-    RdmaTxnTableNode * read_remote_timetable(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset, uint64_t cor_id);
-	char * read_remote_txntable(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset, uint64_t cor_id);
+    RdmaTxnTableNode * read_remote_timetable(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
+	char * read_remote_txntable(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
 // #endif
 
-    bool write_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *local_buf, uint64_t cor_id);
-    bool write_remote_index(yield_func_t &yield,uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content, uint64_t cor_id);
+    bool write_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
+    bool write_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
+ 	bool write_remote_log(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
+	bool write_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, char* local_buf, uint64_t cor_id);
 
     uint64_t cas_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t old_value, uint64_t new_value, uint64_t cor_id);
-    bool loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value, uint64_t cor_id);
+    uint64_t faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t value_to_add, uint64_t cor_id);
+
+	bool loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value, uint64_t cor_id);
 
 
 	bool isRecon() {
@@ -419,6 +431,7 @@ bool rdma_one_side() {
 	int last_batch_id;
 	int last_txn_id;
 	Message* last_msg;
+  	vector<vector<uint64_t>> log_idx{g_node_cnt};
 
 #if CC_ALG == DLI_MVCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || \
 	CC_ALG == DLI_OCC

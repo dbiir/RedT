@@ -449,7 +449,7 @@ obj/ycsb_txn.o: benchmarks/ycsb_txn.cpp system/global.h config.h \
  r2/src/rdma/sop.hh rlibv2/qps/doorbell_helper.hh \
  r2/src/rdma/../libroutine.hh r2/src/rdma/.././sshed.hh \
  r2/src/rdma/../././routine.hh r2/src/rdma/.././././linked_list.hh \
- rlibv2/qps/op.hh transport/transport.h
+ rlibv2/qps/op.hh transport/transport.h storage/log_rdma.h storage/row.h
 obj/ycsb_wl.o: benchmarks/ycsb_wl.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/global.h system/helper.h \
@@ -937,7 +937,8 @@ obj/rdma_silo.o: concurrency_control/rdma_silo.cpp system/global.h config.h \
  transport/rdma.h transport/nn.hpp concurrency_control/row_rdma_silo.h \
  r2/src/rdma/sop.hh rlibv2/qps/doorbell_helper.hh \
  r2/src/rdma/../libroutine.hh r2/src/rdma/.././sshed.hh \
- r2/src/rdma/../././routine.hh r2/src/rdma/.././././linked_list.hh
+ r2/src/rdma/../././routine.hh r2/src/rdma/.././././linked_list.hh \
+ storage/log_rdma.h storage/row.h
 obj/rdma_ts1.o: concurrency_control/rdma_ts1.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/global.h system/helper.h \
@@ -1827,6 +1828,28 @@ obj/index_rdma.o: storage/index_rdma.cpp system/global.h config.h \
  storage/index_hash.h system/mem_alloc.h storage/row.h system/routine.h \
  concurrency_control/row_rdma_cicada.h storage/table.h storage/catalog.h
 obj/index_rdma_tpcc.o: storage/index_rdma_tpcc.cpp
+obj/log_rdma.o: storage/log_rdma.cpp system/global.h config.h \
+ statistics/stats.h statistics/../system/global.h \
+ statistics/stats_array.h system/pool.h system/global.h system/helper.h \
+ system/concurrentqueue.h system/txn_table.h system/logger.h \
+ system/sim_manager.h benchmarks/da_block_queue.h \
+ r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
+ r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
+ rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
+ rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
+ rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
+ rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
+ rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+ rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
+ rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
+ rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
+ rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
+ rlibv2/././bootstrap/./channel.hh \
+ rlibv2/././bootstrap/./../utils/ipname.hh \
+ rlibv2/././bootstrap/./../utils/marshal.hh \
+ rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
+ storage/log_rdma.h storage/row.h system/routine.h \
+ concurrency_control/row_rdma_cicada.h
 obj/row.o: storage/row.cpp system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
  system/global.h system/helper.h system/concurrentqueue.h \
@@ -1973,7 +1996,8 @@ obj/rdma.o: transport/rdma.cpp system/global.h config.h statistics/stats.h \
  storage/index_base.h storage/index_hash.h storage/row.h system/routine.h \
  concurrency_control/row_rdma_cicada.h storage/table.h storage/catalog.h \
  system/rdma_calvin.h transport/message.h system/logger.h system/array.h \
- system/mem_alloc.h benchmarks/ycsb_query.h system/query.h system/array.h
+ system/mem_alloc.h benchmarks/ycsb_query.h system/query.h system/array.h \
+ storage/log_rdma.h storage/row.h
 obj/transport.o: transport/transport.cpp transport/transport.h \
  system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
@@ -2139,7 +2163,8 @@ obj/global.o: system/global.cpp system/global.h config.h statistics/stats.h \
  system/rdma_calvin.h transport/message.h system/logger.h system/array.h \
  benchmarks/ycsb_query.h concurrency_control/rdma_null.h \
  concurrency_control/key_xid.h concurrency_control/spin_lock.h \
- concurrency_control/hash.h system/rts_cache.h system/wl.h
+ concurrency_control/hash.h system/rts_cache.h system/wl.h \
+ storage/log_rdma.h storage/row.h
 obj/hash.o: system/hash.cpp system/hash.h
 obj/helper.o: system/helper.cpp system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
@@ -2302,7 +2327,8 @@ obj/main.o: system/main.cpp system/abort_thread.h system/global.h config.h \
  concurrency_control/ssi.h concurrency_control/wsi.h \
  concurrency_control/focc.h concurrency_control/bocc.h \
  concurrency_control/wkdb.h concurrency_control/tictoc.h transport/rdma.h \
- rlibv2/qps/rc_recv_manager.hh rlibv2/qps/recv_iter.hh
+ storage/log_rdma.h storage/row.h rlibv2/qps/rc_recv_manager.hh \
+ rlibv2/qps/recv_iter.hh
 obj/manager.o: system/manager.cpp system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
  system/helper.h system/concurrentqueue.h system/txn_table.h \
@@ -2635,7 +2661,7 @@ obj/txn.o: system/txn.cpp system/helper.h system/global.h config.h \
  benchmarks/dbpa.hpp rlibv2/qps/op.hh transport/rdma.h r2/src/rdma/sop.hh \
  rlibv2/qps/doorbell_helper.hh r2/src/rdma/../libroutine.hh \
  r2/src/rdma/.././sshed.hh r2/src/rdma/../././routine.hh \
- r2/src/rdma/.././././linked_list.hh
+ r2/src/rdma/.././././linked_list.hh storage/log_rdma.h storage/row.h
 obj/txn_table.o: system/txn_table.cpp system/txn_table.h system/global.h \
  config.h statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
@@ -2748,7 +2774,9 @@ obj/worker_thread.o: system/worker_thread.cpp system/worker_thread.h \
  system/work_queue.h benchmarks/ycsb_query.h concurrency_control/wkdb.h \
  concurrency_control/tictoc.h concurrency_control/wsi.h \
  concurrency_control/ssi.h concurrency_control/focc.h \
- concurrency_control/bocc.h transport/transport.h
+ concurrency_control/bocc.h transport/transport.h storage/log_rdma.h \
+ storage/row.h storage/index_rdma.h storage/index_base.h \
+ storage/index_hash.h
 obj/stats.o: statistics/stats.cpp statistics/stats.h \
  statistics/../system/global.h config.h statistics/stats.h \
  statistics/../system/pool.h statistics/../system/global.h \

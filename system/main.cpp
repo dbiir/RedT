@@ -59,6 +59,7 @@
 #include "rts_cache.h"
 #include "lib.hh"
 #include "rdma.h"
+#include "log_rdma.h"
 // #include "http.h"
 //#include "rdma_ctrl.hpp"
 #include "qps/rc_recv_manager.hh"
@@ -79,6 +80,10 @@ LogThread * log_thds;
 CalvinLockThread * calvin_lock_thds;
 CalvinSequencerThread * calvin_seq_thds;
 #endif
+#if USE_REPLICA
+AsyncRedoThread * async_redo_thds;
+#endif
+
 
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
@@ -86,8 +91,15 @@ void parser(int argc, char * argv[]);
 int main(int argc, char *argv[]) {
 	RDMA_MEMORY_LATCH = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init(RDMA_MEMORY_LATCH, NULL);
+
 	RDMA_QP_LATCH = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init(RDMA_QP_LATCH, NULL);
+	
+	for(int i=0;i<g_node_cnt;i++){
+		LOG_HEAD_LATCH[i] = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
+		pthread_mutex_init(LOG_HEAD_LATCH[i], NULL);
+	}	
+
     // 0. initialize global data structure
     parser(argc, argv);
 #if SEED != 0
@@ -265,6 +277,12 @@ int main(int argc, char *argv[]) {
 	rdma_txn_table.init();
 	printf("Done\n");
 #endif
+#if USE_REPLICA
+    printf("Initializing Redo Log Buffer... ");
+	fflush(stdout);
+	redo_log_buf.init();
+	printf("Done\n");	
+#endif
 #if CC_ALG == RDMA_CICADA
 	printf("Initializing CICADA manager... ");
 	fflush(stdout);
@@ -355,6 +373,9 @@ int main(int argc, char *argv[]) {
 #if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 		all_thd_cnt += 2; // sequencer + scheduler thread
 #endif
+#if USE_REPLICA
+		all_thd_cnt += 1;
+#endif
 
 	if (g_ts_alloc == LTS_TCP_CLOCK) {
 		printf("Initializing tcp queue... ");
@@ -384,6 +405,10 @@ int main(int argc, char *argv[]) {
 	calvin_lock_thds = new CalvinLockThread[1];
 	calvin_seq_thds = new CalvinSequencerThread[1];
 #endif
+#if USE_REPLICA
+	async_redo_thds = new AsyncRedoThread[1];
+#endif
+
 	// query_queue should be the last one to be initialized!!!
 	// because it collects txn latency
 	//if (WORKLOAD != TEST) {
@@ -438,7 +463,7 @@ int main(int argc, char *argv[]) {
 	starttime = get_server_clock();
 	simulation->run_starttime = starttime;
 	simulation->last_da_query_time = starttime;
-
+	
 	uint64_t id = 0;
 	for (uint64_t i = 0; i < wthd_cnt; i++) {
 #if SET_AFFINITY
@@ -467,6 +492,10 @@ int main(int argc, char *argv[]) {
 		pthread_create(&p_thds[id++], NULL, run_thread, (void *)&output_thds[j]);
 	}
 //#endif
+#if USE_REPLICA
+	async_redo_thds[0].init(id,g_node_id,m_wl);
+	pthread_create(&p_thds[id++], &attr, run_thread, (void *)&async_redo_thds[0]);
+#endif
 #if LOGGING
 	log_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&log_thds[0]);

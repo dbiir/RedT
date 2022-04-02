@@ -99,4 +99,13 @@ public:
     void setup();
 
 };
+
+#if USE_REPLICA
+class AsyncRedoThread : public Thread {
+public:
+    RC run();
+    void setup();
+};
+#endif
+
 #endif

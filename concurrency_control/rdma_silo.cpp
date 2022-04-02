@@ -29,6 +29,7 @@
 #include "transport/rdma.h"
 #include "row_rdma_silo.h"
 #include "src/rdma/sop.hh"
+#include "log_rdma.h"
 
 #if CC_ALG == RDMA_SILO
 
@@ -44,6 +45,7 @@ RC RDMA_silo::validate_rdma_silo(yield_func_t &yield, TxnManager * txnMng, uint6
 	int read_set[txn->row_cnt - txn->write_cnt];
 	int cur_rd_idx = 0;
 	for (uint64_t rid = 0; rid < txn->row_cnt; rid ++) {
+		assert(GET_CENTER_ID(txn->accesses[rid]->location) == g_center_id);
 		if (txn->accesses[rid]->type == WR)
 			txnMng->write_set[cur_wr_idx ++] = rid;
 		else
@@ -134,7 +136,6 @@ RC RDMA_silo::validate_rdma_silo(yield_func_t &yield, TxnManager * txnMng, uint6
 				// 	rc = Abort;
 				// 	return rc;
 				// }
-
 			}
 		}
 		if (txnMng->num_locks == wr_cnt) {
@@ -292,8 +293,26 @@ RC
 RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor_id)
 {
 	Transaction *txn = txnMng->txn;
-	//abort
-	if (rc == Abort) {
+#if USE_REPLICA
+	bool* finished = (bool*)mem_allocator.alloc(sizeof(bool));
+	*finished = true;
+	for(int i=0;i<g_node_cnt;i++){
+		for(int j=0;j<txnMng->log_idx[i].size();j++){
+			uint64_t start_idx = txnMng->log_idx[i][j];
+			if(i==g_node_id){ //local 
+				char* start_addr = rdma_log_buffer + 2*sizeof(uint64_t) + start_idx*sizeof(LogEntry); //modify is_commit
+				if(rc==Abort) start_addr += sizeof(bool); //modify is_abort 
+				memcpy(start_addr, (char *)finished, sizeof(bool));
+			}else{ //remote 
+				uint64_t start_offset = rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+start_idx*sizeof(LogEntry); //modify is_commit
+				if(rc==Abort) start_offset += sizeof(bool); //modify is_abort
+				txnMng->write_remote_log(yield, i, sizeof(bool), start_offset, (char *)finished, cor_id);
+			}
+		}
+	}
+	mem_allocator.free(finished, sizeof(bool));
+#else	
+	if (rc == Abort) { //abort
 		if (txnMng->num_locks > txnMng->get_access_cnt())
 			return rc;
 
@@ -433,8 +452,9 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
         }
     }
 #endif
-
 	}
+#endif
+
   for (uint64_t i = 0; i < txn->row_cnt; i++) {
     //local
     if(txn->accesses[i]->location != g_node_id){

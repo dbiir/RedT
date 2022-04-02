@@ -30,8 +30,15 @@
 #define USE_COROUTINE false
 #define MAX_SEND_SIZE 1
 
-#define CENTER_MASTER true
-#define PARAL_SUBTXN false
+#define CENTER_MASTER true  //hg-network without replica stage 2
+#define PARAL_SUBTXN true  //hg-network without replica stage 3
+#define USE_REPLICA true
+
+#if USE_REPLICA
+#define ASYNC_REDO_THREAD_CNT 1
+#else
+#define ASYNC_REDO_THREAD_CNT 0
+#endif
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -222,7 +229,7 @@
 #else
   #define CALVIN_THREAD_NUM 0
 #endif
-#define RDMA_MAX_CLIENT_QP (THREAD_CNT + REM_THREAD_CNT + SEND_THREAD_CNT + 1 + LOG_THREAD_NUM + WORK_THREAD_NUM + CALVIN_THREAD_NUM)
+#define RDMA_MAX_CLIENT_QP (THREAD_CNT + REM_THREAD_CNT + SEND_THREAD_CNT + 1 + LOG_THREAD_NUM + WORK_THREAD_NUM + CALVIN_THREAD_NUM + ASYNC_REDO_THREAD_CNT)
 // #define RDMA_SEND_COUNT (RDMA_BUFFER_SIZE / 4096)
 // #define RDMA_COLOR_LOG
 
@@ -311,16 +318,17 @@
 #define INIT_PARALLELISM 8
 #define SYNTH_TABLE_SIZE 4194304
 #define ZIPF_THETA 0.2
-#define TXN_WRITE_PERC 0.2
-#define TUP_WRITE_PERC 0.2
+#define TXN_WRITE_PERC 0.5
+#define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 4
+#define PART_PER_TXN 3
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 1
+
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.

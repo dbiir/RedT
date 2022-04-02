@@ -2,8 +2,8 @@ CC=/usr/bin/g++
 
 #CFLAGS=-Wall -Werror -std=c++11 -g3 -ggdb -O0 -fno-strict-aliasing -fno-omit-frame-pointer -D_GLIBCXX_USE_CXX11_ABI=0
 
-# CFLAGS=-Wall -std=c++1y -g3 -ggdb -O0 -fno-strict-aliasing -fno-omit-frame-pointer -I/usr/local/include -L/usr/local/lib -D_GLIBCXX_USE_CXX11_ABI=0
-CFLAGS=-Wall -std=c++1y -O3 -fno-strict-aliasing -I/usr/local/include -L/usr/local/lib -D_GLIBCXX_USE_CXX11_ABI=0
+CFLAGS=-Wall -std=c++1y -g3 -ggdb -O0 -fno-strict-aliasing -fno-omit-frame-pointer -I/usr/local/include -L/usr/local/lib -D_GLIBCXX_USE_CXX11_ABI=0
+# CFLAGS=-Wall -std=c++1y -O3 -fno-strict-aliasing -I/usr/local/include -L/usr/local/lib -D_GLIBCXX_USE_CXX11_ABI=0
 # CFLAGS += -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer
 NNMSG=./nanomsg-0.5-beta
 RALLOC = ./rlib/lib

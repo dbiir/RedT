@@ -109,6 +109,9 @@ class RDMA_calvin;
 #if CC_ALG == RDMA_CNULL
 class RDMA_Null;
 #endif
+#if USE_REPLICA
+class RedoLogBuffer;
+#endif
 class Remote_query;
 class TxnManPool;
 class TxnPool;
@@ -193,6 +196,9 @@ extern RDMA_calvin calvin_man;
 #if CC_ALG == RDMA_CNULL
 extern RDMA_Null rcnull_man;
 #endif
+#if USE_REPLICA
+extern RedoLogBuffer redo_log_buf;
+#endif
 extern Workload * m_wl;
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;
@@ -222,9 +228,13 @@ extern RtsCache wkdb_rts_cache;
 extern map<string, string> g_params;
 
 extern char *rdma_global_buffer;
+// global TxnMeta shared memory 
 extern char *rdma_txntable_buffer;
 // CALVIN share memory
 extern char *rdma_calvin_buffer;
+// redo log shared memory
+extern char *rdma_log_buffer;
+
 //extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
 extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
 extern rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
@@ -297,6 +307,7 @@ extern UInt32 g_thread_cnt;
 extern UInt32 g_abort_thread_cnt;
 extern UInt32 g_logger_thread_cnt;
 extern UInt32 g_work_thread_cnt;
+extern UInt32 g_async_redo_thread_cnt;
 extern UInt32 g_tcp_thread_cnt;
 extern UInt32 g_send_thread_cnt;
 extern UInt32 g_rem_thread_cnt;
@@ -320,6 +331,8 @@ extern pthread_mutex_t * RDMA_MEMORY_LATCH;
 extern uint64_t rdma_buffer_size;
 extern uint64_t client_rdma_buffer_size;
 extern uint64_t rdma_index_size;
+// Replica redo log buffer size
+extern uint64_t rdma_log_size;
 // MAAT
 extern uint64_t rdma_txntable_size;
 extern uint64_t row_set_length;
@@ -506,11 +519,17 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 /*DA query build queue*/
 //queue<DAQuery> query_build_queue;
 
+//
+// #define GET_LEADER_NODE(pid)	(pid % g_node_cnt) //pid: the id of partition
 
+#define GET_NODE_ID(id)	(id % g_node_cnt) //get id of the leader node. id: transaction id or partition id
+#define GET_FOLLOWER1_NODE(pid)	((pid + (g_node_cnt/g_center_cnt)) % g_node_cnt) //leader and follower1 are in the same data center
+#define GET_FOLLOWER2_NODE(pid)	((pid + 1) % g_node_cnt) 
+
+
+#define GET_CENTER_ID(nid) (nid % g_center_cnt) //nid: the id of node
 
 #define GET_THREAD_ID(id)	(id % g_thread_cnt)
-#define GET_NODE_ID(id)	(id % g_node_cnt)
-#define GET_CENTER_ID(id) (id % g_node_cnt % g_center_cnt)
 #define GET_PART_ID(t,n)	(n)
 #define GET_PART_ID_FROM_IDX(idx)	(g_node_id + idx * g_node_cnt)
 #define GET_PART_ID_IDX(p)	(p / g_node_cnt)
@@ -561,4 +580,8 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 extern int total_num_atomic_retry;  
 extern int max_num_atomic_retry;
 
-extern int max_batch_index;
+extern int max_batch_num;
+// extern int max_log_entry;
+
+extern uint64_t log_head[NODE_CNT];
+extern pthread_mutex_t * LOG_HEAD_LATCH[NODE_CNT];

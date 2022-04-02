@@ -216,7 +216,7 @@ def ycsb_skew():
     nnodes = [4]
     # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
     # algos=['RDMA_CICADA','RDMA_MVCC','RDMA_TS1']
-    algos=['RDMA_NO_WAIT','RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
+    algos=['RDMA_SILO']
     base_table_size=1048576
     #base_table_size=1048576*4    
     #base_table_size=2097152*8
@@ -225,16 +225,12 @@ def ycsb_skew():
     tup_write_perc = [0.5]
     load = [20000]
 
-    tcnt = [24]  #THREAD_CNT
+    tcnt = [4]  #THREAD_CNT
 
-    #skew = [0.0,0.4,0.6,0.8,0.9]
-    #skew = [0.2,0.6,0.85,0.95]
     #skew = [0.0,0.2,0.4,0.6,0.8,0.85,0.9,0.95]
     # skew = [0.25,0.55,0.65,0.75]
     skew = [0.2]
     # skew = [0.0,0.1,0.2,0.3,0.4,0.5]
-    # skew = [0.1]
-    # skew = [0.8]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
     return fmt,exp

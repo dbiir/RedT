@@ -70,6 +70,7 @@
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
 #include "wl.h"
+#include "log_rdma.h"
 #ifdef USE_RDMA
   #include "qps/rc_recv_manager.hh"
   #include "qps/recv_iter.hh"
@@ -99,6 +100,7 @@ Cicada cicada_man;
 Tictoc tictoc_man;
 Transport tport_man;
 Rdma rdma_man;
+
 #if CC_ALG == RDMA_SILO
 RDMA_silo rsilo_man;
 #elif CC_ALG == RDMA_MVCC
@@ -125,6 +127,9 @@ RDMA_calvin calvin_man;
 #endif
 #if CC_ALG == RDMA_CNULL
 RDMA_Null rcnull_man;
+#endif
+#if USE_REPLICA
+RedoLogBuffer redo_log_buf;
 #endif
 Workload * m_wl;
 TxnManPool txn_man_pool;
@@ -223,12 +228,22 @@ UInt32 g_work_thread_cnt = 1;
 UInt32 g_work_thread_cnt = 0;
 #endif
 UInt32 g_send_thread_cnt = SEND_THREAD_CNT;
+
+#if USE_REPLICA
+UInt32 g_async_redo_thread_cnt = 1;
+#else
+UInt32 g_async_redo_thread_cnt = 0;
+#endif
+
 #if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
 // sequencer + scheduler thread
-UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + 2 + g_work_thread_cnt;
+UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + 2 + g_work_thread_cnt + g_async_redo_thread_cnt;
 #else
-UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + g_work_thread_cnt;
+UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + g_work_thread_cnt + g_async_redo_thread_cnt;
 #endif
+
+
+
 
 UInt32 g_total_client_thread_cnt = g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt;
 UInt32 g_total_node_cnt = g_node_cnt + g_client_node_cnt + g_repl_cnt*g_node_cnt;
@@ -269,7 +284,13 @@ pthread_mutex_t * RDMA_MEMORY_LATCH;
 
 UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 300*(1024*1024L);
+#if USE_REPLICA
+UInt64 rdma_index_size = (300*1024*1024L*g_part_cnt);
+#else
 UInt64 rdma_index_size = (300*1024*1024L);
+#endif
+//Replica redo log buffer size
+UInt64 rdma_log_size = 500*1024*1024;
 
 // MAAT
 UInt64 rdma_txntable_size = 30*1024*1024; //4*(1024*1024*1024L);//30*1024*1024;
@@ -351,9 +372,12 @@ uint64_t ol_index_size = (20 * 1024 *1024L);
 map<string, string> g_params;
 
 char *rdma_global_buffer;
+// global TxnMeta shared memory 
 char *rdma_txntable_buffer;
 // CALVIN shared memory
 char *rdma_calvin_buffer;
+// redo log shared memory
+char *rdma_log_buffer;
 //rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
 rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
 //Each thread uses only its own piece of client memory address
@@ -398,5 +422,12 @@ int g_init_cnt = 0;
 int total_num_atomic_retry = 0;  
 int max_num_atomic_retry = 0;
 
-//the maximum number of doorbell batched row
-int max_batch_index = REQ_PER_QUERY; 
+//the maximum number of doorbell batched row or index
+int max_batch_num = REQ_PER_QUERY; 
+// //the maximum number of LogEntry to write in single RDMA WRITE
+// int max_log_entry = 1;
+
+//local record of the head in RedoLogBuffer for every node, initialized as 0
+//actually, only remote one is used. (i!=g_node_id)
+uint64_t log_head[NODE_CNT] = {0};
+pthread_mutex_t * LOG_HEAD_LATCH[NODE_CNT];

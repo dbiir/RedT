@@ -42,6 +42,8 @@
 #include "bocc.h"
 #include "transport.h"
 #include "routine.h"
+#include "log_rdma.h"
+#include "index_rdma.h"
 #include <boost/bind.hpp>
 
 void WorkerThread::setup() {
@@ -929,8 +931,13 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   if(txn_man->get_rc() == RCOK) {
     if (CC_ALG == TICTOC)
       rc = RCOK;
-    else
-      rc = txn_man->validate(yield, cor_id);
+    else{
+      rc = txn_man->validate(yield, cor_id); 
+#if USE_REPLICA
+      // if(rc != Abort) 
+      assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
+#endif
+    }
   }
   uint64_t finish_start_time = get_sys_clock();
   txn_man->txn_stats.finish_start_time = finish_start_time;
@@ -1046,6 +1053,10 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
     rc  = txn_man->validate(yield, cor_id);
     txn_man->set_rc(rc);
+#if USE_REPLICA
+    // if(rc != Abort) 
+    assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
+#endif
 #if USE_RDMA == CHANGE_MSG_QUEUE
     tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RACK_PREP));
 #else
@@ -1615,3 +1626,67 @@ RC WorkerNumThread::run() {
   fflush(stdout);
   return FINISH;
 }
+
+
+#if USE_REPLICA
+void AsyncRedoThread::setup() {
+}
+
+RC AsyncRedoThread::run() {
+  tsetup();
+  printf("Running AsyncRedoThread %ld\n",_thd_id);
+
+  uint64_t wait_time = 0;
+  uint64_t start_time = get_sys_clock();
+
+	while(!simulation->is_done()) {
+    uint64_t ch = redo_log_buf.get_head();
+    uint64_t ct = redo_log_buf.get_tail();
+    uint64_t buf_size = redo_log_buf.get_size();
+    if(ct > ULONG_MAX-100000){ //clear head and tail to prevent ct bigger than ULONG_MAX
+      assert(false); //no need to clean, uint64_t is big enough for experiment purpose
+      int max_to_subtract = min(ch/buf_size,ct/buf_size);
+      uint64_t cleaned_head = ch - max_to_subtract*buf_size;
+      uint64_t cleaned_tail = ct - max_to_subtract*buf_size;
+      //todo: rdma cas to clean tail...
+      redo_log_buf.set_head(cleaned_head);
+    }
+
+    if(ch < ct){
+      //async apply redo log
+      uint64_t start_idx = ch % buf_size;
+			LogEntry* cur_entry = (LogEntry*)(rdma_log_buffer + 2*sizeof(uint64_t) + start_idx*sizeof(LogEntry));
+  
+      uint64_t stime = get_sys_clock();
+      while(!cur_entry->is_committed && !cur_entry->is_aborted && !simulation->is_done()){ //wait
+      }
+      wait_time += get_sys_clock()-stime;
+
+      if(simulation->is_done()) break;
+      for(int i=0;i<cur_entry->change_cnt;i++){          
+        IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[i].index_key) * sizeof(IndexInfo));
+        char * tar_addr = (char *) idx_info->address;
+        uint64_t write_size;
+        if(cur_entry->is_committed){ //write the whole content
+          write_size = cur_entry->change[i].size;
+        }else if(cur_entry->is_aborted){ //only write to unlock
+          write_size = sizeof(uint64_t);
+        }else{
+          assert(false);
+        }
+        memcpy(tar_addr,cur_entry->change[i].content,write_size);
+      }
+      //reset LogEntry
+      cur_entry->reset();
+      //move head
+      redo_log_buf.forward_head(1);
+    }
+  }
+
+  uint64_t total_time = get_sys_clock() - start_time;
+
+  printf("FINISH %ld:%ld, final head: %ld, final tail: %ld, spend %lf time on waiting\n",_node_id,_thd_id,redo_log_buf.get_head(),redo_log_buf.get_tail(), (double)wait_time/(double)total_time);
+  fflush(stdout);
+  return FINISH;
+}
+#endif

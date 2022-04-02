@@ -55,21 +55,21 @@ void YCSBQuery::print() {
 		printf("%d %ld, ",requests[i]->acctype,requests[i]->key);
 	}
 	printf("\n");
-	/*
+	/* 	
 		printf("YCSBQuery: %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld\n"
-				,GET_NODE_ID(requests[0]->key)
-				,GET_NODE_ID(requests[1]->key)
-				,GET_NODE_ID(requests[2]->key)
-				,GET_NODE_ID(requests[3]->key)
-				,GET_NODE_ID(requests[4]->key)
-				,GET_NODE_ID(requests[5]->key)
-				,GET_NODE_ID(requests[6]->key)
-				,GET_NODE_ID(requests[7]->key)
-				,GET_NODE_ID(requests[8]->key)
-				,GET_NODE_ID(requests[9]->key)
+				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[0]->key))
+				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[1]->key))
+				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[2]->key))
+				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[3]->key))
+				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[4]->key))
+				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[5]->key))
+				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[6]->key))
+				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[7]->key))
+				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[8]->key))
+				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[9]->key))
 				);
 				*/
-}
+} 
 
 void YCSBQuery::init() {
 	requests.init(g_req_per_query);

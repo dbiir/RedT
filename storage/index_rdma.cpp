@@ -79,14 +79,20 @@ RC IndexRdma::init(uint64_t bucket_cnt) {
 }
 #else
 RC IndexRdma::init(uint64_t bucket_cnt) {
-	uint64_t index_size = (g_synth_table_size/g_node_cnt)*(sizeof(IndexInfo)+1);
+
+	// uint64_t index_size = (g_synth_table_size/g_node_cnt)*(sizeof(IndexInfo)+1);
 
 	index_info = (IndexInfo*)rdma_global_buffer;
 
 	// printf("%d",index_info[0].key);
 
 	uint64_t i = 0;
-	for (i = 0; i < g_synth_table_size/g_node_cnt; i ++) {
+#if USE_REPLICA
+	uint64_t index_info_size = g_synth_table_size; 
+#else
+	uint64_t index_info_size = g_synth_table_size/g_node_cnt;
+#endif
+	for (i = 0; i < index_info_size; i ++) {
 		index_info[i].init();
 	}
 
@@ -143,7 +149,11 @@ IndexRdma::release_latch(BucketHeader * bucket) {
 RC IndexRdma::index_insert(idx_key_t key, itemid_t * item, int part_id) {
 	RC rc = RCOK;
 #if WORKLOAD == YCSB
+#if USE_REPLICA
+	uint64_t index_key = key;
+#else
 	uint64_t index_key = key/g_node_cnt;
+#endif
 #else
     uint64_t index_key = key;
 #endif
@@ -209,7 +219,11 @@ RC IndexRdma::index_read(idx_key_t key, int count, itemid_t * &item, int part_id
 RC IndexRdma::index_read(idx_key_t key, itemid_t * &item,int part_id, int thd_id) {
 	RC rc = RCOK;
 #if WORKLOAD == YCSB
+#if USE_REPLICA
+	uint64_t index_key = key;
+#else
 	uint64_t index_key = key/g_node_cnt;
+#endif
 #else
     uint64_t index_key = key;
 #endif
