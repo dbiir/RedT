@@ -69,7 +69,7 @@
 #define MAX_SEND_SIZE 1
 
 #define CENTER_MASTER true
-#define PARAL_SUBTXN false
+#define PARAL_SUBTXN true
 /***********************************************/
 // DA Trans Creator
 /***********************************************/
@@ -151,7 +151,7 @@
 // # of transactions to run for warmup
 #define WARMUP            0
 // YCSB or TPCC or PPS or DA
-#define WORKLOAD TPCC
+#define WORKLOAD YCSB
 // print the transaction latency distribution
 #define PRT_LAT_DISTR false
 #define STATS_ENABLE        true
@@ -359,8 +359,8 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 65536
-#define ZIPF_THETA 0.3
+#define SYNTH_TABLE_SIZE 4194304
+#define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.2
 #define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
@@ -385,7 +385,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH 64
+#define NUM_WH 32
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0

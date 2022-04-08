@@ -190,7 +190,11 @@ RC YCSBTxnManager::run_txn_post_wait() {
 }
 
 bool YCSBTxnManager::is_done() { 
+#if PARAL_SUBTXN == true
+	return (next_record_id >= ((YCSBQuery*)query)->requests.size() && !waiting_for_response());
+#else
 	return next_record_id >= ((YCSBQuery*)query)->requests.size();
+#endif
 }
 
 void YCSBTxnManager::next_ycsb_state() {
@@ -393,7 +397,12 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		} else {
 			// printf("REMOTE CENTER: %ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
-			rc = RCOK;
+			if (waiting_for_response() ) {
+				rc = WAIT_REM;
+			} else {
+				rc = RCOK;
+			}
+			
 #else
 			rc = send_remote_request();
 #endif

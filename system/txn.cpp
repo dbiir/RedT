@@ -759,9 +759,9 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 }
 #endif
 void TxnManager::send_prepare_messages() {
-#if PARAL_SUBTXN == true && CENTER_MASTER == true
-	{
-#elif CENTER_MASTER == true
+// #if PARAL_SUBTXN == true && CENTER_MASTER == true
+// 	{
+#if CENTER_MASTER == true
 	rsp_cnt = query->centers_touched.size() - 1;	
 	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
 	for(uint64_t i = 0; i < query->centers_touched.size(); i++) {

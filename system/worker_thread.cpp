@@ -979,10 +979,24 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
   return rc;
 }
 
+
 RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RQRY_RSP %ld\n",msg->get_txn_id());
   assert(IS_LOCAL(msg->get_txn_id()));
-
+#if PARAL_SUBTXN == true
+  txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
+  RC rc = RCOK;
+  int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+  assert(responses_left >=0);
+  if (responses_left > 0) return WAIT;
+  if(((QueryResponseMessage*)msg)->rc == Abort) {
+    txn_man->start_abort(yield, cor_id);
+    return Abort;
+  }
+  txn_man->send_RQRY_RSP = false;
+  rc = txn_man->run_txn(yield, cor_id);
+  check_if_done(rc);
+#else
   txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
 
   if(((QueryResponseMessage*)msg)->rc == Abort) {
@@ -999,6 +1013,7 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
   txn_man->send_RQRY_RSP = false;
   RC rc = txn_man->run_txn(yield, cor_id);
   check_if_done(rc);
+#endif
   return rc;
 }
 
@@ -1043,23 +1058,23 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 #if USE_RDMA == CHANGE_MSG_QUEUE
     tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->return_id, Message::create_message(txn_man,RQRY_RSP));
 #else
-#if PARAL_SUBTXN == true && CENTER_MASTER == true
-    if(rc != Abort) {
-      rc  = txn_man->validate(yield, cor_id);
-    }
-    txn_man->set_rc(rc);
-#if USE_RDMA == CHANGE_MSG_QUEUE
-    tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RACK_PREP));
-#else
-    msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
-#endif
+// #if PARAL_SUBTXN == true && CENTER_MASTER == true
+//     if(rc != Abort) {
+//       rc  = txn_man->validate(yield, cor_id);
+//     }
+//     txn_man->set_rc(rc);
+// #if USE_RDMA == CHANGE_MSG_QUEUE
+//     tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RACK_PREP));
+// #else
+//     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+// #endif
 
-    if(rc == Abort) {
-      txn_man->abort(yield, cor_id);
-    }
-#else
+//     if(rc == Abort) {
+//       txn_man->abort(yield, cor_id);
+//     }
+// #else
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),txn_man->return_id);
-#endif
+// #endif
 #endif
   }
   return rc;

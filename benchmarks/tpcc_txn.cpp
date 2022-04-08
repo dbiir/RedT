@@ -57,6 +57,9 @@ void TPCCTxnManager::reset() {
 	// 	state = TPCC_NEWORDER0;
 	// }
 	next_item_id = 0;
+	for(int i = 0; i < g_center_cnt; i++) {
+	remote_center[i].clear();
+  }
 	TxnManager::reset();
 }
 
@@ -91,6 +94,9 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
 		query->centers_touched.add_unique(g_center_id);
+#if PARAL_SUBTXN
+		rc = send_remote_subtxn();
+#endif
 	}
 
 
@@ -339,7 +345,50 @@ bool TPCCTxnManager::is_local_item(uint64_t idx) {
 	return GET_NODE_ID(part_id_ol_supply_w) == g_node_id;
 }
 
-
+RC TPCCTxnManager::send_remote_subtxn() {
+	assert(IS_LOCAL(get_txn_id()));
+	TPCCQuery* tpcc_query = (TPCCQuery*) query;
+	TPCCRemTxnType next_state = TPCC_FIN;
+	RC rc = RCOK;
+	uint64_t w_id = tpcc_query->w_id;
+	uint64_t c_w_id = tpcc_query->c_w_id;
+	uint64_t ol_supply_w_id = 0;
+	uint64_t dest_node_id = GET_NODE_ID(wh_to_part(w_id));
+	uint64_t dest_center_id = GET_CENTER_ID(wh_to_part(w_id));
+	tpcc_query->centers_touched.add_unique(dest_center_id);
+	tpcc_query->partitions_touched.add_unique(GET_PART_ID(0, dest_node_id));
+	if(this->center_master.find(dest_center_id) == this->center_master.end()) {
+		this->center_master.insert(pair<uint64_t, uint64_t>(dest_center_id, dest_node_id));
+	}
+	dest_node_id = GET_NODE_ID(wh_to_part(c_w_id));
+	dest_center_id = GET_CENTER_ID(wh_to_part(c_w_id));
+	tpcc_query->centers_touched.add_unique(dest_center_id);
+	tpcc_query->partitions_touched.add_unique(GET_PART_ID(0, dest_node_id));
+	if(this->center_master.find(dest_center_id) == this->center_master.end()) {
+		this->center_master.insert(pair<uint64_t, uint64_t>(dest_center_id, dest_node_id));
+	}
+	
+	for(int i = 0; i < tpcc_query->items.size(); i++) {
+		Item_no * item = tpcc_query->items[i];
+		ol_supply_w_id = item->ol_supply_w_id;
+		dest_node_id = GET_NODE_ID(wh_to_part(ol_supply_w_id));
+		dest_center_id = GET_CENTER_ID(wh_to_part(ol_supply_w_id));
+		tpcc_query->centers_touched.add_unique(dest_center_id);
+		tpcc_query->partitions_touched.add_unique(GET_PART_ID(0, dest_node_id));
+		if(this->center_master.find(dest_center_id) == this->center_master.end()) {
+			this->center_master.insert(pair<uint64_t, uint64_t>(dest_center_id, dest_node_id));
+		}
+	}
+	rsp_cnt = query->centers_touched.size() - 1;
+	for(int i = 0; i < g_center_cnt; i++) {
+		if(this->center_master.find(i) != this->center_master.end() && i != g_center_id) {//向所有数据中心的master发消息
+			// remote_next_center_id = i;
+			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),this->center_master[i]);
+		}
+	}
+	
+	return rc;
+}
 RC TPCCTxnManager::send_remote_request() {
 	assert(IS_LOCAL(get_txn_id()));
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
@@ -403,6 +452,17 @@ RC TPCCTxnManager::send_remote_request() {
 void TPCCTxnManager::copy_remote_items(TPCCQueryMessage * msg) {
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	msg->items.init(tpcc_query->items.size());
+#if PARAL_SUBTXN == true && CENTER_MASTER == true
+	if (tpcc_query->txn_type == TPCC_PAYMENT) return;
+	// uint64_t dest_node_id = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
+	// uint64_t dest_center_id = GET_CENTER_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
+	uint64_t index = 0;
+	while (index < tpcc_query->items.size()) {
+		Item_no * req = (Item_no*) mem_allocator.alloc(sizeof(Item_no));
+		req->copy(tpcc_query->items[index++]);
+		msg->items.add(req);
+	}
+#else
 	if (tpcc_query->txn_type == TPCC_PAYMENT) return;
 	uint64_t dest_node_id = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
 	uint64_t dest_center_id = GET_CENTER_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
@@ -417,6 +477,7 @@ void TPCCTxnManager::copy_remote_items(TPCCQueryMessage * msg) {
 		req->copy(tpcc_query->items[next_item_id++]);
 		msg->items.add(req);
 	}
+#endif
 }
 itemid_t* TPCCTxnManager::tpcc_read_remote_index(TPCCQuery * query) {
     TPCCQuery* tpcc_query = (TPCCQuery*) query;
@@ -573,11 +634,19 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		case TPCC_PAYMENT0 :
 						if(w_loc)
 							rc = run_payment_0(yield,w_id, d_id, d_w_id, h_amount, row,cor_id);
-                        else if(rdma_one_side() && w_cen == g_center_id){//rdma_silo
+#if PARAL_SUBTXN == true
+                        else if(rdma_one_side() && w_cen == g_center_id && g_node_id == center_master[w_cen]){//rdma_silo
+#else
+						else if(rdma_one_side() && w_cen == g_center_id){//rdma_silo
+#endif
                             rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
                         }
 						else {
+#if PARAL_SUBTXN == true && CENTER_MASTER == true
+							rc = RCOK;
+#else
 							rc = send_remote_request();
+#endif
 						}
 						break;
 		case TPCC_PAYMENT1 :
@@ -592,10 +661,18 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		case TPCC_PAYMENT4 :
 						if(c_w_loc)
 							rc = run_payment_4(yield, w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row,cor_id);
-						else if(rdma_one_side() && c_w_cen == g_center_id){//rdma_silo
+#if PARAL_SUBTXN == true
+                        else if(rdma_one_side() && c_w_cen == g_center_id && g_node_id == center_master[c_w_cen]){//rdma_silo
+#else
+						else if(rdma_one_side() && w_cen == g_center_id){//rdma_silo
+#endif
                             rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
                         }else {
+#if PARAL_SUBTXN == true && CENTER_MASTER == true
+								rc = RCOK;
+#else
 								rc = send_remote_request();
+#endif
 						}
 						break;
 		case TPCC_PAYMENT5 :
@@ -604,10 +681,18 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		case TPCC_NEWORDER0 :
 						if(w_loc)
 							rc = new_order_0( yield,w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row,cor_id);
+#if PARAL_SUBTXN == true
+                        else if(rdma_one_side() && w_cen == g_center_id && g_node_id == center_master[w_cen]){//rdma_silo
+#else
 						else if(rdma_one_side() && w_cen == g_center_id){//rdma_silo
+#endif
                             rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
                         }else {
+#if PARAL_SUBTXN == true && CENTER_MASTER == true
+								rc = RCOK;
+#else
 								rc = send_remote_request();
+#endif
 						}
 			break;
 		case TPCC_NEWORDER1 :
@@ -634,10 +719,19 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		case TPCC_NEWORDER8 :
 			if(ol_supply_w_loc) {
 				rc = new_order_8(yield,w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,row,cor_id);
-			        }else if(rdma_one_side() && ol_supply_w_cen == g_center_id){//rdma_silo
+			        }
+#if PARAL_SUBTXN == true
+                        else if(rdma_one_side() && ol_supply_w_cen == g_center_id && g_node_id == center_master[ol_supply_w_cen]){//rdma_silo
+#else
+						else if(rdma_one_side() && w_cen == g_center_id){//rdma_silo
+#endif
                         rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
                     } else {
+#if PARAL_SUBTXN == true && CENTER_MASTER == true
+						rc = RCOK;
+#else
 						rc = send_remote_request();
+#endif
 					}
 					break;
 		case TPCC_NEWORDER9 :
