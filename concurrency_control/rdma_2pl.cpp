@@ -7,6 +7,7 @@
 #include "qps/op.hh"
 #include "rdma_2pl.h"
 #include "row_rdma_2pl.h"
+#include "log_rdma.h"
 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
 void RDMA_2pl::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnManager * txnMng,uint64_t cor_id) {
@@ -46,7 +47,7 @@ retry_unlock:
     row->_tid_word = 0;
 #endif
 #if DEBUG_PRINTF
-    printf("---thd：%lu, local lock succ,lock location: %u; %p, txn: %lu, old lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info);
+    printf("---thd %lu, local unlock write succ, lock location: %u; %p, txn: %lu, old lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info);
 #endif
 }
 
@@ -108,15 +109,14 @@ retry_remote_unlock:
     row_t * remote_row = txnMng->read_remote_row(yield,loc,off,cor_id);
     uint64_t orig_lock_info = remote_row->_tid_word;
 	mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-
-    if(CC_ALG == RDMA_NO_WAIT) assert(orig_lock_info == 3);
-    else if(CC_ALG == RDMA_NO_WAIT2) assert(orig_lock_info == 1);
+    // if(CC_ALG == RDMA_NO_WAIT) assert(orig_lock_info == 3);
+    // else if(CC_ALG == RDMA_NO_WAIT2) assert(orig_lock_info == 1);
 #endif
 
     assert(txnMng->write_remote_row(yield,loc,operate_size,off,(char*)data,cor_id) == true);
 
 #if DEBUG_PRINTF 
-    printf("---线程号：%lu, 远程解写锁成功，锁位置: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: 0\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), orig_lock_info);
+    printf("---thd: %lu, remote unlock write succ,lock location:%lu; %p, txn: %lu, old lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), orig_lock_info);
 #endif
 #endif
 }
@@ -190,10 +190,11 @@ retry_unlock:
     }
     row->_tid_word = 0;
 #elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2
-    assert(row->_tid_word != 0);
+    uint64_t orig = row->_tid_word;
+    assert(orig != 0);
     row->_tid_word = 0;
 #if DEBUG_PRINTF
-    printf("---线程号：%lu, 本地解读锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: 1, new_lock_info: 0\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id());
+    printf("---thd %lu, local unlock read succ, lock location: %u; %p, txn: %lu, old lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(),orig);
 #endif
 #endif
 }
@@ -289,7 +290,7 @@ retry_remote_unlock:
     mem_allocator.free(unlock_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 
 #if DEBUG_PRINTF
-    printf("---thd：%lu,remote release read lock succ,lock location : %lu; %p, txn_id: %lu, old lock_info: 1, new_lock_info: 0\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id());
+    printf("---thd %lu,remote unlock read succ, lock location: %lu; %p, txn: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id());
 #endif
 #endif
 }
@@ -297,19 +298,41 @@ retry_remote_unlock:
 
 //write back and unlock
 void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id){
-	Transaction *txn = txnMng->txn;
+
+#if USE_REPLICA
+	bool* finished = (bool*)mem_allocator.alloc(sizeof(bool));
+	*finished = true;
+	for(int i=0;i<g_node_cnt;i++){
+		for(int j=0;j<txnMng->log_idx[i].size();j++){
+			uint64_t start_idx = txnMng->log_idx[i][j];
+			if(i==g_node_id){ //local 
+				char* start_addr = rdma_log_buffer + 2*sizeof(uint64_t) + start_idx*sizeof(LogEntry); //modify is_commit
+				if(rc==Abort) start_addr += sizeof(bool); //modify is_abort 
+				memcpy(start_addr, (char *)finished, sizeof(bool));
+			}else{ //remote 
+				uint64_t start_offset = rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+start_idx*sizeof(LogEntry); //modify is_commit
+				if(rc==Abort) start_offset += sizeof(bool); //modify is_abort
+				txnMng->write_remote_log(yield, i, sizeof(bool), start_offset, (char *)finished, cor_id);
+			}
+		}
+	}
+	mem_allocator.free(finished, sizeof(bool));
+#endif
+
+    Transaction *txn = txnMng->txn;
     uint64_t starttime = get_sys_clock();
     //NO_WAIT has no problem of deadlock,so doesnot need to bubble sort the write_set in primary key order
 	int read_set[txn->row_cnt - txn->write_cnt];
 	int cur_rd_idx = 0;
     int cur_wr_idx = 0;
 	for (uint64_t rid = 0; rid < txn->row_cnt; rid ++) {
+        assert(GET_CENTER_ID(txn->accesses[rid]->location) == g_center_id);
 		if (txn->accesses[rid]->type == WR)
 			txnMng->write_set[cur_wr_idx ++] = rid;
 		else
 			read_set[cur_rd_idx ++] = rid;
 	}
-    
+
     vector<vector<uint64_t>> remote_access(g_node_cnt);
     //for read set element, release lock
     for (uint64_t i = 0; i < txn->row_cnt-txn->write_cnt; i++) {

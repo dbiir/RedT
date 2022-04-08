@@ -4,12 +4,14 @@
 #if USE_REPLICA
 
 void ChangeInfo::set_change_info(const ChangeInfo& ci){ //set value of "this" by "ci", 
+    is_primary = ci.is_primary;
     index_key = ci.index_key;
     size = ci.size;
     memcpy(content,ci.content,size);
 }
 
-void ChangeInfo::set_change_info(uint64_t ikey, uint64_t s, char* cont){ 
+void ChangeInfo::set_change_info(uint64_t ikey, uint64_t s, char* cont, bool is_pri){ 
+    is_primary = is_pri;
     index_key = ikey;
     size = s;
     memcpy(content,cont,size);

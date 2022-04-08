@@ -113,12 +113,12 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
 	assert(CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN);
+#if DEBUG_PRINTF
+		printf("[txn start]txn %d on node %u, is_local?%d\n",txn->txn_id,g_node_id,IS_LOCAL(txn->txn_id));
+#endif
 
 	if(IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
 		DEBUG("Running txn %ld\n",txn->txn_id);
-#if DEBUG_PRINTF
-		printf("[txn start]txn：%d，ts：%lu\n",txn->txn_id,get_timestamp());
-#endif
 		//query->print();
 		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
 		query->centers_touched.add_unique(g_center_id);
@@ -158,6 +158,13 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time_short += curr_time - starttime;
 	txn_stats.wait_starttime = get_sys_clock();
 
+#if USE_REPLICA && CC_ALG == RDMA_NO_WAIT2
+	if(rc == Abort && (!IS_LOCAL(get_txn_id()) || query->centers_touched.size() > 1)){
+		txn->rc = rc;
+		return rc;
+	}	
+#endif	
+
 	if(IS_LOCAL(get_txn_id())) {  
 		if(is_done() && rc == RCOK) {
 			// printf("a txn is done\n");
@@ -166,7 +173,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 			rc = start_commit(yield, cor_id);
 		}
-		else if(rc == Abort) {
+		else if(rc == Abort) { // rc == Abort && IS_LOCAL(get_txn_id()) && query->centers_touched.size() == 1
 			rc = start_abort(yield, cor_id);
 		}
 	} else if(rc == Abort){
@@ -518,16 +525,25 @@ if(req->acctype == RD || req->acctype == WR){
 
 #if USE_DBPAOR == false
         uint64_t try_lock = -1;
-        try_lock = cas_remote_content(yield,loc,m_item->offset,0,1,cor_id);
+		if(get_txn_id()==0)
+        	try_lock = cas_remote_content(yield,loc,m_item->offset,0,1,cor_id);
+		else
+        	try_lock = cas_remote_content(yield,loc,m_item->offset,0,get_txn_id(),cor_id);
 
 		if(try_lock != 0){ //CAS fail
 			DEBUG_M("TxnManager::get_row(abort) access free\n");
 			row_local = NULL;
 			txn->rc = Abort;
 			mem_allocator.free(m_item, sizeof(itemid_t));
-
+#if DEBUG_PRINTF
+			printf("---thd: %lu, remote lock fail, lock loc: %lu; %p, txn: %lu, current lock:%lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(),try_lock);
+#endif
 			return Abort;
 		}
+
+#if DEBUG_PRINTF
+		printf("---thd: %lu, remote lock suc, lock loc: %lu; %p, txn: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id());
+#endif
         row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
         assert(test_row->get_primary_key() == req->key);
 #endif

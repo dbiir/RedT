@@ -612,7 +612,6 @@ RC WorkerThread::co_run(yield_func_t &yield, uint64_t cor_id) {
     process(yield, msg, cor_id);
     // yield(_routines[0]);
 #endif
-    // process(msg);  /// DA
     ready_starttime = get_sys_clock();
     if(cor_txn_man[cor_id]) {
       bool ready = cor_txn_man[cor_id]->set_ready();
@@ -803,7 +802,6 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
     process(yield, msg, cor_id);
 
 #endif
-    // process(msg);  /// DA
     ready_starttime = get_sys_clock();
     if(txn_man) {
       bool ready = txn_man->set_ready();
@@ -954,6 +952,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   if(CC_ALG == WSI) {
     wsi_man.gene_finish_ts(txn_man);
   }
+  //commit phase: now commit or abort
   txn_man->send_finish_messages();
   if(rc == Abort) {
     txn_man->abort(yield, cor_id);
@@ -1051,21 +1050,23 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
     tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->return_id, Message::create_message(txn_man,RQRY_RSP));
 #else
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
+#if CC_ALG == RDMA_SILO
     rc  = txn_man->validate(yield, cor_id);
     txn_man->set_rc(rc);
 #if USE_REPLICA
     // if(rc != Abort) 
     assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
 #endif
-#if USE_RDMA == CHANGE_MSG_QUEUE
-    tport_man.rdma_thd_send_msg(get_thd_id(), msg->return_node_id, Message::create_message(txn_man,RACK_PREP));
-#else
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
-#endif
-
     if(rc == Abort) {
       txn_man->abort(yield, cor_id);
     }
+#elif CC_ALG == RDMA_NO_WAIT2
+#if USE_REPLICA
+    if(rc != Abort) assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
+#endif
+    msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+#endif
 #else
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),txn_man->return_id);
 #endif
@@ -1663,19 +1664,27 @@ RC AsyncRedoThread::run() {
       wait_time += get_sys_clock()-stime;
 
       if(simulation->is_done()) break;
-      for(int i=0;i<cur_entry->change_cnt;i++){          
+      if(CC_ALG == RDMA_NO_WAIT2 && cur_entry->is_aborted){
+        goto reset_and_forward;
+      }
+      
+      for(int i=0;i<cur_entry->change_cnt;i++){     
+        if(cur_entry->change[i].is_primary) continue;  
         IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[i].index_key) * sizeof(IndexInfo));
         char * tar_addr = (char *) idx_info->address;
-        uint64_t write_size;
         if(cur_entry->is_committed){ //write the whole content
-          write_size = cur_entry->change[i].size;
-        }else if(cur_entry->is_aborted){ //only write to unlock
-          write_size = sizeof(uint64_t);
+          uint64_t write_size = cur_entry->change[i].size;
+          memcpy(tar_addr,cur_entry->change[i].content,write_size);
+        }else if(cur_entry->is_aborted){ 
+          //CC_ALG != RDMA_NO_WAIT2 
+          uint64_t write_size = sizeof(uint64_t); //only write to unlock
+          memcpy(tar_addr,cur_entry->change[i].content,write_size);
         }else{
           assert(false);
         }
-        memcpy(tar_addr,cur_entry->change[i].content,write_size);
       }
+
+reset_and_forward:
       //reset LogEntry
       cur_entry->reset();
       //move head

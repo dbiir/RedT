@@ -210,7 +210,7 @@ char* Rdma::get_row_client_memory(uint64_t thd_id,int num) { //num>=1
 	return temp;
 }
 
-
+#if USE_REPLICA
 char* Rdma::get_log_client_memory(uint64_t thd_id,int num) { //num>=1
 	char* temp = (char *)(client_rdma_rm->raw_ptr);
 	temp += sizeof(IndexInfo) * (max_batch_num * g_total_thread_cnt * (COROUTINE_CNT + 1));
@@ -218,6 +218,7 @@ char* Rdma::get_log_client_memory(uint64_t thd_id,int num) { //num>=1
 	temp += sizeof(LogEntry) * ((num-1) * g_total_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
 	return temp;
 }
+#endif
 
 /*
 char* Rdma::get_table_client_memory(uint64_t thd_id) {

@@ -585,9 +585,6 @@ RC TxnManager::abort(yield_func_t &yield, uint64_t cor_id) {
 	aborted = true;
 	//RDMA_SILO - ADD remote release lock by rdma
 	release_locks(yield, Abort, cor_id);
-#if DEBUG_PRINTF
-	printf("---thd %lu txn %lu，release_lock(Abort) end.\n",get_thd_id(), get_txn_id());
-#endif
 #if CC_ALG == MAAT
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
 	time_table.release(get_thd_id(),get_txn_id());
@@ -693,7 +690,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 			rdma_txn_table.local_set_state(get_thd_id(),txn->txn_id, WOUND_COMMITTING);
 		}
 #endif
-	if(is_multi_part() && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT  && CC_ALG != RDMA_CICADA && CC_ALG !=RDMA_TS1 && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
+	if(is_multi_part() && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT  && CC_ALG != RDMA_CICADA && CC_ALG !=RDMA_TS1 && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
 		if(CC_ALG == TICTOC) {
 			rc = validate(yield, cor_id);
 			if (rc != Abort) {
@@ -701,7 +698,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 				rc = WAIT_REM;
 			}
 		} else if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == DLI_BASE ||
-				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA || CC_ALG == RDMA_SILO) {
+				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA || CC_ALG == RDMA_SILO || CC_ALG == RDMA_NO_WAIT2) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;
@@ -792,7 +789,7 @@ void TxnManager::send_finish_messages() {
 	for(uint64_t i = 0; i < query->centers_touched.size(); i++) {
 		if(this->center_master[query->centers_touched[i]] == g_node_id || query->centers_touched[i] == g_center_id) {
 			continue;
-    }
+    	}
 #if USE_RDMA == CHANGE_MSG_QUEUE
         tport_man.rdma_thd_send_msg(get_thd_id(), this->center_master[query->centers_touched[i]]), Message::create_message(this, RFIN));
 #else
@@ -1653,6 +1650,10 @@ void TxnManager::release_locks(yield_func_t &yield, RC rc, uint64_t cor_id) {
 
 	uint64_t timespan = (get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(), txn_cleanup_time,  timespan);
+#if DEBUG_PRINTF
+	if(rc == Abort) printf("---thd %lu txn %lu, Abort end.\n",get_thd_id(), get_txn_id());
+	else if(rc == RCOK) printf("---thd %lu txn %lu, Commit end.\n",get_thd_id(), get_txn_id());
+#endif
 }
 #if USE_DBPAOR == true
 row_t * TxnManager::cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock, uint64_t target_server, uint64_t cas_offset, uint64_t read_offset, uint64_t compare, uint64_t swap, uint64_t cor_id){
@@ -2088,11 +2089,13 @@ void TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server
 	return write_remote_content(yield, target_server, operate_size,remote_offset,write_content,local_buf,cor_id);
  }
 
+#if USE_REPLICA
  bool TxnManager::write_remote_log(yield_func_t &yield,uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content,uint64_t cor_id){
 	uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
     char *local_buf = Rdma::get_log_client_memory(thd_id);
 	return write_remote_content(yield, target_server, operate_size,remote_offset,write_content,local_buf,cor_id);
  }
+#endif
 
  bool TxnManager::write_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content, char* local_buf,uint64_t cor_id){
 	uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
@@ -2263,6 +2266,7 @@ bool TxnManager::loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint
 
 #if USE_REPLICA
 RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
+	if(CC_ALG == RDMA_NO_WAIT2) assert(status == RCOK);
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	RC rc = RCOK;
 	ts_t ts = get_sys_clock();
@@ -2286,10 +2290,12 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			node_id.push_back(GET_NODE_ID(part_id));
 		}
 		else if(status == Abort){ //validate fail, only log the primary replicas that have been locked
+#if CC_ALG == RDMA_SILO
 			int sum = 0;
 			for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
 			if(sum>=num_locks) break;
-			node_id.push_back(GET_NODE_ID(part_id));				
+			node_id.push_back(GET_NODE_ID(part_id));	
+#endif			
 		}else{
 			assert(false);
 		}
@@ -2299,14 +2305,21 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			if(center_id != g_center_id) continue; //log is only for row in the same center
 			++change_cnt[node_id[i]];
 			ChangeInfo newChange;
+			
 			//fill in ChangeInfo here
 			row_t* temp_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-			temp_row->_tid_word = 0;
-			temp_row->timestamp = ts;
 			//for simulation purpose, only write back metadata here
 			//in actual application, data in req should also be written back
+			temp_row->_tid_word = 0;
+#if CC_ALG == RDMA_SILO
+			temp_row->timestamp = ts;
 			uint64_t op_size = sizeof(temp_row->_tid_word)+sizeof(temp_row->timestamp);
 			newChange.set_change_info(req->key,op_size,(char *)temp_row); //local 
+#elif CC_ALG == RDMA_NO_WAIT2
+			uint64_t op_size = sizeof(temp_row->_tid_word);
+			bool is_primary = (node_id[i] == GET_NODE_ID(part_id));
+			newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 
+#endif
 			mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 
 			change[node_id[i]].push_back(newChange);

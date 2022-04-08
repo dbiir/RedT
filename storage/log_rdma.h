@@ -10,8 +10,9 @@ class ChangeInfo{
 public:
     // void init();
     void set_change_info(const ChangeInfo& ci);
-    void set_change_info(uint64_t ikey, uint64_t s, char* cont);
+    void set_change_info(uint64_t ikey, uint64_t s, char* cont, bool is_pri = false);
 
+    bool is_primary; //primary replica can be skipped in AsyncRedo Thread
     uint64_t index_key; //index_key of the row index
     uint64_t size; //size of content, maximum CONTENT_DEFAULT_SIZE
     char content[CONTENT_DEFAULT_SIZE]; //content after change

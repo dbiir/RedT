@@ -117,8 +117,10 @@ atomic_retry_lock:
     //RDMA CAS，不用本地CAS
         uint64_t loc = g_node_id;
         uint64_t try_lock = -1;
-        try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,1,cor_id);
-
+        if(txn->get_txn_id()==0)
+            try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,1,cor_id);
+        else
+            try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txn->get_txn_id(),cor_id);
         // uint64_t thd_id = txn->get_thd_id();
 		// uint64_t *tmp_buf2 = (uint64_t *)Rdma::get_row_client_memory(thd_id);
 		// auto mr = client_rm_handler->get_reg_attr().value();
@@ -135,11 +137,12 @@ atomic_retry_lock:
 		// if(*tmp_buf2 != 0) rc = Abort; //加锁冲突，Abort	
 		if(try_lock != 0) rc = Abort; //加锁冲突，Abort	
         else{   //加锁成功
-#if DEBUG_PRINTF
-        printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: 0, new_lock_info: 1\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id());
-#endif
         rc = RCOK;
         } 
+#if DEBUG_PRINTF
+        if(rc == RCOK) printf("---thd %lu, local lock suc, lock location: %u; %p, txn: %lu\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id());
+        else if(rc == Abort) printf("---thd %lu, local lock fail, lock location: %u; %p, txn: %lu, current lock:%lu\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id(), try_lock);
+#endif        
 /*
     //本地CAS，成功返回1，失败返回0
     if(__sync_bool_compare_and_swap(&row->_tid_word, 0, 1)){

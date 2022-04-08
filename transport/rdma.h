@@ -25,8 +25,9 @@ class Rdma {
   void init();
   static char *get_index_client_memory(uint64_t thd_id, int num = 1);
   static char *get_row_client_memory(uint64_t thd_id, int num = 1);
+#if USE_REPLICA
   static char *get_log_client_memory(uint64_t thd_id, int num = 1);
-
+#endif
   //static char *get_table_client_memory(uint64_t thd_id);
 
   static char *get_queue_client_memory();
