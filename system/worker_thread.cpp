@@ -849,7 +849,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
   if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC ||
        CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == DLI_BASE ||
-       CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == CICADA)
+       CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == CICADA || USE_REPLICA)
 #if USE_RDMA == CHANGE_MSG_QUEUE
     tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->get_txn_id()), Message::create_message(txn_man, RACK_FIN));
 #else
@@ -1672,6 +1672,7 @@ RC AsyncRedoThread::run() {
         if(cur_entry->change[i].is_primary) continue;  
         IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[i].index_key) * sizeof(IndexInfo));
         char * tar_addr = (char *) idx_info->address;
+        bool temp = cur_entry->is_committed;
         if(cur_entry->is_committed){ //write the whole content
           uint64_t write_size = cur_entry->change[i].size;
           memcpy(tar_addr,cur_entry->change[i].content,write_size);

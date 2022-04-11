@@ -156,7 +156,7 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 7000
+#define TPORT_PORT 7008
 #define TPORT_TWOSIDE_PORT 13000
 #define SET_AFFINITY true
 
@@ -190,7 +190,7 @@
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
 
-#define DEBUG_PRINTF  true
+#define DEBUG_PRINTF  false
 
 #if RDMA_ONE_SIDE 
 #define USE_DBPAOR false

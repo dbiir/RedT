@@ -698,7 +698,8 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 				rc = WAIT_REM;
 			}
 		} else if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == DLI_BASE ||
-				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA || CC_ALG == RDMA_SILO || CC_ALG == RDMA_NO_WAIT2) {
+				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA || 
+				CC_ALG == RDMA_SILO || CC_ALG == RDMA_NO_WAIT2) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;

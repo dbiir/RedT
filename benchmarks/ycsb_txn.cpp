@@ -159,11 +159,21 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.wait_starttime = get_sys_clock();
 
 #if USE_REPLICA && CC_ALG == RDMA_NO_WAIT2
-	if(rc == Abort && (!IS_LOCAL(get_txn_id()) || query->centers_touched.size() > 1)){
+	if(IS_LOCAL(get_txn_id()) && query->centers_touched.size() == 1){
+		if(rc == Abort){
+			rc = start_abort(yield, cor_id);
+		}else if(rc == RCOK){
+			assert(redo_log(yield,rc,cor_id) == RCOK);
+			rc = commit(yield, cor_id);
+		}else assert(false);
+		return rc;
+	}
+	if(rc == Abort){
 		txn->rc = rc;
 		return rc;
 	}	
 #endif	
+
 
 	if(IS_LOCAL(get_txn_id())) {  
 		if(is_done() && rc == RCOK) {
@@ -173,7 +183,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 			rc = start_commit(yield, cor_id);
 		}
-		else if(rc == Abort) { // rc == Abort && IS_LOCAL(get_txn_id()) && query->centers_touched.size() == 1
+		else if(rc == Abort) { 
 			rc = start_abort(yield, cor_id);
 		}
 	} else if(rc == Abort){
@@ -534,10 +544,11 @@ if(req->acctype == RD || req->acctype == WR){
 			DEBUG_M("TxnManager::get_row(abort) access free\n");
 			row_local = NULL;
 			txn->rc = Abort;
-			mem_allocator.free(m_item, sizeof(itemid_t));
+			printf("---remote fail, loc: %lu; %p, txn: %lu, current lock:%lu\n", loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(),try_lock);
 #if DEBUG_PRINTF
 			printf("---thd: %lu, remote lock fail, lock loc: %lu; %p, txn: %lu, current lock:%lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(),try_lock);
 #endif
+			mem_allocator.free(m_item, sizeof(itemid_t));
 			return Abort;
 		}
 
@@ -1344,30 +1355,45 @@ retry_lock:
 
 RC YCSBTxnManager::send_remote_subtxn() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
-	uint64_t next_id = 0;
-	
 	RC rc = RCOK;
+	
+	bool is_primary[g_center_cnt]; //is center_master has primary replica or not
 	for(int i = 0; i < ycsb_query->requests.size(); i++) {
 		ycsb_request * req = ycsb_query->requests[i];
 		uint64_t part_id = _wl->key_to_part(req->key);
-		uint64_t node_id = GET_NODE_ID(part_id);
-		uint64_t center_id = GET_CENTER_ID(node_id);
-		ycsb_query->centers_touched.add_unique(center_id);
-		ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id));
-		// if(center_id != g_center_id) {
-			if(this->center_master.find(center_id) == this->center_master.end()) {
-				this->center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id));
-			}
+		vector<uint64_t> node_id;
+#if USE_REPLICA
+		node_id.push_back(GET_NODE_ID(part_id));
+		node_id.push_back(GET_FOLLOWER1_NODE(part_id));
+		node_id.push_back(GET_FOLLOWER2_NODE(part_id));
+#else
+		node_id.push_back(GET_NODE_ID(part_id));		
+#endif
+		for(int j=0;j<node_id.size();j++){
+			uint64_t center_id = GET_CENTER_ID(node_id[j]);
 			remote_center[center_id].push_back(i);
-		// }
+			ycsb_query->centers_touched.add_unique(center_id);
+			ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id[j]));
+			//center_master is set as the first toughed primary, if not exist, use the first toughed backup.
+			auto ret = center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id[j]));
+			if(ret.second == false){
+				if(!is_primary[center_id] && j == 0){
+					center_master[center_id] = node_id[j]; //change center_master
+					is_primary[center_id] = true;
+				}
+			}else{
+				is_primary[center_id] = (j == 0 ? true : false); 
+			}
+		}
 	}
 	rsp_cnt = query->centers_touched.size() - 1;
 	for(int i = 0; i < g_center_cnt; i++) {
-		if(remote_center[i].size() > 0 && i != g_center_id) {//向所有数据中心的master发消息
+		if(remote_center[i].size() > 0 && i != g_center_id) {//send message to all masters
 			remote_next_center_id = i;
-			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),this->center_master[i]);
+			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),center_master[i]);
 		}
 	}
+
 	return rc;
 }
 

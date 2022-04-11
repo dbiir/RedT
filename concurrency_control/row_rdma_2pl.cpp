@@ -139,6 +139,8 @@ atomic_retry_lock:
         else{   //加锁成功
         rc = RCOK;
         } 
+        
+        if(rc == Abort) printf("---local fail, loc: %u; %p, txn: %lu, current lock:%lu\n", g_node_id, &row->_tid_word, txn->get_txn_id(), try_lock);
 #if DEBUG_PRINTF
         if(rc == RCOK) printf("---thd %lu, local lock suc, lock location: %u; %p, txn: %lu\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id());
         else if(rc == Abort) printf("---thd %lu, local lock fail, lock location: %u; %p, txn: %lu, current lock:%lu\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id(), try_lock);
