@@ -303,17 +303,18 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
 	bool* finished = (bool*)mem_allocator.alloc(sizeof(bool));
 	*finished = true;
 	for(int i=0;i<g_node_cnt;i++){
-		for(int j=0;j<txnMng->log_idx[i].size();j++){
-			uint64_t start_idx = txnMng->log_idx[i][j];
+        if(txnMng->log_idx[i] != -1){
+			uint64_t start_idx = txnMng->log_idx[i];
 			if(i==g_node_id){ //local 
-				char* start_addr = rdma_log_buffer + 2*sizeof(uint64_t) + start_idx*sizeof(LogEntry); //modify is_commit
-				if(rc==Abort) start_addr += sizeof(bool); //modify is_abort 
+				char* start_addr = rdma_log_buffer + 2*sizeof(uint64_t) + start_idx*sizeof(LogEntry); //modify is_committed
+				if(rc==Abort) start_addr += sizeof(bool); //modify is_aborted
 				memcpy(start_addr, (char *)finished, sizeof(bool));
 			}else{ //remote 
-				uint64_t start_offset = rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+start_idx*sizeof(LogEntry); //modify is_commit
-				if(rc==Abort) start_offset += sizeof(bool); //modify is_abort
+				uint64_t start_offset = rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+start_idx*sizeof(LogEntry); //modify is_committed
+				if(rc==Abort) start_offset += sizeof(bool); //modify is_aborted
 				txnMng->write_remote_log(yield, i, sizeof(bool), start_offset, (char *)finished, cor_id);
 			}
+            txnMng->log_idx[i] = -1;
 		}
 	}
 	mem_allocator.free(finished, sizeof(bool));

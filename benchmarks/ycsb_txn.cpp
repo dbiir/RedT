@@ -544,7 +544,7 @@ if(req->acctype == RD || req->acctype == WR){
 			DEBUG_M("TxnManager::get_row(abort) access free\n");
 			row_local = NULL;
 			txn->rc = Abort;
-			printf("---remote fail, loc: %lu; %p, txn: %lu, current lock:%lu\n", loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(),try_lock);
+			// printf("---remote fail, loc: %lu; %p, txn: %lu, current lock:%lu\n", loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(),try_lock);
 #if DEBUG_PRINTF
 			printf("---thd: %lu, remote lock fail, lock loc: %lu; %p, txn: %lu, current lock:%lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(),try_lock);
 #endif

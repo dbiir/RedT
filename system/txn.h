@@ -251,7 +251,10 @@ bool rdma_one_side() {
 
 	row_t * read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
     itemid_t * read_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t key, uint64_t cor_id);
+#if USE_REPLICA
 	uint64_t read_remote_log_head(yield_func_t &yield, uint64_t target_server, uint64_t cor_id);
+ 	char* read_remote_log(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
+#endif
 	void read_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t operate_size, char* local_buf, uint64_t cor_id);
 
 // #if CC_ALG == RDMA_MAAT
@@ -433,7 +436,7 @@ bool rdma_one_side() {
 	int last_batch_id;
 	int last_txn_id;
 	Message* last_msg;
-  	vector<vector<uint64_t>> log_idx{g_node_cnt};
+	uint64_t log_idx[NODE_CNT]; //-1 if no log 
 
 #if CC_ALG == DLI_MVCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || \
 	CC_ALG == DLI_OCC

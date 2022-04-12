@@ -2013,6 +2013,7 @@ row_t * TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,
     return test_row;
 }
 
+#if USE_REPLICA
 uint64_t TxnManager::read_remote_log_head(yield_func_t &yield, uint64_t target_server, uint64_t cor_id){
     uint64_t operate_size = sizeof(uint64_t);
     uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
@@ -2023,6 +2024,16 @@ uint64_t TxnManager::read_remote_log_head(yield_func_t &yield, uint64_t target_s
 
 	return *((uint64_t *)local_buf);
 }
+char* TxnManager::read_remote_log(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id){
+    uint64_t operate_size = sizeof(LogEntry);
+    uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
+    char *local_buf = Rdma::get_log_client_memory(thd_id);
+	
+	read_remote_content(yield, target_server, remote_offset, operate_size, local_buf, cor_id);
+	
+	return local_buf;
+}
+#endif
 
 void TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t operate_size, char* local_buf, uint64_t cor_id){
 	uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
@@ -2328,6 +2339,7 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	}
 	
 	//write log
+	for(int i=0;i<g_node_cnt;i++) log_idx[i] = -1;
 	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
 		if(change_cnt[i]>0){
 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
@@ -2335,6 +2347,7 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			int num_of_entry = 1;
 			//use RDMA_FAA for local and remote
 			uint64_t start_idx = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id);
+			uint64_t temp = start_idx;
 
 			if(i == g_node_id){ //local log
 				//consider possible overwritten:if no space, wait until cleaned 
@@ -2343,13 +2356,16 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				// 	//wait for head to reset
 				// 	assert(false);
 				// }
-				while((start_idx + num_of_entry - redo_log_buf.get_head() > redo_log_buf.get_size()) && !simulation->is_done()){
+				while((start_idx + num_of_entry - redo_log_buf.get_head() >= redo_log_buf.get_size()) && !simulation->is_done()){
 					//wait for AsyncRedoThread to clean buffer
 				}
 				if(simulation->is_done()) break;
 				
 				start_idx = start_idx % redo_log_buf.get_size();
 				char* start_addr = rdma_log_buffer + 2*sizeof(uint64_t)+start_idx*sizeof(LogEntry);
+				// assert(((LogEntry *)start_addr)->is_committed == false);
+				// assert(((LogEntry *)start_addr)->is_aborted == false);
+				// assert(((LogEntry *)start_addr)->change_cnt == 0);					
 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
 			}else{ //remote log
 				//consider possible overwritten: if no space, wait until cleaned 
@@ -2360,7 +2376,7 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				// 	assert(false);
 				// 	log_head[i] = read_remote_log_head(yield, i, cor_id);					
 				// }
-				while(start_idx + num_of_entry - log_head[i] > redo_log_buf.get_size() && !simulation->is_done()){
+				while(start_idx + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
 					//wait for AsyncRedoThread to clean buffer
 					log_head[i] = read_remote_log_head(yield, i, cor_id);
 				}
@@ -2369,9 +2385,16 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				
 				start_idx = start_idx % redo_log_buf.get_size();
 				uint64_t start_offset = rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+start_idx*sizeof(LogEntry);
+				
+				//for debug purpose
+				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
+				// assert(!le->is_aborted);
+				// assert(!le->is_committed);
+				// assert(le->change_cnt == 0);
+
 				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id);
 			}
-			log_idx[i].push_back(start_idx);
+			log_idx[i] = start_idx;
 			mem_allocator.free(newEntry, sizeof(LogEntry));
 		}
 	}

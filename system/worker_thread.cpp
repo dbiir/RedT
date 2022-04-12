@@ -1664,28 +1664,30 @@ RC AsyncRedoThread::run() {
       wait_time += get_sys_clock()-stime;
 
       if(simulation->is_done()) break;
-      if(CC_ALG == RDMA_NO_WAIT2 && cur_entry->is_aborted){
-        goto reset_and_forward;
-      }
-      
+      // if(CC_ALG == RDMA_NO_WAIT2 && cur_entry->is_aborted){
+      //   goto reset_and_forward;
+      // }
+      assert(cur_entry->change_cnt > 0);
       for(int i=0;i<cur_entry->change_cnt;i++){     
         if(cur_entry->change[i].is_primary) continue;  
         IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[i].index_key) * sizeof(IndexInfo));
         char * tar_addr = (char *) idx_info->address;
-        bool temp = cur_entry->is_committed;
         if(cur_entry->is_committed){ //write the whole content
           uint64_t write_size = cur_entry->change[i].size;
           memcpy(tar_addr,cur_entry->change[i].content,write_size);
         }else if(cur_entry->is_aborted){ 
-          //CC_ALG != RDMA_NO_WAIT2 
+#if CC_ALG == RDMA_SILO
           uint64_t write_size = sizeof(uint64_t); //only write to unlock
           memcpy(tar_addr,cur_entry->change[i].content,write_size);
+#else if CC_ALG == RDMA_NO_WAIT2
+          //do nothing if abort
+#endif
         }else{
           assert(false);
         }
       }
 
-reset_and_forward:
+// reset_and_forward:
       //reset LogEntry
       cur_entry->reset();
       //move head
@@ -1696,6 +1698,10 @@ reset_and_forward:
   uint64_t total_time = get_sys_clock() - start_time;
 
   printf("FINISH %ld:%ld, final head: %ld, final tail: %ld, spend %lf time on waiting\n",_node_id,_thd_id,redo_log_buf.get_head(),redo_log_buf.get_tail(), (double)wait_time/(double)total_time);
+  for(int i=0;i<g_node_cnt;i++){
+    if(i!=g_node_id) printf("log_head[%d]: %lu \n", i, log_head[i]);
+  }
+  
   fflush(stdout);
   return FINISH;
 }
