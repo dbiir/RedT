@@ -1041,6 +1041,9 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
   txn_table.update_min_ts(get_thd_id(), txn_man->get_txn_id(), 0, txn_man->get_start_timestamp());
   dta_time_table.init(get_thd_id(), txn_man->get_txn_id(), txn_man->get_start_timestamp());
 #endif
+#if USE_REPLICA
+	for(int i=0;i<g_node_cnt;i++) txn_man->log_idx[i] = redo_log_buf.get_size();
+#endif
   txn_man->send_RQRY_RSP = true;
   rc = txn_man->run_txn(yield, cor_id);
 
@@ -1447,6 +1450,9 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     fflush(stdout);
   #endif
   // Execute transaction
+#if USE_REPLICA
+	for(int i=0;i<g_node_cnt;i++) txn_man->log_idx[i] = redo_log_buf.get_size();
+#endif
   txn_man->send_RQRY_RSP = false;
 
   if (is_cl_o) {
@@ -1664,10 +1670,9 @@ RC AsyncRedoThread::run() {
       wait_time += get_sys_clock()-stime;
 
       if(simulation->is_done()) break;
-      // if(CC_ALG == RDMA_NO_WAIT2 && cur_entry->is_aborted){
-      //   goto reset_and_forward;
-      // }
+
       assert(cur_entry->change_cnt > 0);
+
       for(int i=0;i<cur_entry->change_cnt;i++){     
         if(cur_entry->change[i].is_primary) continue;  
         IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[i].index_key) * sizeof(IndexInfo));
@@ -1687,7 +1692,6 @@ RC AsyncRedoThread::run() {
         }
       }
 
-// reset_and_forward:
       //reset LogEntry
       cur_entry->reset();
       //move head

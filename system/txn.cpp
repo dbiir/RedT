@@ -2339,7 +2339,6 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	}
 	
 	//write log
-	for(int i=0;i<g_node_cnt;i++) log_idx[i] = -1;
 	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
 		if(change_cnt[i]>0){
 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
@@ -2363,9 +2362,11 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				
 				start_idx = start_idx % redo_log_buf.get_size();
 				char* start_addr = rdma_log_buffer + 2*sizeof(uint64_t)+start_idx*sizeof(LogEntry);
-				// assert(((LogEntry *)start_addr)->is_committed == false);
-				// assert(((LogEntry *)start_addr)->is_aborted == false);
-				// assert(((LogEntry *)start_addr)->change_cnt == 0);					
+				
+				assert(((LogEntry *)start_addr)->is_committed == false);
+				assert(((LogEntry *)start_addr)->is_aborted == false);
+				assert(((LogEntry *)start_addr)->change_cnt == 0);					
+				
 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
 			}else{ //remote log
 				//consider possible overwritten: if no space, wait until cleaned 
@@ -2386,7 +2387,7 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				start_idx = start_idx % redo_log_buf.get_size();
 				uint64_t start_offset = rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+start_idx*sizeof(LogEntry);
 				
-				//for debug purpose
+				// //for debug purpose
 				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
 				// assert(!le->is_aborted);
 				// assert(!le->is_committed);

@@ -436,7 +436,7 @@ bool rdma_one_side() {
 	int last_batch_id;
 	int last_txn_id;
 	Message* last_msg;
-	uint64_t log_idx[NODE_CNT]; //-1 if no log 
+	uint64_t log_idx[NODE_CNT]; //redo_log_buf.get_size() if no log 
 
 #if CC_ALG == DLI_MVCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || \
 	CC_ALG == DLI_OCC
