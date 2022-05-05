@@ -135,6 +135,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	//batch read all row for remote access
 	ycsb_batch_read(yield,R_ROW,cor_id);
 #endif
+	num_locks = 0;
 	while(rc == RCOK && !is_done()) {
 #if CC_ALG == WOUND_WAIT
 		if (txn_state == WOUNDED) {
@@ -158,20 +159,19 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time_short += curr_time - starttime;
 	txn_stats.wait_starttime = get_sys_clock();
 
-#if USE_REPLICA && CC_ALG == RDMA_NO_WAIT2
-	if(IS_LOCAL(get_txn_id()) && query->centers_touched.size() == 1){
-		if(rc == Abort){
-			rc = start_abort(yield, cor_id);
-		}else if(rc == RCOK){
-			assert(redo_log(yield,rc,cor_id) == RCOK);
-			rc = commit(yield, cor_id);
-		}else assert(false);
+#if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT)
+	if(query->centers_touched.size() == 1 && rc == RCOK){
+		assert(false);
+		assert(IS_LOCAL(get_txn_id()));
+		set_commit_timestamp(glob_manager.get_ts(get_thd_id()));
+		assert(redo_log(yield,rc,cor_id) == RCOK);
+		rc = commit(yield, cor_id);
 		return rc;
 	}
-	if(rc == Abort){
-		txn->rc = rc;
-		return rc;
-	}	
+	// if(rc == Abort){ //multi-center txn 
+	// 	txn->rc = rc;
+	// 	return rc;
+	// }	
 #endif	
 
 
@@ -459,8 +459,8 @@ remote_atomic_retry_lock:
                 total_num_atomic_retry++;
                 if(num_atomic_retry > max_num_atomic_retry)
                     max_num_atomic_retry = num_atomic_retry;
-                    lock_info = try_lock;
-                    goto remote_atomic_retry_lock;
+                lock_info = try_lock;
+                goto remote_atomic_retry_lock;
             }
 			//read remote data
         	test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
@@ -499,6 +499,7 @@ remote_atomic_retry_lock:
 #endif
 		}
         //preserve the txn->access
+		++num_locks;
         access_t type = req->acctype;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
 
@@ -555,6 +556,7 @@ if(req->acctype == RD || req->acctype == WR){
 #if DEBUG_PRINTF
 		printf("---thd: %lu, remote lock suc, lock loc: %lu; %p, txn: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id());
 #endif
+		++num_locks;
         row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
         assert(test_row->get_primary_key() == req->key);
 #endif

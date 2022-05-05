@@ -829,7 +829,8 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()), "RFIN local: %ld %ld/%d\n", msg->get_txn_id(),
              msg->get_txn_id() % g_node_cnt, g_node_id);
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || \
-    CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_MVCC || CC_ALG == SILO
+    CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
+    CC_ALG == DLI_MVCC || CC_ALG == SILO || USE_REPLICA
   txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
 #endif
 
@@ -953,6 +954,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     wsi_man.gene_finish_ts(txn_man);
   }
   //commit phase: now commit or abort
+  txn_man->set_commit_timestamp(get_next_ts());
   txn_man->send_finish_messages();
   if(rc == Abort) {
     txn_man->abort(yield, cor_id);
@@ -1048,6 +1050,10 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
   rc = txn_man->run_txn(yield, cor_id);
 
   // Send response
+#if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT)
+  assert(rc != WAIT);
+#endif 
+
   if(rc != WAIT) {
 #if USE_RDMA == CHANGE_MSG_QUEUE
     tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->return_id, Message::create_message(txn_man,RQRY_RSP));
@@ -1064,7 +1070,7 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
     if(rc == Abort) {
       txn_man->abort(yield, cor_id);
     }
-#elif CC_ALG == RDMA_NO_WAIT2
+#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
 #if USE_REPLICA
     if(rc != Abort) assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
 #endif
@@ -1647,8 +1653,8 @@ RC AsyncRedoThread::run() {
   uint64_t start_time = get_sys_clock();
 
 	while(!simulation->is_done()) {
-    uint64_t ch = redo_log_buf.get_head();
-    uint64_t ct = redo_log_buf.get_tail();
+    uint64_t ch = *(redo_log_buf.get_head());
+    uint64_t ct = *(redo_log_buf.get_tail());
     uint64_t buf_size = redo_log_buf.get_size();
     if(ct > ULONG_MAX-100000){ //clear head and tail to prevent ct bigger than ULONG_MAX
       assert(false); //no need to clean, uint64_t is big enough for experiment purpose
@@ -1658,12 +1664,69 @@ RC AsyncRedoThread::run() {
       //todo: rdma cas to clean tail...
       redo_log_buf.set_head(cleaned_head);
     }
+#if 1
+    if(ch < ct){
+      //scan from head to tail, get applyList of LogEntries sorted by ts.            
+      
+      // map<uint64_t,LogEntry*> applyList; 
+      LogEntry* le_array[ct-ch] = {nullptr};
+      uint64_t array_size = 0;
+      for(uint64_t i=ch;i<ct;i++){ 
+        LogEntry* cur_entry = redo_log_buf.get_entry(i % buf_size);
+        if(cur_entry->get_status() != ENDED) continue;
+        //cur_entry ended(aborted or commited) and not flushed data yet
+        if(cur_entry->is_aborted){ //flush right now
+          cur_entry->reset();
+        }else{
+          // applyList.insert(pair<uint64_t,LogEntry*>(cur_entry->ts,cur_entry));
+          le_array[array_size++] = cur_entry;
+        }
+      }
 
+      //bubble sort 
+      if(array_size>=2){
+        for(uint64_t i=array_size-1;i>=1;i--){
+          for(uint64_t j=0;j<i;j++){
+            if(le_array[j]->ts > le_array[j+1]->ts){
+              LogEntry* temp_le = le_array[j];
+              le_array[j] = le_array[j+1];
+              le_array[j+1] = temp_le;            
+            }
+          }
+        }
+      }
+
+      //apply applyList and reset LogEntries afterwards
+
+      // for(auto it=applyList.begin(); it!=applyList.end(); ++it){  //ts from small to big
+      //   LogEntry* entry_to_apply= it->second;
+      for(int j=0;j<array_size;j++){
+        LogEntry* entry_to_apply = le_array[j];
+        for(int i=0;i<entry_to_apply->change_cnt;i++){
+          if(entry_to_apply->change[i].is_primary) continue;
+          IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (entry_to_apply->change[i].index_key) * sizeof(IndexInfo));
+          char * tar_addr = (char *) idx_info->address;
+          memcpy(tar_addr,entry_to_apply->change[i].content,entry_to_apply->change[i].size);
+        }
+        entry_to_apply->reset();
+      }
+      
+      //move head as far as able to
+      for(int i=ch;i<ct;i++){
+        LogEntry* cur_entry = redo_log_buf.get_entry(i % buf_size);
+        if(cur_entry->get_status() == FLUSHED){
+          cur_entry->set_rewritable();
+          redo_log_buf.set_head(*(redo_log_buf.get_head())+1);
+        }
+        else break; 
+      }
+    }
+#else
     if(ch < ct){
       //async apply redo log
       uint64_t start_idx = ch % buf_size;
-			LogEntry* cur_entry = (LogEntry*)(rdma_log_buffer + 2*sizeof(uint64_t) + start_idx*sizeof(LogEntry));
-  
+      LogEntry* cur_entry = redo_log_buf.get_entry(start_idx);
+
       uint64_t stime = get_sys_clock();
       while(!cur_entry->is_committed && !cur_entry->is_aborted && !simulation->is_done()){ //wait
       }
@@ -1682,10 +1745,12 @@ RC AsyncRedoThread::run() {
           memcpy(tar_addr,cur_entry->change[i].content,write_size);
         }else if(cur_entry->is_aborted){ 
 #if CC_ALG == RDMA_SILO
-          uint64_t write_size = sizeof(uint64_t); //only write to unlock
+      uint64_t write_size = sizeof(uint64_t); //only write to unlock
           memcpy(tar_addr,cur_entry->change[i].content,write_size);
-#else if CC_ALG == RDMA_NO_WAIT2
+#else if CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
           //do nothing if abort
+          // uint64_t write_size = cur_entry->change[i].size;
+          // memcpy(tar_addr,cur_entry->change[i].content,write_size);
 #endif
         }else{
           assert(false);
@@ -1695,13 +1760,15 @@ RC AsyncRedoThread::run() {
       //reset LogEntry
       cur_entry->reset();
       //move head
-      redo_log_buf.forward_head(1);
+      redo_log_buf.set_head(*(redo_log_buf.get_head())+1);
     }
+#endif
   }
 
   uint64_t total_time = get_sys_clock() - start_time;
 
-  printf("FINISH %ld:%ld, final head: %ld, final tail: %ld, spend %lf time on waiting\n",_node_id,_thd_id,redo_log_buf.get_head(),redo_log_buf.get_tail(), (double)wait_time/(double)total_time);
+  // assert(false);
+  printf("FINISH %ld:%ld, final head: %ld, final tail: %ld, spend %lf time on waiting\n",_node_id,_thd_id,*(redo_log_buf.get_head()),*(redo_log_buf.get_tail()), (double)wait_time/(double)total_time);
   for(int i=0;i<g_node_cnt;i++){
     if(i!=g_node_id) printf("log_head[%d]: %lu \n", i, log_head[i]);
   }

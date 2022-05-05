@@ -110,7 +110,7 @@ public:
   bool readonly;
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_MVCC || CC_ALG == SILO
+    CC_ALG == DLI_MVCC || CC_ALG == SILO || USE_REPLICA
   uint64_t commit_timestamp;
 #endif
 };

@@ -290,7 +290,7 @@ UInt64 rdma_index_size = (300*1024*1024L*g_part_cnt);
 UInt64 rdma_index_size = (300*1024*1024L);
 #endif
 //Replica redo log buffer size
-UInt64 rdma_log_size = 100*1024*1024;
+UInt64 rdma_log_size = 1024*1024*1024;
 
 // MAAT
 UInt64 rdma_txntable_size = 30*1024*1024; //4*(1024*1024*1024L);//30*1024*1024;

@@ -300,11 +300,11 @@ RDMA_silo::finish(yield_func_t &yield, RC rc , TxnManager * txnMng, uint64_t cor
 		if(txnMng->log_idx[i] != redo_log_buf.get_size()){
 			uint64_t start_idx = txnMng->log_idx[i];
 			if(i==g_node_id){ //local 
-				char* start_addr = rdma_log_buffer + 2*sizeof(uint64_t) + start_idx*sizeof(LogEntry); //modify is_commit
+                char* start_addr = (char *)redo_log_buf.get_entry(start_idx); //modify is_commit
 				if(rc==Abort) start_addr += sizeof(bool); //modify is_abort 
 				memcpy(start_addr, (char *)finished, sizeof(bool));
 			}else{ //remote 
-				uint64_t start_offset = rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+start_idx*sizeof(LogEntry); //modify is_commit
+			    uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx); //modify is_commit
 				if(rc==Abort) start_offset += sizeof(bool); //modify is_abort
 				txnMng->write_remote_log(yield, i, sizeof(bool), start_offset, (char *)finished, cor_id);
 			}

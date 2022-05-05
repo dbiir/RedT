@@ -321,6 +321,7 @@ bool rdma_one_side() {
     int             write_set[100];
     int*            read_set;
 	int				num_atomic_retry; //num of txn atomic_retry
+	int				num_locks;
 #endif
 
 #if CC_ALG == SILO || CC_ALG == RDMA_SILO

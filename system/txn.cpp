@@ -690,7 +690,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 			rdma_txn_table.local_set_state(get_thd_id(),txn->txn_id, WOUND_COMMITTING);
 		}
 #endif
-	if(is_multi_part() && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT  && CC_ALG != RDMA_CICADA && CC_ALG !=RDMA_TS1 && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
+	if(is_multi_part() && CC_ALG != RDMA_WAIT_DIE2 && CC_ALG != RDMA_MAAT  && CC_ALG != RDMA_CICADA && CC_ALG !=RDMA_TS1 && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
 		if(CC_ALG == TICTOC) {
 			rc = validate(yield, cor_id);
 			if (rc != Abort) {
@@ -699,7 +699,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 			}
 		} else if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == DLI_BASE ||
 				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA || 
-				CC_ALG == RDMA_SILO || CC_ALG == RDMA_NO_WAIT2) {
+				CC_ALG == RDMA_SILO || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;
@@ -1321,6 +1321,7 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 #endif
 		return rc;
 	}
+	++num_locks;
 	access->type = type;
 	access->orig_row = row; //access->data == access->orig_row
 #if CC_ALG == SILO
@@ -2278,14 +2279,15 @@ bool TxnManager::loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint
 
 #if USE_REPLICA
 RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
-	if(CC_ALG == RDMA_NO_WAIT2) assert(status == RCOK);
+	if(CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT) assert(status == RCOK);
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	RC rc = RCOK;
-	ts_t ts = get_sys_clock();
+	ts_t ts = get_sys_clock(); //for RDMA_SILO, which is problematic
 
 	//for every node
 	int change_cnt[g_node_cnt] = {0};
 	vector<vector<ChangeInfo>> change(g_node_cnt);
+	
 
 	//construct log 
 	for(int i=0;i<((YCSBQuery*)query)->requests.size();i++){
@@ -2307,7 +2309,12 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
 			if(sum>=num_locks) break;
 			node_id.push_back(GET_NODE_ID(part_id));	
-#endif			
+#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
+			// int sum = 0;
+			// for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
+			// if(sum>=num_locks) break;
+			// node_id.push_back(GET_NODE_ID(part_id));				
+#endif
 		}else{
 			assert(false);
 		}
@@ -2327,7 +2334,7 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			temp_row->timestamp = ts;
 			uint64_t op_size = sizeof(temp_row->_tid_word)+sizeof(temp_row->timestamp);
 			newChange.set_change_info(req->key,op_size,(char *)temp_row); //local 
-#elif CC_ALG == RDMA_NO_WAIT2
+#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
 			uint64_t op_size = sizeof(temp_row->_tid_word);
 			bool is_primary = (node_id[i] == GET_NODE_ID(part_id));
 			newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 
@@ -2341,33 +2348,39 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	//write log
 	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
 		if(change_cnt[i]>0){
-			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
-			newEntry->set_entry(change_cnt[i],change[i]);
 			int num_of_entry = 1;
 			//use RDMA_FAA for local and remote
 			uint64_t start_idx = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id);
-			uint64_t temp = start_idx;
+			uint64_t logid = start_idx;
+
+			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
+			newEntry->set_entry(change_cnt[i],change[i],logid+1);
+
 
 			if(i == g_node_id){ //local log
 				//consider possible overwritten:if no space, wait until cleaned 
 				//for head: there is local read and write, and remote RDMA read, conflicts are ignored here, which might be problematic
-				// while(start_idx + num_of_entry < redo_log_buf.get_head()){
+				// while(start_idx + num_of_entry < *(redo_log_buf.get_head())){
 				// 	//wait for head to reset
 				// 	assert(false);
 				// }
-				while((start_idx + num_of_entry - redo_log_buf.get_head() >= redo_log_buf.get_size()) && !simulation->is_done()){
+				while((start_idx + num_of_entry - *(redo_log_buf.get_head()) >= redo_log_buf.get_size()) && !simulation->is_done()){
 					//wait for AsyncRedoThread to clean buffer
 				}
 				if(simulation->is_done()) break;
 				
 				start_idx = start_idx % redo_log_buf.get_size();
-				char* start_addr = rdma_log_buffer + 2*sizeof(uint64_t)+start_idx*sizeof(LogEntry);
-				
+
+				char* start_addr = (char*)redo_log_buf.get_entry(start_idx);
+
 				assert(((LogEntry *)start_addr)->is_committed == false);
 				assert(((LogEntry *)start_addr)->is_aborted == false);
 				assert(((LogEntry *)start_addr)->change_cnt == 0);					
-				
+				assert(((LogEntry *)start_addr)->rewritable == true);					
+
+
 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
+				assert(((LogEntry *)start_addr)->rewritable == false);					
 			}else{ //remote log
 				//consider possible overwritten: if no space, wait until cleaned 
 				//first prevent concurrent read and write among threads
@@ -2385,7 +2398,8 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				if(simulation->is_done()) break;
 				
 				start_idx = start_idx % redo_log_buf.get_size();
-				uint64_t start_offset = rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+start_idx*sizeof(LogEntry);
+
+				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx);
 				
 				// //for debug purpose
 				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
@@ -2394,6 +2408,11 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				// assert(le->change_cnt == 0);
 
 				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id);
+				//for debug purpose
+				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
+				// assert(!le->is_aborted);
+				// assert(!le->is_committed);
+				// assert(!le->rewritable);
 			}
 			log_idx[i] = start_idx;
 			mem_allocator.free(newEntry, sizeof(LogEntry));
