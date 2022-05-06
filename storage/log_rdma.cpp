@@ -17,11 +17,9 @@ void ChangeInfo::set_change_info(uint64_t ikey, uint64_t s, char* cont, bool is_
     if(s>0) memcpy(content,cont,s);
 }
 
-void LogEntry::set_entry(int ccnt,const vector<ChangeInfo>& cinfo,uint64_t log_id){ //set value before logging
-    logid = log_id; 
+void LogEntry::set_entry(int ccnt,const vector<ChangeInfo>& cinfo){ //set value before logging
     ts = 0;
-    is_committed = false;
-    is_aborted = false;
+    state = LOGGED;
     change_cnt = ccnt;
     assert(cinfo.size() == ccnt);
     assert(cinfo.size()>0 && cinfo.size()<=CHANGE_PER_ENTRY);
@@ -29,50 +27,24 @@ void LogEntry::set_entry(int ccnt,const vector<ChangeInfo>& cinfo,uint64_t log_i
         if(i<cinfo.size()) change[i].set_change_info(cinfo[i]);
         else change[i].set_change_info(0,0,nullptr,true);
     }
-    rewritable = false;
-    logid_check = log_id;
 }
 
 void LogEntry::init(){ //initialize during system startup
-    logid = 0;
-    is_committed = false;
-    is_aborted = false;
+    ts = 0;
+    state = EMPTY;
     change_cnt = 0;
-    rewritable = true;
-    logid_check = 0;
+}
+
+void LogEntry::set_flushed(){ 
+    state = FLUSHED;
+    change_cnt = 0;
 }
 
 void LogEntry::reset(){ 
-    is_committed = false;
-    is_aborted = false;
-    change_cnt = 0;
-}
-
-void LogEntry::set_rewritable(){ 
-    assert(!is_committed && !is_aborted && change_cnt==0 && !rewritable);
     // change[0].index_key = 888888;
-    rewritable = true;
+    assert(state == FLUSHED && change_cnt == 0);
+    state = EMPTY;
 }
-
-entry_status LogEntry::get_status(){    
-    // if(rewritable && !ended && !change_exist) return INIT_STATE;   
-    // if(logid!=logid_check) return INIT_STATE; //corrupt:write not finished yet
-    while(logid!=logid_check && !simulation->is_done()){}
-    if(simulation->is_done()) return INIT_STATE;
-
-    if(rewritable){
-        return INIT_STATE;
-    }   
-
-    bool ended = ((!is_committed&&!is_aborted) ? false : true);
-    bool change_exist = (change_cnt==0 ? false : true);
-    
-    if(!ended && change_exist) return WRITTEN;
-    else if(ended && change_exist) return ENDED;
-    else if(!ended && !change_exist) return FLUSHED;
-    else assert(false);   
-}
-
 
 void RedoLogBuffer::init(){
     set_head(0);
@@ -95,16 +67,14 @@ uint64_t* RedoLogBuffer::get_tail(){
     return (uint64_t*)(rdma_log_buffer+sizeof(uint64_t));
 }
 
-LogEntry* RedoLogBuffer::get_entry(uint64_t idx, bool skip_logid){
+LogEntry* RedoLogBuffer::get_entry(uint64_t idx){
     assert(idx >= 0 && idx < log_buffer_size);
-    if(skip_logid) return (LogEntry*)(rdma_log_buffer+2*sizeof(uint64_t)+idx*sizeof(LogEntry)+sizeof(uint64_t));
-    else return (LogEntry*)(rdma_log_buffer+2*sizeof(uint64_t)+idx*sizeof(LogEntry));
+    return (LogEntry*)(rdma_log_buffer+2*sizeof(uint64_t)+idx*sizeof(LogEntry));
 }
 
-uint64_t RedoLogBuffer::get_entry_offset(uint64_t idx, bool skip_logid){
+uint64_t RedoLogBuffer::get_entry_offset(uint64_t idx){
     assert(idx >= 0 && idx < log_buffer_size);
-    if(skip_logid) return rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+idx*sizeof(LogEntry)+sizeof(uint64_t);
-    else return rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+idx*sizeof(LogEntry);
+    return rdma_buffer_size-rdma_log_size+2*sizeof(uint64_t)+idx*sizeof(LogEntry);
 }
 
 void RedoLogBuffer::set_head(uint64_t h){

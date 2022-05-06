@@ -303,23 +303,21 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
     LogEntry * le = (LogEntry *)mem_allocator.alloc(sizeof(LogEntry));
     le->ts = txnMng->get_commit_timestamp();
     if(rc == Abort){
-        le->is_committed = false;
-        le->is_aborted = true;
+        le->state = LE_ABORTED;
     }else{
-        le->is_committed = true;
-        le->is_aborted = false;
+        le->state = LE_COMMITTED;
     }
-    uint64_t operate_size = sizeof(le->ts) + sizeof(le->is_committed) + sizeof(le->is_aborted);
+    uint64_t operate_size = sizeof(le->ts) + sizeof(le->state);
 
 	for(int i=0;i<g_node_cnt;i++){
         if(txnMng->log_idx[i] != redo_log_buf.get_size()){
 			uint64_t start_idx = txnMng->log_idx[i];
 			if(i==g_node_id){ //local 
-                char* start_addr = (char *)redo_log_buf.get_entry(start_idx,true);
-				memcpy(start_addr, (char *)le+sizeof(uint64_t), operate_size);
+                char* start_addr = (char *)redo_log_buf.get_entry(start_idx);
+				memcpy(start_addr, (char *)le, operate_size);
 			}else{ //remote 
-                uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx,true);
-				txnMng->write_remote_log(yield, i, operate_size, start_offset, (char *)le+sizeof(uint64_t), cor_id);
+                uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx);
+				txnMng->write_remote_log(yield, i, operate_size, start_offset, (char *)le, cor_id);
 			}
             txnMng->log_idx[i] = redo_log_buf.get_size();
 		}

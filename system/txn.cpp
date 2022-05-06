@@ -2351,10 +2351,9 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			int num_of_entry = 1;
 			//use RDMA_FAA for local and remote
 			uint64_t start_idx = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id);
-			uint64_t logid = start_idx;
 
 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
-			newEntry->set_entry(change_cnt[i],change[i],logid+1);
+			newEntry->set_entry(change_cnt[i],change[i]);
 
 
 			if(i == g_node_id){ //local log
@@ -2373,14 +2372,11 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 
 				char* start_addr = (char*)redo_log_buf.get_entry(start_idx);
 
-				assert(((LogEntry *)start_addr)->is_committed == false);
-				assert(((LogEntry *)start_addr)->is_aborted == false);
+				assert(((LogEntry *)start_addr)->state == EMPTY);					
 				assert(((LogEntry *)start_addr)->change_cnt == 0);					
-				assert(((LogEntry *)start_addr)->rewritable == true);					
-
 
 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
-				assert(((LogEntry *)start_addr)->rewritable == false);					
+				assert(((LogEntry *)start_addr)->state == LOGGED);						
 			}else{ //remote log
 				//consider possible overwritten: if no space, wait until cleaned 
 				//first prevent concurrent read and write among threads
@@ -2403,22 +2399,19 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				
 				// //for debug purpose
 				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
-				// assert(!le->is_aborted);
-				// assert(!le->is_committed);
+				// assert(le->state == EMPTY);
 				// assert(le->change_cnt == 0);
 
 				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id);
 				//for debug purpose
 				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
-				// assert(!le->is_aborted);
-				// assert(!le->is_committed);
-				// assert(!le->rewritable);
+				// assert(le->state == LOGGED);
+
 			}
 			log_idx[i] = start_idx;
 			mem_allocator.free(newEntry, sizeof(LogEntry));
 		}
 	}
-
 	return rc;
 }
 #endif

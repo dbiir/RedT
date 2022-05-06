@@ -1664,21 +1664,17 @@ RC AsyncRedoThread::run() {
       //todo: rdma cas to clean tail...
       redo_log_buf.set_head(cleaned_head);
     }
-#if 1
     if(ch < ct){
       //scan from head to tail, get applyList of LogEntries sorted by ts.            
-      
-      // map<uint64_t,LogEntry*> applyList; 
       LogEntry* le_array[ct-ch] = {nullptr};
       uint64_t array_size = 0;
       for(uint64_t i=ch;i<ct;i++){ 
         LogEntry* cur_entry = redo_log_buf.get_entry(i % buf_size);
-        if(cur_entry->get_status() != ENDED) continue;
-        //cur_entry ended(aborted or commited) and not flushed data yet
-        if(cur_entry->is_aborted){ //flush right now
-          cur_entry->reset();
-        }else{
-          // applyList.insert(pair<uint64_t,LogEntry*>(cur_entry->ts,cur_entry));
+
+        // while(cur_entry->logid != cur_entry->logid_check && !simulation->is_done()){}
+        if(cur_entry->state == LE_ABORTED){ //flush right now
+          cur_entry->set_flushed();
+        }else if(cur_entry->state == LE_COMMITTED){
           le_array[array_size++] = cur_entry;
         }
       }
@@ -1697,9 +1693,6 @@ RC AsyncRedoThread::run() {
       }
 
       //apply applyList and reset LogEntries afterwards
-
-      // for(auto it=applyList.begin(); it!=applyList.end(); ++it){  //ts from small to big
-      //   LogEntry* entry_to_apply= it->second;
       for(int j=0;j<array_size;j++){
         LogEntry* entry_to_apply = le_array[j];
         for(int i=0;i<entry_to_apply->change_cnt;i++){
@@ -1708,61 +1701,18 @@ RC AsyncRedoThread::run() {
           char * tar_addr = (char *) idx_info->address;
           memcpy(tar_addr,entry_to_apply->change[i].content,entry_to_apply->change[i].size);
         }
-        entry_to_apply->reset();
+        entry_to_apply->set_flushed();
       }
       
       //move head as far as able to
       for(int i=ch;i<ct;i++){
         LogEntry* cur_entry = redo_log_buf.get_entry(i % buf_size);
-        if(cur_entry->get_status() == FLUSHED){
-          cur_entry->set_rewritable();
+        if(cur_entry->state == FLUSHED){
+          cur_entry->reset();
           redo_log_buf.set_head(*(redo_log_buf.get_head())+1);
-        }
-        else break; 
+        }else break;
       }
     }
-#else
-    if(ch < ct){
-      //async apply redo log
-      uint64_t start_idx = ch % buf_size;
-      LogEntry* cur_entry = redo_log_buf.get_entry(start_idx);
-
-      uint64_t stime = get_sys_clock();
-      while(!cur_entry->is_committed && !cur_entry->is_aborted && !simulation->is_done()){ //wait
-      }
-      wait_time += get_sys_clock()-stime;
-
-      if(simulation->is_done()) break;
-
-      assert(cur_entry->change_cnt > 0);
-
-      for(int i=0;i<cur_entry->change_cnt;i++){     
-        if(cur_entry->change[i].is_primary) continue;  
-        IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[i].index_key) * sizeof(IndexInfo));
-        char * tar_addr = (char *) idx_info->address;
-        if(cur_entry->is_committed){ //write the whole content
-          uint64_t write_size = cur_entry->change[i].size;
-          memcpy(tar_addr,cur_entry->change[i].content,write_size);
-        }else if(cur_entry->is_aborted){ 
-#if CC_ALG == RDMA_SILO
-      uint64_t write_size = sizeof(uint64_t); //only write to unlock
-          memcpy(tar_addr,cur_entry->change[i].content,write_size);
-#else if CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
-          //do nothing if abort
-          // uint64_t write_size = cur_entry->change[i].size;
-          // memcpy(tar_addr,cur_entry->change[i].content,write_size);
-#endif
-        }else{
-          assert(false);
-        }
-      }
-
-      //reset LogEntry
-      cur_entry->reset();
-      //move head
-      redo_log_buf.set_head(*(redo_log_buf.get_head())+1);
-    }
-#endif
   }
 
   uint64_t total_time = get_sys_clock() - start_time;

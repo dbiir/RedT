@@ -6,7 +6,7 @@
 // #define CONTENT_DEFAULT_SIZE (sizeof(row_t)+ROW_DEFAULT_SIZE)
 #define CONTENT_DEFAULT_SIZE (3*sizeof(uint64_t))
 
-enum entry_status {INIT_STATE = 0, WRITTEN, ENDED, FLUSHED};
+enum entry_status : uint8_t {EMPTY = 0, LOGGED, LE_COMMITTED, LE_ABORTED, FLUSHED};
 
 class ChangeInfo{
 public:
@@ -23,19 +23,15 @@ public:
 class LogEntry {
 public:
 	void init(); //initialize during system startup
-    void reset(); //reset after applying.
-    void set_rewritable();
-    void set_entry(int ccnt,const vector<ChangeInfo>& cinfo,uint64_t log_id);
-    entry_status get_status();
+    void set_flushed(); //set flushed after applying.
+    void reset();
+    void set_entry(int ccnt,const vector<ChangeInfo>& cinfo);
+    // entry_status get_status();
 
-    uint64_t logid;
     uint64_t ts;
-    bool is_committed;
-    bool is_aborted;
+    entry_status state;
     int change_cnt;
-    bool rewritable;    
     ChangeInfo change[CHANGE_PER_ENTRY];
-    uint64_t logid_check;
 };
 
 class RedoLogBuffer {
@@ -44,8 +40,8 @@ public:
     uint64_t get_size();
     uint64_t* get_head();    
     uint64_t* get_tail();
-    LogEntry* get_entry(uint64_t idx, bool skip_logid = false);
-    uint64_t  get_entry_offset(uint64_t idx, bool skip_logid = false);
+    LogEntry* get_entry(uint64_t idx);
+    uint64_t  get_entry_offset(uint64_t idx);
 
     void set_head(uint64_t h);
     void set_tail(uint64_t t);
