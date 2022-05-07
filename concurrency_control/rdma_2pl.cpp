@@ -301,16 +301,18 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
     Transaction *txn = txnMng->txn;
 #if USE_REPLICA
     LogEntry * le = (LogEntry *)mem_allocator.alloc(sizeof(LogEntry));
-    le->ts = txnMng->get_commit_timestamp();
     if(rc == Abort){
         le->state = LE_ABORTED;
     }else{
         le->state = LE_COMMITTED;
     }
-    uint64_t operate_size = sizeof(le->ts) + sizeof(le->state);
+    le->c_ts = txnMng->get_commit_timestamp();
+    // printf("c_ts:%lu\n",le->c_ts);
+    uint64_t operate_size = sizeof(le->state) + sizeof(le->c_ts);
 
 	for(int i=0;i<g_node_cnt;i++){
         if(txnMng->log_idx[i] != redo_log_buf.get_size()){
+            assert(le->c_ts != UINT64_MAX && le->c_ts != 0);
 			uint64_t start_idx = txnMng->log_idx[i];
 			if(i==g_node_id){ //local 
                 char* start_addr = (char *)redo_log_buf.get_entry(start_idx);

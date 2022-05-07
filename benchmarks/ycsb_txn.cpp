@@ -161,7 +161,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 #if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT)
 	if(query->centers_touched.size() == 1 && rc == RCOK){
-		assert(false);
+		assert(false); //for current workload, transactions are always multi-center.
 		assert(IS_LOCAL(get_txn_id()));
 		set_commit_timestamp(glob_manager.get_ts(get_thd_id()));
 		assert(redo_log(yield,rc,cor_id) == RCOK);

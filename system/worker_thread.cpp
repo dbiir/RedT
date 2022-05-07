@@ -45,6 +45,8 @@
 #include "log_rdma.h"
 #include "index_rdma.h"
 #include <boost/bind.hpp>
+#include <unordered_map>
+
 
 void WorkerThread::setup() {
 	if( get_thd_id() == 0) {
@@ -1019,7 +1021,6 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
   assert(!IS_LOCAL(msg->get_txn_id()));
 #endif
   RC rc = RCOK;
-
   msg->copy_to_txn(txn_man);
 
 #if CC_ALG == MVCC
@@ -1378,6 +1379,10 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     #endif
     }
 
+#if USE_REPLICA
+      txn_man->set_start_timestamp(get_next_ts());
+#endif
+
 #if CC_ALG == MVCC|| CC_ALG == WSI || CC_ALG == SSI
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
 #endif
@@ -1665,36 +1670,82 @@ RC AsyncRedoThread::run() {
       redo_log_buf.set_head(cleaned_head);
     }
     if(ch < ct){
-      //scan from head to tail, get applyList of LogEntries sorted by ts.            
-      LogEntry* le_array[ct-ch] = {nullptr};
-      uint64_t array_size = 0;
+      //scan from head to tail, get committed_entries, logged_entries and ikey_to_cts
+      LogEntry* committed_entries[ct-ch];
+      LogEntry* logged_entries[ct-ch];
+      uint64_t c_size = 0;
+      uint64_t l_size = 0;
+      unordered_map<uint64_t,uint64_t> ikey_to_cts; //index key of changies in COMMITTED entries to max cts
       for(uint64_t i=ch;i<ct;i++){ 
         LogEntry* cur_entry = redo_log_buf.get_entry(i % buf_size);
-
-        // while(cur_entry->logid != cur_entry->logid_check && !simulation->is_done()){}
-        if(cur_entry->state == LE_ABORTED){ //flush right now
+        entry_status cur_state = cur_entry->state;
+        if(cur_state == LOGGED){
+          logged_entries[l_size++] = cur_entry;
+        }else if(cur_state == LE_COMMITTED){
+          committed_entries[c_size++] = cur_entry;
+          for(int j=0;j<cur_entry->change_cnt;j++){
+            if(cur_entry->change[j].is_primary) continue;
+            auto ret = ikey_to_cts.insert ({cur_entry->change[j].index_key,cur_entry->c_ts});
+            if(!ret.second){
+              uint64_t ikey = cur_entry->change[j].index_key;
+              if(ikey_to_cts[ikey] < cur_entry->c_ts) ikey_to_cts[ikey] = cur_entry->c_ts;
+            }
+          }
+        }else if(cur_state == LE_ABORTED){
           cur_entry->set_flushed();
-        }else if(cur_entry->state == LE_COMMITTED){
-          le_array[array_size++] = cur_entry;
         }
       }
 
-      //bubble sort 
-      if(array_size>=2){
-        for(uint64_t i=array_size-1;i>=1;i--){
+      //scan logged_entries, get entries_to_wait
+      LogEntry* entries_to_wait[l_size];
+      uint64_t w_size = 0;
+      for(int i=0;i<l_size;i++){
+        for(int j=0;j<logged_entries[i]->change_cnt;j++){
+          if(logged_entries[i]->change[j].is_primary) continue;
+          uint64_t ikey = logged_entries[i]->change[j].index_key;
+          if(ikey_to_cts.find(ikey) == ikey_to_cts.end()) continue;
+          if(logged_entries[i]->s_ts >= ikey_to_cts[ikey]) continue;
+          entries_to_wait[w_size++] = logged_entries[i];
+          break;
+        }
+      }
+
+      //wait 
+      bool need_wait[w_size] = {true};
+      uint64_t need_wait_size = w_size;
+      while(need_wait_size != 0 && !simulation->is_done()){
+        for(int i=0;i<w_size;i++){
+          if(!need_wait[i]) continue;
+          entry_status cur_state = entries_to_wait[i]->state;
+          if(cur_state == LOGGED) continue;
+          else if(cur_state == LE_COMMITTED){
+            committed_entries[c_size++] = entries_to_wait[i];
+            --need_wait_size;
+            need_wait[i] = false;
+          }else if(cur_state == LE_ABORTED){
+            entries_to_wait[i]->set_flushed();
+            --need_wait_size;
+            need_wait[i] = false;
+          }
+        }
+      }
+
+      //bubble sort committed_entries
+      if(c_size>=2){
+        for(uint64_t i=c_size-1;i>=1;i--){
           for(uint64_t j=0;j<i;j++){
-            if(le_array[j]->ts > le_array[j+1]->ts){
-              LogEntry* temp_le = le_array[j];
-              le_array[j] = le_array[j+1];
-              le_array[j+1] = temp_le;            
+            if(committed_entries[j]->c_ts > committed_entries[j+1]->c_ts){
+              LogEntry* temp_le = committed_entries[j];
+              committed_entries[j] = committed_entries[j+1];
+              committed_entries[j+1] = temp_le;            
             }
           }
         }
       }
 
       //apply applyList and reset LogEntries afterwards
-      for(int j=0;j<array_size;j++){
-        LogEntry* entry_to_apply = le_array[j];
+      for(int j=0;j<c_size;j++){
+        LogEntry* entry_to_apply = committed_entries[j];
         for(int i=0;i<entry_to_apply->change_cnt;i++){
           if(entry_to_apply->change[i].is_primary) continue;
           IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (entry_to_apply->change[i].index_key) * sizeof(IndexInfo));

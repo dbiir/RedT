@@ -411,7 +411,7 @@ uint64_t QueryMessage::get_size() {
 #endif
 #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC || USE_REPLICA
   size += sizeof(start_ts);
 #endif
   return size;
@@ -425,7 +425,7 @@ void QueryMessage::copy_from_txn(TxnManager * txn) {
 #endif
 #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC || USE_REPLICA
   start_ts = txn->get_start_timestamp();
 #endif
 }
@@ -438,7 +438,7 @@ void QueryMessage::copy_to_txn(TxnManager * txn) {
 #endif
 #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC || USE_REPLICA
   txn->set_start_timestamp(start_ts);
 #endif
 }
@@ -453,7 +453,7 @@ void QueryMessage::copy_from_buf(char * buf) {
 #endif
 #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC || USE_REPLICA
  COPY_VAL(start_ts,buf,ptr);
 #endif
 }
@@ -468,7 +468,7 @@ void QueryMessage::copy_to_buf(char * buf) {
 #endif
 #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC || USE_REPLICA
  COPY_BUF(buf,start_ts,ptr);
 #endif
 }
@@ -1313,7 +1313,7 @@ uint64_t FinishMessage::get_size() {
   size += sizeof(bool);
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC || CC_ALG == SILO
+    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC || CC_ALG == SILO || USE_REPLICA
   size += sizeof(uint64_t);
 #endif
   return size;
@@ -1336,7 +1336,7 @@ void FinishMessage::copy_to_txn(TxnManager * txn) {
 
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_MVCC || CC_ALG == SILO
+    CC_ALG == DLI_MVCC || CC_ALG == SILO || USE_REPLICA
   txn->commit_timestamp = commit_timestamp;
 #endif
 }
@@ -1349,7 +1349,7 @@ void FinishMessage::copy_from_buf(char * buf) {
   COPY_VAL(readonly,buf,ptr);
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_MVCC || CC_ALG == SILO
+    CC_ALG == DLI_MVCC || CC_ALG == SILO || USE_REPLICA
   COPY_VAL(commit_timestamp,buf,ptr);
 #endif
  assert(ptr == get_size());
@@ -1363,7 +1363,7 @@ void FinishMessage::copy_to_buf(char * buf) {
   COPY_BUF(buf,readonly,ptr);
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_MVCC || CC_ALG == SILO
+    CC_ALG == DLI_MVCC || CC_ALG == SILO || USE_REPLICA
   COPY_BUF(buf,commit_timestamp,ptr);
 #endif
 

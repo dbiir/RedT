@@ -2353,7 +2353,8 @@ RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			uint64_t start_idx = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id);
 
 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
-			newEntry->set_entry(change_cnt[i],change[i]);
+
+			newEntry->set_entry(change_cnt[i],change[i],get_start_timestamp());
 
 
 			if(i == g_node_id){ //local log

@@ -17,9 +17,12 @@ void ChangeInfo::set_change_info(uint64_t ikey, uint64_t s, char* cont, bool is_
     if(s>0) memcpy(content,cont,s);
 }
 
-void LogEntry::set_entry(int ccnt,const vector<ChangeInfo>& cinfo){ //set value before logging
-    ts = 0;
+void LogEntry::set_entry(int ccnt,const vector<ChangeInfo>& cinfo, uint64_t sts){ //set value before logging
+    assert(sts != UINT64_MAX && sts != 0);
+
     state = LOGGED;
+    c_ts = 0;
+    s_ts = sts; 
     change_cnt = ccnt;
     assert(cinfo.size() == ccnt);
     assert(cinfo.size()>0 && cinfo.size()<=CHANGE_PER_ENTRY);
@@ -29,20 +32,23 @@ void LogEntry::set_entry(int ccnt,const vector<ChangeInfo>& cinfo){ //set value 
     }
 }
 
-void LogEntry::init(){ //initialize during system startup
-    ts = 0;
+void LogEntry::init(){ //initialize during system startup    
     state = EMPTY;
+    c_ts = 0;
+    s_ts = 0;
     change_cnt = 0;
 }
 
 void LogEntry::set_flushed(){ 
     state = FLUSHED;
+    c_ts = 0;
+    s_ts = 0;
     change_cnt = 0;
 }
 
 void LogEntry::reset(){ 
     // change[0].index_key = 888888;
-    assert(state == FLUSHED && change_cnt == 0);
+    assert(state == FLUSHED && c_ts == 0 && s_ts == 0 && change_cnt == 0);
     state = EMPTY;
 }
 
