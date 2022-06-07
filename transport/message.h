@@ -31,7 +31,7 @@ public:
   virtual ~Message(){}
   static Message * create_message(char * buf);
   static Message * create_message(BaseQuery * query, RemReqType rtype);
-  static Message * create_message(TxnManager * txn, RemReqType rtype);
+  static Message * create_message(TxnManager * txn, RemReqType rtype, uint64_t txnid = 0);
   static Message * create_message(uint64_t txn_id, RemReqType rtype);
   static Message * create_message(uint64_t txn_id,uint64_t batch_id, RemReqType rtype);
   static Message * create_message(LogRecord * record, RemReqType rtype);

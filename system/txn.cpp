@@ -534,7 +534,19 @@ void TxnManager::reset_query() {
 #endif
 }
 
+bool TxnManager::need_finish_log(){
+	uint64_t row_cnt = txn->accesses.get_count();
+	assert(txn->accesses.get_count() == txn->row_cnt);
+	
+	for (int rid = row_cnt - 1; rid >= 0; rid --) {
+		access_t type = txn->accesses[rid]->type;
+		if(type == WR) return true;
+	}
+	return false;
+}
+
 RC TxnManager::commit(yield_func_t &yield, uint64_t cor_id) {
+	assert(!aborted);
 	DEBUG("Commit %ld\n",get_txn_id());
 #if CC_ALG == WOUND_WAIT
     txn_state = STARTCOMMIT;    
@@ -697,6 +709,19 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 			rdma_txn_table.local_set_state(this,get_thd_id(),txn->txn_id, WOUND_COMMITTING);
 		}
 #endif
+#if USE_REPLICA
+	send_prepare_messages();
+	if(local_log){
+		log_replica(g_node_id, false);
+	}
+
+	if(rsp_cnt != 0 || log_rsp_cnt!=0){
+		return WAIT_REM;
+	}
+	assert(query->readonly());
+	assert(query->partitions_modified.size() == 0);	
+#endif
+
 	if(is_multi_part() && !rdma_one_side()) {
 		if(CC_ALG == TICTOC) {
 			rc = validate(yield, cor_id);
@@ -756,12 +781,36 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 }
 #endif
 void TxnManager::send_prepare_messages() {
+#if USE_REPLICA
+	uint64_t tar_nodes[g_node_cnt];
+	rsp_cnt = 0;
+	log_rsp_cnt = 0;
+	log_fin_rsp_cnt = 0;
+	local_log = false;
+	for(int i=0;i<query->partitions_modified.size();i++){
+		uint64_t part_id = query->partitions_modified[i];
+		uint64_t l_node = GET_NODE_ID(part_id);
+		if(l_node != g_node_id){
+			bool exist = false;
+			for(int j=0;j<rsp_cnt;j++){
+				if(tar_nodes[j] == l_node) {exist = true;break;}
+			}
+			//every part in different node
+			if(g_part_cnt == g_node_cnt) assert(!exist);
+			if(!exist){
+				tar_nodes[rsp_cnt++] = l_node;
+			}
+		}
+		else local_log = true;
+	}
+	for(int i=0;i<rsp_cnt;i++){
+			msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
+	}
+#else
 	rsp_cnt = query->partitions_touched.size() - 1;
 	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
 	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
-	if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) {
-		continue;
-	}
+	if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) continue;
 #if USE_RDMA == CHANGE_MSG_QUEUE
         tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(query->partitions_touched[i]), Message::create_message(this, RPREPARE));
 #else
@@ -769,6 +818,7 @@ void TxnManager::send_prepare_messages() {
 											GET_NODE_ID(query->partitions_touched[i]));
 #endif
 	}
+#endif
 }
 
 void TxnManager::send_finish_messages() {
@@ -778,7 +828,7 @@ void TxnManager::send_finish_messages() {
 	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
 		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) {
 			continue;
-    }
+    	}
 #if USE_RDMA == CHANGE_MSG_QUEUE
         tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(query->partitions_touched[i]), Message::create_message(this, RFIN));
 #else
@@ -800,7 +850,23 @@ int TxnManager::received_response(RC rc) {
 	return rsp_cnt;
 }
 
-bool TxnManager::waiting_for_response() { return rsp_cnt > 0; }
+int TxnManager::received_log_fin_response(RC rc) {
+	assert(rc == RCOK);
+	txn->rc == RCOK;
+	if (log_fin_rsp_cnt > 0)
+	  --log_fin_rsp_cnt;
+	return log_fin_rsp_cnt;
+}
+
+int TxnManager::received_log_response(RC rc) {
+	assert(rc == RCOK);
+	txn->rc == RCOK;
+	if (log_rsp_cnt > 0)
+	  --log_rsp_cnt;
+	return log_rsp_cnt;
+}
+
+bool TxnManager::waiting_for_response() { return (rsp_cnt > 0 || log_rsp_cnt > 0 || log_fin_rsp_cnt > 0); }
 
 bool TxnManager::is_multi_part() {
 	return query->partitions_touched.size() > 1;
@@ -3079,6 +3145,36 @@ itemid_t *TxnManager::index_read(INDEX *index, idx_key_t key, int part_id, int c
 	//txn_time_idx += t;
 
 	return item;
+}
+
+uint64_t TxnManager::get_return_node() {
+	return return_node;
+}
+
+void TxnManager::log_replica(uint64_t ret_nid,bool finish) {
+	assert(g_part_cnt==g_node_cnt);
+	return_node = ret_nid;
+	
+	//hard code here to get part_id, with above assumption
+	uint64_t part_id; 
+	for(uint64_t pid=0;pid<g_part_cnt;pid++){
+		if(GET_NODE_ID(pid)==g_node_id){
+			part_id = pid;
+			break;
+		}
+	}
+
+	uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
+	uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
+	if(finish){
+		log_fin_rsp_cnt = 2;
+		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RFIN_LOG),f1);
+		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RFIN_LOG),f2);
+	}else{
+		log_rsp_cnt = 2;
+		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RLOG),f1);
+		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RLOG),f2);
+	}
 }
 
 RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {

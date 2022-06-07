@@ -145,6 +145,22 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	reqId_index.erase(reqId_index.begin(),reqId_index.end());
 	reqId_row.erase(reqId_row.begin(),reqId_row.end());
 #endif
+	
+	// if(IS_LOCAL(get_txn_id())){
+	// 	if(is_done() && rc == RCOK){
+	// 		if(query->partitions_touched.size()==2){
+	// 			printf("txn on node %lu touched: %lu %lu and commit\n",g_node_id,query->partitions_touched[0],query->partitions_touched[1]);
+	// 		}else assert(false);
+	// 	}
+	// 	else if(rc==Abort){
+	// 		if(query->partitions_touched.size()==1){
+	// 			printf("txn on node %lu touched: %lu and abort\n",g_node_id,query->partitions_touched[0]);
+	// 		}else if(query->partitions_touched.size()==2){
+	// 			printf("txn on node %lu touched: %lu %lu and abort\n",g_node_id,query->partitions_touched[0],query->partitions_touched[1]);
+	// 		}else assert(false);
+	// 	}
+	// }
+
     if(rc == Abort) total_num_atomic_retry++;
 	uint64_t curr_time = get_sys_clock();
 	txn_stats.process_time += curr_time - starttime;
@@ -164,9 +180,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	} else if(rc == Abort){
 		rc = abort(yield, cor_id);
 	}
-	
   return rc;
-
 }
 
 RC YCSBTxnManager::run_txn_post_wait() {
@@ -297,9 +311,12 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 	while (next_record_id < ycsb_query->requests.size() && !is_local_request(next_record_id) &&
 			GET_NODE_ID(ycsb_query->requests[next_record_id]->key) == dest_node_id) {
 	#endif
+		if(ycsb_query->requests[next_record_id]->acctype == WR && IS_LOCAL(get_txn_id())) 	
+			ycsb_query->partitions_modified.add_unique(_wl->key_to_part(ycsb_query->requests[next_record_id]->key));
 		YCSBQuery::copy_request_to_msg(ycsb_query,msg,next_record_id++);
 	}
 }
+
 
 
 RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
@@ -318,6 +335,8 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		} else {
 #endif
 		if(loc) {
+			if(ycsb_query->requests[next_record_id]->acctype == WR && IS_LOCAL(get_txn_id())) 	
+				ycsb_query->partitions_modified.add_unique(part_id);
 			rc = run_ycsb_0(yield,req,row,cor_id);
 		} else if (rdma_one_side()) {
 			// printf("%ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);

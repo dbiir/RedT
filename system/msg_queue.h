@@ -22,6 +22,7 @@
 #include "concurrentqueue.h"
 #include "lock_free_queue.h"
 #include <boost/lockfree/queue.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
 #include "semaphore.h"
 class BaseQuery;
 class Message;
@@ -30,6 +31,7 @@ struct msg_entry {
   Message * msg;
   uint64_t dest;
   uint64_t starttime;
+  uint64_t touchedtime;
 };
 
 typedef msg_entry * msg_entry_t;
@@ -45,6 +47,7 @@ private:
 // This is close to max capacity for boost
 #if NETWORK_DELAY_TEST
   boost::lockfree::queue<msg_entry*> ** cl_m_queue;
+  boost::lockfree::spsc_queue<msg_entry*> ** wait_queue;
 #endif
   boost::lockfree::queue<msg_entry*> ** m_queue;
   std::vector<msg_entry*> sthd_m_cache;

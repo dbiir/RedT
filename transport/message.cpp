@@ -77,19 +77,24 @@ Message * Message::create_message(char * buf) {
  return msg;
 }
 
-Message * Message::create_message(TxnManager * txn, RemReqType rtype) {
+Message * Message::create_message(TxnManager * txn, RemReqType rtype, uint64_t txnid) {
  Message * msg = create_message(rtype);
- msg->mcopy_from_txn(txn);
- msg->copy_from_txn(txn);
+ if(rtype == RACK_LOG || rtype == RACK_FIN_LOG){
+  msg->txn_id = txnid;
+  ((AckMessage*)msg)->rc = RCOK;
+ }else{
+  msg->mcopy_from_txn(txn);
+  msg->copy_from_txn(txn);
 
- // copy latency here
- msg->lat_work_queue_time = txn->txn_stats.work_queue_time_short;
- msg->lat_msg_queue_time = txn->txn_stats.msg_queue_time_short;
- msg->lat_cc_block_time = txn->txn_stats.cc_block_time_short;
- msg->lat_cc_time = txn->txn_stats.cc_time_short;
- msg->lat_process_time = txn->txn_stats.process_time_short;
- msg->lat_network_time = txn->txn_stats.lat_network_time_start;
- msg->lat_other_time = txn->txn_stats.lat_other_time_start;
+  // copy latency here
+  msg->lat_work_queue_time = txn->txn_stats.work_queue_time_short;
+  msg->lat_msg_queue_time = txn->txn_stats.msg_queue_time_short;
+  msg->lat_cc_block_time = txn->txn_stats.cc_block_time_short;
+  msg->lat_cc_time = txn->txn_stats.cc_time_short;
+  msg->lat_process_time = txn->txn_stats.process_time_short;
+  msg->lat_network_time = txn->txn_stats.lat_network_time_start;
+  msg->lat_other_time = txn->txn_stats.lat_other_time_start;
+ }
 
  return msg;
 }
@@ -167,6 +172,8 @@ Message * Message::create_message(RemReqType rtype) {
     case CALVIN_ACK:
     case RACK_PREP:
     case RACK_FIN:
+    case RACK_LOG:
+    case RACK_FIN_LOG:
       msg = new AckMessage;
       break;
     case CL_QRY:
@@ -185,6 +192,8 @@ Message * Message::create_message(RemReqType rtype) {
       msg->init();
       break;
     case RPREPARE:
+    case RLOG:
+    case RFIN_LOG:
       msg = new PrepareMessage;
       break;
     case RFWD:
@@ -350,6 +359,8 @@ void Message::release_message(Message * msg) {
                       }
     case CALVIN_ACK:
     case RACK_PREP:
+    case RACK_LOG:
+    case RACK_FIN_LOG:
     case RACK_FIN: {
       AckMessage * m_msg = (AckMessage*)msg;
       m_msg->release();
@@ -373,6 +384,8 @@ void Message::release_message(Message * msg) {
       delete m_msg;
       break;
                     }
+    case RLOG:
+    case RFIN_LOG:
     case RPREPARE: {
       PrepareMessage * m_msg = (PrepareMessage*)msg;
       m_msg->release();

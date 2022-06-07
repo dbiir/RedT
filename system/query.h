@@ -42,7 +42,7 @@ public:
     Array<uint64_t> partitions_touched;
     Array<uint64_t> active_nodes;
     Array<uint64_t> participant_nodes;
-
+    Array<uint64_t> partitions_modified;    
 };
 
 class QueryGenerator {

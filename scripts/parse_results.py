@@ -21,6 +21,9 @@ for arg in sys.argv[1:]:
     get_summary(arg)
 names = summary.keys()
 
+# sfile = '/home/ljy/all-deneva/results/20220527-112657/0_NO_WAIT_TIF-20000_N-4_SYNTH_TABLE_SIZE-4194304_T-4_TWR-0.5_WR-0.5_YCSB_SKEW-0.3_20220527-112657.out'
+# get_summary(sfile)
+
 # a, b, c = 0, 0, 0
 # if 'tput' in summary:
 #     a = sum(summary['tput'])
@@ -33,6 +36,7 @@ names = summary.keys()
 # print a, b, c
 
 a, b, c, d, f = 0, 0, 0, 0, 0
+# e, g, h = 0, 0, 0
 if 'tput' in summary:
     a = sum(summary['tput'])
 if 'total_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
@@ -51,3 +55,4 @@ if 'txn_cnt' in summary:
 if 'worker_oneside_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
     f = sum(summary['worker_oneside_cnt']) / (sum(summary['total_txn_commit_cnt']) + sum(summary['total_txn_abort_cnt']))
 print a, b, f, g / h
+# print a, b, f, g, h

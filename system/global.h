@@ -297,6 +297,8 @@ extern bool g_mem_pad;
 extern bool g_prt_lat_distr;
 extern UInt32 g_node_id;
 extern UInt32 g_node_cnt;
+extern UInt32 g_center_id;
+extern UInt32 g_center_cnt;
 extern UInt32 g_part_cnt;
 extern UInt32 g_virtual_part_cnt;
 extern UInt32 g_core_cnt;
@@ -375,6 +377,7 @@ extern UInt32 g_field_per_tuple;
 extern UInt32 g_init_parallelism;
 extern double g_mpr;
 extern double g_mpitem;
+extern double g_cross_dc_txn_perc;
 
 // TPCC
 extern UInt32 g_num_wh;
@@ -457,6 +460,10 @@ enum RemReqType {
     RQRY_RSP,
     RACK,
     RACK_PREP,
+    RLOG,
+    RACK_LOG,
+    RFIN_LOG,
+    RACK_FIN_LOG,
     RACK_FIN,
     RTXN,
     RTXN_CONT,
@@ -521,10 +528,12 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 /*DA query build queue*/
 //queue<DAQuery> query_build_queue;
 
-
+#define GET_NODE_ID(id)	(id % g_node_cnt) //get id of the leader node. id: transaction id or partition id
+#define GET_FOLLOWER1_NODE(pid)	((pid + (g_node_cnt/g_center_cnt)) % g_node_cnt) //leader and follower1 are in the same data center
+#define GET_FOLLOWER2_NODE(pid)	((pid + 1) % g_node_cnt) 
+#define GET_CENTER_ID(nid) (nid % g_center_cnt) //nid: the id of node
 
 #define GET_THREAD_ID(id)	(id % g_thread_cnt)
-#define GET_NODE_ID(id)	(id % g_node_cnt)
 #define GET_PART_ID(t,n)	(n)
 #define GET_PART_ID_FROM_IDX(idx)	(g_node_id + idx * g_node_cnt)
 #define GET_PART_ID_IDX(p)	(p / g_node_cnt)
@@ -576,3 +585,5 @@ extern int total_num_atomic_retry;
 extern int max_num_atomic_retry;
 
 extern int max_batch_index;
+
+extern uint64_t extra_wait_time;

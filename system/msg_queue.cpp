@@ -20,17 +20,20 @@
 #include "pool.h"
 #include "message.h"
 #include <boost/lockfree/queue.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
 
 void MessageQueue::init() {
   //m_queue = new boost::lockfree::queue<msg_entry* > (0);
   m_queue = new boost::lockfree::queue<msg_entry* > * [g_this_send_thread_cnt];
 #if NETWORK_DELAY_TEST
   cl_m_queue = new boost::lockfree::queue<msg_entry* > * [g_this_send_thread_cnt];
+  wait_queue = new boost::lockfree::spsc_queue<msg_entry* > * [g_this_send_thread_cnt];  
 #endif
   for(uint64_t i = 0; i < g_this_send_thread_cnt; i++) {
     m_queue[i] = new boost::lockfree::queue<msg_entry* > (0);
 #if NETWORK_DELAY_TEST
     cl_m_queue[i] = new boost::lockfree::queue<msg_entry* > (0);
+    wait_queue[i] = new boost::lockfree::spsc_queue<msg_entry* > (1024*1024); 
 #endif
   }
   ctr = new  uint64_t * [g_this_send_thread_cnt];
@@ -67,7 +70,8 @@ void MessageQueue::enqueue(uint64_t thd_id, Message * msg,uint64_t dest) {
   // if(thd_id > 3)
   // printf("MQ Enqueue thread id: %ld\n", thd_id);
   //if(thd_id > 3) printf("MQ Enqueue thread id: %ld\n", thd_id);
-  DEBUG("MQ Enqueue %ld\n",dest)
+
+  DEBUG("MQ Enqueue %ld\n",dest);
   assert(dest < g_total_node_cnt);
 #if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
 #else
@@ -79,6 +83,7 @@ void MessageQueue::enqueue(uint64_t thd_id, Message * msg,uint64_t dest) {
   entry->msg = msg;
   entry->dest = dest;
   entry->starttime = get_sys_clock();
+  entry->touchedtime = UINT64_MAX;
   assert(entry->dest < g_total_node_cnt);
   uint64_t mtx_time_start = get_sys_clock();
 #if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
@@ -114,13 +119,25 @@ uint64_t MessageQueue::dequeue(uint64_t thd_id, Message *& msg) {
   bool valid = false;
 #if NETWORK_DELAY_TEST
   valid = cl_m_queue[thd_id%g_this_send_thread_cnt]->pop(entry);
-  if(!valid) {
-    entry = sthd_m_cache[thd_id % g_this_send_thread_cnt];
-    if(entry)
-      valid = true;
-    else
-      valid = m_queue[thd_id%g_this_send_thread_cnt]->pop(entry);
+  if(!valid){
+    //check wait_queue first
+    if(!wait_queue[thd_id%g_this_send_thread_cnt]->empty() && 
+      get_sys_clock() - wait_queue[thd_id%g_this_send_thread_cnt]->front()->touchedtime >= g_network_delay){
+        valid = wait_queue[thd_id%g_this_send_thread_cnt]->pop(entry);
+        assert(valid); 
+    }else{
+      valid = m_queue[thd_id%g_this_send_thread_cnt]->pop(entry);      
+    }
   }
+
+  // valid = cl_m_queue[thd_id%g_this_send_thread_cnt]->pop(entry);
+  // if(!valid) {
+  //   entry = sthd_m_cache[thd_id % g_this_send_thread_cnt];
+  //   if(entry)
+  //     valid = true;
+  //   else
+  //     valid = m_queue[thd_id%g_this_send_thread_cnt]->pop(entry);
+  // }
 #elif WORKLOAD == DA
   valid = m_queue[0]->pop(entry);
 #else
@@ -142,21 +159,43 @@ uint64_t MessageQueue::dequeue(uint64_t thd_id, Message *& msg) {
   uint64_t curr_time = get_sys_clock();
   if(valid) {
     assert(entry);
+    if(entry->touchedtime == UINT64_MAX) entry->touchedtime = get_sys_clock(); //record first touch
 #if NETWORK_DELAY_TEST
-    if(!ISCLIENTN(entry->dest)) {
-      if(ISSERVER && (get_sys_clock() - entry->starttime) < g_network_delay) {
-        sthd_m_cache[thd_id%g_this_send_thread_cnt] = entry;
-        INC_STATS(thd_id,mtx[5],get_sys_clock() - curr_time);
-        return UINT64_MAX;
-      } else {
-        sthd_m_cache[thd_id%g_this_send_thread_cnt] = NULL;
-      }
-      if(ISSERVER) {
-        INC_STATS(thd_id,mtx[38],1);
-        INC_STATS(thd_id,mtx[39],curr_time - entry->starttime);
-      }
-    }
+    if(!ISCLIENTN(entry->dest) && ISSERVER) { //only consider network delay for inter-server message 
+      RemReqType rt = entry->msg->rtype;
+      if(GET_CENTER_ID(entry->dest)!=g_center_id && rt != INIT_DONE &&
+        get_sys_clock() - entry->touchedtime < g_network_delay){
+          if(wait_queue[thd_id%g_this_send_thread_cnt]->push(entry)){
+            return UINT64_MAX;
+          }else{
+            //wait_queue full: wait for front element, then push again
+            msg_entry* entry_to_wait = entry;
 
+            uint64_t starttime = get_sys_clock();
+            while(get_sys_clock() - wait_queue[thd_id%g_this_send_thread_cnt]->front()->touchedtime < g_network_delay){
+            }
+            extra_wait_time += get_sys_clock()-starttime;
+            
+            valid = wait_queue[thd_id%g_this_send_thread_cnt]->pop(entry);
+            assert(valid); 
+            assert(wait_queue[thd_id%g_this_send_thread_cnt]->push(entry_to_wait)); 
+          }
+      }
+    }    
+
+    // if(!ISCLIENTN(entry->dest)) {
+    //   if(ISSERVER && (get_sys_clock() - entry->starttime) < g_network_delay) {
+    //     sthd_m_cache[thd_id%g_this_send_thread_cnt] = entry;
+    //     INC_STATS(thd_id,mtx[5],get_sys_clock() - curr_time);
+    //     return UINT64_MAX;
+    //   } else {
+    //     sthd_m_cache[thd_id%g_this_send_thread_cnt] = NULL;
+    //   }
+    //   if(ISSERVER) {
+    //     INC_STATS(thd_id,mtx[38],1);
+    //     INC_STATS(thd_id,mtx[39],curr_time - entry->starttime);
+    //   }
+    // }
 #endif
     dest = entry->dest;
     assert(dest < g_total_node_cnt);

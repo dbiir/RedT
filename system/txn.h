@@ -207,6 +207,10 @@ public:
 	void            set_start_timestamp(uint64_t start_timestamp);
 	ts_t            get_start_timestamp();
 	uint64_t        get_rsp_cnt() {return rsp_cnt;}
+	uint64_t        get_log_rsp_cnt() {return log_rsp_cnt;}
+	uint64_t        get_log_fin_rsp_cnt() {return log_fin_rsp_cnt;}
+	bool	        get_local_log() {return local_log;}
+	bool			need_finish_log();	
 	uint64_t        incr_rsp(int i);
 	uint64_t        decr_rsp(int i);
 	uint64_t        incr_lr();
@@ -337,6 +341,8 @@ public:
 	bool aborted;
 	uint64_t return_id;
 	RC        validate(yield_func_t &yield, uint64_t cor_id);
+	void log_replica(uint64_t ret_nid, bool finish);
+	uint64_t get_return_node();
 	void            cleanup(yield_func_t &yield, RC rc, uint64_t cor_id);
 	void            cleanup_row(yield_func_t &yield, RC rc,uint64_t rid, vector<vector<uint64_t>>&remote_access, uint64_t cor_id);
 	void release_last_row_lock();
@@ -413,6 +419,8 @@ public:
 	uint64_t get_abort_cnt() {return abort_cnt;}
 	uint64_t abort_cnt;
 	int received_response(RC rc);
+	int received_log_response(RC rc);
+	int received_log_fin_response(RC rc);
 	bool waiting_for_response();
 	RC get_rc() {return txn->rc;}
 	void set_rc(RC rc) {txn->rc = rc;}
@@ -447,6 +455,10 @@ public:
 protected:
 
 	int rsp_cnt;
+	int log_rsp_cnt;
+	int log_fin_rsp_cnt;
+	bool local_log;
+	uint64_t return_node;
 	void            insert_row(row_t * row, table_t * table);
 
 	itemid_t *      index_read(INDEX * index, idx_key_t key, int part_id);

@@ -167,8 +167,12 @@ void * YCSBWorkload::init_table_slice() {
 			key < slice_size * (tid + 1);
 			//key ++
 	) {
-
-		if(GET_NODE_ID(key_to_part(key)) != g_node_id) {
+		int part_id = key_to_part(key); // % g_part_cnt;
+#if USE_REPLICA
+		if(GET_NODE_ID(part_id) != g_node_id && GET_FOLLOWER1_NODE(part_id) != g_node_id && GET_FOLLOWER2_NODE(part_id) != g_node_id) {
+#else
+		if(GET_NODE_ID(part_id) != g_node_id) {
+#endif
 			++key;
 			continue;
 		}
@@ -180,7 +184,6 @@ void * YCSBWorkload::init_table_slice() {
 //		printf("tid=%d. key=%ld\n", tid, key);
 		row_t * new_row = NULL;
 		uint64_t row_id;
-		int part_id = key_to_part(key); // % g_part_cnt;
 		rc = the_table->get_new_row(new_row, part_id, row_id);
 		assert(rc == RCOK);
 //		uint64_t value = rand();
@@ -213,7 +216,11 @@ void * YCSBWorkload::init_table_slice() {
       mem_allocator.free(m_item, sizeof(itemid_t));
     }
 		assert(rc == RCOK);
+#if USE_REPLICA
+        key ++;
+#else
         key += g_part_cnt;
+#endif
 	}
     printf("Thd %d inserted %ld keys\n",tid,key_cnt);
 

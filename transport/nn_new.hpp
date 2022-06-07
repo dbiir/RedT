@@ -71,7 +71,7 @@ namespace nn
 
         inline socket ()
         {
-            // First Step, 7000 will be changed soon
+            // First Step, 7658 will be changed soon
             // In this version, the qp number is only 1
             buffer_counter_s = 0;
             buffer_counter_r = 0;
@@ -80,7 +80,7 @@ namespace nn
 
             FILL(ibv_res);
 
-            m_init_parameter(&ibv_res, 1, 7000, 0xdeadbeaf, M_RC, 1);
+            m_init_parameter(&ibv_res, 1, 7658, 0xdeadbeaf, M_RC, 1);
 
             m_open_device_and_alloc_pd(&ibv_res);
 

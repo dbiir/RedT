@@ -27,7 +27,7 @@
 #define SIT_COROUTINE   3
 #define SIT_DBPA        4
 #define SIT_ALL         5
-#define RDMA_SIT 2
+#define RDMA_SIT SIT_TCP
 #if RDMA_SIT == SIT_TCP
   #define RDMA_ONE_SIDE false
   #define RDMA_TWO_SIDE false
@@ -112,16 +112,17 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
+#define CENTER_CNT 2
 #define NODE_CNT 4
-#define THREAD_CNT 24
+#define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
-#define COROUTINE_CNT 8
+#define COROUTINE_CNT 4
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
 #define CLIENT_NODE_CNT 1
-#define CLIENT_THREAD_CNT 2
+#define CLIENT_THREAD_CNT 4
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
@@ -154,9 +155,9 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 200000
+#define MAX_TXN_IN_FLIGHT 5000
 
-#define SERVER_GENERATE_QUERIES true
+#define SERVER_GENERATE_QUERIES false
 
 /***********************************************/
 // Memory System
@@ -183,7 +184,7 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 7000
+#define TPORT_PORT 7658
 #define TPORT_TWOSIDE_PORT 15000
 #define RDMA_TPORT 9214
 #define SET_AFFINITY true
@@ -193,8 +194,8 @@
 #define HEADER_SIZE sizeof(uint32_t)*2 // in bits
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
-#define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 0UL
+#define NETWORK_DELAY_TEST true
+#define NETWORK_DELAY 50000000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -211,12 +212,15 @@
 //RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_TS1
+#define CC_ALG NO_WAIT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
 
 #define DEBUG_PRINTF  false
+#define USE_REPLICA true
+#define MAJORITY true
+#define INTER_DC_CONTROL true
 
 #if RDMA_ONE_SIDE 
 #define BATCH_INDEX_AND_READ false //keep this "false", a fail test for SILO
@@ -355,16 +359,19 @@
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 41943040
 #define ZIPF_THETA 0.2
-#define TXN_WRITE_PERC 0.2
-#define TUP_WRITE_PERC 0.2
+#define TXN_WRITE_PERC 0.5
+#define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 10
+#define PART_PER_TXN 2
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
 #define STRICT_PPT 1
+//only consider the primary replica here,
+//try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
+#define CROSS_DC_TXN_PERC 1.0
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.

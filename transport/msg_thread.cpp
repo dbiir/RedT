@@ -396,8 +396,8 @@ void MessageThread::run() {
 
   dest_node_id = msg_queue.dequeue(get_thd_id(), msg);
   if(!msg) {
-    check_and_send_batches();
     INC_STATS(_thd_id,mtx[9],get_sys_clock() - starttime);
+    check_and_send_batches();
     return;
   }
   assert(msg);

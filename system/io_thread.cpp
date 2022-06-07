@@ -314,8 +314,9 @@ RC OutputThread::run() {
 		heartbeat();
 		messager->run();
 	}
-
-	printf("FINISH %ld:%ld\n",_node_id,_thd_id);
+	
+	//extra_wait_time should be as small as possible
+	printf("FINISH %ld:%ld, extra wait time: %lu(ns)\n",_node_id,_thd_id,extra_wait_time);
 	fflush(stdout);
 	return FINISH;
 }
