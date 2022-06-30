@@ -389,7 +389,7 @@ public:
 	int write_set[100];
 	std::vector<uint64_t> version_num; 
 #endif
-
+	uint64_t txn_state = 0;// 0 execution, 1, prepare, 2 commit
 	uint64_t twopl_wait_start;
 
 	// For Tictoc
@@ -421,6 +421,8 @@ public:
 	int received_response(RC rc);
 	int received_log_response(RC rc);
 	int received_log_fin_response(RC rc);
+	int received_tapir_response(RC rc, uint64_t return_node_id);
+	int received_tapir_fin_response(RC rc, uint64_t return_node_id);
 	bool waiting_for_response();
 	RC get_rc() {return txn->rc;}
 	void set_rc(RC rc) {txn->rc = rc;}
@@ -458,6 +460,10 @@ protected:
 	int log_rsp_cnt;
 	int log_fin_rsp_cnt;
 	bool local_log;
+#if USE_TAPIR
+	int ir_log_rsp_cnt[NODE_CNT];
+#endif
+	
 	uint64_t return_node;
 	void            insert_row(row_t * row, table_t * table);
 

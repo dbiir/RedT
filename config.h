@@ -63,6 +63,7 @@
 #define CHANGE_TCP_ONLY 0
 #define CHANGE_MSG_QUEUE 1
 
+#define PARAL_SUBTXN true
 #define HIS_CHAIN_NUM 4
 #define USE_CAS
 #define MAX_SEND_SIZE 1
@@ -114,7 +115,7 @@
 /***********************************************/
 #define CENTER_CNT 2
 #define NODE_CNT 4
-#define THREAD_CNT 10
+#define THREAD_CNT 1
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -195,7 +196,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST true
-#define NETWORK_DELAY 50000000UL
+#define NETWORK_DELAY 10000000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -219,6 +220,7 @@
 
 #define DEBUG_PRINTF  false
 #define USE_REPLICA true
+#define USE_TAPIR false
 #define MAJORITY true
 #define INTER_DC_CONTROL true
 
@@ -357,7 +359,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 41943040
+#define SYNTH_TABLE_SIZE 4194304
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5
@@ -371,7 +373,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 1.0
+#define CROSS_DC_TXN_PERC 0.5
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.

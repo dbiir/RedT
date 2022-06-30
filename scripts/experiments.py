@@ -611,8 +611,8 @@ def ycsb_cross_dc():
     load = [5000]
     tcnt = [10]  #THREAD_CNT
     skew = [0.2]
-    # cross_dc_perc = [0] 
-    cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+    cross_dc_perc = [0.5] 
+    # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
 
 
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CROSS_DC_TXN_PERC"]
@@ -1424,7 +1424,7 @@ configs = {
     "PART_CNT": "NODE_CNT",
     "PART_PER_TXN": 2,
     "MAX_TXN_IN_FLIGHT": 10000,
-    "NETWORK_DELAY": '50000000UL',
+    "NETWORK_DELAY": '10000000UL',
     "COROUTINE_CNT": 4,
     "ONLY_ONE_HOME": 'false',
     "NETWORK_DELAY_TEST": 'true',

@@ -92,7 +92,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
             rc = Abort;
       DEBUG("abort %ld,%ld %ld %lx\n", txn->get_txn_id(), txn->get_batch_id(),
             _row->get_primary_key(), (uint64_t)_row);
-      //printf("abort %ld %ld %lx\n",txn->get_txn_id(),_row->get_primary_key(),(uint64_t)_row);
+    //   printf("abort %ld %ld %lx\n",txn->get_txn_id(),_row->get_primary_key(),(uint64_t)_row);
             goto final;
         } 
         else if (CC_ALG == WAIT_DIE) {

@@ -89,11 +89,14 @@ private:
   bool is_done() ;
   bool is_local_request(uint64_t idx) ;
   RC send_remote_request() ;
+  RC send_remote_subtxn();
 
   row_t * row;
 	YCSBWorkload * _wl;
 	YCSBRemTxnType state;
   uint64_t next_record_id;
+  uint64_t remote_next_node_id;
+  vector<vector<uint64_t>> remote_node{g_node_cnt};
 };
 
 #endif

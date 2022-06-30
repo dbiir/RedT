@@ -63,6 +63,10 @@ void YCSBTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 void YCSBTxnManager::reset() {
   state = YCSB_0;
   next_record_id = 0;
+  remote_next_node_id = 0;
+  for(int i = 0; i < g_node_cnt; i++) {
+	remote_node[i].clear();
+  }
   TxnManager::reset();
 }
 
@@ -106,6 +110,45 @@ RC YCSBTxnManager::acquire_locks() {
   return rc;
 }
 
+RC YCSBTxnManager::send_remote_subtxn() {
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	RC rc = RCOK;
+	
+	bool is_primary[g_node_cnt]; //is center_master has primary replica or not
+	for(int i = 0; i < ycsb_query->requests.size(); i++) {
+		// next_record_id++;
+		ycsb_request * req = ycsb_query->requests[i];
+		uint64_t part_id = _wl->key_to_part(req->key);
+		vector<uint64_t> node_id;
+#if USE_REPLICA
+		node_id.push_back(GET_NODE_ID(part_id));
+		node_id.push_back(GET_FOLLOWER1_NODE(part_id));
+		node_id.push_back(GET_FOLLOWER2_NODE(part_id));
+#else
+		node_id.push_back(GET_NODE_ID(part_id));		
+#endif
+		
+			uint64_t n_id = GET_NODE_ID(part_id);
+			remote_node[n_id].push_back(i);
+			// ycsb_query->centers_touched.add_unique(center_id);
+			ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,n_id));
+			//center_master is set as the first toughed primary, if not exist, use the first toughed backup.
+			// auto ret = center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id[j]));
+		
+	}
+	rsp_cnt = query->partitions_touched.size() - 1;
+	for(int i = 0; i < g_node_cnt; i++) {
+		if(i != g_node_id && remote_node[i].size() > 0) {//send message to all masters
+			remote_next_node_id = i;
+			// printf("%d \n",remote_node[i].size());
+			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
+			// printf("send subtxn to %d\n", i);
+		}
+	}
+	// printf("txn %d send subtxn success \n", get_txn_id());
+	return rc;
+}
+
 RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
@@ -118,6 +161,9 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 		//query->print();
 		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
+#if PARAL_SUBTXN
+		rc = send_remote_subtxn();
+#endif
 	}
 	
 	uint64_t starttime = get_sys_clock();
@@ -167,6 +213,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time_short += curr_time - starttime;
 	txn_stats.wait_starttime = get_sys_clock();
 //RDMA_SILO:logic?
+#if !PARAL_SUBTXN
 	if(IS_LOCAL(get_txn_id())) {  //for one-side rdma, must be local
 		if(is_done() && rc == RCOK) {
 			// printf("a txn is done\n");
@@ -180,6 +227,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	} else if(rc == Abort){
 		rc = abort(yield, cor_id);
 	}
+#endif
   return rc;
 }
 
@@ -304,6 +352,16 @@ RC YCSBTxnManager::send_remote_request() {
 void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	//msg->requests.init(ycsb_query->requests.size());
+#if PARAL_SUBTXN == true
+	uint64_t remote_node_id = remote_next_node_id;
+	uint64_t record_id = remote_node[remote_node_id][0];
+	uint64_t index = 0;
+	while(index < remote_node[remote_node_id].size()) {
+		YCSBQuery::copy_request_to_msg(ycsb_query,msg,record_id);
+		index++;
+		record_id = remote_node[remote_node_id][index];
+	}
+#else
 	uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
 	#if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
 	while (next_record_id < ycsb_query->requests.size() && GET_NODE_ID(ycsb_query->requests[next_record_id]->key) == dest_node_id) {
@@ -315,6 +373,7 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 			ycsb_query->partitions_modified.add_unique(_wl->key_to_part(ycsb_query->requests[next_record_id]->key));
 		YCSBQuery::copy_request_to_msg(ycsb_query,msg,next_record_id++);
 	}
+#endif
 }
 
 
@@ -342,7 +401,11 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			// printf("%ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
 			rc = send_remote_one_side_request(yield, req, row, cor_id);
 		} else {
+#if PARAL_SUBTXN == true
+			rc = RCOK;
+#else
 			rc = send_remote_request();
+#endif
 		}
 #if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
 		}
