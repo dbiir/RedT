@@ -1157,12 +1157,13 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
   DEBUG("RQRY_RSP %ld\n",msg->get_txn_id());
   assert(IS_LOCAL(msg->get_txn_id()));
 #if PARAL_SUBTXN == true
-
+  if(((QueryResponseMessage*)msg)->rc == Abort) {
+    txn_man->start_abort(yield, cor_id);
+    return Abort;
+  }
   int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
   assert(responses_left >=0);
   if (responses_left > 0) return WAIT;
-
-#else
 #endif
   txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
   
@@ -1178,10 +1179,10 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
                             txn_man->_min_commit_ts : qmsg->_min_commit_ts;
 #endif
   txn_man->send_RQRY_RSP = false;
-  RC rc = RCOK;
+  RC rc = ((QueryResponseMessage*)msg)->rc;
 #if PARAL_SUBTXN
 	if(IS_LOCAL(txn_man->get_txn_id())) {  //for one-side rdma, must be local
-		if(rc == RCOK) {
+		if(rc == RCOK && !txn_man->aborted) {
 			// printf("a txn is done\n");
 #if CC_ALG == WOUND_WAIT
       		txn_state = STARTCOMMIT;

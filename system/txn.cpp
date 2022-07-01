@@ -554,6 +554,9 @@ bool TxnManager::need_finish_log(){
 }
 
 RC TxnManager::commit(yield_func_t &yield, uint64_t cor_id) {
+// #if PARAL_SUBTXN
+// 	if(aborted) return Abort;
+// #endif
 	assert(!aborted);
 	DEBUG("Commit %ld\n",get_txn_id());
 #if CC_ALG == WOUND_WAIT

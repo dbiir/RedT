@@ -115,7 +115,7 @@
 /***********************************************/
 #define CENTER_CNT 2
 #define NODE_CNT 4
-#define THREAD_CNT 1
+#define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -156,7 +156,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 5000
+#define MAX_TXN_IN_FLIGHT 20000
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -196,7 +196,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST true
-#define NETWORK_DELAY 10000000UL
+#define NETWORK_DELAY 1000000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -359,7 +359,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 4194304
+#define SYNTH_TABLE_SIZE 41943040
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5

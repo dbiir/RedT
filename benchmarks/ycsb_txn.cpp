@@ -213,7 +213,10 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time_short += curr_time - starttime;
 	txn_stats.wait_starttime = get_sys_clock();
 //RDMA_SILO:logic?
-#if !PARAL_SUBTXN
+// #if !PARAL_SUBTXN
+	if(rsp_cnt > 0) {
+		return WAIT;
+	}
 	if(IS_LOCAL(get_txn_id())) {  //for one-side rdma, must be local
 		if(is_done() && rc == RCOK) {
 			// printf("a txn is done\n");
@@ -227,7 +230,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	} else if(rc == Abort){
 		rc = abort(yield, cor_id);
 	}
-#endif
+// #endif
   return rc;
 }
 
@@ -243,7 +246,11 @@ RC YCSBTxnManager::run_txn_post_wait() {
 }
 
 bool YCSBTxnManager::is_done() { 
+// #if PARAL_SUBTXN
+// 	return (next_record_id >= ((YCSBQuery*)query)->requests.size() && rsp_cnt == 0);
+// #else
 	return next_record_id >= ((YCSBQuery*)query)->requests.size();
+// #endif
 }
 
 void YCSBTxnManager::next_ycsb_state() {
