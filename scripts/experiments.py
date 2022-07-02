@@ -608,7 +608,7 @@ def ycsb_cross_dc():
     base_table_size=1048576*10
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
-    load = [20000]
+    load = [5000]
     tcnt = [10]  #THREAD_CNT
     skew = [0.2]
     cross_dc_perc = [0.5] 

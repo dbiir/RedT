@@ -738,8 +738,8 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	if(rsp_cnt != 0 || log_rsp_cnt!=0){
 		return WAIT_REM;
 	}
-	// assert(query->readonly());
-	// assert(query->partitions_modified.size() == 0);	
+	assert(query->readonly());
+	assert(query->partitions_modified.size() == 0);	
 #else
 	// printf("%d query_partitions_modified size: %d\n", get_txn_id(), query->partitions_modified.size());
 	if(query->partitions_modified.size() != 0)

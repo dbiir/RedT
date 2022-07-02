@@ -1191,7 +1191,7 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
 		}
 		else if(rc == Abort)
 		rc = txn_man->start_abort(yield, cor_id);
-	} else if(rc == Abort){
+  } else if(rc == Abort){
 		rc = txn_man->abort(yield, cor_id);
 	}
 #else

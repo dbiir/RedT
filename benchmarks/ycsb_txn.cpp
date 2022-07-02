@@ -134,6 +134,8 @@ RC YCSBTxnManager::send_remote_subtxn() {
 			ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,n_id));
 			//center_master is set as the first toughed primary, if not exist, use the first toughed backup.
 			// auto ret = center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id[j]));
+			if( req->acctype == WR)
+			ycsb_query->partitions_modified.add_unique(_wl->key_to_part(ycsb_query->requests[next_record_id]->key));
 		
 	}
 	rsp_cnt = query->partitions_touched.size() - 1;
@@ -214,6 +216,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.wait_starttime = get_sys_clock();
 //RDMA_SILO:logic?
 // #if !PARAL_SUBTXN
+	// rsp_cnt --;
 	if(rsp_cnt > 0) {
 		return WAIT;
 	}
