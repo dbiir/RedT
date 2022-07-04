@@ -72,6 +72,11 @@ do
             shift
             shift
             ;;
+        -dc)
+            CROSSDCPERC=($(echo $2 | tr ',' ' '))
+            shift
+            shift
+            ;;
         -t)
             RESULT_PATH=../results/$2
             shift
@@ -158,6 +163,9 @@ ArgsType() {
     if [[ "${TEST_TYPE}" == 'ycsb_skew' ]]
     then
         args=("${SKEW[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_cross_dc' ]]
+    then
+        args=("${CROSSDCPERC[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_scaling' ]]
     then
         args=("${NUMBEROFNODE[@]}")
@@ -192,6 +200,9 @@ FileName() {
     if [[ "${TEST_TYPE}" == 'ycsb_skew' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _SKEW-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_cross_dc' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_scaling' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${arg}_ | grep ^${i}_)

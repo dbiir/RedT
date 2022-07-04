@@ -210,6 +210,22 @@ def ycsb_scaling_abort():
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,'true'] for thr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
     return fmt,exp
 
+def ycsb_cross_dc():
+    wl = 'YCSB'
+    nnodes = [4]
+    algos=['RDMA_NO_WAIT']
+    base_table_size=1048576
+    txn_write_perc = [0.5]
+    tup_write_perc = [0.5]
+    load = [20000]
+    tcnt = [4]  #THREAD_CNT
+    skew = [0.2]
+    cross_dc_perc = [0.66,1] 
+    # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CROSS_DC_TXN_PERC"]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,cro_dc_perc] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc)]
+    return fmt,exp
 
 def ycsb_skew():
     wl = 'YCSB'
@@ -866,6 +882,7 @@ experiment_map = {
     'ppr_ycsb_scaling_abort_plot': ppr_ycsb_scaling_abort_plot,
     'ycsb_writes': ycsb_writes,
     'ycsb_skew': ycsb_skew,
+    'ycsb_cross_dc': ycsb_cross_dc,
     'ycsb_skew1': ycsb_skew1,
     'isolation_levels': isolation_levels,
     'ycsb_partitions': ycsb_partitions,
@@ -930,7 +947,7 @@ configs = {
     "TPORT_TYPE":"IPC",
     "TPORT_PORT":"18000",
     "PART_CNT": "NODE_CNT",
-    "PART_PER_TXN": 3,
+    "PART_PER_TXN": 2,
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '50000000UL',
     "NETWORK_DELAY_TEST": 'true',

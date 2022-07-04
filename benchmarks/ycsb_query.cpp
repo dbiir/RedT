@@ -307,6 +307,14 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 
 	double r_twr = (double)(mrand->next() % 10000) / 10000;
 
+#if INTER_DC_CONTROL
+	bool cross_dc_txn = false;
+	double cc = (double)(mrand->next() % 10000) / 10000;
+	if(cc < g_cross_dc_txn_perc){
+		cross_dc_txn = true;
+	}
+	bool has_cross_dc_part = false; //not used when cross_dc_txn = false
+#endif
 	int rid = 0;
 	for (UInt32 i = 0; i < g_req_per_query; i ++) {
 		double r = (double)(mrand->next() % 10000) / 10000;
@@ -320,22 +328,70 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 #else
 	#ifdef NO_REMOTE
 		partition_id = home_partition_id;
-	#else
-		if ( FIRST_PART_LOCAL && rid == 0) {
+	#elif ONLY_ONE_HOME
+		if ( (FIRST_PART_LOCAL && rid == 0) || g_node_cnt == 1 ) {
 			partition_id = home_partition_id;
 		} else {
 			partition_id = mrand->next() % g_part_cnt;
-			if(g_strict_ppt && g_part_per_txn <= g_part_cnt) {
+			if(g_strict_ppt && g_part_per_txn <= g_part_cnt || partition_id == home_partition_id) {
 				while ((partitions_accessed.size() < g_part_per_txn &&
 								partitions_accessed.count(partition_id) > 0) ||
 							 (partitions_accessed.size() == g_part_per_txn &&
-								partitions_accessed.count(partition_id) == 0)) {
+								partitions_accessed.count(partition_id) == 0) || partition_id == home_partition_id) {
 					partition_id = mrand->next() % g_part_cnt;
 				}
 			}
 		}
-	#endif
+	#else
+		if ( (FIRST_PART_LOCAL && rid == 0) || g_node_cnt == 1 ) {
+			partition_id = home_partition_id;
+		} else {
+			partition_id = mrand->next() % g_part_cnt;
+			if(g_strict_ppt && g_part_per_txn <= g_part_cnt) {
+
+#if INTER_DC_CONTROL
+				while ((partitions_accessed.size() < g_part_per_txn &&
+								partitions_accessed.count(partition_id) > 0)||
+					   (partitions_accessed.size() == g_part_per_txn &&
+								partitions_accessed.count(partition_id) == 0)||
+					   (!cross_dc_txn && 
+								GET_CENTER_ID(GET_NODE_ID(partition_id)) != GET_CENTER_ID(GET_NODE_ID(home_partition_id)))||
+					   (cross_dc_txn && !has_cross_dc_part &&
+								GET_CENTER_ID(GET_NODE_ID(partition_id)) == GET_CENTER_ID(GET_NODE_ID(home_partition_id)))) {
+					partition_id = mrand->next() % g_part_cnt;
+				}
+#else 
+				while ((partitions_accessed.size() < g_part_per_txn &&
+								partitions_accessed.count(partition_id) > 0) ||
+					    (partitions_accessed.size() == g_part_per_txn &&
+								partitions_accessed.count(partition_id) == 0)) {
+					partition_id = mrand->next() % g_part_cnt;
+				}
 #endif
+			}
+		}
+	#endif
+		// if ( (FIRST_PART_LOCAL && rid == 0) || g_node_cnt == 1 ) {
+		// 	partition_id = home_partition_id;
+		// } else {
+		// 	partition_id = mrand->next() % g_part_cnt;
+		// 	if(g_strict_ppt && g_part_per_txn <= g_part_cnt || partition_id == home_partition_id) {
+		// 		while ((partitions_accessed.size() < g_part_per_txn &&
+		// 						partitions_accessed.count(partition_id) > 0) ||
+		// 					 (partitions_accessed.size() == g_part_per_txn &&
+		// 						partitions_accessed.count(partition_id) == 0) || partition_id == home_partition_id) {
+		// 			partition_id = mrand->next() % g_part_cnt;
+		// 		}
+		// 	}
+		// }
+	// #endif
+#endif
+#if INTER_DC_CONTROL
+		if(cross_dc_txn && !has_cross_dc_part && GET_CENTER_ID(GET_NODE_ID(partition_id)) != GET_CENTER_ID(GET_NODE_ID(home_partition_id))){
+			has_cross_dc_part = true;
+		}
+#endif
+
 		ycsb_request * req = (ycsb_request*) mem_allocator.alloc(sizeof(ycsb_request));
 		if (r_twr < g_txn_read_perc || r < g_tup_read_perc)
 			req->acctype = RD;

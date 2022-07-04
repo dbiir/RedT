@@ -373,6 +373,7 @@ extern UInt32 g_field_per_tuple;
 extern UInt32 g_init_parallelism;
 extern double g_mpr;
 extern double g_mpitem;
+extern double g_cross_dc_txn_perc;
 
 // TPCC
 extern UInt32 g_num_wh;
