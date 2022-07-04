@@ -1,7 +1,7 @@
 RDMA_NO_WAIT 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
-183.508061
+163.488494
 0.0
-590148.279663
-20840.64648
-477763.88092
+323685.430556
+287798.114122
+37388.029741

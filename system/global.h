@@ -585,3 +585,5 @@ extern int max_batch_num;
 
 extern uint64_t log_head[NODE_CNT];
 extern pthread_mutex_t * LOG_HEAD_LATCH[NODE_CNT];
+
+extern uint64_t extra_wait_time;

@@ -1670,12 +1670,35 @@ RC AsyncRedoThread::run() {
       redo_log_buf.set_head(cleaned_head);
     }
     if(ch < ct){
+#if THOMAS_WRITE
+      for(uint64_t i=ch;i<ct;i++){ 
+        LogEntry* cur_entry = redo_log_buf.get_entry(i % buf_size);
+        if(cur_entry->state == LE_ABORTED){
+          cur_entry->set_flushed();
+        }else if(cur_entry->state == LE_COMMITTED){
+          for(i=0;i<cur_entry->change_cnt;i++){
+            if(cur_entry->change[i].is_primary) continue;
+            IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[i].index_key) * sizeof(IndexInfo));
+            row_t * tar_row = idx_info->address;
+            uint64_t tar_wts= *(uint64_t*)(tar_row + sizeof(tar_row->_tid_word));
+            if(cur_entry->c_ts > tar_wts){ //update data and cts
+              memcpy((char *)tar_row,cur_entry->change[i].content,cur_entry->change[i].size);
+              tar_row->wts = cur_entry->c_ts;
+            }else {
+              //do nothing 
+            }
+          }
+          cur_entry->set_flushed();
+        }else continue;
+      }
+#else
       //scan from head to tail, get committed_entries, logged_entries and ikey_to_cts
       LogEntry* committed_entries[ct-ch];
       LogEntry* logged_entries[ct-ch];
       uint64_t c_size = 0;
       uint64_t l_size = 0;
       unordered_map<uint64_t,uint64_t> ikey_to_cts; //index key of changies in COMMITTED entries to max cts
+
       for(uint64_t i=ch;i<ct;i++){ 
         LogEntry* cur_entry = redo_log_buf.get_entry(i % buf_size);
         entry_status cur_state = cur_entry->state;
@@ -1743,7 +1766,7 @@ RC AsyncRedoThread::run() {
         }
       }
 
-      //apply applyList and reset LogEntries afterwards
+      //apply committed_entries and reset LogEntries afterwards
       for(int j=0;j<c_size;j++){
         LogEntry* entry_to_apply = committed_entries[j];
         for(int i=0;i<entry_to_apply->change_cnt;i++){
@@ -1754,7 +1777,8 @@ RC AsyncRedoThread::run() {
         }
         entry_to_apply->set_flushed();
       }
-      
+#endif
+
       //move head as far as able to
       for(int i=ch;i<ct;i++){
         LogEntry* cur_entry = redo_log_buf.get_entry(i % buf_size);
@@ -1762,7 +1786,7 @@ RC AsyncRedoThread::run() {
           cur_entry->reset();
           redo_log_buf.set_head(*(redo_log_buf.get_head())+1);
         }else break;
-      }
+      }     
     }
   }
 

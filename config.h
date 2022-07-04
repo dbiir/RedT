@@ -33,6 +33,7 @@
 #define CENTER_MASTER true  //hg-network without replica stage 2
 #define PARAL_SUBTXN true  //hg-network without replica stage 3
 #define USE_REPLICA true
+#define THOMAS_WRITE false  //if false, wait and sort
 
 #if USE_REPLICA
 #define ASYNC_REDO_THREAD_CNT 1
@@ -156,8 +157,8 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 7008
-#define TPORT_TWOSIDE_PORT 13000
+#define TPORT_PORT 7500
+#define TPORT_TWOSIDE_PORT 7779
 #define SET_AFFINITY true
 
 #define MAX_TPORT_NAME 128
@@ -165,8 +166,8 @@
 #define HEADER_SIZE sizeof(uint32_t)*2 // in bits
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
-#define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 0UL
+#define NETWORK_DELAY_TEST true
+#define NETWORK_DELAY 50000000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -317,7 +318,7 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 8
 #define SYNTH_TABLE_SIZE 4194304
-#define ZIPF_THETA 0.8
+#define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0

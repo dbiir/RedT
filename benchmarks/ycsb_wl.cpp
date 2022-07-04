@@ -170,7 +170,7 @@ void * YCSBWorkload::init_table_slice() {
 #if USE_REPLICA
 		if(GET_NODE_ID(part_id) != g_node_id && GET_FOLLOWER1_NODE(part_id) != g_node_id && GET_FOLLOWER2_NODE(part_id) != g_node_id) {
 #else
-		if(GET_NODE_ID(key_to_part(key)) != g_node_id) {
+		if(GET_NODE_ID(part_id) != g_node_id) {
 #endif
 			++key;
 			continue;

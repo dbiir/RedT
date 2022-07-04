@@ -86,6 +86,7 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 	_tid_word = 0;
+	wts = 0;
 #endif
 #if CC_ALG == RDMA_WOUND_WAIT2
 	_tid_word = 0;

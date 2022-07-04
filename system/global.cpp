@@ -431,3 +431,5 @@ int max_batch_num = REQ_PER_QUERY;
 //actually, only remote one is used. (i!=g_node_id)
 uint64_t log_head[NODE_CNT] = {0};
 pthread_mutex_t * LOG_HEAD_LATCH[NODE_CNT];
+
+uint64_t extra_wait_time = 0;
