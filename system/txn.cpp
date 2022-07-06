@@ -417,6 +417,9 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	txn_ready = true;
 	twopl_wait_start = 0;
 	txn_stats.init();
+	finish_logging = false;
+	is_primary[CENTER_CNT] = {false}; 
+	rsp_cnt = 0;
 }
 
 // reset after abort
@@ -432,6 +435,8 @@ void TxnManager::reset() {
 	aborted = false;
 	return_id = UINT64_MAX;
 	twopl_wait_start = 0;
+	finish_logging = false;
+	is_primary[CENTER_CNT] = {false};
 
 	//ready = true;
 
@@ -784,7 +789,13 @@ void TxnManager::send_prepare_messages() {
 
 void TxnManager::send_finish_messages() {
 #if CENTER_MASTER == true
-	rsp_cnt = query->centers_touched.size() - 1;	
+	rsp_cnt = 0;
+	for(int i=0;i<query->centers_touched.size();i++){
+		if(is_primary[query->centers_touched[i]]) ++rsp_cnt;
+	}
+	--rsp_cnt; //exclude this center
+	// rsp_cnt = query->centers_touched.size() - 1;	
+
 	assert(IS_LOCAL(get_txn_id()));
 	DEBUG("%ld Send FINISH messages to %d\n",get_txn_id(),rsp_cnt);
 	for(uint64_t i = 0; i < query->centers_touched.size(); i++) {
@@ -824,6 +835,7 @@ int TxnManager::received_response(RC rc) {
 #else
   if (rsp_cnt > 0)
 	  --rsp_cnt;
+  else return -1;
 #endif
 	return rsp_cnt;
 }
@@ -2279,7 +2291,11 @@ bool TxnManager::loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint
 
 #if USE_REPLICA
 RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
-	if(CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT) assert(status == RCOK);
+	if(CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT){
+		assert(status != Abort);
+		status = RCOK;		
+	}
+	
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	RC rc = RCOK;
 	ts_t ts = get_sys_clock(); //for RDMA_SILO, which is problematic

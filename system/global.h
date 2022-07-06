@@ -576,8 +576,6 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 #define UINT64_MAX 		18446744073709551615UL
 #endif // UINT64_MAX
 
-#endif
-
 extern int total_num_atomic_retry;  
 extern int max_num_atomic_retry;
 
@@ -588,3 +586,5 @@ extern uint64_t log_head[NODE_CNT];
 extern pthread_mutex_t * LOG_HEAD_LATCH[NODE_CNT];
 
 extern uint64_t extra_wait_time;
+
+#endif

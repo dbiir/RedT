@@ -290,6 +290,8 @@ bool rdma_one_side() {
 	int volatile    ready_part;
 	int volatile    ready_ulk;
 	std::map<uint64_t, uint64_t> center_master;
+	bool is_primary[CENTER_CNT]; //is center_master has primary replica or not
+
 #if CC_ALG == SILO
 	ts_t 			last_tid;
     ts_t            max_tid;
@@ -425,6 +427,8 @@ bool rdma_one_side() {
 	bool unset_ready() {return ATOM_CAS(txn_ready,1,0);}
 	bool is_ready() {return txn_ready == true;}
 	volatile int txn_ready;
+	volatile bool finish_logging;
+
 	// Calvin
 	uint32_t lock_ready_cnt;
 	uint32_t calvin_expected_rsp_cnt;

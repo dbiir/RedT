@@ -437,7 +437,7 @@ void WorkerThread::commit() {
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,CL_RSP),txn_man->client_id);
 #endif
 #endif
-  // remove txn from pool
+  // remove txn from pool  
   release_txn_man();
   // Do not use txn_man after this
 }
@@ -750,6 +750,11 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
     if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O) || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) {
       txn_man = get_transaction_manager(msg);
+      // if(!txn_man){
+      //   assert(msg->rtype == RACK_PREP || msg->rtype == RACK_FIN);
+      //   printf("---\n");
+      //   continue; // in majority, txn_man may has been destroyed when receive msgs
+      // } 
 
       if ((CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) && IS_LOCAL(txn_man->get_txn_id())) {
         if (msg->rtype != RTXN_CONT &&
@@ -787,7 +792,10 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
 
       ready_starttime = get_sys_clock();
-      bool ready = txn_man->unset_ready();
+      bool ready;
+      if(msg->rtype == RFIN && !txn_man->finish_logging) ready = false;
+      else ready = txn_man->unset_ready(); 
+      
       INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
       if(!ready) {
         // Return to work queue, end processing
@@ -818,7 +826,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 #endif
     INC_STATS(get_thd_id(),worker_release_msg_time,get_sys_clock() - ready_starttime);
 	}
-  printf("FINISH %ld:%ld\n",_node_id,_thd_id);
+	printf("FINISH %ld:%ld, extra wait time: %lu(ns)\n",_node_id,_thd_id,extra_wait_time);
   fflush(stdout);
   return FINISH;
 }
@@ -868,8 +876,14 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   DEBUG("RPREP_ACK %ld\n",msg->get_txn_id());
 
   RC rc = RCOK;
-
-  int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+  int responses_left;
+  if(txn_man->is_primary[GET_CENTER_ID(msg->return_node_id)]){
+    responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+    if(responses_left<0) return RCOK;
+  }else{
+      return RCOK; //do nothing
+  }
+  
   assert(responses_left >=0);
 #if CC_ALG == MAAT
   // Integrate bounds
@@ -969,10 +983,16 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 
 RC WorkerThread::process_rack_rfin(Message * msg) {
   DEBUG("RFIN_ACK %ld\n",msg->get_txn_id());
-
   RC rc = RCOK;
 
-  int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+  int responses_left;
+  if(txn_man->is_primary[GET_CENTER_ID(msg->return_node_id)]){
+    responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+    if(responses_left<0) return RCOK;
+  }else{
+      return RCOK; //do nothing
+  }
+
   assert(responses_left >=0);
   if (responses_left > 0) return WAIT;
 
@@ -1012,7 +1032,7 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
   return rc;
 }
 
-RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_id) { 
   DEBUG("RQRY %ld\n",msg->get_txn_id());
 #if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
 #else
@@ -1074,6 +1094,7 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 #elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
 #if USE_REPLICA
     if(rc != Abort) assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
+    txn_man->finish_logging = true;
 #endif
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
 #endif
@@ -1471,6 +1492,30 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   } else {
     rc = txn_man->run_txn(yield, cor_id);
   }
+
+#if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT)
+	if(txn_man->get_rsp_cnt() == 0){
+		assert(IS_LOCAL(txn_man->get_txn_id()));
+    if(txn_man->get_rc() != Abort) {
+      assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
+    }
+
+    //commit phase: now commit or abort
+    txn_man->set_commit_timestamp(get_next_ts());
+    txn_man->send_finish_messages();
+    assert(txn_man->get_rsp_cnt() == 0);
+
+    if(rc == Abort) {
+      txn_man->abort(yield, cor_id);
+      abort();
+    } else {
+      txn_man->commit(yield, cor_id);
+      commit();
+    }
+    return rc;
+	}
+#endif	
+
   check_if_done(rc);
   #endif
   return rc;
@@ -1792,7 +1837,6 @@ RC AsyncRedoThread::run() {
 
   uint64_t total_time = get_sys_clock() - start_time;
 
-  // assert(false);
   printf("FINISH %ld:%ld, final head: %ld, final tail: %ld, spend %lf time on waiting\n",_node_id,_thd_id,*(redo_log_buf.get_head()),*(redo_log_buf.get_tail()), (double)wait_time/(double)total_time);
   for(int i=0;i<g_node_cnt;i++){
     if(i!=g_node_id) printf("log_head[%d]: %lu \n", i, log_head[i]);

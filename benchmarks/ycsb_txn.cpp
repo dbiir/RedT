@@ -158,23 +158,6 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time += curr_time - starttime;
 	txn_stats.process_time_short += curr_time - starttime;
 	txn_stats.wait_starttime = get_sys_clock();
-
-#if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT)
-	if(query->centers_touched.size() == 1 && rc == RCOK){
-		assert(false); //for current workload, transactions are always multi-center.
-		assert(IS_LOCAL(get_txn_id()));
-		set_commit_timestamp(glob_manager.get_ts(get_thd_id()));
-		assert(redo_log(yield,rc,cor_id) == RCOK);
-		rc = commit(yield, cor_id);
-		return rc;
-	}
-	// if(rc == Abort){ //multi-center txn 
-	// 	txn->rc = rc;
-	// 	return rc;
-	// }	
-#endif	
-
-
 	if(IS_LOCAL(get_txn_id())) {  
 		if(is_done() && rc == RCOK) {
 			// printf("a txn is done\n");
@@ -1359,7 +1342,6 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	RC rc = RCOK;
 	
-	bool is_primary[g_center_cnt]; //is center_master has primary replica or not
 	for(int i = 0; i < ycsb_query->requests.size(); i++) {
 		ycsb_request * req = ycsb_query->requests[i];
 		uint64_t part_id = _wl->key_to_part(req->key);
@@ -1388,7 +1370,13 @@ RC YCSBTxnManager::send_remote_subtxn() {
 			}
 		}
 	}
-	rsp_cnt = query->centers_touched.size() - 1;
+	rsp_cnt = 0;
+	for(int i=0;i<query->centers_touched.size();i++){
+		if(is_primary[query->centers_touched[i]]) ++rsp_cnt;
+	}
+	--rsp_cnt; //exclude this center
+	// rsp_cnt = query->centers_touched.size() - 1;
+
 	for(int i = 0; i < g_center_cnt; i++) {
 		if(remote_center[i].size() > 0 && i != g_center_id) {//send message to all masters
 			remote_next_center_id = i;
