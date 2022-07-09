@@ -1721,13 +1721,13 @@ RC AsyncRedoThread::run() {
         if(cur_entry->state == LE_ABORTED){
           cur_entry->set_flushed();
         }else if(cur_entry->state == LE_COMMITTED){
-          for(i=0;i<cur_entry->change_cnt;i++){
-            if(cur_entry->change[i].is_primary) continue;
-            IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[i].index_key) * sizeof(IndexInfo));
+          for(int j=0;j<cur_entry->change_cnt;j++){
+            if(cur_entry->change[j].is_primary) continue;
+            IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[j].index_key) * sizeof(IndexInfo));
             row_t * tar_row = idx_info->address;
             uint64_t tar_wts= *(uint64_t*)(tar_row + sizeof(tar_row->_tid_word));
             if(cur_entry->c_ts > tar_wts){ //update data and cts
-              memcpy((char *)tar_row,cur_entry->change[i].content,cur_entry->change[i].size);
+              memcpy((char *)tar_row,cur_entry->change[j].content,cur_entry->change[j].size);
               tar_row->wts = cur_entry->c_ts;
             }else {
               //do nothing 
