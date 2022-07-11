@@ -1706,6 +1706,7 @@ RC AsyncRedoThread::run() {
     uint64_t ch = *(redo_log_buf.get_head());
     uint64_t ct = *(redo_log_buf.get_tail());
     uint64_t buf_size = redo_log_buf.get_size();
+    if(ct-ch> buf_size) ct = ch+buf_size;
     if(ct > ULONG_MAX-100000){ //clear head and tail to prevent ct bigger than ULONG_MAX
       assert(false); //no need to clean, uint64_t is big enough for experiment purpose
       int max_to_subtract = min(ch/buf_size,ct/buf_size);
@@ -1721,13 +1722,13 @@ RC AsyncRedoThread::run() {
         if(cur_entry->state == LE_ABORTED){
           cur_entry->set_flushed();
         }else if(cur_entry->state == LE_COMMITTED){
-          for(i=0;i<cur_entry->change_cnt;i++){
-            if(cur_entry->change[i].is_primary) continue;
-            IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[i].index_key) * sizeof(IndexInfo));
+          for(int j=0;j<cur_entry->change_cnt;j++){
+            if(cur_entry->change[j].is_primary) continue;
+            IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[j].index_key) * sizeof(IndexInfo));
             row_t * tar_row = idx_info->address;
             uint64_t tar_wts= *(uint64_t*)(tar_row + sizeof(tar_row->_tid_word));
             if(cur_entry->c_ts > tar_wts){ //update data and cts
-              memcpy((char *)tar_row,cur_entry->change[i].content,cur_entry->change[i].size);
+              memcpy((char *)tar_row,cur_entry->change[j].content,cur_entry->change[j].size);
               tar_row->wts = cur_entry->c_ts;
             }else {
               //do nothing 

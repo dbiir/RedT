@@ -394,6 +394,7 @@ void TPCCTxnManager::copy_remote_items(TPCCQueryMessage * msg) {
 		msg->items.add(req);
 	}
 }
+
 itemid_t* TPCCTxnManager::tpcc_read_remote_index(TPCCQuery * query) {
     TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	uint64_t w_id = tpcc_query->w_id;

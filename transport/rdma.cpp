@@ -89,8 +89,8 @@ uint64_t get_rm_id(uint64_t node_id,uint64_t thread_id){
 
 uint64_t Rdma::get_port(uint64_t node_id){
   uint64_t port_id = 0;
-  port_id = 7650 + node_id;
-  //port_id = TPORT_PORT + 344 + node_id;
+//   port_id = 7050 + node_id;
+  port_id = TPORT_PORT + 344 + node_id;
   return port_id ;
 }
 

@@ -598,9 +598,9 @@ void * TPCCWorkload::threadInitWh(void * This) {
 void * TPCCWorkload::threadInitDist(void * This) {
   TPCCWorkload * wl = (TPCCWorkload*) This;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
+		if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid)) != g_node_id) continue;
 		wl->init_tab_dist(wid);
-  }
+  	}
 	printf("DISTRICT Done\n");
 	return NULL;
 }
@@ -609,9 +609,9 @@ void * TPCCWorkload::threadInitStock(void * This) {
   TPCCWorkload * wl = ((thr_args*) This)->wl;
   int id = ((thr_args*) This)->id;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
+		if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid))) continue;
 		wl->init_tab_stock(id,wid);
-  }
+  	}
 	printf("STOCK Done\n");
 	return NULL;
 }
@@ -620,7 +620,7 @@ void * TPCCWorkload::threadInitCust(void * This) {
   TPCCWorkload * wl = ((thr_args*) This)->wl;
   int id = ((thr_args*) This)->id;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
+	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid))) continue;
 		for (uint64_t did = 1; did <= g_dist_per_wh; did++) {
 			wl->init_tab_cust(id,did, wid);
 	}
@@ -629,10 +629,10 @@ void * TPCCWorkload::threadInitCust(void * This) {
 	return NULL;
 }
 
-void * TPCCWorkload::threadInitHist(void * This) {
+void * TPCCWorkload::threadInitHist(void * This) { //这个都没有往共享内存里存
   TPCCWorkload * wl = (TPCCWorkload*) This;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
+	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid))) continue;
 		for (uint64_t did = 1; did <= g_dist_per_wh; did++)
 	        for (uint64_t cid = 1; cid <= g_cust_per_dist; cid++) wl->init_tab_hist(cid, did, wid);
   }
@@ -644,9 +644,9 @@ void * TPCCWorkload::threadInitOrder(void * This) {
   TPCCWorkload * wl = ((thr_args*) This)->wl;
   int id = ((thr_args*) This)->id;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-	if (GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
-	for (uint64_t did = 1; did <= g_dist_per_wh; did++) wl->init_tab_order(id, did, wid);
-  }
+		if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid))) continue;
+		for (uint64_t did = 1; did <= g_dist_per_wh; did++) wl->init_tab_order(id, did, wid);
+	}
 	printf("ORDER Done\n");
 	return NULL;
 }
