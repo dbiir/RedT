@@ -33,7 +33,7 @@
 #define CENTER_MASTER true  //hg-network without replica stage 2
 #define PARAL_SUBTXN true  //hg-network without replica stage 3
 #define USE_REPLICA true
-#define THOMAS_WRITE false  //if false, wait and sort
+#define THOMAS_WRITE true  //if false, wait and sort
 #define INTER_DC_CONTROL true
 
 #if USE_REPLICA
@@ -332,7 +332,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 1
+#define CROSS_DC_TXN_PERC 0
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.
