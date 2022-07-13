@@ -37,9 +37,11 @@
 #include "row_rdma_mvcc.h"
 #include "row_rdma_2pl.h"
 #include "row_rdma_ts1.h"
+#include "row_rdma_ts.h"
 #include "row_rdma_cicada.h"
 #include "rdma_mvcc.h"
 #include "rdma_ts1.h"
+#include "rdma_ts.h"
 #include "rdma_null.h"
 #include "mem_alloc.h"
 #include "query.h"
@@ -153,7 +155,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	reqId_index.erase(reqId_index.begin(),reqId_index.end());
 	reqId_row.erase(reqId_row.begin(),reqId_row.end());
 #endif
-
+    if(rc == Abort) total_num_atomic_retry++;
 	uint64_t curr_time = get_sys_clock();
 	txn_stats.process_time += curr_time - starttime;
 	txn_stats.process_time_short += curr_time - starttime;
@@ -189,7 +191,11 @@ RC YCSBTxnManager::run_txn_post_wait() {
 }
 
 bool YCSBTxnManager::is_done() { 
+#if PARAL_SUBTXN == true
+	return (next_record_id >= ((YCSBQuery*)query)->requests.size() && !waiting_for_response());
+#else
 	return next_record_id >= ((YCSBQuery*)query)->requests.size();
+#endif
 }
 
 void YCSBTxnManager::next_ycsb_state() {
@@ -278,121 +284,9 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
     
     RC rc = RCOK;
     uint64_t version = 0;
-    uint64_t lock = get_txn_id() + 1;
 
-#if CC_ALG == RDMA_CNULL
-    row_t * test_row = read_remote_row(yield,loc,m_item->offset,,cor_id);
-    assert(test_row->get_primary_key() == req->key);
-	mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-    mem_allocator.free(m_item, sizeof(itemid_t));
-    return RCOK;
-#endif
-
-#if CC_ALG == RDMA_SILO
-    if(req->acctype == RD || req->acctype == WR){
-		uint64_t tts = get_timestamp();
-
-		//read remote data
-#if BATCH_INDEX_AND_READ
-		row_t * test_row = reqId_row.find(next_record_id)->second;
-#else
-        row_t * test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
-#endif
-		assert(test_row->get_primary_key() == req->key);
-
-        //preserve the txn->access
-        access_t type = req->acctype;
-        rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
-
-        return rc;	   		
-	}
-	rc = RCOK;
-	return rc;
-#endif
-
-#if CC_ALG == RDMA_MVCC
-	row_t * test_row;
-	if(req->acctype == RD){
-		//read remote data
-		test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
-		assert(test_row->get_primary_key() == req->key);
-
-		uint64_t change_num = 0;
-		bool result = false;
-		result = get_version(test_row,&change_num,txn);
-		if(result == false){//no proper version: Abort
-			INC_STATS(get_thd_id(), result_false, 1);
-			rc = Abort;
-			return rc;
-		}
-		//check txn_id
-		if(test_row->txn_id[change_num] != 0 && test_row->txn_id[change_num] != get_txn_id() + 1){
-			INC_STATS(get_thd_id(), result_false, 1);
-			rc = Abort;
-			return rc;
-		}
-		//CAS(old_rts,new_rts)
-        uint64_t version = change_num;
-		uint64_t old_rts = test_row->rts[version];
-		uint64_t new_rts = get_timestamp();
-		uint64_t rts_offset = m_item->offset + 2*sizeof(uint64_t) + HIS_CHAIN_NUM*sizeof(uint64_t) + version*sizeof(uint64_t);
-		uint64_t cas_result = cas_remote_content(yield,loc,rts_offset,old_rts,new_rts,cor_id);//lock
-		if(cas_result!=old_rts){ //CAS fail, atomicity violated
-			INC_STATS(get_thd_id(), result_false, 1);
-			rc = Abort;
-			return rc;			
-		}
-		//read success
-		test_row->rts[version] = get_timestamp();
-	}
-	else if(req->acctype == WR){
-		uint64_t lock = get_txn_id()+1;
-		uint64_t try_lock = -1;
-#if USE_DBPAOR
-		test_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,0,lock,cor_id);
-		if(try_lock != 0){
-			INC_STATS(get_thd_id(), lock_fail, 1);
-			mem_allocator.free(test_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
-			rc = Abort;
-			return rc;			
-		}
-#else
-		try_lock = cas_remote_content(yield,loc,m_item->offset,0,lock,cor_id);//lock
-		if(try_lock != 0){
-			INC_STATS(get_thd_id(), lock_fail, 1);
-			rc = Abort;
-			return rc;
-		}
-		//read remote data
-		test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
-#endif
-		assert(test_row->get_primary_key() == req->key);
-
-		uint64_t version = (test_row->version_num)%HIS_CHAIN_NUM;
-		if((test_row->txn_id[version] != 0 && test_row->txn_id[version] != get_txn_id() + 1)||(get_timestamp() <= test_row->rts[version])){
-			INC_STATS(get_thd_id(), ts_error, 1);
-			//unlock and Abort
-			uint64_t* temp__tid_word = (uint64_t *)mem_allocator.alloc(sizeof(uint64_t));
-			*temp__tid_word = 0;
-			assert(write_remote_row(loc, sizeof(uint64_t),m_item->offset,(char*)(temp__tid_word))==true);
-			mem_allocator.free(temp__tid_word,sizeof(uint64_t));
-			mem_allocator.free(test_row,row_t::get_row_size(ROW_DEFAULT_SIZE));
-			rc = Abort;
-			return rc;
-		}
-
-		test_row->txn_id[version] = get_txn_id() + 1;
-		test_row->rts[version] = get_timestamp();
-		//temp_row->version_num = temp_row->version_num + 1;
-		test_row->_tid_word = 0;//release lock
-		//write back row
-        uint64_t operate_size = row_t::get_row_size(test_row->tuple_size);
-		assert(write_remote_row(loc,operate_size,m_item->offset,(char*)test_row)==true);
-	}
-    //preserve the txn->access
-    access_t type = req->acctype;
-	rc =  RCOK;
-    rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+	rc = get_remote_row(yield, req->acctype, loc, m_item, row_local, cor_id);
+	// mem_allocator.free(m_item, sizeof(itemid_t));
 	return rc;
 #endif
 
@@ -1482,7 +1376,12 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		} else {
 			// printf("REMOTE CENTER: %ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
-			rc = RCOK;
+			if (waiting_for_response() ) {
+				rc = WAIT_REM;
+			} else {
+				rc = RCOK;
+			}
+			
 #else
 			rc = send_remote_request();
 #endif

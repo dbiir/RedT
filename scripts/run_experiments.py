@@ -72,7 +72,7 @@ for exp in exps:
     for e in experiments:
         cfgs = get_cfgs(fmt,e)
         if remote:
-            cfgs["TPORT_TYPE"], cfgs["TPORT_TYPE_IPC"], cfgs["TPORT_PORT"] = "tcp", "false", 7500
+            cfgs["TPORT_TYPE"], cfgs["TPORT_TYPE_IPC"], cfgs["TPORT_PORT"] = "tcp", "false", 7658
         output_f = get_outfile_name(cfgs, fmt)
         output_dir = output_f + "/"
         output_f += strnow
@@ -117,9 +117,8 @@ for exp in exps:
                     cfg_fname = "vcloud_ifconfig.txt"
                 else:
                     assert(False)
-
-                machines = machines_[:(cfgs["NODE_CNT"]+1)]
-                # machines = machines_[:(cfgs["NODE_CNT"]+cfgs["CLIENT_NODE_CNT"])]
+                # machines = machines_[:(cfgs["NODE_CNT"]+1)]
+                machines = machines_[:(cfgs["NODE_CNT"]+cfgs["CLIENT_NODE_CNT"])]
                 with open("ifconfig.txt", 'w') as f_ifcfg:
                     for m in machines:
                         f_ifcfg.write(m + "\n")
@@ -162,9 +161,9 @@ for exp in exps:
                 print cmd
                 os.system(cmd)
                 os.chdir('..')
-                cpu_usage_path=PATH + "/results/" + strnow + '/cpu_usage_' + str(cpu_usage_index)
+                # cpu_usage_path=PATH + "/results/" + strnow + '/cpu_usage_' + str(cpu_usage_index)
                 # cpu_usage_avg_path = PATH + "/results/" + strnow + '/cpu_usage_avg'
-                os.mkdir(cpu_usage_path)
+                # os.mkdir(cpu_usage_path)
                 cpu_usage_index+=1
                 for m, n in zip(machines, range(len(machines))):
                     if cluster == 'istc':
@@ -175,9 +174,9 @@ for exp in exps:
                         cmd = 'scp {}:/{}/dbresults{}.out results/{}/{}_{}.out'.format(m,uname,n,strnow,n,output_f)
                         print cmd
                         os.system(cmd)
-                        cmd = 'scp {}:/tmp/{}* {}/'.format(m,uname2,cpu_usage_path)
-                        print cmd
-                        os.system(cmd)
+                        # cmd = 'scp {}:/tmp/{}* {}/'.format(m,uname2,cpu_usage_path)
+                        # print cmd
+                        # os.system(cmd)
 
             else:
                 nnodes = cfgs["NODE_CNT"]
@@ -205,7 +204,7 @@ for exp in exps:
 
     tcnt = []
     for e in experiments:
-        tcnt.append(e[-2])
+        tcnt.append(e[-6])
     tcnt = sorted(list(set(tcnt)))
 
     cocnt = []
@@ -222,6 +221,11 @@ for exp in exps:
         dcp.append(e[-1])
     dcp = sorted(list(set(dcp)))
     
+    nd = []
+    for e in experiments:
+        nd.append(e[-1])
+    nd = sorted(list(set(nd)))
+
     wr = []
     for e in experiments:
         wr.append(e[-4])
@@ -258,10 +262,24 @@ for exp in exps:
         cmd='sh result.sh -a ycsb_skew -n {} -c {} -s {} -t {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in sk]), strnow)
     elif exp == 'ycsb_cross_dc':
         cmd='sh result.sh -a ycsb_cross_dc -n {} -c {} -dc {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in dcp]), strnow)
+    elif exp == 'ycsb_network_delay':
+        cmd='sh result.sh -a ycsb_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
     elif exp == 'ycsb_writes':
         cmd='sh result.sh -a ycsb_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join([str(x) for x in al]), ','.join([str(x) for x in wr]), strnow)
     elif 'ycsb_scaling' in exp:
         cmd='sh result.sh -a ycsb_scaling -n {} -c {} -t {} --ft {} --tt {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow, ','.join(fromtimelist), ','.join(totimelist))
+    elif 'ycsb_scaling_tcp' in exp:
+        cmd='sh result.sh -a ycsb_scaling_tcp -n {} -c {} -t {} --ft {} --tt {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow, ','.join(fromtimelist), ','.join(totimelist))
+    elif 'ycsb_scaling_two_sided' in exp:
+        cmd='sh result.sh -a ycsb_scaling_two_sided -n {} -c {} -t {} --ft {} --tt {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow, ','.join(fromtimelist), ','.join(totimelist))
+    elif 'ycsb_scaling_one_sided' in exp:
+        cmd='sh result.sh -a ycsb_scaling_one_sided -n {} -c {} -t {} --ft {} --tt {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow, ','.join(fromtimelist), ','.join(totimelist))
+    elif 'ycsb_scaling_coroutine' in exp:
+        cmd='sh result.sh -a ycsb_scaling_coroutine -n {} -c {} -t {} --ft {} --tt {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow, ','.join(fromtimelist), ','.join(totimelist))
+    elif 'ycsb_scaling_dbpa' in exp:
+        cmd='sh result.sh -a ycsb_scaling_dbpa -n {} -c {} -t {} --ft {} --tt {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow, ','.join(fromtimelist), ','.join(totimelist))
+    elif 'ycsb_scaling_all' in exp:
+        cmd='sh result.sh -a ycsb_scaling_all -n {} -c {} -t {} --ft {} --tt {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow, ','.join(fromtimelist), ','.join(totimelist))
     elif 'tpcc_scaling' in exp:
         cmd='sh result.sh -a tpcc_scaling -n {} -c {} -t {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow)
     elif 'ycsb_stress' in exp:

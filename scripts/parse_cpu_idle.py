@@ -29,6 +29,8 @@ we = sum(summary['worker_process_time'])
 wf = sum(summary['worker_yield_time'])
 wg = sum(summary['worker_msg_time'])
 wh = sum(summary['worker_waitcomp_time'])
+# th = sum(summary['g_thread_cnt'])
+ti = sum(summary['total_runtime'])
 #trans_total_run_time trans_process_time trans_process_time% trans_2pc_time trans_2pc_time% trans_prepare_time trans_prepare_time% trans_validate_time trans_validate_time% trans_finish_time trans_finish_time% trans_commit_time trans_commit_time% trans_abort_time trans_abort_time% trans_block_time trans_block_time% txn_index_time txn_index_time% txn_manager_time txn_manager_time% lat_l_loc_cc_time lat_l_loc_cc_time%
-print (wa*100)/(wa+wb+wc+wd+we),(wf*100)/(wa+wb+wc+wd+we),(wg*100)/(wa+wb+wc+wd+we),(wh*100)/(wa+wb+wc+wd+we)
+print (wa*100)/(wa+wb+wc+wd+we),(wf*100)/(wa+wb+wc+wd+we),(wg*100)/(wa+wb+wc+wd+we),(wh*100)/(wa+wb+wc+wd+we),(we*100)/(wa+wb+wc+wd+we)
 

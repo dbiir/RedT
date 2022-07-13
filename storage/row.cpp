@@ -43,7 +43,11 @@
 #include "row_rdma_mvcc.h"
 #include "row_rdma_2pl.h"
 #include "row_rdma_ts1.h"
+#include "row_rdma_mocc.h"
+#include "row_rdma_dslr_no_wait.h"
 #include "rdma_ts1.h"
+#include "row_rdma_ts.h"
+#include "rdma_ts.h"
 #include "mem_alloc.h"
 #include "manager.h"
 #include "wl.h"
@@ -81,12 +85,26 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 	#endif
 #endif
 #if CC_ALG == RDMA_SILO
-  _tid_word = 0;
-  timestamp = 0;
+	_tid_word = 0;
+	timestamp = 0;
+#endif
+#if CC_ALG == RDMA_MOCC
+	_tid_word = 0;
+  	timestamp = 0;
+	lock_type = 0;
+	is_hot = 0;
+    for(int i = 0; i < LOCK_LENGTH; i++) {
+		ts[i] = 0;
+		lock_owner[i] = 0;
+	}
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
 	_tid_word = 0;
 	wts = 0;
+#endif
+#if CC_ALG == RDMA_DSLR_NO_WAIT 
+    _tid_word = 0;
+	_reset_from = 0;
 #endif
 #if CC_ALG == RDMA_WOUND_WAIT2
 	_tid_word = 0;
@@ -111,9 +129,18 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 #endif
 #if CC_ALG ==RDMA_TS1
 	mutx = 0;
-	tid = 0;
+	for(int i = 0; i < CASCADING_LENGTH; i++) {
+		tid[i] = 0;
+	}
 	wts = 0;
 	rts = 0;
+#endif
+#if CC_ALG ==RDMA_TS
+	mutx = 0;
+	wts = 0;
+	rts = 0;
+	memset(ur, 0, sizeof(ur));
+	memset(up, 0, sizeof(ur));
 #endif
 #if CC_ALG == RDMA_MAAT
 
@@ -132,6 +159,7 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 		cicada_version[i].init(i, 0, 0);
 	}
 	cicada_version[0].state = Cicada_COMMITTED;
+	cicada_version[0].Wts = 1; 
 	version_cnt = 0;
 	_tid_word = 0;
 #endif
@@ -178,8 +206,12 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_silo *) mem_allocator.align_alloc(sizeof(Row_silo));
 #elif CC_ALG == RDMA_SILO
   manager = (Row_rdma_silo *) mem_allocator.align_alloc(sizeof(Row_rdma_silo));
+#elif CC_ALG == RDMA_MOCC
+  manager = (Row_rdma_mocc *) mem_allocator.align_alloc(sizeof(Row_rdma_mocc));
 #elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
   manager = (Row_rdma_2pl *) mem_allocator.align_alloc(sizeof(Row_rdma_2pl));
+#elif CC_ALG == RDMA_DSLR_NO_WAIT
+  manager = (Row_rdma_dslr_no_wait *)mem_allocator.align_alloc(sizeof(Row_rdma_dslr_no_wait));
 #elif CC_ALG == RDMA_MVCC
   manager = (Row_rdma_mvcc *) mem_allocator.align_alloc(sizeof(Row_rdma_mvcc));
 
@@ -187,6 +219,8 @@ void row_t::init_manager(row_t * row) {
   manager = (Row_rdma_maat *) mem_allocator.align_alloc(sizeof(Row_rdma_maat));
 #elif CC_ALG ==RDMA_TS1
   manager = (Row_rdma_ts1 *) mem_allocator.align_alloc(sizeof(Row_rdma_ts1));
+#elif CC_ALG ==RDMA_TS
+  manager = (Row_rdma_ts *) mem_allocator.align_alloc(sizeof(Row_rdma_ts));
 #elif CC_ALG == RDMA_CICADA
   manager = (Row_rdma_cicada *) mem_allocator.align_alloc(sizeof(Row_rdma_cicada));
 #elif CC_ALG == CICADA
@@ -223,7 +257,7 @@ void row_t::set_value(int id, void * ptr) {
 	// table* table = get_table();
 	int datasize = get_schema()->get_field_size(id);
 	int pos = get_schema()->get_field_index(id);
-	DEBUG("set_value pos %d datasize %d -- %lx\n", pos, datasize, (uint64_t)this);
+	// DEBUG("set_value pos %d datasize %d -- %lx\n", pos, datasize, (uint64_t)this);
 #if SIM_FULL_ROW
 	memcpy( &data[pos], ptr, datasize);
 #else
@@ -367,17 +401,16 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 #endif
 
 #if CC_ALG == CNULL
-  uint64_t init_time = get_sys_clock();
+  	uint64_t init_time = get_sys_clock();
 	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), get_part_id());
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
 	rc = this->manager->access(type,txn);
 
-  uint64_t copy_time = get_sys_clock();
-	txn->cur_row->copy(this);
+  	uint64_t copy_time = get_sys_clock();
+	// txn->cur_row->copy(this);
 	access->data = txn->cur_row;
-	assert(rc == RCOK);
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #endif
@@ -523,24 +556,27 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	goto end;
 
 #endif
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
-  uint64_t init_time = get_sys_clock();
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_DSLR_NO_WAIT 
+  	uint64_t init_time = get_sys_clock();
 	//uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN) ? DLOCK_SH : DLOCK_EX; // ! this wrong !!
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-#if CC_ALG!=RDMA_NO_WAIT && CC_ALG!=RDMA_NO_WAIT2 && CC_ALG!=RDMA_WAIT_DIE2 && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT
-	rc = this->manager->lock_get(lt, txn);
-#else
-	rc = this->manager->lock_get(yield,lt,txn,this,cor_id);
-#endif
-  uint64_t copy_time = get_sys_clock();
+	#if CC_ALG!=RDMA_NO_WAIT && CC_ALG!=RDMA_NO_WAIT2 && CC_ALG!=RDMA_WAIT_DIE2 && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT && CC_ALG != RDMA_DSLR_NO_WAIT
+		rc = this->manager->lock_get(lt, txn);
+	#elif CC_ALG == RDMA_DSLR_NO_WAIT
+		rc = this->manager->lock_get(yield,type,txn,this,cor_id);
+	#else
+		rc = this->manager->lock_get(yield,lt,txn,this,cor_id);
+	#endif
+  	uint64_t copy_time = get_sys_clock();
+	access->data = this;
 	if (rc == RCOK) {
-		access->data = this;
 	} else if (rc == Abort) {
+		// total_num_atomic_retry++;
 	} else if (rc == WAIT) {
 		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT);
 	}
-  INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+  	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI
 	//uint64_t thd_id = txn->get_thd_id();
@@ -593,9 +629,9 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	}
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
-#elif CC_ALG ==RDMA_TS1
+#elif CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_TS
 	uint64_t init_time = get_sys_clock();
-	DEBUG_M("row_t::get_rowRDMA_TS1 alloc \n");
+	DEBUG_M("row_t::get_row RDMA_TS1 alloc \n");
 	// txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
     txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), this->get_part_id());
@@ -680,7 +716,21 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
   	access->data = txn->cur_row;
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
+#elif CC_ALG == RDMA_MOCC
+	// like OCC, tictoc also makes a local copy for each read/write
+ 	uint64_t init_time = get_sys_clock();
+ 	DEBUG_M("row_t::get_row SILO alloc \n");
+	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
+	txn->cur_row->init(get_table(), get_part_id());
+	TsType ts_type = (type == RD)? R_REQ : P_REQ;
+    INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
+	rc = this->manager->access(yield, txn, ts_type, txn->cur_row, cor_id);
+
+  	uint64_t copy_time = get_sys_clock();
+  	access->data = txn->cur_row;
+  	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+	goto end;
 #elif CC_ALG == RDMA_MVCC
    // rc = this->manager->access(txn, type, txn->cur_row);
    txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
@@ -791,7 +841,7 @@ RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 // delete during history cleanup.
 // For TIMESTAMP, the row will be explicity deleted at the end of access().
 // (c.f. row_ts.cpp)
-#if CC_ALG ==RDMA_TS1
+#if CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_TS
 uint64_t row_t::return_row(yield_func_t &yield, access_t type, TxnManager *txn, Access *access, uint64_t cor_id) {
 #if MODE==NOCC_MODE || MODE==QRY_ONLY_MODE
 	return 0;
@@ -801,13 +851,13 @@ uint64_t row_t::return_row(yield_func_t &yield, access_t type, TxnManager *txn, 
 #endif
 	if (type == RD || type == SCAN) {
 		access->data->free_row();
-		DEBUG_M("row_t::return_rowRDMA_TS1 RD free \n");
+		DEBUG_M("row_t::return_row RDMA_TS1 RD free \n");
 		// mem_allocator.free(access->data, sizeof(row_t));
         mem_allocator.free(access->data, row_t::get_row_size(access->data->tuple_size));
 	}
 	else if (type == WR || type == XP) {
 #if DEBUG_PRINTF
-		printf("[return_row本地提交]事务号：%d，主键：%d\n",txn->get_txn_id(),this->get_primary_key());
+		// printf("[return_row本地提交]事务号：%d，主键：%d\n",txn->get_txn_id(),this->get_primary_key());
 #endif
 		RC rc =  this->manager->local_commit(yield, txn, access, type, cor_id);
 		assert(rc == RCOK);
@@ -833,9 +883,9 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	}
 	this->manager->lock_release(txn);
 	return 0;
-#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
-	assert (row == NULL || row == this || type == XP);
-	if (ROLL_BACK && type == XP) {  // recover from previous writes.
+#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_DSLR_NO_WAIT
+	assert (row == NULL || row == this || type == XP || CC_ALG == RDMA_DSLR_NO_WAIT);
+	if (CC_ALG != RDMA_DSLR_NO_WAIT && ROLL_BACK && type == XP) {  // recover from previous writes.
 		this->copy(row);  //for abort of local txn ABORT, copy orig_data to orig_row. remote ABORT dont need this operate
 	}
 	return 0;
@@ -962,7 +1012,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		this->copy(row);
 	}
 	return 0;
-#elif CC_ALG == SILO || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC
+#elif CC_ALG == SILO || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_MOCC
 	assert (row != NULL);
 	row->free_row();
   DEBUG_M("row_t::return_row XP free \n");

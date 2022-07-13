@@ -309,7 +309,7 @@ void Transport::create_client(uint64_t port, uint64_t dest_node_id) {
 
 	ConnectManager cm(addr);
 
-	if (cm.wait_ready(1000000, 4) == IOCode::Timeout)
+	if (cm.wait_ready(10000000, 4) == IOCode::Timeout)
 		RDMA_LOG(4) << "connect to the " << ifaddr[dest_node_id] << " timeout!";
 	sleep(1);
 	//2 create the remote QP and connect
@@ -364,6 +364,7 @@ void Transport::init() {
 	printf("Tport Init %d: %ld\n",g_node_id,_sock_cnt);
 	string path = get_path();
 	read_ifconfig(path.c_str());
+
 
 	latch = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init( latch, NULL );

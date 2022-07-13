@@ -138,13 +138,13 @@ private:
     row_t * row;
 
   uint64_t next_item_id;
-
+  vector<vector<uint64_t>> remote_center{g_center_cnt};
 void next_tpcc_state();
 RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
   bool is_done();
   bool is_local_item(uint64_t idx);
   RC send_remote_request();
-
+  RC send_remote_subtxn();
   itemid_t* tpcc_read_remote_index(TPCCQuery * query);
   RC send_remote_one_side_request(yield_func_t &yield, TPCCQuery * query,row_t *& row_local, uint64_t cor_id);
 

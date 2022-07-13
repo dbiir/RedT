@@ -241,7 +241,11 @@ RC InputThread::server_recv_loop() {
 	uint64_t starttime;
 
 	std::vector<Message*> * msgs;
+// #if RDMA_ONE_SIDE == true && SERVER_GENERATE_QUERIES == true
+// 	while (!simulation->is_setup_done()) {
+// #else
 	while (!simulation->is_done()) {
+// #endif
 		heartbeat();
 		starttime = get_sys_clock();
 
@@ -302,8 +306,11 @@ RC OutputThread::run() {
 
 	tsetup();
 	printf("Running OutputThread %ld\n",_thd_id);
-
+// #if RDMA_ONE_SIDE == true && SERVER_GENERATE_QUERIES == true
+// 	while (!simulation->is_setup_done()) {
+// #else
 	while (!simulation->is_done()) {
+// #endif
 		heartbeat();
 		messager->run();
 	}
