@@ -60,6 +60,10 @@ void Thread::init(uint64_t thd_id, uint64_t node_id, Workload * workload) {
 	_node_id = node_id;
 	_wl = workload;
 	rdm.init(_thd_id);
+#if USE_REPLICA
+  log_count = 0;
+  log_content = 0;
+#endif
 }
 
 uint64_t Thread::get_thd_id() { return _thd_id; }

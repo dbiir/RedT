@@ -271,7 +271,9 @@ extern int rdma_server_port[NODE_CNT];
 extern bool volatile warmup_done;
 extern bool volatile enable_thread_mem_pool;
 extern pthread_barrier_t warmup_bar;
-
+#if USE_REPLICA
+extern pthread_mutex_t log_lock;
+#endif
 /******************************************/
 // Client Global Params
 /******************************************/
@@ -529,7 +531,8 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 //queue<DAQuery> query_build_queue;
 
 #define GET_NODE_ID(id)	(id % g_node_cnt) //get id of the leader node. id: transaction id or partition id
-#define GET_FOLLOWER1_NODE(pid)	((pid + (g_node_cnt/g_center_cnt)) % g_node_cnt) //leader and follower1 are in the same data center
+// #define GET_FOLLOWER1_NODE(pid)	((pid + (g_node_cnt/g_center_cnt)) % g_node_cnt) //leader and follower1 are in the same data center
+#define GET_FOLLOWER1_NODE(pid)	((pid + 2) % g_node_cnt) 
 #define GET_FOLLOWER2_NODE(pid)	((pid + 1) % g_node_cnt) 
 #define GET_CENTER_ID(nid) (nid % g_center_cnt) //nid: the id of node
 

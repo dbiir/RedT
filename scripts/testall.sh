@@ -1,42 +1,20 @@
-# python run_experiments.py -e -c vcloud ycsb_scaling
-#python run_experiments.py -e -c vcloud tpcc_stress1
-#sleep 10
 
 
-# python run_experiments.py -e -c vcloud ycsb_scaling
-# sleep 10
-# python run_experiments.py -e -c vcloud ycsb_scaling1
-# sleep 10
-# python run_experiments.py -e -c vcloud ycsb_scaling2
-# sleep 10
-# python run_experiments.py -e -c vcloud tpcc_scaling
-# sleep 10
+# python run_experiments.py -e -c vcloud ycsb_thread
+# sleep 30
 # python run_experiments.py -e -c vcloud ycsb_skew
-# sleep 10
-#cd ../draw
-#./deneva-homepage.sh
-#exit 0
-#python run_experiments.py -e -c vcloud tpcc_stress1
-#sleep 30
-#cd ../draw
-#./deneva-homepage.sh
-#exit 0
-
-#python run_experiments.py -e -c vcloud ycsb_stress5
-#sleep 30
-
-python run_experiments.py -e -c vcloud ycsb_scaling_tcp
+# sleep 30
+# python run_experiments.py -e -c vcloud ycsb_cross_dc
+# sleep 30
+python run_experiments.py -e -c vcloud ycsb_tapir_cross_dc
 sleep 30
-python run_experiments.py -e -c vcloud ycsb_scaling_two_sided
+# python run_experiments.py -e -c vcloud ycsb_writes
+# sleep 30
+python run_experiments.py -e -c vcloud ycsb_tapir_writes
 sleep 30
-python run_experiments.py -e -c vcloud ycsb_scaling_one_sided
-sleep 30
-python run_experiments.py -e -c vcloud ycsb_scaling_coroutine
-sleep 30
-python run_experiments.py -e -c vcloud ycsb_scaling_dbpa
-sleep 30
-python run_experiments.py -e -c vcloud ycsb_scaling_all
-sleep 30
+# python run_experiments.py -e -c vcloud ycsb_network_delay
+# sleep 30
+python run_experiments.py -e -c vcloud ycsb_tapir_network_delay
 sleep 30
 
 # neworder

@@ -155,7 +155,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
 	assert(CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN);
-
+	// printf("centerID: %d\n", g_center_id);
 	if(IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
 		DEBUG("Running txn %ld\n",txn->txn_id);
 #if DEBUG_PRINTF

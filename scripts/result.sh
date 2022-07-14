@@ -77,6 +77,11 @@ do
             shift
             shift
             ;;
+        -nd)
+            NETWORKDELAY=($(echo $2 | tr ',' ' '))
+            shift
+            shift
+            ;;
         -t)
             RESULT_PATH=../results/$2
             shift
@@ -163,13 +168,28 @@ ArgsType() {
     if [[ "${TEST_TYPE}" == 'ycsb_skew' ]]
     then
         args=("${SKEW[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_tapir_skew' ]]
+    then
+        args=("${SKEW[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_cross_dc' ]]
     then
         args=("${CROSSDCPERC[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_tapir_cross_dc' ]]
+    then
+        args=("${CROSSDCPERC[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_network_delay' ]]
+    then
+        args=("${NETWORKDELAY[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_tapir_network_delay' ]]
+    then
+        args=("${NETWORKDELAY[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_scaling' || "${TEST_TYPE}" == 'ycsb_scaling_tcp' || "${TEST_TYPE}" == 'ycsb_scaling_two_sided' || "${TEST_TYPE}" == 'ycsb_scaling_one_sided' || "${TEST_TYPE}" == 'ycsb_scaling_coroutine' || "${TEST_TYPE}" == 'ycsb_scaling_dbpa' || "${TEST_TYPE}" == 'ycsb_scaling_all' ]]
     then
         args=("${NUMBEROFNODE[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_writes' ]]
+    then
+        args=("${WR[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_tapir_writes' ]]
     then
         args=("${WR[@]}")
     elif [[ "${TEST_TYPE}" == 'tpcc_scaling' ]]
@@ -185,6 +205,9 @@ ArgsType() {
     then
         args=("${LOAD[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_thread' ]]
+    then
+        args=("${THREAD[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_tapir_thread' ]]
     then
         args=("${THREAD[@]}")
     elif [[ "${TEST_TYPE}" == 'tpcc_thread' ]]
@@ -206,13 +229,28 @@ FileName() {
     if [[ "${TEST_TYPE}" == 'ycsb_skew' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _SKEW-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_tapir_skew' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _SKEW-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_cross_dc' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_tapir_cross_dc' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_network_delay' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_tapir_network_delay' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_scaling' || "${TEST_TYPE}" == 'ycsb_scaling_tcp' || "${TEST_TYPE}" == 'ycsb_scaling_two_sided' || "${TEST_TYPE}" == 'ycsb_scaling_one_sided' || "${TEST_TYPE}" == 'ycsb_scaling_coroutine' || "${TEST_TYPE}" == 'ycsb_scaling_dbpa' || "${TEST_TYPE}" == 'ycsb_scaling_all' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_writes' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _WR-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_tapir_writes' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _WR-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'tpcc_scaling' ]]
@@ -228,6 +266,9 @@ FileName() {
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _CT-${CT}_TIF-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_thread' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _T-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_tapir_thread' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _T-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'tpcc_thread' ]]
@@ -337,7 +378,7 @@ do
         addContent "<td>${tput}</td>"
         addContent "<td>${ar}</td>"
         addContent "<td>${dr}</td>"
-        echo $(cat ${RESULT_PATH}/cpu_usage_${num}/root_*_avg| awk '{sum+=$1}END{print "",sum}') >> ${CPUFILE}
+        # echo $(cat ${RESULT_PATH}/cpu_usage_${num}/root_*_avg| awk '{sum+=$1}END{print "",sum}') >> ${CPUFILE}
         
     done
     let num++

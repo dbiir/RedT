@@ -19,7 +19,7 @@ for HOSTNAME in ${HOSTS}; do
     else
         SCRIPT="source /etc/profile;env SCHEMA_PATH=\"$2\" timeout -k 15m 15m ${PATHE}rundb -nid${count} > ${PATHE}dbresults${count}.out 2>&1"
         echo "${HOSTNAME}: rundb ${count}"
-        ssh -n -o BatchMode=yes -o StrictHostKeyChecking=no -l ${USERNAME} ${USERNAME}@${HOSTNAME} "source /etc/profile;bash ${PATHE}cpu_monitor.sh ${USERNAME} ${count}" &
+        # ssh -n -o BatchMode=yes -o StrictHostKeyChecking=no -l ${USERNAME} ${USERNAME}@${HOSTNAME} "source /etc/profile;bash ${PATHE}cpu_monitor.sh ${USERNAME} ${count}" &
         let mc=mc+1
     fi
     ssh -n -o BatchMode=yes -o StrictHostKeyChecking=no -l ${USERNAME} ${USERNAME}@${HOSTNAME} "${SCRIPT}" &

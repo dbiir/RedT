@@ -54,5 +54,5 @@ if 'txn_cnt' in summary:
     h = sum(summary['txn_cnt']) 
 if 'worker_oneside_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
     f = sum(summary['worker_oneside_cnt']) / (sum(summary['total_txn_commit_cnt']) + sum(summary['total_txn_abort_cnt']))
-print a, b, f, g / h
+print a, b, e, f, g / h
 # print a, b, f, g, h

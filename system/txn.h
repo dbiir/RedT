@@ -453,7 +453,10 @@ public:
 	CC_ALG == DLI_OCC
 	std::atomic<bool>* is_abort = nullptr;
 #endif
-
+#if USE_TAPIR
+	int prepare_count;
+	int commit_count;
+#endif
 protected:
 
 	int rsp_cnt;
@@ -478,7 +481,6 @@ protected:
 	row_t * last_row;
 	row_t * last_row_rtn;
 	access_t last_type;
-
 	sem_t rsp_mutex;
 	bool registed_;
 #if BATCH_INDEX_AND_READ

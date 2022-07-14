@@ -178,6 +178,7 @@ ofstream abort_file;
 bool volatile warmup_done = false;
 bool volatile enable_thread_mem_pool = false;
 pthread_barrier_t warmup_bar;
+pthread_mutex_t log_lock;
 
 ts_t g_abort_penalty = ABORT_PENALTY;
 ts_t g_abort_penalty_max = ABORT_PENALTY_MAX;

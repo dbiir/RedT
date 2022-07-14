@@ -32,7 +32,11 @@ public:
     Workload * _wl;
     myrand rdm;
     uint64_t run_starttime;
-
+    #if USE_REPLICA
+    
+	int log_count;
+	int log_content;
+    #endif
     uint64_t    get_thd_id();
     uint64_t    get_node_id();
     void tsetup();

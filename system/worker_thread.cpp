@@ -850,6 +850,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
     CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_MVCC || CC_ALG == SILO
   txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
 #endif
+// printf("%d %d\n", txn_man->query->partitions_touched.size(), g_node_id);
 // #if USE_REPLICA && USE_TAPIR 
 //   bool leader_node = false;
 //   for(int i = 0; i < txn_man->query->partitions_touched.size(); i++) {
@@ -861,10 +862,10 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
 //     }
 //   }
 //   if(leader_node == false) {
-//     printf("%d:%d send replica finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
+//     // printf("%d:%d send replica finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
 //     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_FIN), GET_NODE_ID(msg->get_txn_id()));
-//     release_txn_man();
-//     // txn_man->reset();
+//     // release_txn_man();
+//     txn_man->reset();
 //     // txn_man->reset_query();
 //     return ((FinishMessage*)msg)->rc;
     
@@ -913,6 +914,12 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
 RC WorkerThread::process_rlog(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   RC rc = RCOK;
   // txn_man->set_rc(rc);
+#if USE_REPLICA
+  pthread_mutex_lock(&log_lock);
+	log_count ++;
+	log_content = log_count;
+	pthread_mutex_unlock(&log_lock);
+#endif
   msg_queue.enqueue(get_thd_id(),Message::create_message(NULL,RACK_LOG,msg->get_txn_id()),msg->return_node_id);
   return rc;
 }
@@ -930,7 +937,10 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
       if(txn_man->get_rsp_cnt() > 0) return WAIT;
       //finish
       uint64_t finish_start_time = get_sys_clock();
-      txn_man->txn_stats.finish_start_time = finish_start_time;
+			txn_man->txn_stats.finish_start_time = finish_start_time;
+			uint64_t prepare_timespan  = finish_start_time - txn_man->txn_stats.prepare_start_time;
+			INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+      		INC_STATS(get_thd_id(), trans_prepare_count, 1);
       assert(!txn_man->query->readonly());
       txn_man->send_finish_messages();
       
@@ -948,6 +958,12 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
 RC WorkerThread::process_rfin_log(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   RC rc = RCOK;
   // txn_man->set_rc(rc);
+#if USE_REPLICA
+  pthread_mutex_lock(&log_lock);
+	log_count ++;
+	log_content = log_count;
+	pthread_mutex_unlock(&log_lock);
+#endif
   msg_queue.enqueue(get_thd_id(),Message::create_message(NULL,RACK_FIN_LOG,msg->get_txn_id()),msg->return_node_id);
   return rc;
 }
@@ -983,6 +999,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #if USE_TAPIR
   responses_left = txn_man->received_tapir_response(((AckMessage*)msg)->rc, msg->return_node_id);
   assert(responses_left >= 0);
+  // if (responses_left == 0) printf("recive prepare %d message\n", txn_man->prepare_count);
 #else
   responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
 
@@ -1063,9 +1080,9 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   }
   uint64_t finish_start_time = get_sys_clock();
   txn_man->txn_stats.finish_start_time = finish_start_time;
-  // uint64_t prepare_timespan  = finish_start_time - txn_man->txn_stats.prepare_start_time;
-  // INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-  // INC_STATS(get_thd_id(), trans_prepare_count, 1);
+  uint64_t prepare_timespan  = finish_start_time - txn_man->txn_stats.prepare_start_time;
+  INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+  INC_STATS(get_thd_id(), trans_prepare_count, 1);
   if(rc == Abort || txn_man->get_rc() == Abort) {
     txn_man->txn->rc = Abort;
     rc = Abort;
@@ -1115,6 +1132,7 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
 #if USE_TAPIR
   responses_left = txn_man->received_tapir_fin_response(((AckMessage*)msg)->rc, msg->return_node_id);
   assert(responses_left >= 0);
+  // if (responses_left == 0) printf("%d recive commit %d message\n",txn_man->get_txn_id(), txn_man->commit_count);
 #else
   responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
   assert(responses_left >=0);
@@ -1133,11 +1151,12 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
 #if USE_TAPIR
   // printf("responses_left %d %d\n", responses_left, txn_man->txn_state);
   if(txn_man->txn_state != 2) return rc;
+  // if (responses_left == 0) printf("%d recive commit %d message\n",txn_man->get_txn_id(), txn_man->commit_count);
   if(txn_man->get_rc() == RCOK) {
-    //txn_man->commit();
+    // txn_man->commit();
       commit();
   } else {
-    //txn_man->abort();
+    // txn_man->abort();
       abort();
   }
   // txn_man->txn_state = 0;
@@ -1290,6 +1309,10 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
 #if USE_REPLICA
 #if USE_TAPIR
     // printf("%d:%d send prepare ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
+    pthread_mutex_lock(&log_lock);
+    log_count ++;
+    log_content = log_count;
+    pthread_mutex_unlock(&log_lock);
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
     return rc;
 #else

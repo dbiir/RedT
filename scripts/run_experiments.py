@@ -162,10 +162,10 @@ for exp in exps:
                 print cmd
                 os.system(cmd)
                 os.chdir('..')
-                cpu_usage_path=PATH + "/results/" + strnow + '/cpu_usage_' + str(cpu_usage_index)
+                # cpu_usage_path=PATH + "/results/" + strnow + '/cpu_usage_' + str(cpu_usage_index)
                 # cpu_usage_avg_path = PATH + "/results/" + strnow + '/cpu_usage_avg'
-                os.mkdir(cpu_usage_path)
-                cpu_usage_index+=1
+                # os.mkdir(cpu_usage_path)
+                # cpu_usage_index+=1
                 for m, n in zip(machines, range(len(machines))):
                     if cluster == 'istc':
                         cmd = 'scp {}.csail.mit.edu:/{}/results.out {}{}_{}.out'.format(m,uname,result_dir,n,output_f)
@@ -175,9 +175,9 @@ for exp in exps:
                         cmd = 'scp {}:/{}/dbresults{}.out results/{}/{}_{}.out'.format(m,uname,n,strnow,n,output_f)
                         print cmd
                         os.system(cmd)
-                        cmd = 'scp {}:/tmp/{}* {}/'.format(m,uname2,cpu_usage_path)
-                        print cmd
-                        os.system(cmd)
+                        # cmd = 'scp {}:/tmp/{}* {}/'.format(m,uname2,cpu_usage_path)
+                        # print cmd
+                        # os.system(cmd)
 
             else:
                 nnodes = cfgs["NODE_CNT"]
@@ -205,7 +205,7 @@ for exp in exps:
 
     tcnt = []
     for e in experiments:
-        tcnt.append(e[-2])
+        tcnt.append(e[-6])
     tcnt = sorted(list(set(tcnt)))
 
     cocnt = []
@@ -222,9 +222,14 @@ for exp in exps:
         dcp.append(e[-1])
     dcp = sorted(list(set(dcp)))
     
+    nd = []
+    for e in experiments:
+        nd.append(e[-1])
+    nd = sorted(list(set(nd)))
+
     wr = []
     for e in experiments:
-        wr.append(e[-4])
+        wr.append(e[-5])
     wr = sorted(list(set(wr)))
 
     cn = []
@@ -256,10 +261,20 @@ for exp in exps:
     os.chdir('./scripts')
     if exp == 'ycsb_skew':
         cmd='sh result.sh -a ycsb_skew -n {} -c {} -s {} -t {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in sk]), strnow)
+    elif exp == 'ycsb_tapir_skew':
+        cmd='sh result.sh -a ycsb_tapir_skew -n {} -c {} -s {} -t {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in sk]), strnow)
     elif exp == 'ycsb_cross_dc':
         cmd='sh result.sh -a ycsb_cross_dc -n {} -c {} -dc {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in dcp]), strnow)
+    elif exp == 'ycsb_network_delay':
+        cmd='sh result.sh -a ycsb_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
     elif exp == 'ycsb_writes':
         cmd='sh result.sh -a ycsb_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join([str(x) for x in al]), ','.join([str(x) for x in wr]), strnow)
+    elif exp == 'ycsb_tapir_cross_dc':
+        cmd='sh result.sh -a ycsb_tapir_cross_dc -n {} -c {} -dc {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in dcp]), strnow)
+    elif exp == 'ycsb_tapir_network_delay':
+        cmd='sh result.sh -a ycsb_tapir_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
+    elif exp == 'ycsb_tapir_writes':
+        cmd='sh result.sh -a ycsb_tapir_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join([str(x) for x in al]), ','.join([str(x) for x in wr]), strnow)
     elif 'ycsb_scaling' in exp:
         cmd='sh result.sh -a ycsb_scaling -n {} -c {} -t {} --ft {} --tt {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow, ','.join(fromtimelist), ','.join(totimelist))
     elif 'ycsb_scaling_tcp' in exp:
@@ -284,6 +299,8 @@ for exp in exps:
         cmd='sh result.sh -a tpcc_stress_ctx -n {} -c {} -l {} -C {} -t {} --ft {} --tt {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in ld]), ','.join([str(x) for x in ccnt]), strnow, ','.join(fromtimelist), ','.join(totimelist))
     elif 'ycsb_thread' in exp:
         cmd='sh result.sh -a ycsb_thread -n {} -c {} -t {} -T {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in tcnt]))
+    elif 'ycsb_tapir_thread' in exp:
+        cmd='sh result.sh -a ycsb_tapir_thread -n {} -c {} -t {} -T {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in tcnt]))
     elif 'tpcc_thread' in exp:
         cmd='sh result.sh -a tpcc_thread -n {} -c {} -t {} -T {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in tcnt]))
     elif 'ycsb_partitions' in exp:
@@ -302,6 +319,12 @@ for exp in exps:
        cmd='./deneva-plot.sh -a ycsb_cross_dc -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     elif exp == 'ycsb_writes':
        cmd='./deneva-plot.sh -a ycsb_writes -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    elif exp == 'ycsb_tapir_skew':
+           cmd='./deneva-plot.sh -a ycsb_tapir_skew -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    elif exp == 'ycsb_tapir_cross_dc':
+       cmd='./deneva-plot.sh -a ycsb_tapir_cross_dc -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    elif exp == 'ycsb_tapir_writes':
+       cmd='./deneva-plot.sh -a ycsb_tapir_writes -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     elif 'ycsb_scaling' in exp:
        cmd='./deneva-plot.sh -a ycsb_scaling -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     elif 'tpcc_scaling' in exp:
