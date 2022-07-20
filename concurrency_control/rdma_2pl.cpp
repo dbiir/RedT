@@ -47,7 +47,7 @@ retry_unlock:
     row->_tid_word = 0;
 #endif
 #if DEBUG_PRINTF
-    printf("---thd %lu, local unlock write succ, lock location: %u; %p, txn: %lu, old lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info);
+    printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info);
 #endif
 }
 
@@ -116,7 +116,10 @@ retry_remote_unlock:
     assert(txnMng->write_remote_row(yield,loc,operate_size,off,(char*)data,cor_id) == true);
 
 #if DEBUG_PRINTF 
-    printf("---thd: %lu, remote unlock write succ,lock location:%lu; %p, txn: %lu, old lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), orig_lock_info);
+
+    printf("---thread id:%lu, local unlock shared lock, nodeid-key: %u; %lu, txnid: %lu, origin lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, remote_row->get_primary_key(), txnMng->get_txn_id(), orig_lock_info);
+
+    // printf("---thd: %lu, remote unlock write succ,lock location:%lu; %p, txn: %lu, old lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), orig_lock_info);
 #endif
 #endif
 }
@@ -134,7 +137,7 @@ retry_unlock:
     Row_rdma_2pl::info_encode(new_lock_info,lock_type,new_lock_num);
     
     if(lock_type!=0 || lock_num <= 0) {
-        printf("---thd：%lu, lock release read lock fail!!!!!!lock location: %u; %p, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info, new_lock_info);
+        printf("---thd：%lu, lock unlock read lock fail!!!!!!lock location: %u; %p, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info, new_lock_info);
     }
     assert(lock_type == 0);  //already write locked
     assert(lock_num > 0); //already locked
@@ -158,7 +161,7 @@ retry_unlock:
         if (!simulation->is_done()) goto retry_unlock;
     }
 #if DEBUG_PRINTF
-    printf("---线程号：%lu, 本地解读锁成功，锁位置: %u; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info, new_lock_info);
+    printf("---thread id:%lu, local unlock shared lock, nodeid-key: %u; %lu, txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, new_lock_info);
 #endif     
 #elif CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
 retry_unlock:
@@ -236,7 +239,7 @@ remote_retry_unlock:
         if (!simulation->is_done()) goto remote_retry_unlock;
     }
 #if DEBUG_PRINTF
-    printf("---thd：%lu, remote release lock succ,lock location: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), *lock_info, new_lock_info);
+    printf("---thd：%lu, remote unlock lock succ,lock location: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), *lock_info, new_lock_info);
 #endif
 	mem_allocator.free(lock_info, sizeof(uint64_t));
 #elif CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT

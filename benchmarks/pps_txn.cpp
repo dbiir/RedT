@@ -1249,3 +1249,9 @@ RC PPSTxnManager::run_pps_phase5(yield_func_t &yield, uint64_t cor_id) {
   }
   return rc;
 }
+
+#if USE_REPLICA
+RC PPSTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
+	return RCOK;
+}
+#endif

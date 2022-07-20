@@ -126,6 +126,9 @@ public:
   void reset();
   RC acquire_locks();
 	RC run_txn(yield_func_t &yield, uint64_t cor_id);
+#if USE_REPLICA
+	RC redo_log(yield_func_t &yield, RC status, uint64_t cor_id);
+#endif
 	RC run_txn_post_wait();
 	RC run_calvin_txn(yield_func_t &yield, uint64_t cor_id);
   RC run_tpcc_phase2(yield_func_t &yield, uint64_t cor_id);
@@ -140,6 +143,7 @@ private:
   uint64_t next_item_id;
   vector<vector<uint64_t>> remote_center{g_center_cnt};
 void next_tpcc_state();
+RC generate_center_master(uint64_t w_id);
 RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
   bool is_done();
   bool is_local_item(uint64_t idx);

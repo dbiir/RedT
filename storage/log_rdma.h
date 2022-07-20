@@ -2,7 +2,11 @@
 #include "row.h"
 
 #if USE_REPLICA 
+#if WORKLOAD== YCSB
 #define CHANGE_PER_ENTRY REQ_PER_QUERY
+#else 
+#define CHANGE_PER_ENTRY 100
+#endif
 // #define CONTENT_DEFAULT_SIZE (sizeof(row_t)+ROW_DEFAULT_SIZE)
 #define CONTENT_DEFAULT_SIZE (3*sizeof(uint64_t))
 

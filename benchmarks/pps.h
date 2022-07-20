@@ -122,6 +122,9 @@ public:
   RC run_pps_phase5(yield_func_t &yield, uint64_t cor_id);
 	PPSRemTxnType state;
   void copy_remote_items(PPSQueryMessage * msg);
+#if USE_REPLICA
+	RC redo_log(yield_func_t &yield, RC status, uint64_t cor_id);
+#endif
 private:
 	PPSWorkload * _wl;
 	volatile RC _rc;

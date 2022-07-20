@@ -189,3 +189,10 @@ RC DATxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
   }
   return rc;
 }
+
+#if USE_REPLICA
+RC DATxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
+	
+	return RCOK;
+}
+#endif

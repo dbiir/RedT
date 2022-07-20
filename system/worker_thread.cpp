@@ -877,10 +877,10 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 
   RC rc = RCOK;
   int responses_left;
-  if(txn_man->is_primary[GET_CENTER_ID(msg->return_node_id)]){
+  if(txn_man->is_primary[GET_CENTER_ID(msg->return_node_id)]){ //! 是主副本的返回
     responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
-    if(responses_left<0) return RCOK;
-  }else{
+    if(responses_left<0) return RCOK; //!   ?????????啥意思
+  }else{  // !从副本的返回是不管吗
       return RCOK; //do nothing
   }
   
@@ -942,6 +942,11 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 
   if (responses_left > 0) return WAIT;
 
+  uint64_t curr_time = get_sys_clock();
+  INC_STATS(get_thd_id(),trans_wait_for_rsp_time, curr_time - txn_man->txn_stats.wait_for_rsp_time);
+  INC_STATS(get_thd_id(),trans_wait_for_rsp_count, 1);
+  txn_man->txn_stats.wait_for_rsp_time = curr_time;
+
   // Done waiting
   if(txn_man->get_rc() == RCOK) {
     if (CC_ALG == TICTOC)
@@ -997,8 +1002,11 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
   if (responses_left > 0) return WAIT;
 
   // Done waiting
-  txn_man->txn_stats.twopc_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
-
+  uint64_t curr_time = get_sys_clock();
+  txn_man->txn_stats.twopc_time += curr_time - txn_man->txn_stats.wait_starttime;
+  
+  INC_STATS(get_thd_id(),trans_wait_for_commit_rsp_time, curr_time - txn_man->txn_stats.wait_for_rsp_time);
+  INC_STATS(get_thd_id(),trans_wait_for_commit_rsp_count, 1);
   if(txn_man->get_rc() == RCOK) {
     //txn_man->commit();
     commit();
@@ -1019,6 +1027,11 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
   int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
   assert(responses_left >=0);
   if (responses_left > 0) return WAIT;
+
+  //for redt
+  uint64_t curr_time = get_sys_clock();
+  INC_STATS(get_thd_id(),trans_wait_for_rsp_time, curr_time - txn_man->txn_stats.wait_for_rsp_time);
+
   if(((QueryResponseMessage*)msg)->rc == Abort) {
     txn_man->start_abort(yield, cor_id);
     return Abort;
@@ -1521,6 +1534,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
 
 #if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT)
 	if(txn_man->get_rsp_cnt() == 0){
+    assert(false);
 		assert(IS_LOCAL(txn_man->get_txn_id()));
     if(txn_man->get_rc() != Abort) {
       assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);

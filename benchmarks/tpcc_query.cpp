@@ -179,7 +179,8 @@ BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
 		} else
       query->c_w_id = query->w_id;
 	}
-	if(y <= 60) {
+	// if(y <= 60) {
+  if(y < 0) {
 		// by last name
 		query->by_last_name = true;
 		Lastname(NURand(255,0,999),query->c_last);

@@ -82,11 +82,11 @@ def ycsb_thread():
     base_table_size=1048576
     # base_table_size=1048576*8
     #base_table_size=2097152*8
-    txn_write_perc = [0.2]
-    tup_write_perc = [0.2]
+    txn_write_perc = [0.5]
+    tup_write_perc = [0.5]
     load = [10000]
-    tcnt = [1,2,4,6,8,10,12,14,16,18,20]
-    # tcnt = [10]
+    # tcnt = [1,2,4,6,8,10,12,14,16,18,20]
+    tcnt = [10]
     ctcnt = [4]
     scnt = [1]
     rcnt = [1]
@@ -579,9 +579,9 @@ def ycsb_cross_dc():
     nnodes = [4]
     algos=['RDMA_NO_WAIT']
     base_table_size=1048576
-    txn_write_perc = [0.2]
-    tup_write_perc = [0.2]
-    load = [20000]
+    txn_write_perc = [0.5]
+    tup_write_perc = [0.5]
+    load = [10000]
     tcnt = [10]  #THREAD_CNT
     skew = [0.2]
     # cross_dc_perc = [0.5] 
@@ -596,8 +596,8 @@ def ycsb_network_delay():
     nnodes = [4]
     algos=['RDMA_NO_WAIT']
     base_table_size=1048576
-    txn_write_perc = [0.2]
-    tup_write_perc = [0.2]
+    txn_write_perc = [0.5]
+    tup_write_perc = [0.5]
     load = [10000]
     tcnt = [10]  #THREAD_CNT
     skew = [0.2]
@@ -621,8 +621,8 @@ def ycsb_skew():
     base_table_size=1048576  
     #base_table_size=2097152*8
 
-    txn_write_perc = [0.2]
-    tup_write_perc = [0.2]
+    txn_write_perc = [0.5]
+    tup_write_perc = [0.5]
     load = [10000]
 
     tcnt = [4]  #THREAD_CNT
@@ -928,7 +928,7 @@ def ycsb_partitions_distr():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [4]
+    nnodes = [2]
     # nnodes = [8,16]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
@@ -939,13 +939,13 @@ def tpcc_scaling():
     # nalgos=['RDMA_SILO','RDMA_MVCC']
     # nalgos = ['RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WOUND_WAIT2','RDMA_WAIT_DIE2']
     # nalgos = ['RDMA_TS1']
-    nalgos = ['RDMA_SILO']
+    nalgos = ['RDMA_NO_WAIT']
     # nalgos = ['RDMA_CALVIN']
+    # npercpay=[1.0]
     npercpay=[1.0]
-    # npercpay=[0.0]
-    wh=16
+    wh=32
     # wh=64
-    load = [20000]
+    load = [10000]
     tcnt = [4]
     ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
@@ -954,19 +954,19 @@ def tpcc_scaling():
 
 def tpcc_scaling_n():
     wl = 'TPCC'
-    nnodes = [15]
+    nnodes = [4]
     # nnodes = [3,6,9,12,15]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    nalgos=['RDMA_CICADA']
+    nalgos=['RDMA_NO_WAIT']
     # nalgos=['RDMA_SILO']
     # nalgos=['RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2','RDMA_MAAT']
     npercpay=[0.0]
     # npercpay=[1.0]
     wh=8
     # wh=64
-    load = [20000]
-    tcnt = [8]
+    load = [10000]
+    tcnt = [10]
     ctcnt = [1]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,1,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
@@ -1422,7 +1422,7 @@ configs = {
     "PART_CNT": "NODE_CNT",
     "PART_PER_TXN": 2,
     "MAX_TXN_IN_FLIGHT": 10000,
-    "NETWORK_DELAY": '100000000UL',
+    "NETWORK_DELAY": '000000000UL',
     "NETWORK_DELAY_TEST": 'true',
     "DONE_TIMER": "1 * 30 * BILLION // ~1 minutes",
     "WARMUP_TIMER": "1 * 20 * BILLION // ~1 minutes",

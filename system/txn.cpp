@@ -763,9 +763,9 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 }
 #endif
 void TxnManager::send_prepare_messages() {
-// #if PARAL_SUBTXN == true && CENTER_MASTER == true
-// 	{
-#if CENTER_MASTER == true
+#if PARAL_SUBTXN == true && CENTER_MASTER == true
+	{
+#elif CENTER_MASTER == true
 	rsp_cnt = query->centers_touched.size() - 1;	
 	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
 	for(uint64_t i = 0; i < query->centers_touched.size(); i++) {
@@ -3904,56 +3904,6 @@ uint64_t TxnManager::cas_remote_content(yield_func_t &yield, uint64_t target_ser
     return *local_buf;
 }
 
-uint64_t TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t add, uint64_t cor_id){
-    
-    rdmaio::qp::Op<> op;
-    uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
-    uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-    auto mr = client_rm_handler->get_reg_attr().value();
-    
-    uint64_t starttime;
-	uint64_t endtime;
-	starttime = get_sys_clock();
-
-    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[target_server].buf + remote_offset), remote_mr_attr[target_server].key).set_fetch_add(add);
-    assert(op.set_payload(local_buf, sizeof(uint64_t), mr.key) == true);
-    auto res_s2 = op.execute(rc_qp[target_server][thd_id], IBV_SEND_SIGNALED);
-
-    RDMA_ASSERT(res_s2 == IOCode::Ok);
-	INC_STATS(get_thd_id(), worker_oneside_cnt, 1);
-#if USE_COROUTINE
-	uint64_t waitcomp_time;
-	std::pair<int,ibv_wc> res_p;
-	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
-	do {
-		h_thd->start_wait_time = get_sys_clock();
-		h_thd->last_yield_time = get_sys_clock();
-		// printf("do\n");
-		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
-		uint64_t yield_endtime = get_sys_clock();
-		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
-		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
-		INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - h_thd->last_yield_time);
-		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
-		waitcomp_time = get_sys_clock();
-		
-		INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
-		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
-	} while (res_p.first == 0);
-	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
-
-#else
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-    endtime = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
-	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
-#endif
-
-    return *local_buf;
-}
-
 bool TxnManager::loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value, uint64_t cor_id){
     uint64_t cas_result = -1;
     do{
@@ -3964,149 +3914,149 @@ bool TxnManager::loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint
     return true;
 }
 
-#if USE_REPLICA
-RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
-	if(CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT){
-		assert(status != Abort);
-		status = RCOK;		
-	}
+// #if USE_REPLICA
+// RC TxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
+// 	if(CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT){
+// 		assert(status != Abort);
+// 		status = RCOK;		
+// 	}
 	
-	YCSBQuery* ycsb_query = (YCSBQuery*) query;
-	RC rc = RCOK;
-	ts_t ts = get_sys_clock(); //for RDMA_SILO, which is problematic
+// 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+// 	RC rc = RCOK;
+// 	ts_t ts = get_sys_clock(); //for RDMA_SILO, which is problematic
 
-	//for every node
-	int change_cnt[g_node_cnt] = {0};
-	vector<vector<ChangeInfo>> change(g_node_cnt);
+// 	//for every node
+// 	int change_cnt[g_node_cnt] = {0};
+// 	vector<vector<ChangeInfo>> change(g_node_cnt);
 	
 
-	//construct log 
-	for(int i=0;i<((YCSBQuery*)query)->requests.size();i++){
-		ycsb_request * req = ycsb_query->requests[i];
-		if(req->acctype!=WR) continue; //log is only for write operation
-		// key_to_part should be used here! but its only for YCSB workload, so manually set part_id
-		// this part should be considered and changed for other workload!
-		// uint64_t part_id = _wl->key_to_part( req->key );
-		uint64_t part_id = req->key % g_part_cnt;
-		vector<uint64_t> node_id;
-		if(status == RCOK){ //validate success, log all replicas
-			node_id.push_back(GET_FOLLOWER1_NODE(part_id));
-			node_id.push_back(GET_FOLLOWER2_NODE(part_id));
-			node_id.push_back(GET_NODE_ID(part_id));
-		}
-		else if(status == Abort){ //validate fail, only log the primary replicas that have been locked
-#if CC_ALG == RDMA_SILO
-			int sum = 0;
-			for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
-			if(sum>=num_locks) break;
-			node_id.push_back(GET_NODE_ID(part_id));	
-#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
-			// int sum = 0;
-			// for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
-			// if(sum>=num_locks) break;
-			// node_id.push_back(GET_NODE_ID(part_id));				
-#endif
-		}else{
-			assert(false);
-		}
+// 	//construct log 
+// 	for(int i=0;i<((YCSBQuery*)query)->requests.size();i++){
+// 		ycsb_request * req = ycsb_query->requests[i];
+// 		if(req->acctype!=WR) continue; //log is only for write operation
+// 		// key_to_part should be used here! but its only for YCSB workload, so manually set part_id
+// 		// this part should be considered and changed for other workload!
+// 		// uint64_t part_id = _wl->key_to_part( req->key );
+// 		uint64_t part_id = req->key % g_part_cnt;
+// 		vector<uint64_t> node_id;
+// 		if(status == RCOK){ //validate success, log all replicas
+// 			node_id.push_back(GET_FOLLOWER1_NODE(part_id));
+// 			node_id.push_back(GET_FOLLOWER2_NODE(part_id));
+// 			node_id.push_back(GET_NODE_ID(part_id));
+// 		}
+// 		else if(status == Abort){ //validate fail, only log the primary replicas that have been locked
+// #if CC_ALG == RDMA_SILO
+// 			int sum = 0;
+// 			for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
+// 			if(sum>=num_locks) break;
+// 			node_id.push_back(GET_NODE_ID(part_id));	
+// #elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
+// 			// int sum = 0;
+// 			// for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
+// 			// if(sum>=num_locks) break;
+// 			// node_id.push_back(GET_NODE_ID(part_id));				
+// #endif
+// 		}else{
+// 			assert(false);
+// 		}
 
-		for(int i=0;i<node_id.size();i++){
-			uint32_t center_id = GET_CENTER_ID(node_id[i]);
-			if(center_id != g_center_id) continue; //log is only for row in the same center
-			++change_cnt[node_id[i]];
-			ChangeInfo newChange;
+// 		for(int i=0;i<node_id.size();i++){
+// 			uint32_t center_id = GET_CENTER_ID(node_id[i]);
+// 			if(center_id != g_center_id) continue; //log is only for row in the same center
+// 			++change_cnt[node_id[i]];
+// 			ChangeInfo newChange;
 			
-			//fill in ChangeInfo here
-			row_t* temp_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-			//for simulation purpose, only write back metadata here
-			//in actual application, data in req should also be written back
-			temp_row->_tid_word = 0;
-#if CC_ALG == RDMA_SILO
-			temp_row->timestamp = ts;
-			uint64_t op_size = sizeof(temp_row->_tid_word)+sizeof(temp_row->timestamp);
-			newChange.set_change_info(req->key,op_size,(char *)temp_row); //local 
-#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
-			uint64_t op_size = sizeof(temp_row->_tid_word);
-			bool is_primary = (node_id[i] == GET_NODE_ID(part_id));
-			newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 
-#endif
-			mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+// 			//fill in ChangeInfo here
+// 			row_t* temp_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+// 			//for simulation purpose, only write back metadata here
+// 			//in actual application, data in req should also be written back
+// 			temp_row->_tid_word = 0;
+// #if CC_ALG == RDMA_SILO
+// 			temp_row->timestamp = ts;
+// 			uint64_t op_size = sizeof(temp_row->_tid_word)+sizeof(temp_row->timestamp);
+// 			newChange.set_change_info(req->key,op_size,(char *)temp_row); //local 
+// #elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
+// 			uint64_t op_size = sizeof(temp_row->_tid_word);
+// 			bool is_primary = (node_id[i] == GET_NODE_ID(part_id));
+// 			newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 
+// #endif
+// 			mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 
-			change[node_id[i]].push_back(newChange);
-		}
-	}
+// 			change[node_id[i]].push_back(newChange);
+// 		}
+// 	}
 	
-	//write log
-	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
-		if(change_cnt[i]>0){
-			int num_of_entry = 1;
-			//use RDMA_FAA for local and remote
-			uint64_t start_idx = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id);
+// 	//write log
+// 	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+// 		if(change_cnt[i]>0){
+// 			int num_of_entry = 1;
+// 			//use RDMA_FAA for local and remote
+// 			uint64_t start_idx = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id);
 
-			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
+// 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
 
-			newEntry->set_entry(change_cnt[i],change[i],get_start_timestamp());
+// 			newEntry->set_entry(change_cnt[i],change[i],get_start_timestamp());
 
 
-			if(i == g_node_id){ //local log
-				//consider possible overwritten:if no space, wait until cleaned 
-				//for head: there is local read and write, and remote RDMA read, conflicts are ignored here, which might be problematic
-				// while(start_idx + num_of_entry < *(redo_log_buf.get_head())){
-				// 	//wait for head to reset
-				// 	assert(false);
-				// }
-				while((start_idx + num_of_entry - *(redo_log_buf.get_head()) >= redo_log_buf.get_size()) && !simulation->is_done()){
-					//wait for AsyncRedoThread to clean buffer
-				}
-				if(simulation->is_done()) break;
+// 			if(i == g_node_id){ //local log
+// 				//consider possible overwritten:if no space, wait until cleaned 
+// 				//for head: there is local read and write, and remote RDMA read, conflicts are ignored here, which might be problematic
+// 				// while(start_idx + num_of_entry < *(redo_log_buf.get_head())){
+// 				// 	//wait for head to reset
+// 				// 	assert(false);
+// 				// }
+// 				while((start_idx + num_of_entry - *(redo_log_buf.get_head()) >= redo_log_buf.get_size()) && !simulation->is_done()){
+// 					//wait for AsyncRedoThread to clean buffer
+// 				}
+// 				if(simulation->is_done()) break;
 				
-				start_idx = start_idx % redo_log_buf.get_size();
+// 				start_idx = start_idx % redo_log_buf.get_size();
 
-				char* start_addr = (char*)redo_log_buf.get_entry(start_idx);
+// 				char* start_addr = (char*)redo_log_buf.get_entry(start_idx);
 
-				assert(((LogEntry *)start_addr)->state == EMPTY);					
-				assert(((LogEntry *)start_addr)->change_cnt == 0);					
+// 				assert(((LogEntry *)start_addr)->state == EMPTY);					
+// 				assert(((LogEntry *)start_addr)->change_cnt == 0);					
 
-				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
-				assert(((LogEntry *)start_addr)->state == LOGGED);						
-			}else{ //remote log
-				//consider possible overwritten: if no space, wait until cleaned 
-				//first prevent concurrent read and write among threads
-				pthread_mutex_lock( LOG_HEAD_LATCH[i] );
-				// while(start_idx + num_of_entry < log_head[i]){
-				// 	//wait for head to reset
-				// 	assert(false);
-				// 	log_head[i] = read_remote_log_head(yield, i, cor_id);					
-				// }
-				while(start_idx + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
-					//wait for AsyncRedoThread to clean buffer
-					log_head[i] = read_remote_log_head(yield, i, cor_id);
-				}
-				pthread_mutex_unlock( LOG_HEAD_LATCH[i] );
-				if(simulation->is_done()) break;
+// 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
+// 				assert(((LogEntry *)start_addr)->state == LOGGED);						
+// 			}else{ //remote log
+// 				//consider possible overwritten: if no space, wait until cleaned 
+// 				//first prevent concurrent read and write among threads
+// 				pthread_mutex_lock( LOG_HEAD_LATCH[i] );
+// 				// while(start_idx + num_of_entry < log_head[i]){
+// 				// 	//wait for head to reset
+// 				// 	assert(false);
+// 				// 	log_head[i] = read_remote_log_head(yield, i, cor_id);					
+// 				// }
+// 				while(start_idx + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
+// 					//wait for AsyncRedoThread to clean buffer
+// 					log_head[i] = read_remote_log_head(yield, i, cor_id);
+// 				}
+// 				pthread_mutex_unlock( LOG_HEAD_LATCH[i] );
+// 				if(simulation->is_done()) break;
 				
-				start_idx = start_idx % redo_log_buf.get_size();
+// 				start_idx = start_idx % redo_log_buf.get_size();
 
-				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx);
+// 				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx);
 				
-				// //for debug purpose
-				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
-				// assert(le->state == EMPTY);
-				// assert(le->change_cnt == 0);
+// 				// //for debug purpose
+// 				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
+// 				// assert(le->state == EMPTY);
+// 				// assert(le->change_cnt == 0);
 
-				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id);
-				//for debug purpose
-				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
-				// assert(le->state == LOGGED);
+// 				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id);
+// 				//for debug purpose
+// 				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
+// 				// assert(le->state == LOGGED);
 
-			}
-			log_idx[i] = start_idx;
-			mem_allocator.free(newEntry, sizeof(LogEntry));
-		}
-	}
-	return rc;
-}
-#endif
+// 			}
+// 			log_idx[i] = start_idx;
+// 			mem_allocator.free(newEntry, sizeof(LogEntry));
+// 		}
+// 	}
+// 	return rc;
+// }
+// #endif
 
 
 row_t * TxnManager::read_remote_row(uint64_t target_server,uint64_t remote_offset){
@@ -4430,55 +4380,6 @@ bool TxnManager::get_version(row_t * temp_row,uint64_t * change_num,Transaction 
     return result;
 }
 #endif
-uint64_t TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t cor_id){
-    
-    rdmaio::qp::Op<> op;
-    uint64_t thd_id = get_thd_id() + cor_id * g_total_thread_cnt;
-    uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
-    auto mr = client_rm_handler->get_reg_attr().value();
-    
-    uint64_t starttime;
-	uint64_t endtime;
-	starttime = get_sys_clock();
-
-    op.set_atomic_rbuf((uint64_t*)(remote_mr_attr[target_server].buf + remote_offset), remote_mr_attr[target_server].key).set_fetch_add(1);
-    assert(op.set_payload(local_buf, sizeof(uint64_t), mr.key) == true);
-    auto res_s2 = op.execute(rc_qp[target_server][thd_id], IBV_SEND_SIGNALED);
-
-    RDMA_ASSERT(res_s2 == IOCode::Ok);
-	INC_STATS(get_thd_id(), worker_oneside_cnt, 1);
-#if USE_COROUTINE
-	uint64_t waitcomp_time;
-	std::pair<int,ibv_wc> res_p;
-	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
-	do {
-		h_thd->start_wait_time = get_sys_clock();
-		h_thd->last_yield_time = get_sys_clock();
-		// printf("do\n");
-		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
-		uint64_t yield_endtime = get_sys_clock();
-		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
-		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
-		INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - h_thd->last_yield_time);
-		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
-		waitcomp_time = get_sys_clock();
-		
-		INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
-		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
-	} while (res_p.first == 0);
-	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
-
-#else
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-    endtime = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
-	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
-#endif
-
-    return *local_buf;
-}
 
 uint64_t TxnManager::cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value ){
     
@@ -4518,7 +4419,7 @@ bool TxnManager::loop_cas_remote(uint64_t target_server,uint64_t remote_offset,u
     return true;
 }
 
-RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc,uint64_t* wid){
+RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc){
     Access * access = NULL;
 	access_pool.get(get_thd_id(),access);
 
@@ -4557,12 +4458,6 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
   	access->orig_row = test_row;
 	access->location = loc;
 	access->offset = m_item->offset;
-#endif
-
-#if CC_ALG == RDMA_TS1
-	for (int i = 0; i < CASCADING_LENGTH; i++) {
-		access->wid[i] = wid[i];
-	}
 #endif
 
 #if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA

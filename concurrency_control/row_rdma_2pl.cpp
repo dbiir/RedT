@@ -56,11 +56,11 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
     //检测是否有冲突，在conflict=false的情况下得到new_lock_info
     bool conflict = conflict_lock(lock_info, type, new_lock_info);
     if (conflict) {
+        #if DEBUG_PRINTF
+        printf("---thread id:%lu, lock failed!!!!!!  nodeid-key : %u; %lu , txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, row->get_primary_key(), txn->get_txn_id(), lock_info, new_lock_info);  
+        #endif
         rc = Abort;
 	    return rc;
-    }
-    if(new_lock_info == 0){
-        printf("---线程号：%lu, 本地加锁失败!!!!!!锁位置: %u; %p , 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id(), lock_info, new_lock_info);    
     }
     assert(new_lock_info != 0);
     //RDMA CAS，不用本地CAS
@@ -71,9 +71,9 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
     try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,lock_info,new_lock_info,cor_id);
 
     if(try_lock != lock_info){ //如果CAS失败，原子性被破坏	
-    #if DEBUG_PRINTF
-                printf("---atomic_retry_lock\n");
-    #endif 
+        #if DEBUG_PRINTF
+            printf("---atomic_retry_lock\n");
+        #endif 
         total_num_atomic_retry++;
         txn->num_atomic_retry++;
         if(txn->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txn->num_atomic_retry;
@@ -86,7 +86,7 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
     }         
     else{   //加锁成功
     #if DEBUG_PRINTF
-        printf("---线程号：%lu, 本地加锁成功，锁位置: %u; %p , 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, &row->_tid_word, txn->get_txn_id(), lock_info, new_lock_info);
+        printf("---thread id:%lu, lock success, nodeid-key : %u; %lu , txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, row->get_primary_key(), txn->get_txn_id(), lock_info, new_lock_info);
     #endif
         rc = RCOK;
     } 
@@ -130,7 +130,8 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
 
         rc = RCOK;
     } 
-
+    else    rc = Abort;  //加锁冲突
+*/
 #endif
 #if CC_ALG == RDMA_WAIT_DIE
     		//直接RDMA CAS加锁
