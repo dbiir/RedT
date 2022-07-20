@@ -131,7 +131,7 @@ for exp in exps:
                     if cluster == 'istc':
                         cmd = 'scp {}/{} {}.csail.mit.edu:/{}/'.format(PATH, f, m, uname)
                     elif cluster == 'vcloud':
-                        os.system('./scripts/kill.sh {}'.format(m))
+                        os.system('sh scripts/kill.sh {}'.format(m))
                         cmd = 'scp {}/{} {}:/{}'.format(PATH, f, m, uname)
                     print cmd
                     os.system(cmd)
@@ -143,9 +143,9 @@ for exp in exps:
                 print("Deploying: {}".format(output_f))
                 os.chdir('./scripts')
                 if cluster == 'istc':
-                    cmd = './deploy.sh \'{}\' /{}/ {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"])
+                    cmd = 'sh deploy.sh \'{}\' /{}/ {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"])
                 elif cluster == 'vcloud':
-                    cmd = './vcloud_deploy.sh \'{}\' /{}/ {} {} {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"], perfTime, uname2)
+                    cmd = 'sh vcloud_deploy.sh \'{}\' /{}/ {} {} {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"], perfTime, uname2)
                 print cmd
                 fromtimelist.append(str(int(time.time())) + "000")
                 os.system(cmd)

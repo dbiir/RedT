@@ -294,7 +294,7 @@ UInt64 tuple_count = 0;
 UInt64 max_tuple_size = 0;
 pthread_mutex_t * RDMA_MEMORY_LATCH;
 
-UInt64 rdma_buffer_size = 30*(1024*1024*1024L);
+UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 300*(1024*1024L);
 #if USE_REPLICA
 UInt64 rdma_index_size = (300*1024*1024L*g_part_cnt);
@@ -435,6 +435,9 @@ int g_init_cnt = 0;
 
 int total_num_atomic_retry = 0;  
 int max_num_atomic_retry = 0;
+
+int lock_atomic_failed_count=0;
+int unlock_atomic_failed_count=0;
 
 //the maximum number of doorbell batched row or index
 int max_batch_num = REQ_PER_QUERY; 

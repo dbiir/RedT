@@ -137,7 +137,7 @@ retry_unlock:
     Row_rdma_2pl::info_encode(new_lock_info,lock_type,new_lock_num);
     
     if(lock_type!=0 || lock_num <= 0) {
-        printf("---thd：%lu, lock unlock read lock fail!!!!!!lock location: %u; %p, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info, new_lock_info);
+        printf("---thd:%lu, lock unlock read lock fail!!!!!! lock location: %u; %p, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info, new_lock_info);
     }
     assert(lock_type == 0);  //already write locked
     assert(lock_num > 0); //already locked
@@ -152,6 +152,7 @@ retry_unlock:
     if(try_lock != lock_info){
         //atomicity is destroyed
         txnMng->num_atomic_retry++;
+        unlock_atomic_failed_count++;
         total_num_atomic_retry++;
         if(txnMng->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txnMng->num_atomic_retry;
 
@@ -231,6 +232,7 @@ remote_retry_unlock:
     if(try_lock != *lock_info){ //atomicity is destroyed，CAS fail
         txnMng->num_atomic_retry++;
         total_num_atomic_retry++;
+        unlock_atomic_failed_count++;
         if(txnMng->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txnMng->num_atomic_retry;
 #if DEBUG_PRINTF
         printf("---remote_retry_unlock read set element\n");

@@ -75,6 +75,7 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
             printf("---atomic_retry_lock\n");
         #endif 
         total_num_atomic_retry++;
+        lock_atomic_failed_count++;
         txn->num_atomic_retry++;
         if(txn->num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = txn->num_atomic_retry;
         if (!simulation->is_done()) goto atomic_retry_lock;

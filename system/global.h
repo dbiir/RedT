@@ -541,8 +541,11 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 // #define GET_LEADER_NODE(pid)	(pid % g_node_cnt) //pid: the id of partition
 
 #define GET_NODE_ID(id)	(id % g_node_cnt) //get id of the leader node. id: transaction id or partition id
-#define GET_FOLLOWER1_NODE(pid)	((pid + (g_node_cnt/g_center_cnt)) % g_node_cnt) //leader and follower1 are in the same data center
+#define GET_FOLLOWER1_NODE(pid)	((pid + 2) % g_node_cnt) //leader and follower1 are in the same data center
 #define GET_FOLLOWER2_NODE(pid)	((pid + 1) % g_node_cnt) 
+
+// #define GET_FOLLOWER1_NODE(pid)	((pid + (g_node_cnt/g_center_cnt)) % g_node_cnt) //leader and follower1 are in the same data center
+// #define GET_FOLLOWER2_NODE(pid)	((pid + 1) % g_node_cnt) 
 
 
 #define GET_CENTER_ID(nid) (nid % g_center_cnt) //nid: the id of node
@@ -595,6 +598,9 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 
 extern int total_num_atomic_retry;  
 extern int max_num_atomic_retry;
+
+extern int lock_atomic_failed_count;
+extern int unlock_atomic_failed_count;
 
 extern int max_batch_num;
 // extern int max_log_entry;

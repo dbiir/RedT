@@ -467,6 +467,12 @@ public:
   uint64_t ano_4_trans_read_skew;
   uint64_t ano_unknown;
 
+  double trans_wait_for_rsp_time;
+  uint64_t trans_wait_for_rsp_count;
+
+  double trans_wait_for_commit_rsp_time;
+  uint64_t trans_wait_for_commit_rsp_count;
+
   double * mtx;
 
 	char _pad[CL_SIZE];

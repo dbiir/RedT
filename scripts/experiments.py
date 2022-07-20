@@ -576,7 +576,7 @@ def ycsb_scaling_abort():
 
 def ycsb_cross_dc():
     wl = 'YCSB'
-    nnodes = [4]
+    nnodes = [8]
     algos=['RDMA_NO_WAIT']
     base_table_size=1048576
     txn_write_perc = [0.5]
@@ -584,8 +584,8 @@ def ycsb_cross_dc():
     load = [10000]
     tcnt = [10]  #THREAD_CNT
     skew = [0.2]
-    # cross_dc_perc = [0.5] 
-    cross_dc_perc = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+    cross_dc_perc = [0.2,0.4,0.6] 
+    # cross_dc_perc = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
 
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CROSS_DC_TXN_PERC"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,cro_dc_perc] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc)]
@@ -593,17 +593,17 @@ def ycsb_cross_dc():
 
 def ycsb_network_delay():
     wl = 'YCSB'
-    nnodes = [4]
+    nnodes = [8]
     algos=['RDMA_NO_WAIT']
     base_table_size=1048576
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
     load = [10000]
-    tcnt = [10]  #THREAD_CNT
+    tcnt = [5]  #THREAD_CNT
     skew = [0.2]
-    cross_dc_perc = [0.5]
+    cross_dc_perc = [1]
     network_delay = ['50000000UL','100000000UL','150000000UL','200000000UL','250000000UL','300000000UL','350000000UL','400000000UL','450000000UL','500000000UL'] 
-    # network_delay = ['20000000UL'] 
+    # network_delay = ['50000000UL','10000000UL'] 
     # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
 
 
@@ -1422,8 +1422,8 @@ configs = {
     "PART_CNT": "NODE_CNT",
     "PART_PER_TXN": 2,
     "MAX_TXN_IN_FLIGHT": 10000,
-    "NETWORK_DELAY": '000000000UL',
-    "NETWORK_DELAY_TEST": 'true',
+    "NETWORK_DELAY": '100000000UL',
+    "NETWORK_DELAY_TEST": 'false',
     "DONE_TIMER": "1 * 30 * BILLION // ~1 minutes",
     "WARMUP_TIMER": "1 * 20 * BILLION // ~1 minutes",
     "SEQ_BATCH_TIMER": "5 * 1 * MILLION // ~5ms -- same as CALVIN paper",

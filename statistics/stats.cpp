@@ -479,6 +479,12 @@ void Stats_thd::clear() {
   ano_4_trans_read_skew = 0;
   ano_unknown = 0;
 
+  trans_wait_for_rsp_time = 0;
+  trans_wait_for_rsp_count = 0;
+
+  trans_wait_for_commit_rsp_time = 0;
+  trans_wait_for_commit_rsp_count = 0;
+
   client_client_latency.clear();
     last_start_commit_latency.clear();
     first_start_commit_latency.clear();
@@ -617,9 +623,9 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",total_txn_commit_cnt=%ld"
   ",local_txn_commit_cnt=%ld"
   ",remote_txn_commit_cnt=%ld"
-  ",total_num_atomic_retry=%ld"
+  ",total_num_atomic_retry=%d"
   ",total_txn_abort_cnt=%ld"
-          ",positive_txn_abort_cnt=%ld"
+  ",positive_txn_abort_cnt=%ld"
   ",unique_txn_abort_cnt=%ld"
   ",local_txn_abort_cnt=%ld"
   ",remote_txn_abort_cnt=%ld"
@@ -634,14 +640,17 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",txn_write_cnt=%ld"
   ",record_write_cnt=%ld"
   ",parts_touched=%ld"
-          ",avg_parts_touched=%f",
+  ",avg_parts_touched=%f"
+  ",lock_atomic_failed_count=%d"
+  ",unlock_atomic_failed_count=%d",
           tput, txn_cnt, remote_txn_cnt, local_txn_cnt, local_txn_start_cnt, total_txn_commit_cnt,
           local_txn_commit_cnt, remote_txn_commit_cnt, total_num_atomic_retry, total_txn_abort_cnt,positive_txn_abort_cnt, unique_txn_abort_cnt,
           local_txn_abort_cnt, remote_txn_abort_cnt, txn_run_time / BILLION,
           txn_run_avg_time / BILLION, multi_part_txn_cnt, multi_part_txn_run_time / BILLION,
           multi_part_txn_avg_time / BILLION, single_part_txn_cnt,
           single_part_txn_run_time / BILLION, single_part_txn_avg_time / BILLION, txn_write_cnt,
-          record_write_cnt, parts_touched, avg_parts_touched);
+          record_write_cnt, parts_touched, avg_parts_touched,
+          lock_atomic_failed_count, unlock_atomic_failed_count);
 
 //   fprintf(outf,
 //   ",local_lock_fail_abort =%ld"
@@ -842,7 +851,11 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",txn_total_remote_wait_time_avg=%f"
   ",txn_remote_wait_time_avg=%f"
   ",txn_total_twopc_time_avg=%f"
-          ",txn_twopc_time_avg=%f",
+          ",txn_twopc_time_avg=%f"
+          ",trans_wait_for_rsp_time=%f"
+          ",trans_wait_for_rsp_count=%lu"
+          ",trans_wait_for_commit_rsp_time=%f"
+          ",trans_wait_for_commit_rsp_count=%lu",
           txn_total_process_time / BILLION, txn_process_time / BILLION,
           txn_total_local_wait_time / BILLION, txn_local_wait_time / BILLION,
           txn_total_remote_wait_time / BILLION, txn_remote_wait_time / BILLION,
@@ -850,7 +863,9 @@ void Stats_thd::print(FILE * outf, bool prog) {
           txn_total_process_time_avg / BILLION, txn_process_time_avg / BILLION,
           txn_total_local_wait_time_avg / BILLION, txn_local_wait_time_avg / BILLION,
           txn_total_remote_wait_time_avg / BILLION, txn_remote_wait_time_avg / BILLION,
-          txn_total_twopc_time_avg / BILLION, txn_twopc_time_avg / BILLION);
+          txn_total_twopc_time_avg / BILLION, txn_twopc_time_avg / BILLION,
+          trans_wait_for_rsp_time / BILLION, trans_wait_for_rsp_count,
+          trans_wait_for_commit_rsp_time / BILLION, trans_wait_for_commit_rsp_count);
 
   // Abort queue
   double abort_queue_penalty_avg = 0;
@@ -1837,6 +1852,12 @@ void Stats_thd::combine(Stats_thd * stats) {
   ano_3_trans_read_skew_2 += stats->ano_3_trans_read_skew_2;
   ano_4_trans_read_skew += stats->ano_4_trans_read_skew;
   ano_unknown += stats->ano_unknown;
+
+  trans_wait_for_rsp_time += stats->trans_wait_for_rsp_time;
+  trans_wait_for_rsp_count += stats->trans_wait_for_rsp_count;
+
+  trans_wait_for_commit_rsp_time += stats->trans_wait_for_commit_rsp_time;
+  trans_wait_for_commit_rsp_count += stats->trans_wait_for_commit_rsp_count;
 }
 
 void Stats::init(uint64_t thread_cnt) {

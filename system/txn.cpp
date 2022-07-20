@@ -1818,6 +1818,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 			if(try_lock != lock_info){
 				num_atomic_retry++;
 				total_num_atomic_retry++;
+				lock_atomic_failed_count++;
 				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
 				lock_info = try_lock;
 				if (!simulation->is_done()) goto remote_atomic_retry_lock;

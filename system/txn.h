@@ -121,7 +121,10 @@ public:
 										uint64_t timespan_short);
 	uint64_t starttime;
 	uint64_t restart_starttime;
-  uint64_t init_complete_time;
+	// for redt
+	uint64_t wait_for_rsp_time;
+
+  	uint64_t init_complete_time;
 	uint64_t wait_starttime;
 	uint64_t write_cnt;
 	uint64_t abort_cnt;
@@ -158,6 +161,9 @@ public:
 
 	double lat_network_time_start;
 	double lat_other_time_start;
+
+	int unlock_atomic_failed_count;
+	int lock_atomic_failed_count;
 };
 
 /*

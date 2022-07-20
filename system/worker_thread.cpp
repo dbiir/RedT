@@ -750,11 +750,11 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
     if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O) || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) {
       txn_man = get_transaction_manager(msg);
-      // if(!txn_man){
-      //   assert(msg->rtype == RACK_PREP || msg->rtype == RACK_FIN);
-      //   printf("---\n");
-      //   continue; // in majority, txn_man may has been destroyed when receive msgs
-      // } 
+      if(!txn_man->txn){
+        assert(msg->rtype == RACK_PREP || msg->rtype == RACK_FIN);
+        //   printf("---\n");
+        continue; // in majority, txn_man may has been destroyed when receive msgs
+      } 
 
       if ((CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) && IS_LOCAL(txn_man->get_txn_id())) {
         if (msg->rtype != RTXN_CONT &&
@@ -1534,7 +1534,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
 
 #if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT)
 	if(txn_man->get_rsp_cnt() == 0){
-    assert(false);
+    // assert(false);
 		assert(IS_LOCAL(txn_man->get_txn_id()));
     if(txn_man->get_rc() != Abort) {
       assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);

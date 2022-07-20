@@ -382,7 +382,7 @@ RC row_t::remote_copy_row(row_t* remote_row, TxnManager * txn, Access *access) {
   uint64_t copy_time = get_sys_clock();
   memcpy((char*)txn->cur_row, (char*)remote_row, row_t::get_row_size(remote_row->tuple_size));
   access->data = txn->cur_row;
-//   printf("remote_copy_row.cpp:286】table_name = %s operate_size = %ld tuple_size = %ld sizeof(row_t)=%d\n",txn->cur_row->table_name,row_t::get_row_size(remote_row->tuple_size),txn->cur_row->tuple_size,sizeof(row_t));
+	//printf("remote_copy_row.cpp:286】table_name = %s operate_size = %ld tuple_size = %ld sizeof(row_t)=%d\n",txn->cur_row->table_name,row_t::get_row_size(remote_row->tuple_size),txn->cur_row->tuple_size,sizeof(row_t));
   //access->orig_row = txn->cur_row;
 
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
