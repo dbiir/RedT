@@ -311,7 +311,7 @@ obj/tpcc_txn.o: benchmarks/tpcc_txn.cpp benchmarks/tpcc.h system/wl.h \
  r2/src/rdma/sop.hh rlibv2/qps/doorbell_helper.hh \
  r2/src/rdma/../libroutine.hh r2/src/rdma/.././sshed.hh \
  r2/src/rdma/../././routine.hh r2/src/rdma/.././././linked_list.hh \
- rlibv2/qps/op.hh
+ rlibv2/qps/op.hh storage/log_rdma.h storage/row.h
 obj/tpcc_wl.o: benchmarks/tpcc_wl.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/global.h system/helper.h \
@@ -961,6 +961,38 @@ obj/rdma_silo.o: concurrency_control/rdma_silo.cpp system/global.h config.h \
  r2/src/rdma/../libroutine.hh r2/src/rdma/.././sshed.hh \
  r2/src/rdma/../././routine.hh r2/src/rdma/.././././linked_list.hh \
  storage/log_rdma.h storage/row.h
+obj/rdma_ts.o: concurrency_control/rdma_ts.cpp system/global.h config.h \
+ statistics/stats.h statistics/../system/global.h \
+ statistics/stats_array.h system/pool.h system/global.h system/helper.h \
+ system/concurrentqueue.h system/txn_table.h system/logger.h \
+ system/sim_manager.h benchmarks/da_block_queue.h \
+ r2/src/allocator_master.hh r2/src/allocator.hh r2/src/common.hh \
+ r2/src/./utils/option.hh r2/src/./logging.hh rlibv2/lib.hh \
+ rlibv2/./nicinfo.hh rlibv2/./nic.hh rlibv2/././common.hh \
+ rlibv2/./././utils/logging.hh rlibv2/./././utils/option.hh \
+ rlibv2/./././result.hh rlibv2/././naming.hh rlibv2/./rctrl.hh \
+ rlibv2/././rmem/handler.hh rlibv2/././rmem/../utils/abs_factory.hh \
+ rlibv2/././rmem/./config.hh rlibv2/././rmem/./mem.hh rlibv2/./qps/mod.hh \
+ rlibv2/./qps/../utils/mod.hh rlibv2/./qps/../utils/./timer.hh \
+ rlibv2/./qps/./recv_helper.hh rlibv2/./qps/././abs_recv_allocator.hh \
+ rlibv2/./qps/rc.hh rlibv2/./qps/./impl.hh rlibv2/./qps/././config.hh \
+ rlibv2/./qps/ud.hh rlibv2/././bootstrap/srpc.hh \
+ rlibv2/././bootstrap/./channel.hh \
+ rlibv2/././bootstrap/./../utils/ipname.hh \
+ rlibv2/././bootstrap/./../utils/marshal.hh \
+ rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
+ system/helper.h system/txn.h system/array.h system/mem_alloc.h \
+ concurrency_control/row_rdma_maat.h system/routine.h \
+ concurrency_control/rdma_maat.h storage/row.h \
+ concurrency_control/row_rdma_cicada.h concurrency_control/maat.h \
+ concurrency_control/row_rdma_maat.h transport/message.h system/logger.h \
+ system/array.h system/worker_thread.h system/thread.h system/routine.h \
+ concurrency_control/rdma_ts.h system/manager.h system/mem_alloc.h \
+ concurrency_control/row_rdma_ts.h transport/rdma.h transport/nn.hpp \
+ rlibv2/qps/op.hh r2/src/rdma/sop.hh rlibv2/qps/doorbell_helper.hh \
+ r2/src/rdma/../libroutine.hh r2/src/rdma/.././sshed.hh \
+ r2/src/rdma/../././routine.hh r2/src/rdma/.././././linked_list.hh \
+ transport/transport.h system/query.h
 obj/rdma_ts1.o: concurrency_control/rdma_ts1.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/global.h system/helper.h \
@@ -2271,9 +2303,9 @@ obj/global.o: system/global.cpp system/global.h config.h statistics/stats.h \
  concurrency_control/rdma_ts.h concurrency_control/rdma_cicada.h \
  system/rdma_calvin.h transport/message.h system/logger.h system/array.h \
  benchmarks/ycsb_query.h concurrency_control/rdma_null.h \
- concurrency_control/key_xid.h concurrency_control/spin_lock.h \
- concurrency_control/hash.h system/rts_cache.h system/wl.h \
- storage/log_rdma.h storage/row.h
+ concurrency_control/rdma_dslr_no_wait.h concurrency_control/key_xid.h \
+ concurrency_control/spin_lock.h concurrency_control/hash.h \
+ system/rts_cache.h system/wl.h storage/log_rdma.h storage/row.h
 obj/hash.o: system/hash.cpp system/hash.h
 obj/helper.o: system/helper.cpp system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \

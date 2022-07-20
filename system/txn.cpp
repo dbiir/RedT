@@ -1755,40 +1755,33 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 	#endif
 
 	#if CC_ALG == RDMA_NO_WAIT
-	remote_atomic_retry_lock:
-		if(type == RD || type == WR){
-			uint64_t new_lock_info;
-			uint64_t lock_info;
-			row_t * test_row = NULL;
+	if(type == RD || type == WR){
+		uint64_t new_lock_info;
+		uint64_t lock_info;
+		row_t * test_row = NULL;
 
-			if(type == RD){ //读集元素
-				//第一次rdma read，得到数据项的锁信息
-				row_t * lock_read = read_remote_row(yield,loc,m_item->offset,cor_id);
+		if(type == RD){ //读集元素
+			//第一次rdma read，得到数据项的锁信息
+            row_t * lock_read = read_remote_row(yield,loc,m_item->offset,cor_id);
 
-				new_lock_info = 0;
-				lock_info = lock_read->_tid_word;
-				mem_allocator.free(lock_read, row_t::get_row_size(ROW_DEFAULT_SIZE));
-	
-				bool conflict = Row_rdma_2pl::conflict_lock(lock_info, DLOCK_SH, new_lock_info);
+			new_lock_info = 0;
+			lock_info = lock_read->_tid_word;
+			mem_allocator.free(lock_read, row_t::get_row_size(ROW_DEFAULT_SIZE));
+remote_atomic_retry_lock:
+			bool conflict = Row_rdma_2pl::conflict_lock(lock_info, DLOCK_SH, new_lock_info);
 
-				if(conflict){
-					DEBUG_M("TxnManager::get_row(abort) access free\n");
-					row_local = NULL;
-					txn->rc = Abort;
-					return Abort;
-				}
-				if(new_lock_info == 0){
-					// printf("---thd：%lu, remote lock fail!!!!!!lock location: %lu; %p, txn: %lu, old lock_info: %lu, new_lock_info: %lu\n", get_thd_id(), loc, remote_mr_attr[loc].buf + m_item->offset, get_txn_id(), lock_info, new_lock_info);
-				} 
-				assert(new_lock_info!=0);
-			} else {
-				lock_info = 0; //if lock_info!=0, CAS fail , Abort
-				new_lock_info = 3; //binary 11, aka 1 read lock
+			if(conflict){
+				DEBUG_M("TxnManager::get_row(abort) access free\n");
+				row_local = NULL;
+				txn->rc = Abort;
+				mem_allocator.free(m_item, sizeof(itemid_t));
+				return Abort;
 			}
-		#if USE_DBPAOR == true
+			assert(new_lock_info!=0);
+#if USE_DBPAOR == true
 			uint64_t try_lock = -1;
 			test_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,lock_info,new_lock_info,cor_id);
-			if(try_lock != lock_info && type == RD){ //CAS fail: Atomicity violated
+			if(try_lock != lock_info){ //CAS fail: Atomicity violated
 				num_atomic_retry++;
 				total_num_atomic_retry++;
 				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
@@ -1803,48 +1796,67 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 					mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 					return Abort; //原子性被破坏，CAS失败	
 				}
-			} else if (try_lock != lock_info && type == WR) {
+			}
+			// assert(test_row->get_primary_key() == req->key);
+#else
+            uint64_t try_lock = -1;
+            try_lock = cas_remote_content(yield,loc,m_item->offset,lock_info,new_lock_info,cor_id);
+            if(try_lock != lock_info){
+                num_atomic_retry++;
+                total_num_atomic_retry++;
+                if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
+                lock_info = try_lock;
+                if (!simulation->is_done()) goto remote_atomic_retry_lock;
+                else {
+                  DEBUG_M("TxnManager::get_row(abort) access free\n");
+                  row_local = NULL;
+                  txn->rc = Abort;
+                  mem_allocator.free(m_item, sizeof(itemid_t));
+                  // mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+                  return Abort; //原子性被破坏，CAS失败	
+                }
+            }
+			//read remote data
+        	test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
+        	// assert(test_row->get_primary_key() == req->key);
+#endif
+		}
+		else{ //写集元素直接CAS即可，不需要RDMA READ
+			lock_info = 0; //只有lock_info==0时才可以CAS，否则加写锁失败，Abort
+			new_lock_info = 3; //二进制11，即1个写锁
+#if USE_DBPAOR == true
+			uint64_t try_lock;
+			test_row = cas_and_read_remote(yield, try_lock,loc,m_item->offset,m_item->offset,lock_info,new_lock_info, cor_id);
+			if(try_lock != lock_info){ //CAS fail: lock conflict. Ignore read content 
 				DEBUG_M("TxnManager::get_row(abort) access free\n");
 				row_local = NULL;
 				txn->rc = Abort;
 				mem_allocator.free(m_item, sizeof(itemid_t));
 				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-				return Abort; //原子性被破坏，CAS失败	
-			}
-			// assert(test_row->get_primary_key() == req->key);
-		#else
+				return Abort; //原子性被破坏，CAS失败			
+			}	
+			//CAS success, now get read content
+#else
+			//RDMA CAS加锁
 			uint64_t try_lock = -1;
 			try_lock = cas_remote_content(yield,loc,m_item->offset,lock_info,new_lock_info,cor_id);
-			if(try_lock != lock_info){
-				num_atomic_retry++;
-				total_num_atomic_retry++;
-				lock_atomic_failed_count++;
-				if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
-				lock_info = try_lock;
-				if (!simulation->is_done()) goto remote_atomic_retry_lock;
-				else {
-					DEBUG_M("TxnManager::get_row(abort) access free\n");
-					row_local = NULL;
-					txn->rc = Abort;
-					mem_allocator.free(m_item, sizeof(itemid_t));
-					// mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-					return Abort; //原子性被破坏，CAS失败	
-				}
-			} else if (try_lock != lock_info && type == WR) {
+			if(try_lock != lock_info){ //如果CAS失败:对写集元素来说,即已经有锁;
 				DEBUG_M("TxnManager::get_row(abort) access free\n");
 				row_local = NULL;
 				txn->rc = Abort;
 				mem_allocator.free(m_item, sizeof(itemid_t));
-				return Abort; //原子性被破坏，CAS失败
-			}
+				return Abort; //原子性被破坏，CAS失败			
+			}	
 			//read remote data
 			test_row = read_remote_row(yield,loc,m_item->offset,cor_id);
-			// assert(test_row->get_primary_key() == req->key);
-		#endif
-			//preserve the txn->access
-			rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
-			return rc;
+			// assert(test_row->get_primary_key() == req->key);   
+#endif
 		}
+        //preserve the txn->access
+		++num_locks;
+        rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc);
+        return rc;
+	}		
 		rc = RCOK;
 		return rc;
 	#endif
