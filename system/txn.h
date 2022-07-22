@@ -218,6 +218,12 @@ public:
 	void            set_start_timestamp(uint64_t start_timestamp);
 	ts_t            get_start_timestamp();
 	uint64_t        get_rsp_cnt() {return rsp_cnt;}
+	bool			need_extra_wait() {
+		for(int i=0;i<REQ_PER_QUERY;i++){
+			if(req_need_wait[i]) return true;
+		}
+		return false;
+	}
 	uint64_t        incr_rsp(int i);
 	uint64_t        decr_rsp(int i);
 	uint64_t        incr_lr();
@@ -303,6 +309,8 @@ public:
 	int volatile    ready_ulk;
 	std::map<uint64_t, uint64_t> center_master;
 	bool is_primary[CENTER_CNT]; //is center_master has primary replica or not
+	int extra_wait[REQ_PER_QUERY][2];
+	bool req_need_wait[REQ_PER_QUERY];
 
 #if CC_ALG == SILO
 	ts_t 			last_tid;

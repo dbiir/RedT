@@ -300,9 +300,13 @@ RC YCSBTxnManager::send_remote_subtxn() {
 		uint64_t part_id = _wl->key_to_part(req->key);
 		vector<uint64_t> node_id;
 #if USE_REPLICA
-		node_id.push_back(GET_NODE_ID(part_id));
-		node_id.push_back(GET_FOLLOWER1_NODE(part_id));
-		node_id.push_back(GET_FOLLOWER2_NODE(part_id));
+		if(req->acctype == WR){
+			node_id.push_back(GET_NODE_ID(part_id));
+			node_id.push_back(GET_FOLLOWER1_NODE(part_id));
+			node_id.push_back(GET_FOLLOWER2_NODE(part_id));
+		}else if(req->acctype == RD){
+			node_id.push_back(GET_NODE_ID(part_id));
+		}else assert(false);
 #else
 		node_id.push_back(GET_NODE_ID(part_id));		
 #endif
@@ -323,12 +327,39 @@ RC YCSBTxnManager::send_remote_subtxn() {
 			}
 		}
 	}
+	// printf("txn %lu, is_primary: %d %d %d %d\n", get_txn_id(),is_primary[0],is_primary[1],is_primary[2],is_primary[3]);
+	//get rsp_cnt
 	rsp_cnt = 0;
 	for(int i=0;i<query->centers_touched.size();i++){
 		if(is_primary[query->centers_touched[i]]) ++rsp_cnt;
 	}
 	--rsp_cnt; //exclude this center
 	// rsp_cnt = query->centers_touched.size() - 1;
+	// printf("p_rsp_cnt: %d\n", rsp_cnt);
+
+
+	//get extra_wait and req_need_wait
+	for(int i = 0; i < ycsb_query->requests.size(); i++) {
+		ycsb_request * req = ycsb_query->requests[i];
+		uint64_t part_id = _wl->key_to_part(req->key);
+		if(req->acctype == WR){
+			uint64_t center_id1 = GET_CENTER_ID(GET_FOLLOWER1_NODE(part_id));
+			uint64_t center_id2 = GET_CENTER_ID(GET_FOLLOWER2_NODE(part_id));
+			if(is_primary[center_id1] || is_primary[center_id2]){
+				//no extra wait for req i
+				extra_wait[i][0] = -1;
+				extra_wait[i][1] = -1;			
+			}else{
+				req_need_wait[i] = true;
+				extra_wait[i][0] = center_id1;
+				extra_wait[i][1] = center_id2;							
+			}
+		}else if(req->acctype == RD){
+			//no extra wait for req i
+			extra_wait[i][0] = -1;
+			extra_wait[i][1] = -1;			
+		}
+	}
 
 	for(int i = 0; i < g_center_cnt; i++) {
 		if(remote_center[i].size() > 0 && i != g_center_id) {//send message to all masters
@@ -636,7 +667,11 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	ts_t ts = get_sys_clock(); //for RDMA_SILO, which is problematic
 
 	//for every node
-	int change_cnt[g_node_cnt] = {0};
+	int change_cnt[g_node_cnt];
+	for(int i=0;i<g_node_cnt;i++){
+		change_cnt[i] = 0;
+	}
+
 	vector<vector<ChangeInfo>> change(g_node_cnt);
 	
 

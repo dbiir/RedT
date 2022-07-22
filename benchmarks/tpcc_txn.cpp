@@ -372,7 +372,7 @@ RC TPCCTxnManager::generate_center_master(uint64_t w_id) {
 			is_primary[center_id] = (j == 0 ? true : false); 
 		}
 	}
-
+	
 }
 
 RC TPCCTxnManager::send_remote_subtxn() {
@@ -1536,7 +1536,10 @@ RC TPCCTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	ts_t ts = get_sys_clock(); //for RDMA_SILO, which is problematic
 
 	//for every node
-	int change_cnt[g_node_cnt] = {0};
+	int change_cnt[g_node_cnt];
+	for(int i=0;i<g_node_cnt;i++){
+		change_cnt[i] = 0;
+	}
 	vector<vector<ChangeInfo>> change(g_node_cnt);
 	
 	//construct log 

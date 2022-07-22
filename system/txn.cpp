@@ -347,7 +347,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	if(!txn)  {
 	DEBUG_M("Transaction alloc\n");
 	txn_pool.get(thd_id,txn);
-
+	
 	}
 	INC_STATS(get_thd_id(),mtx[15],get_sys_clock()-prof_starttime);
 	prof_starttime = get_sys_clock();
@@ -421,8 +421,20 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	twopl_wait_start = 0;
 	txn_stats.init();
 	finish_logging = false;
-	is_primary[CENTER_CNT] = {false}; 
+	for(int i=0;i<CENTER_CNT;i++){
+		is_primary[i] = false; 	
+	}
+	for(int i=0;i<REQ_PER_QUERY;i++){
+		for(int j=0;j<2;j++){
+			extra_wait[i][j] = -1;
+		}
+	}
+	for(int i=0;i<REQ_PER_QUERY;i++){
+		req_need_wait[i] = false;	
+	}
+	commit_timestamp = 0;
 	rsp_cnt = 0;
+	abort_cnt = 0;
 }
 
 // reset after abort
@@ -438,8 +450,19 @@ void TxnManager::reset() {
 	aborted = false;
 	return_id = UINT64_MAX;
 	twopl_wait_start = 0;
-	finish_logging = false;
-	is_primary[CENTER_CNT] = {false};
+	finish_logging = false;	
+	for(int i=0;i<CENTER_CNT;i++){
+		is_primary[i] = false; 	
+	}
+	for(int i=0;i<REQ_PER_QUERY;i++){
+		for(int j=0;j<2;j++){
+			extra_wait[i][j] = -1;
+		}
+	}
+	for(int i=0;i<REQ_PER_QUERY;i++){
+		req_need_wait[i] = false;	
+	}
+
 
 	//ready = true;
 
@@ -527,6 +550,18 @@ void TxnManager::release() {
   // mem_allocator.free(write_set, sizeof(int) * 100);
 #endif
 	txn_ready = true;
+
+	for(int i=0;i<CENTER_CNT;i++){
+		is_primary[i] = false; 	
+	}
+	for(int i=0;i<REQ_PER_QUERY;i++){
+		for(int j=0;j<2;j++){
+			extra_wait[i][j] = -1;
+		}
+	}
+	for(int i=0;i<REQ_PER_QUERY;i++){
+		req_need_wait[i] = false;	
+	}
 }
 
 void TxnManager::reset_query() {
@@ -797,13 +832,23 @@ void TxnManager::send_prepare_messages() {
 
 void TxnManager::send_finish_messages() {
 #if CENTER_MASTER == true
+	//get rsp_cnt
 	rsp_cnt = 0;
 	for(int i=0;i<query->centers_touched.size();i++){
 		if(is_primary[query->centers_touched[i]]) ++rsp_cnt;
 	}
 	--rsp_cnt; //exclude this center
 	// rsp_cnt = query->centers_touched.size() - 1;	
+	// printf("c_rsp_cnt: %d\n", rsp_cnt);
 
+	//get req_need_wait
+	for(int i=0;i<REQ_PER_QUERY;i++){
+		if(extra_wait[i][0] != -1){
+			assert(extra_wait[i][1] != -1);
+			req_need_wait[i] = true;
+		}
+	}	
+	
 	assert(IS_LOCAL(get_txn_id()));
 	DEBUG("%ld Send FINISH messages to %d\n",get_txn_id(),rsp_cnt);
 	for(uint64_t i = 0; i < query->centers_touched.size(); i++) {
