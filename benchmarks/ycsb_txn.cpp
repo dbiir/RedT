@@ -730,7 +730,127 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			change[node_id[i]].push_back(newChange);
 		}
 	}
-	
+#if RDMA_DBPAOR
+	// int nnum = 0;
+	// for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+	// 	if(change_cnt[i]>0) ++nnum;
+	// }
+	// DBrequests dbreq(nnum);
+	// dbreq.init();
+	// //get remote tail
+	// int count = 0;
+	// for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+	// 	if(change_cnt[i]>0){
+	// 		int num_of_entry = 1;
+    //         uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(get_thd_id(),count+1);            
+	// 		uint64_t remote_off= (uint64_t)(remote_mr_attr[i].buf + rdma_buffer_size-rdma_log_size+sizeof(uint64_t));
+	// 		dbreq.set_faa_meta(count,num_of_entry,local_buf,remote_off);
+	// 		++count;
+	// 	}
+	// }
+	// auto dbres = dbreq.post_reqs(rc_qp[i][thd_id]);
+
+	//batch faa
+    uint64_t starttime = get_sys_clock();
+	uint64_t count = 0;
+	int num_of_entry = 1; //suppose one log per node is enough
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(change_cnt[i]>0){
+			//use RDMA_FAA for local and remote
+			faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id, count+1, true);
+			++count;
+		}
+	}
+	//poll faa results
+	uint64_t start_idx[g_node_cnt];
+	count = 0;
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(change_cnt[i]>0){
+			INC_STATS(get_thd_id(), worker_oneside_cnt, 1);
+			#if USE_COROUTINE
+			assert(false); //not support yet
+			#else
+			auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp();
+			RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+			uint64_t endtime = get_sys_clock();
+			INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+			DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+			INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+			#endif
+    		uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(get_thd_id(),count+1);
+			start_idx[i] = *local_buf;
+			++count;
+		}
+	}
+	//wait for AsyncRedoThread to clean buffer
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(change_cnt[i]>0){
+			if(i == g_node_id){ //local log
+				while((start_idx[i] + num_of_entry - *(redo_log_buf.get_head()) >= redo_log_buf.get_size()) && !simulation->is_done()){
+				}
+				if(simulation->is_done()) break;
+			}else{ //remote log
+				pthread_mutex_lock( LOG_HEAD_LATCH[i] );
+				while(start_idx[i] + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
+					log_head[i] = read_remote_log_head(yield, i, cor_id);
+				}
+				pthread_mutex_unlock( LOG_HEAD_LATCH[i] );
+				if(simulation->is_done()) break;
+			}
+		}
+	}
+	//write log
+	count = 0;
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(change_cnt[i]>0){
+			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
+			newEntry->set_entry(change_cnt[i],change[i],get_start_timestamp());
+			if(i == g_node_id){ //local log
+				start_idx[i] = start_idx[i] % redo_log_buf.get_size();
+				char* start_addr = (char*)redo_log_buf.get_entry(start_idx[i]);
+				assert(((LogEntry *)start_addr)->state == EMPTY);					
+				assert(((LogEntry *)start_addr)->change_cnt == 0);					
+				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
+				assert(((LogEntry *)start_addr)->state == LOGGED);						
+			}else{ //remote log
+				start_idx[i] = start_idx[i] % redo_log_buf.get_size();
+				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx[i]);
+				// //for debug purpose
+				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
+				// assert(le->state == EMPTY);
+				// assert(le->change_cnt == 0);
+				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id, count+1,true);
+				//for debug purpose
+				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
+				// assert(le->state == LOGGED);
+				++count;
+			}
+			log_idx[i] = start_idx[i];
+			mem_allocator.free(newEntry, sizeof(LogEntry));
+		}
+	}
+	//poll write results
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(change_cnt[i]>0){
+			if(i != g_node_id){ //remote 
+				starttime = get_sys_clock();
+				INC_STATS(get_thd_id(), worker_oneside_cnt, 1);
+				#if USE_COROUTINE
+				assert(false); //not support yet
+				#else
+				auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp();
+				RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+				uint64_t endtime = get_sys_clock();
+				INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
+				INC_STATS(get_thd_id(), rdma_read_cnt, 1);
+				INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+				INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+				DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+				#endif
+			}
+		}
+	}
+#else
 	//write log
 	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
 		if(change_cnt[i]>0){
@@ -771,7 +891,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				// while(start_idx + num_of_entry < log_head[i]){
 				// 	//wait for head to reset
 				// 	assert(false);
-				// 	log_head[i] = read_remote_log_head(yield, i, cor_id);					
+			// 	log_head[i] = read_remote_log_head(yield, i, cor_id);					
 				// }
 				while(start_idx + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
 					//wait for AsyncRedoThread to clean buffer
@@ -799,6 +919,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			mem_allocator.free(newEntry, sizeof(LogEntry));
 		}
 	}
+#endif
 	return rc;
 }
 #endif

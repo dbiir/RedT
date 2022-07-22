@@ -3798,14 +3798,14 @@ void TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server
  }
 
 #if USE_REPLICA
- bool TxnManager::write_remote_log(yield_func_t &yield,uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content,uint64_t cor_id){
+ bool TxnManager::write_remote_log(yield_func_t &yield,uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content,uint64_t cor_id, int num, bool outstanding){
 	uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
-    char *local_buf = Rdma::get_log_client_memory(thd_id);
-	return write_remote_content(yield, target_server, operate_size,remote_offset,write_content,local_buf,cor_id);
+    char *local_buf = Rdma::get_log_client_memory(thd_id, num);
+	return write_remote_content(yield, target_server, operate_size,remote_offset,write_content,local_buf,cor_id,outstanding);
  }
 #endif
 
- bool TxnManager::write_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content, char* local_buf,uint64_t cor_id){
+ bool TxnManager::write_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content, char* local_buf,uint64_t cor_id, bool outstanding){
 	uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
     memset(local_buf, 0, operate_size);
     memcpy(local_buf, write_content , operate_size);
@@ -3822,6 +3822,7 @@ void TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server
 		.remote_addr = remote_offset,
 		.imm_data = 0});
 	RDMA_ASSERT(res_s == rdmaio::IOCode::Ok);
+	if(!outstanding){
 	INC_STATS(get_thd_id(), worker_oneside_cnt, 1);
 #if USE_COROUTINE
 	// h_thd->un_res_p.push(std::make_pair(target_server, thd_id));
@@ -3856,15 +3857,16 @@ void TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server
 	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 #endif
+	}
     return true;
 }
 
 //the value prior to being incremented is returned to the caller.
-uint64_t TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t value_to_add, uint64_t cor_id){
+uint64_t TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t value_to_add, uint64_t cor_id, int num, bool outstanding){
     
     rdmaio::qp::Op<> op;
 	uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
-    uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
+    uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id,num);
     auto mr = client_rm_handler->get_reg_attr().value();
     
     uint64_t starttime;
@@ -3876,38 +3878,39 @@ uint64_t TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_ser
     auto res_s2 = op.execute(rc_qp[target_server][thd_id], IBV_SEND_SIGNALED);
 
     RDMA_ASSERT(res_s2 == IOCode::Ok);
-	INC_STATS(get_thd_id(), worker_oneside_cnt, 1);
+	if(!outstanding){
+		INC_STATS(get_thd_id(), worker_oneside_cnt, 1);
 #if USE_COROUTINE
-	uint64_t waitcomp_time;
-	std::pair<int,ibv_wc> res_p;
-	INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
-	do {
-		h_thd->start_wait_time = get_sys_clock();
-		h_thd->last_yield_time = get_sys_clock();
-		// printf("do\n");
-		yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
-		uint64_t yield_endtime = get_sys_clock();
-		INC_STATS(get_thd_id(), worker_yield_cnt, 1);
-		INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
-		INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - h_thd->last_yield_time);
-		res_p = rc_qp[target_server][thd_id]->poll_send_comp();
-		waitcomp_time = get_sys_clock();
-		
-		INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
-		INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
-	} while (res_p.first == 0);
-	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
+		uint64_t waitcomp_time;
+		std::pair<int,ibv_wc> res_p;
+		INC_STATS(get_thd_id(), worker_process_time, get_sys_clock() - h_thd->cor_process_starttime[cor_id]);
+		do {
+			h_thd->start_wait_time = get_sys_clock();
+			h_thd->last_yield_time = get_sys_clock();
+			// printf("do\n");
+			yield(h_thd->_routines[((cor_id) % COROUTINE_CNT) + 1]);
+			uint64_t yield_endtime = get_sys_clock();
+			INC_STATS(get_thd_id(), worker_yield_cnt, 1);
+			INC_STATS(get_thd_id(), worker_yield_time, yield_endtime - h_thd->last_yield_time);
+			INC_STATS(get_thd_id(), worker_idle_time, yield_endtime - h_thd->last_yield_time);
+			res_p = rc_qp[target_server][thd_id]->poll_send_comp();
+			waitcomp_time = get_sys_clock();
+			
+			INC_STATS(get_thd_id(), worker_idle_time, waitcomp_time - yield_endtime);
+			INC_STATS(get_thd_id(), worker_waitcomp_time, waitcomp_time - yield_endtime);
+		} while (res_p.first == 0);
+		h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 
 #else
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
-	RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
-    endtime = get_sys_clock();
-	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
-	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
-	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+		RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+		endtime = get_sys_clock();
+		INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+		DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+		INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 #endif
-
-    return *local_buf;
+		return *local_buf;
+	}else return 0;
 }
 
 uint64_t TxnManager::cas_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value, uint64_t cor_id){

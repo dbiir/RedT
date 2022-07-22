@@ -315,6 +315,7 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
     // printf("c_ts:%lu\n",le->c_ts);
     uint64_t operate_size = sizeof(le->state) + sizeof(le->c_ts);
 
+    int count = 0;
 	for(int i=0;i<g_node_cnt;i++){
         if(txnMng->log_idx[i] != redo_log_buf.get_size()){
             assert(le->c_ts != UINT64_MAX && le->c_ts != 0);
@@ -324,12 +325,41 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
 				memcpy(start_addr, (char *)le, operate_size);
 			}else{ //remote 
                 uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx);
+#if RDMA_DBPAOR
+				txnMng->write_remote_log(yield, i, operate_size, start_offset, (char *)le, cor_id, count+1, true);
+#else 
 				txnMng->write_remote_log(yield, i, operate_size, start_offset, (char *)le, cor_id);
+#endif 
+				++count;
 			}
-            txnMng->log_idx[i] = redo_log_buf.get_size();
 		}
 	}
 	mem_allocator.free(le, sizeof(LogEntry));
+#if RDMA_DBPAOR
+    //poll write result
+	for(int i=0;i<g_node_cnt;i++){
+        if(txnMng->log_idx[i] != redo_log_buf.get_size()){
+            if(i!=g_node_id){ //remote 
+				uint64_t starttime = get_sys_clock();
+				INC_STATS(txnMng->get_thd_id(), worker_oneside_cnt, 1);
+				#if USE_COROUTINE
+				assert(false); //not support yet
+				#else
+				auto res_p = rc_qp[i][txnMng->get_thd_id()]->wait_one_comp();
+				RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+				uint64_t endtime = get_sys_clock();
+				INC_STATS(txnMng->get_thd_id(), rdma_read_time, endtime-starttime);
+				INC_STATS(txnMng->get_thd_id(), rdma_read_cnt, 1);
+				INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
+				INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
+				DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
+				#endif
+            }
+            txnMng->log_idx[i] = redo_log_buf.get_size();
+        }
+    }
+#endif
+
 #endif
 // #else
     uint64_t starttime = get_sys_clock();

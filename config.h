@@ -73,6 +73,7 @@
 #define USE_REPLICA true
 #define THOMAS_WRITE true  //if false, wait and sort
 #define INTER_DC_CONTROL true
+#define RDMA_DBPAOR true //concurrent logging
 
 #if USE_REPLICA
 #define ASYNC_REDO_THREAD_CNT 1

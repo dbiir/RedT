@@ -283,12 +283,12 @@ public:
     bool write_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
     bool write_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
 #if USE_REPLICA
- 	bool write_remote_log(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
+ 	bool write_remote_log(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id, int num = 1, bool outstanding = false);
 #endif
-	bool write_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, char* local_buf, uint64_t cor_id);
+	bool write_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, char* local_buf, uint64_t cor_id, bool outstanding = false);
 
     uint64_t cas_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t old_value, uint64_t new_value, uint64_t cor_id);
-    uint64_t faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t value_to_add, uint64_t cor_id);
+    uint64_t faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t value_to_add, uint64_t cor_id, int num = 1, bool outstanding = false);
 
 	bool loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value, uint64_t cor_id);
 
