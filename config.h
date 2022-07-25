@@ -127,7 +127,7 @@
 /***********************************************/
 #define CENTER_CNT  4
 #define NODE_CNT 8
-#define THREAD_CNT 5
+#define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -168,7 +168,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 10000
+#define MAX_TXN_IN_FLIGHT 5000
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -207,7 +207,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 100000000UL
+#define NETWORK_DELAY 0UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
