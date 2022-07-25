@@ -584,7 +584,7 @@ def ycsb_cross_dc():
     load = [10000]
     tcnt = [5]  #THREAD_CNT
     skew = [0.2]
-    cross_dc_perc = [1] 
+    cross_dc_perc = [0.5] 
     # cross_dc_perc = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
 
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CROSS_DC_TXN_PERC"]
