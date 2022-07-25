@@ -793,7 +793,11 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
       ready_starttime = get_sys_clock();
       bool ready;
-      if(msg->rtype == RFIN && !txn_man->finish_logging) ready = false;
+      if((msg->rtype == RQRY || msg->rtype == RFIN) && msg->current_abort_cnt > txn_man->txn_stats.abort_cnt){
+        // assert(msg->current_abort_cnt > txn_man->txn_stats.abort_cnt);
+        ready = false;
+      }
+      else if(msg->rtype == RFIN && !txn_man->finish_logging) ready = false;
       else ready = txn_man->unset_ready(); 
       
       INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
@@ -1583,7 +1587,6 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   }
 
 #if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT)
-	
   if(txn_man->get_rsp_cnt() == 0 && !txn_man->need_extra_wait()){
     // assert(false);
 		assert(IS_LOCAL(txn_man->get_txn_id()));
@@ -1607,7 +1610,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
 	}
 #endif	
 
-  check_if_done(rc);
+  // check_if_done(rc);
   #endif
   return rc;
 }
