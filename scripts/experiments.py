@@ -598,11 +598,11 @@ def ycsb_network_delay():
     base_table_size=1048576
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
-    load = [10000]
-    tcnt = [5]  #THREAD_CNT
+    load = [5000]
+    tcnt = [10]  #THREAD_CNT
     skew = [0.2]
     cross_dc_perc = [1]
-    network_delay = ['50000000UL','100000000UL','150000000UL','200000000UL','250000000UL','300000000UL','350000000UL','400000000UL','450000000UL','500000000UL'] 
+    network_delay = ['0UL'] 
     # network_delay = ['50000000UL','10000000UL'] 
     # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
 
