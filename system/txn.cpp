@@ -424,6 +424,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	for(int i=0;i<CENTER_CNT;i++){
 		is_primary[i] = false; 	
 	}
+	#if WORKLOAD == YCSB
 	for(int i=0;i<REQ_PER_QUERY;i++){
 		for(int j=0;j<2;j++){
 			extra_wait[i][j] = -1;
@@ -432,6 +433,22 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	for(int i=0;i<REQ_PER_QUERY;i++){
 		req_need_wait[i] = false;	
 	}
+	#else 
+	wh_need_wait = false;
+	wh_extra_wait[0] = -1;
+	wh_extra_wait[1] = -1;
+	cus_need_wait = false;
+	cus_extra_wait[0] = -1;
+	cus_extra_wait[1] = -1;
+	for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+		for(int j=0;j<2;j++){
+			extra_wait[i][j] = -1;
+		}
+	}
+	for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+		req_need_wait[i] = false;	
+	}
+	#endif
 	commit_timestamp = 0;
 	rsp_cnt = 0;
 	abort_cnt = 0;
@@ -454,6 +471,7 @@ void TxnManager::reset() {
 	for(int i=0;i<CENTER_CNT;i++){
 		is_primary[i] = false; 	
 	}
+	#if WORKLOAD == YCSB
 	for(int i=0;i<REQ_PER_QUERY;i++){
 		for(int j=0;j<2;j++){
 			extra_wait[i][j] = -1;
@@ -462,6 +480,22 @@ void TxnManager::reset() {
 	for(int i=0;i<REQ_PER_QUERY;i++){
 		req_need_wait[i] = false;	
 	}
+	#else 
+	wh_need_wait = false;
+	wh_extra_wait[0] = -1;
+	wh_extra_wait[1] = -1;
+	cus_need_wait = false;
+	cus_extra_wait[0] = -1;
+	cus_extra_wait[1] = -1;
+	for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+		for(int j=0;j<2;j++){
+			extra_wait[i][j] = -1;
+		}
+	}
+	for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+		req_need_wait[i] = false;	
+	}
+	#endif
 
 
 	//ready = true;
@@ -554,6 +588,7 @@ void TxnManager::release() {
 	for(int i=0;i<CENTER_CNT;i++){
 		is_primary[i] = false; 	
 	}
+	#if WORKLOAD == YCSB
 	for(int i=0;i<REQ_PER_QUERY;i++){
 		for(int j=0;j<2;j++){
 			extra_wait[i][j] = -1;
@@ -562,6 +597,22 @@ void TxnManager::release() {
 	for(int i=0;i<REQ_PER_QUERY;i++){
 		req_need_wait[i] = false;	
 	}
+	#else 
+	wh_need_wait = false;
+	wh_extra_wait[0] = -1;
+	wh_extra_wait[1] = -1;
+	cus_need_wait = false;
+	cus_extra_wait[0] = -1;
+	cus_extra_wait[1] = -1;
+	for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+		for(int j=0;j<2;j++){
+			extra_wait[i][j] = -1;
+		}
+	}
+	for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+		req_need_wait[i] = false;	
+	}
+	#endif
 }
 
 void TxnManager::reset_query() {
@@ -842,12 +893,30 @@ void TxnManager::send_finish_messages() {
 	// printf("c_rsp_cnt: %d\n", rsp_cnt);
 
 	//get req_need_wait
+
+	#if WORKLOAD == YCSB
 	for(int i=0;i<REQ_PER_QUERY;i++){
 		if(extra_wait[i][0] != -1){
 			assert(extra_wait[i][1] != -1);
 			req_need_wait[i] = true;
 		}
 	}	
+	#else 
+	if (wh_extra_wait[0] != -1) {
+		assert(wh_extra_wait[1] != -1);
+		wh_need_wait = true;
+	}
+	if (cus_extra_wait[0] != -1) {
+		assert(cus_extra_wait[1] != -1);
+		cus_need_wait = true;
+	}
+	for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+		if (extra_wait[i][0] != -1) {
+			assert(extra_wait[i][1] != -1);
+			req_need_wait[i] = true;
+		}
+	}
+	#endif
 	
 	assert(IS_LOCAL(get_txn_id()));
 	DEBUG("%ld Send FINISH messages to %d\n",get_txn_id(),rsp_cnt);

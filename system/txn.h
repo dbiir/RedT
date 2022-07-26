@@ -219,10 +219,18 @@ public:
 	ts_t            get_start_timestamp();
 	uint64_t        get_rsp_cnt() {return rsp_cnt;}
 	bool			need_extra_wait() {
+		#if WORKLOAD == YCSB
 		for(int i=0;i<REQ_PER_QUERY;i++){
 			if(req_need_wait[i]) return true;
 		}
 		return false;
+		#else 
+		if (cus_need_wait || wh_need_wait) return true;
+		for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+			if(req_need_wait[i]) return true;
+		}
+		return false;
+		#endif
 	}
 	uint64_t        incr_rsp(int i);
 	uint64_t        decr_rsp(int i);
@@ -309,9 +317,19 @@ public:
 	int volatile    ready_ulk;
 	std::map<uint64_t, uint64_t> center_master;
 	bool is_primary[CENTER_CNT]; //is center_master has primary replica or not
+	#if WORKLOAD == YCSB
 	int extra_wait[REQ_PER_QUERY][2];
 	bool req_need_wait[REQ_PER_QUERY];
-
+	#elif WORKLOAD == TPCC
+	int wh_extra_wait[2];
+	bool wh_need_wait;
+	//for payment
+	int cus_extra_wait[2];
+	bool cus_need_wait;
+	//for neworder
+	int extra_wait[MAX_ITEMS_PER_TXN][2];
+	bool req_need_wait[MAX_ITEMS_PER_TXN];
+	#endif
 #if CC_ALG == SILO
 	ts_t 			last_tid;
     ts_t            max_tid;
