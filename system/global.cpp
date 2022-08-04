@@ -417,3 +417,11 @@ int max_num_atomic_retry = 0;
 int max_batch_index = REQ_PER_QUERY; 
 
 uint64_t extra_wait_time = 0;
+
+uint64_t total_local_txn_commit = 0;
+uint64_t total_num_msgs_rw = 0;
+uint64_t total_num_msgs_prep = 0;
+uint64_t total_num_msgs_commit = 0;
+uint64_t max_num_msgs_rw = 0;
+uint64_t max_num_msgs_prep = 0;
+uint64_t max_num_msgs_commit = 0;

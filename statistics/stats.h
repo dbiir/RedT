@@ -150,10 +150,23 @@ public:
   uint64_t trans_store_access_count=0;
   uint64_t trans_get_row_count=0;
   double trans_total_run_time=0;
+  double trans_commit_total_run_time=0;
+  double trans_abort_total_run_time=0;
   double trans_init_time=0;
   double trans_process_time=0;
   double trans_2pc_time=0;
   double trans_prepare_time=0;
+
+  double trans_read_write_time=0;
+  uint64_t trans_read_write_count=0;
+  double trans_logging_time=0;
+  uint64_t trans_logging_count=0;
+  double trans_fin_time=0;
+  uint64_t trans_fin_count=0;
+  double trans_prepare_message_time=0;
+  uint64_t trans_prepare_message_count=0;
+  double trans_prepare_log_message_time=0;
+  uint64_t trans_prepare_log_message_count=0;
 
   double rdma_read_time = 0;
   double rdma_write_time = 0;

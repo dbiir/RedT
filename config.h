@@ -114,8 +114,8 @@
 // Simulation + Hardware
 /***********************************************/
 #define CENTER_CNT 4
-#define NODE_CNT 4
-#define THREAD_CNT 10
+#define NODE_CNT 8
+#define THREAD_CNT 40
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -156,7 +156,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 10000
+#define MAX_TXN_IN_FLIGHT 320
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -185,7 +185,7 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 7658
+#define TPORT_PORT 4560
 #define TPORT_TWOSIDE_PORT 15000
 #define RDMA_TPORT 9214
 #define SET_AFFINITY true
@@ -195,7 +195,7 @@
 #define HEADER_SIZE sizeof(uint32_t)*2 // in bits
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
-#define NETWORK_DELAY_TEST true
+#define NETWORK_DELAY_TEST false
 #define NETWORK_DELAY 100000000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
@@ -223,6 +223,9 @@
 #define USE_TAPIR false
 #define MAJORITY true
 #define INTER_DC_CONTROL true
+
+#define TAPIR_DEBUG false
+#define TAPIR_REPLICA false
 
 #if RDMA_ONE_SIDE 
 #define BATCH_INDEX_AND_READ false //keep this "false", a fail test for SILO
@@ -359,13 +362,13 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 16777216
+#define SYNTH_TABLE_SIZE 33554432
 #define ZIPF_THETA 0.2
-#define TXN_WRITE_PERC 0.5
+#define TXN_WRITE_PERC 1
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 2
+#define PART_PER_TXN 4
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10

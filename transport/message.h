@@ -53,6 +53,7 @@ public:
   uint64_t send_time;
 
   // Collect other stats
+  uint64_t current_abort_cnt;
   double lat_work_queue_time;
   double lat_msg_queue_time;
   double lat_cc_block_time;

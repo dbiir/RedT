@@ -121,12 +121,14 @@ public:
 										uint64_t timespan_short);
 	uint64_t starttime;
 	uint64_t restart_starttime;
-  uint64_t init_complete_time;
+  	uint64_t init_complete_time;
 	uint64_t wait_starttime;
 	uint64_t write_cnt;
 	uint64_t abort_cnt;
 	uint64_t prepare_start_time;
 	uint64_t finish_start_time;
+	uint64_t log_start_time;
+
 	double total_process_time;
 	double process_time;
 	double total_local_wait_time;
@@ -285,6 +287,11 @@ public:
 	int volatile    ready_part;
 	int volatile    ready_ulk;
 
+	uint64_t num_msgs_rw;
+	uint64_t num_msgs_prep;
+	uint64_t num_msgs_commit;	
+
+
 #if CC_ALG == SILO
 	ts_t 			last_tid;
     ts_t            max_tid;
@@ -406,6 +413,9 @@ public:
 	uint64_t _lock_acquire_time;
 	uint64_t _lock_acquire_time_commit;
 	uint64_t _lock_acquire_time_abort;
+	uint64_t start_rw_time;
+	uint64_t start_logging_time;
+	uint64_t start_fin_time;
 	////////////////////////////////
 	// LOGGING
 	////////////////////////////////
