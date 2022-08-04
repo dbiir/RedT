@@ -921,7 +921,7 @@ def ycsb_partitions_distr():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [2]
+    nnodes = [8]
     # nnodes = [8,16]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
@@ -935,11 +935,11 @@ def tpcc_scaling():
     nalgos = ['RDMA_NO_WAIT']
     # nalgos = ['RDMA_CALVIN']
     # npercpay=[1.0]
-    npercpay=[1.0]
-    wh=32
+    npercpay=[0.0]
+    wh=16
     # wh=64
-    load = [10000]
-    tcnt = [4]
+    load = [80]
+    tcnt = [10]
     ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]

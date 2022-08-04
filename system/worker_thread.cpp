@@ -907,11 +907,27 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     // if(responses_left<0) return RCOK; //!   ?????????啥意思
   }else{  
     if(!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt || txn_man->get_commit_timestamp() != 0) return RCOK;
+    #if WORKLOAD == YCSB
     for(int i=0;i<REQ_PER_QUERY;i++){
       if(txn_man->extra_wait[i][0] == center_from || txn_man->extra_wait[i][1] == center_from){
         txn_man->req_need_wait[i] = false;
       }
     }  
+    #else
+    if (txn_man->wh_extra_wait[0] == center_from ||
+        txn_man->wh_extra_wait[1] == center_from) {
+      txn_man->wh_need_wait = false;
+    }
+    if (txn_man->cus_extra_wait[0] == center_from ||
+        txn_man->cus_extra_wait[1] == center_from) {
+      txn_man->cus_need_wait = false;
+    }
+    for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+      if(txn_man->extra_wait[i][0] == center_from || txn_man->extra_wait[i][1] == center_from){
+        txn_man->req_need_wait[i] = false;
+      }
+    }  
+    #endif
     responses_left = txn_man->get_rsp_cnt();
   }
   // else{  // !从副本的返回是不管吗
@@ -975,9 +991,18 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #endif
 
   if (responses_left > 0) return WAIT;
+  #if WORKLOAD == YCSB
   for(int i=0;i<REQ_PER_QUERY;i++){
     if(txn_man->req_need_wait[i]) return WAIT;
   }
+  #else 
+  if (txn_man->wh_need_wait || txn_man->cus_need_wait) {
+    return WAIT;
+  }
+  for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+    if(txn_man->req_need_wait[i]) return WAIT;
+  }
+  #endif
   // Done waiting
   txn_man->set_commit_timestamp(get_next_ts());
 
@@ -1047,11 +1072,27 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
       return RCOK;
     }
     assert(txn_man->get_commit_timestamp() != 0);
+    #if WORKLOAD == YCSB
     for(int i=0;i<REQ_PER_QUERY;i++){
       if(txn_man->extra_wait[i][0] == center_from || txn_man->extra_wait[i][1] == center_from){
         txn_man->req_need_wait[i] = false;
       }
     }  
+    #else
+    if (txn_man->wh_extra_wait[0] == center_from ||
+        txn_man->wh_extra_wait[1] == center_from) {
+      txn_man->wh_need_wait = false;
+    }
+    if (txn_man->cus_extra_wait[0] == center_from ||
+        txn_man->cus_extra_wait[1] == center_from) {
+      txn_man->cus_need_wait = false;
+    }
+    for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+      if(txn_man->extra_wait[i][0] == center_from || txn_man->extra_wait[i][1] == center_from){
+        txn_man->req_need_wait[i] = false;
+      }
+    }  
+    #endif
     responses_left = txn_man->get_rsp_cnt();
   }
   // else{  // !从副本的返回是不管吗
@@ -1060,9 +1101,18 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
 
   assert(responses_left >=0);
   if (responses_left > 0) return WAIT;
+  #if WORKLOAD == YCSB
   for(int i=0;i<REQ_PER_QUERY;i++){
     if(txn_man->req_need_wait[i]) return WAIT;
   }
+  #else 
+  if (txn_man->wh_need_wait || txn_man->cus_need_wait) {
+    return WAIT;
+  }
+  for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+    if(txn_man->req_need_wait[i]) return WAIT;
+  }
+  #endif
 
   // Done waiting
   uint64_t curr_time = get_sys_clock();

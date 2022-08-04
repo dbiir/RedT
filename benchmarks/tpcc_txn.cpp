@@ -350,12 +350,20 @@ bool TPCCTxnManager::is_local_item(uint64_t idx) {
 	return GET_NODE_ID(part_id_ol_supply_w) == g_node_id;
 }
 
-RC TPCCTxnManager::generate_center_master(uint64_t w_id) {
+RC TPCCTxnManager::generate_center_master(uint64_t w_id, access_t type) {
 	vector<uint64_t> node_id;
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
+#if USE_REPLICA
+	if (type == WR) {
+		node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
+		node_id.push_back(GET_FOLLOWER1_NODE(wh_to_part(w_id)));
+		node_id.push_back(GET_FOLLOWER2_NODE(wh_to_part(w_id)));
+	} else {
+		node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
+	}
+#else
 	node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
-	node_id.push_back(GET_FOLLOWER1_NODE(wh_to_part(w_id)));
-	node_id.push_back(GET_FOLLOWER2_NODE(wh_to_part(w_id)));
+#endif
 	for(int j=0;j<node_id.size();j++){
 		uint64_t center_id = GET_CENTER_ID(node_id[j]);
 		remote_center[center_id].push_back(w_id);
@@ -372,7 +380,6 @@ RC TPCCTxnManager::generate_center_master(uint64_t w_id) {
 			is_primary[center_id] = (j == 0 ? true : false); 
 		}
 	}
-	
 }
 
 RC TPCCTxnManager::send_remote_subtxn() {
@@ -384,21 +391,21 @@ RC TPCCTxnManager::send_remote_subtxn() {
 
 	// 
 	uint64_t w_id = tpcc_query->w_id;
-	generate_center_master(w_id);
+	generate_center_master(w_id, WR);
 
 	// for payment
 	uint64_t d_w_id = tpcc_query->d_w_id;
 	uint64_t c_w_id = tpcc_query->c_w_id;
 	if (tpcc_query->txn_type == TPCC_PAYMENT) {
-		generate_center_master(d_w_id);
-		generate_center_master(c_w_id);
+		generate_center_master(d_w_id, WR);
+		generate_center_master(c_w_id, WR);
 	}
 	// for neworder
 	if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
 		for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
 			uint64_t ol_number = i;
 			uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
-			generate_center_master(ol_supply_w_id);
+			generate_center_master(ol_supply_w_id, WR);
 		}
 	}
 	rsp_cnt = 0;
@@ -406,6 +413,53 @@ RC TPCCTxnManager::send_remote_subtxn() {
 		if(is_primary[query->centers_touched[i]]) ++rsp_cnt;
 	}
 	--rsp_cnt; //exclude this center
+
+	uint64_t center_id1 = GET_CENTER_ID(GET_FOLLOWER1_NODE(wh_to_part(w_id)));
+	uint64_t center_id2 = GET_CENTER_ID(GET_FOLLOWER2_NODE(wh_to_part(w_id)));
+	if(is_primary[center_id1] || is_primary[center_id2]){
+		//no extra wait for req i
+		wh_extra_wait[0] = -1;
+		wh_extra_wait[1] = -1;			
+	}else{
+		wh_need_wait = true;
+		wh_extra_wait[0] = center_id1;
+		wh_extra_wait[1] = center_id2;
+	}
+
+	if (tpcc_query->txn_type == TPCC_PAYMENT){
+		// customer wait
+		center_id1 = GET_CENTER_ID(GET_FOLLOWER1_NODE(wh_to_part(c_w_id)));
+		center_id2 = GET_CENTER_ID(GET_FOLLOWER2_NODE(wh_to_part(c_w_id)));
+		if(is_primary[center_id1] || is_primary[center_id2]){
+			//no extra wait for req i
+			cus_extra_wait[0] = -1;
+			cus_extra_wait[1] = -1;			
+		}else{
+			cus_need_wait = true;
+			cus_extra_wait[0] = center_id1;
+			cus_extra_wait[1] = center_id2;
+		}
+	}
+
+	if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
+		for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
+			uint64_t ol_number = i;
+			uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
+			center_id1 = GET_CENTER_ID(GET_FOLLOWER1_NODE(wh_to_part(ol_supply_w_id)));
+			center_id2 = GET_CENTER_ID(GET_FOLLOWER2_NODE(wh_to_part(ol_supply_w_id)));
+
+			if(is_primary[center_id1] || is_primary[center_id2]){
+				//no extra wait for req i
+				extra_wait[i][0] = -1;
+				extra_wait[i][1] = -1;			
+			}else{
+				req_need_wait[i] = true;
+				extra_wait[i][0] = center_id1;
+				extra_wait[i][1] = center_id2;
+			}
+		}
+	}
+
 	for(int i = 0; i < g_center_cnt; i++) {
 		if(remote_center[i].size() > 0 && i != g_center_id) {//send message to all masters
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),center_master[i]);
@@ -708,15 +762,15 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			}
 			break;
 		case TPCC_NEWORDER0 :
-						if(w_loc)
-							rc = new_order_0( yield,w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row,cor_id);
-                        else {
+			if(w_loc)
+				rc = new_order_0( yield,w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row,cor_id);
+			else {
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
-								rc = RCOK;
+				rc = RCOK;
 #else
-								rc = send_remote_request();
+				rc = send_remote_request();
 #endif
-						}
+			}
 			break;
 		case TPCC_NEWORDER1 :
 			if(w_loc) {
@@ -784,7 +838,7 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			}
 			break;
 		default:
-				assert(false);
+			assert(false);
 	}
 	starttime = get_sys_clock();
 	if (rc == RCOK) next_tpcc_state();

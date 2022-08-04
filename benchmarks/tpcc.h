@@ -142,9 +142,9 @@ private:
 
   uint64_t next_item_id;
   vector<vector<uint64_t>> remote_center{g_center_cnt};
-void next_tpcc_state();
-RC generate_center_master(uint64_t w_id);
-RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
+  void next_tpcc_state();
+  RC generate_center_master(uint64_t w_id, access_t type);
+  RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
   bool is_done();
   bool is_local_item(uint64_t idx);
   RC send_remote_request();
