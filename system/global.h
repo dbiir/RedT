@@ -610,4 +610,11 @@ extern pthread_mutex_t * LOG_HEAD_LATCH[NODE_CNT];
 
 extern uint64_t extra_wait_time;
 
+
+extern uint64_t total_local_txn_commit;
+extern uint64_t total_num_msgs_rw_prep;
+extern uint64_t total_num_msgs_commit;
+extern uint64_t max_num_msgs_rw_prep;
+extern uint64_t max_num_msgs_commit;
+
 #endif

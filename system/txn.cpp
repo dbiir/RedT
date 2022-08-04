@@ -421,6 +421,9 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	twopl_wait_start = 0;
 	txn_stats.init();
 	finish_logging = false;
+	
+	num_msgs_commit = 0;
+	num_msgs_rw_prep = 0;
 	for(int i=0;i<CENTER_CNT;i++){
 		is_primary[i] = false; 	
 	}
@@ -450,7 +453,10 @@ void TxnManager::reset() {
 	aborted = false;
 	return_id = UINT64_MAX;
 	twopl_wait_start = 0;
-	finish_logging = false;	
+	finish_logging = false;
+
+	num_msgs_commit = 0;
+	num_msgs_rw_prep = 0;
 	for(int i=0;i<CENTER_CNT;i++){
 		is_primary[i] = false; 	
 	}
@@ -462,8 +468,6 @@ void TxnManager::reset() {
 	for(int i=0;i<REQ_PER_QUERY;i++){
 		req_need_wait[i] = false;	
 	}
-
-
 	//ready = true;
 
 	// MaaT & DTA & WKDB
@@ -550,7 +554,8 @@ void TxnManager::release() {
   // mem_allocator.free(write_set, sizeof(int) * 100);
 #endif
 	txn_ready = true;
-
+	num_msgs_commit = 0;
+	num_msgs_rw_prep = 0;
 	for(int i=0;i<CENTER_CNT;i++){
 		is_primary[i] = false; 	
 	}
@@ -686,9 +691,9 @@ RC TxnManager::start_abort(yield_func_t &yield, uint64_t cor_id) {
 
 	uint64_t finish_start_time = get_sys_clock();
 	txn_stats.finish_start_time = finish_start_time;
-	uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    INC_STATS(get_thd_id(), trans_prepare_count, 1);
+	// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
+	// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+    // INC_STATS(get_thd_id(), trans_prepare_count, 1);
 	//RDMA_SILO:keep message or not
 #if CENTER_MASTER == true
     if(query->centers_touched.size() > 1 && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT2 && CC_ALG != RDMA_WAIT_DIE2  && CC_ALG != RDMA_MAAT && CC_ALG != RDMA_CICADA && CC_ALG != RDMA_WOUND_WAIT2 && CC_ALG != RDMA_WAIT_DIE && CC_ALG != RDMA_WOUND_WAIT) {
@@ -754,9 +759,9 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		} else {
 			uint64_t finish_start_time = get_sys_clock();
 			txn_stats.finish_start_time = finish_start_time;
-			uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-			INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-      		INC_STATS(get_thd_id(), trans_prepare_count, 1);
+			// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
+			// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+      		// INC_STATS(get_thd_id(), trans_prepare_count, 1);
 			if(CC_ALG == WSI) {
 				wsi_man.gene_finish_ts(this);
 			}
@@ -771,9 +776,9 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
 
-		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-		INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    	INC_STATS(get_thd_id(), trans_prepare_count, 1);
+		// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
+		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+    	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
 		if(CC_ALG == SSI) {
 			ssi_man.gene_finish_ts(this);
 		}
@@ -848,7 +853,7 @@ void TxnManager::send_finish_messages() {
 			req_need_wait[i] = true;
 		}
 	}	
-	
+	assert(num_msgs_commit==0);
 	assert(IS_LOCAL(get_txn_id()));
 	DEBUG("%ld Send FINISH messages to %d\n",get_txn_id(),rsp_cnt);
 	for(uint64_t i = 0; i < query->centers_touched.size(); i++) {
@@ -858,6 +863,7 @@ void TxnManager::send_finish_messages() {
 #if USE_RDMA == CHANGE_MSG_QUEUE
         tport_man.rdma_thd_send_msg(get_thd_id(), this->center_master[query->centers_touched[i]]), Message::create_message(this, RFIN));
 #else
+		num_msgs_commit++;
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN),
 											this->center_master[query->centers_touched[i]]);
 #endif
@@ -878,6 +884,7 @@ void TxnManager::send_finish_messages() {
 #endif
 #endif
 	}
+	assert(num_msgs_commit==num_msgs_rw_prep);
 }
 
 int TxnManager::received_response(RC rc) {

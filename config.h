@@ -127,7 +127,7 @@
 /***********************************************/
 #define CENTER_CNT  4
 #define NODE_CNT 8
-#define THREAD_CNT 10
+#define THREAD_CNT 40
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -168,7 +168,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 5000
+#define MAX_TXN_IN_FLIGHT 320
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -197,7 +197,7 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 7658
+#define TPORT_PORT 4222
 #define TPORT_TWOSIDE_PORT 13000
 #define SET_AFFINITY true
 
@@ -370,7 +370,7 @@
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 8388608
 #define ZIPF_THETA 0.2
-#define TXN_WRITE_PERC 0.5
+#define TXN_WRITE_PERC 1
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
@@ -382,7 +382,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 0.5
+#define CROSS_DC_TXN_PERC 1
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.

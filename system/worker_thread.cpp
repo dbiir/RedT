@@ -295,7 +295,7 @@ void WorkerThread::co_commit(uint64_t cor_id) {
   uint64_t timespan_short  = end_time - cor_txn_man[cor_id]->txn_stats.restart_starttime;
   uint64_t two_pc_timespan  = end_time - cor_txn_man[cor_id]->txn_stats.prepare_start_time;
   uint64_t finish_timespan  = end_time - cor_txn_man[cor_id]->txn_stats.finish_start_time;
-  uint64_t prepare_timespan = cor_txn_man[cor_id]->txn_stats.finish_start_time - cor_txn_man[cor_id]->txn_stats.prepare_start_time;
+  uint64_t prepare_timespan = cor_txn_man[cor_id]->txn_stats.finish_start_time - cor_txn_man[cor_id]->txn_stats.restart_starttime;
   INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
   INC_STATS(get_thd_id(), trans_prepare_count, 1);
 
@@ -334,7 +334,7 @@ void WorkerThread::co_abort(uint64_t cor_id) {
   uint64_t timespan_short  = end_time - cor_txn_man[cor_id]->txn_stats.restart_starttime;
   uint64_t two_pc_timespan  = end_time - cor_txn_man[cor_id]->txn_stats.prepare_start_time;
   uint64_t finish_timespan  = end_time - cor_txn_man[cor_id]->txn_stats.finish_start_time;
-  uint64_t prepare_timespan = cor_txn_man[cor_id]->txn_stats.finish_start_time - cor_txn_man[cor_id]->txn_stats.prepare_start_time;
+  uint64_t prepare_timespan = cor_txn_man[cor_id]->txn_stats.finish_start_time - cor_txn_man[cor_id]->txn_stats.restart_starttime;
   INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
   INC_STATS(get_thd_id(), trans_prepare_count, 1);
 
@@ -403,6 +403,13 @@ void WorkerThread::calvin_wrapup(yield_func_t &yield, uint64_t cor_id) {
 
 // Can't use txn_man after this function
 void WorkerThread::commit() {
+  
+  total_local_txn_commit++;
+  total_num_msgs_rw_prep += txn_man->num_msgs_rw_prep;
+  total_num_msgs_commit += txn_man->num_msgs_commit;
+  if(txn_man->num_msgs_rw_prep > max_num_msgs_rw_prep) max_num_msgs_rw_prep = txn_man->num_msgs_rw_prep;
+  if(txn_man->num_msgs_commit > max_num_msgs_commit) max_num_msgs_commit = txn_man->num_msgs_commit;
+
   assert(txn_man);
   assert(IS_LOCAL(txn_man->get_txn_id()));
 
@@ -415,7 +422,7 @@ void WorkerThread::commit() {
   uint64_t timespan_short  = end_time - txn_man->txn_stats.restart_starttime;
   uint64_t two_pc_timespan  = end_time - txn_man->txn_stats.prepare_start_time;
   uint64_t finish_timespan  = end_time - txn_man->txn_stats.finish_start_time;
-  uint64_t prepare_timespan = txn_man->txn_stats.finish_start_time - txn_man->txn_stats.prepare_start_time;
+  uint64_t prepare_timespan = txn_man->txn_stats.finish_start_time - txn_man->txn_stats.restart_starttime;
   INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
   INC_STATS(get_thd_id(), trans_prepare_count, 1);
 
@@ -454,7 +461,7 @@ void WorkerThread::abort() {
   uint64_t timespan_short  = end_time - txn_man->txn_stats.restart_starttime;
   uint64_t two_pc_timespan  = end_time - txn_man->txn_stats.prepare_start_time;
   uint64_t finish_timespan  = end_time - txn_man->txn_stats.finish_start_time;
-  uint64_t prepare_timespan = txn_man->txn_stats.finish_start_time - txn_man->txn_stats.prepare_start_time;
+  uint64_t prepare_timespan = txn_man->txn_stats.finish_start_time - txn_man->txn_stats.restart_starttime;
   INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
   INC_STATS(get_thd_id(), trans_prepare_count, 1);
 
@@ -750,9 +757,28 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
     if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O) || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) {
       txn_man = get_transaction_manager(msg);
+
+      ready_starttime = get_sys_clock();
+      bool ready;
+      if((msg->rtype == RQRY || msg->rtype == RFIN) && msg->current_abort_cnt > txn_man->txn_stats.abort_cnt){
+        // assert(msg->current_abort_cnt > txn_man->txn_stats.abort_cnt);
+        ready = false;
+      }
+      else if(msg->rtype == RFIN && !txn_man->finish_logging) ready = false;
+      else ready = txn_man->unset_ready(); 
+      
+      INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
+      if(!ready) {
+        // Return to work queue, end processing
+        work_queue.enqueue(get_thd_id(),msg,true);
+        continue;
+      }
+
       if(!txn_man->txn){
         assert(msg->rtype == RACK_PREP || msg->rtype == RACK_FIN);
-        //   printf("---\n");
+        //   printf("---\n");        
+          bool ready = txn_man->set_ready();
+          assert(ready);
         continue; // in majority, txn_man may has been destroyed when receive msgs
       } 
 
@@ -790,22 +816,6 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
       msg->wq_time = 0;
       txn_man->txn_stats.work_queue_cnt += 1;
 
-
-      ready_starttime = get_sys_clock();
-      bool ready;
-      if((msg->rtype == RQRY || msg->rtype == RFIN) && msg->current_abort_cnt > txn_man->txn_stats.abort_cnt){
-        // assert(msg->current_abort_cnt > txn_man->txn_stats.abort_cnt);
-        ready = false;
-      }
-      else if(msg->rtype == RFIN && !txn_man->finish_logging) ready = false;
-      else ready = txn_man->unset_ready(); 
-      
-      INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
-      if(!ready) {
-        // Return to work queue, end processing
-        work_queue.enqueue(get_thd_id(),msg,true);
-        continue;
-      }
 #if !USE_COROUTINE
       txn_man->register_thread(this);
 #endif

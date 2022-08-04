@@ -32,7 +32,8 @@ names = summary.keys()
 
 # print a, b, c
 
-a, b, c, d, f = 0, 0, 0, 0, 0
+a, b, c, d, e, f, g, h = 0, 0, 0, 0, 0, 0, 0, 0,
+m, n, p, q =  0, 0, 0, 0
 if 'tput' in summary:
     a = sum(summary['tput'])
 if 'total_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
@@ -50,4 +51,14 @@ if 'txn_cnt' in summary:
     h = sum(summary['txn_cnt']) 
 if 'worker_oneside_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
     f = sum(summary['worker_oneside_cnt']) / (sum(summary['total_txn_commit_cnt']) + sum(summary['total_txn_abort_cnt']))
-print a, b, e, f, g / h
+if 'max_num_msgs_rw_prep' in summary:
+    m = max(summary['max_num_msgs_rw_prep']) 
+if 'max_num_msgs_commit' in summary:
+    n = max(summary['max_num_msgs_commit']) 
+if 'avg_num_msgs_rw_prep' in summary:
+    p = sum(summary['avg_num_msgs_rw_prep']) 
+if 'avg_num_msgs_commit' in summary:
+    q = sum(summary['avg_num_msgs_commit']) 
+
+# print a, b, e, f, g / h
+print a, b, e, m, n, p, q  

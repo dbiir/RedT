@@ -763,6 +763,10 @@ void Stats_thd::print(FILE * outf, bool prog) {
 
   fprintf(outf,
   ",avg_trans_total_run_time=%f"
+  ",avg_num_msgs_rw_prep=%f"
+  ",avg_num_msgs_commit=%f"
+  ",max_num_msgs_rw_prep=%lu"
+  ",max_num_msgs_commit=%lu"
   ",avg_trans_init_time=%f"
   ",avg_trans_process_time=%f"
   ",avg_trans_get_access_time=%f"
@@ -777,7 +781,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",avg_trans_finish_time=%f"
   ",avg_trans_commit_time=%f"
   ",avg_trans_abort_time=%f",
-          trans_total_run_time / (trans_total_count * BILLION), trans_init_time / (trans_init_count * BILLION), trans_process_time / (trans_process_count * BILLION),
+          trans_total_run_time / (trans_total_count * BILLION), (double)total_num_msgs_rw_prep / (double)total_local_txn_commit, (double)total_num_msgs_commit / (double)total_local_txn_commit, max_num_msgs_rw_prep, max_num_msgs_commit, trans_init_time / (trans_init_count * BILLION), trans_process_time / (trans_process_count * BILLION),
           trans_get_access_time / (trans_get_access_count * BILLION), trans_store_access_time / (trans_store_access_count * BILLION), trans_get_row_time / (trans_get_row_count * BILLION),
           trans_2pc_time / (trans_2pc_count * BILLION),
           trans_prepare_time / (trans_prepare_count * BILLION),

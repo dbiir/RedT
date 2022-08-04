@@ -311,6 +311,8 @@ public:
 	bool is_primary[CENTER_CNT]; //is center_master has primary replica or not
 	int extra_wait[REQ_PER_QUERY][2];
 	bool req_need_wait[REQ_PER_QUERY];
+	uint64_t num_msgs_rw_prep;
+	uint64_t num_msgs_commit;	
 
 #if CC_ALG == SILO
 	ts_t 			last_tid;

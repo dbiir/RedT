@@ -360,10 +360,12 @@ RC YCSBTxnManager::send_remote_subtxn() {
 			extra_wait[i][1] = -1;			
 		}
 	}
-
+	
+	assert(num_msgs_rw_prep==0);
 	for(int i = 0; i < g_center_cnt; i++) {
 		if(remote_center[i].size() > 0 && i != g_center_id) {//send message to all masters
 			remote_next_center_id = i;
+			num_msgs_rw_prep++;
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),center_master[i]);
 		}
 	}

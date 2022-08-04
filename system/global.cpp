@@ -294,14 +294,16 @@ UInt64 tuple_count = 0;
 UInt64 max_tuple_size = 0;
 pthread_mutex_t * RDMA_MEMORY_LATCH;
 
+// UInt64 rdma_buffer_size = 4*(1024*1024*1024L);
 UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 300*(1024*1024L);
 #if USE_REPLICA
+// UInt64 rdma_index_size = (10*1024*1024L*g_part_cnt);
 UInt64 rdma_index_size = (300*1024*1024L*g_part_cnt);
 #else
 UInt64 rdma_index_size = (300*1024*1024L);
 #endif
-//Replica redo log buffer size
+//Replica redo log buffer size, in bytes
 UInt64 rdma_log_size = 1024*1024*1024;
 
 // MAAT
@@ -450,3 +452,9 @@ uint64_t log_head[NODE_CNT] = {0};
 pthread_mutex_t * LOG_HEAD_LATCH[NODE_CNT];
 
 uint64_t extra_wait_time = 0;
+
+uint64_t total_local_txn_commit = 0;
+uint64_t total_num_msgs_rw_prep = 0;
+uint64_t total_num_msgs_commit = 0;
+uint64_t max_num_msgs_rw_prep = 0;
+uint64_t max_num_msgs_commit = 0;

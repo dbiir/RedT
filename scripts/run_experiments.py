@@ -72,7 +72,7 @@ for exp in exps:
     for e in experiments:
         cfgs = get_cfgs(fmt,e)
         if remote:
-            cfgs["TPORT_TYPE"], cfgs["TPORT_TYPE_IPC"], cfgs["TPORT_PORT"] = "tcp", "false", 7658
+            cfgs["TPORT_TYPE"], cfgs["TPORT_TYPE_IPC"], cfgs["TPORT_PORT"] = "tcp", "false", 4222
         output_f = get_outfile_name(cfgs, fmt)
         output_dir = output_f + "/"
         output_f += strnow
@@ -228,7 +228,7 @@ for exp in exps:
 
     wr = []
     for e in experiments:
-        wr.append(e[-4])
+        wr.append(e[-5])
     wr = sorted(list(set(wr)))
 
     cn = []

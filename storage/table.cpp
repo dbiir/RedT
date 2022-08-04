@@ -110,7 +110,9 @@ RC table_t::get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id) {
     // printf("[table.cpp:114]tuple_size = %ld \n",get_schema()->get_tuple_size());
     // printf("[table.cpp:115]tuple_size = %ld \n",row_t::get_row_size(get_schema()->get_tuple_size()));
     pthread_mutex_lock( RDMA_MEMORY_LATCH );
-    uint64_t size = row_t::get_row_size(get_schema()->get_tuple_size());
+    uint64_t size = row_t::get_row_size(get_schema()->get_tuple_size()); //size:1112
+	// printf("row_size:%lu\n",size);
+	// assert(false);
     row_t *ptr = (row_t*)r2::AllocatorMaster<>::get_thread_allocator()->alloc(size);
 	assert (ptr != NULL);
 
