@@ -10,8 +10,9 @@
 # sleep 30
 # python run_experiments.py -e -c vcloud ycsb_writes
 # sleep 30
-python run_experiments.py -e -c vcloud ycsb_tapir_writes
-sleep 30
+python run_experiments.py -e -c vcloud tpcc_scaling
+sleep 3
+python run_experiments.py -e -c vcloud tpcc_scaling_n
 # python run_experiments.py -e -c vcloud ycsb_network_delay
 # sleep 30
 # python run_experiments.py -e -c vcloud ycsb_tapir_network_delay

@@ -448,8 +448,7 @@ void WorkerThread::commit() {
 #endif
 #endif
   // remove txn from pool
-  if(txn_man != NULL)
-    release_txn_man();
+  // if(txn_man != NULL) release_txn_man();
   // Do not use txn_man after this
 }
 
@@ -911,7 +910,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
     msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN),
                       GET_NODE_ID(msg->get_txn_id()));
 #endif
-  release_txn_man();
+  // release_txn_man();
 
   return RCOK;
 }
@@ -1020,7 +1019,7 @@ RC WorkerThread::process_rack_fin_log(yield_func_t &yield, Message * msg, uint64
     }else{
       // printf("%d:%d send rack fin to %d\n", g_node_id, txn_man->get_txn_id(), txn_man->get_return_node());
       msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man,RACK_FIN),txn_man->get_return_node());
-      release_txn_man();
+      // release_txn_man();
     }    
   }
   return RCOK;
