@@ -162,7 +162,8 @@ BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
 #ifdef NO_REMOTE
   if(x >= 0) {
 #else
-	if(x > 0.15) {
+	// if(x > 0.15) {
+  if(x > 0.50) {
 #endif
 		// home warehouse
 		query->c_d_id = query->d_id;
@@ -171,8 +172,8 @@ BaseQuery * TPCCQueryGenerator::gen_payment(uint64_t home_partition) {
 		// remote warehouse
 		query->c_d_id = URand(1, g_dist_per_wh);
 		if(g_num_wh > 1) {
-      while ((query->c_w_id = URand(1, g_num_wh)) == query->w_id) {
-      }
+      while ((query->c_w_id = URand(1, g_num_wh)) == query->w_id ||
+      GET_CENTER_ID(GET_NODE_ID(wh_to_part(query->c_w_id))) == GET_CENTER_ID(GET_NODE_ID(wh_to_part(query->w_id))));
 			if (wh_to_part(query->w_id) != wh_to_part(query->c_w_id)) {
         partitions_accessed.insert(wh_to_part(query->c_w_id));
 			}
@@ -238,12 +239,16 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
     ol_i_ids.insert(item->ol_i_id);
     item->ol_quantity = URand(1, 10);
     double r_rem = (double)(rand() % 100000) / 100000;
-		if (r_rem > 0.01 || r_mpr > g_mpr || g_num_wh == 1) {
+		if (r_rem > 0.05 || r_mpr > g_mpr || g_num_wh == 1) {
 			// home warehouse
 			item->ol_supply_w_id = query->w_id;
     } else {
       if(partitions_accessed.size() < part_limit) {
         item->ol_supply_w_id = URand(1, g_num_wh);
+        while( GET_CENTER_ID(GET_NODE_ID(wh_to_part(item->ol_supply_w_id))) ==
+               GET_CENTER_ID(GET_NODE_ID(wh_to_part(query->w_id)))) {
+          item->ol_supply_w_id = URand(1, g_num_wh);
+        }
         partitions_accessed.insert(wh_to_part(item->ol_supply_w_id));
       } else {
         // select warehouse from among those already selected

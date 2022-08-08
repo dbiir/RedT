@@ -48,11 +48,24 @@ if 'read_retry_cnt' in summary:
     d = sum(summary['read_retry_cnt'])
 if 'avg_trans_total_run_time' in summary:
     e = sum(summary['avg_trans_total_run_time']) 
+if 'avg_trans_commit_time' in summary:
+    o = sum(summary['avg_trans_commit_time']) 
+if 'avg_trans_commit_total_run_time' in summary:
+    i = sum(summary['avg_trans_commit_total_run_time']) 
 if 'remote_txn_cnt' in summary:
     g = sum(summary['remote_txn_cnt']) 
 if 'txn_cnt' in summary:
     h = sum(summary['txn_cnt']) 
 if 'worker_oneside_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
     f = sum(summary['worker_oneside_cnt']) / (sum(summary['total_txn_commit_cnt']) + sum(summary['total_txn_abort_cnt']))
-print a, b, e, f, g / h
+if 'trans_read_write_count' in summary:
+    j = sum(summary['trans_read_write_count']) 
+if 'trans_fin_count' in summary:
+    k = sum(summary['trans_fin_count']) 
+if 'trans_read_write_time' in summary:
+    m = sum(summary['trans_read_write_time']) 
+if 'trans_fin_time' in summary:
+    n = sum(summary['trans_fin_time']) 
+print a, b, e, o, i, j, k, m, n
+# f, g / h
 # print a, b, f, g, h

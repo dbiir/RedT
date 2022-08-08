@@ -87,6 +87,7 @@ Message * Message::create_message(TxnManager * txn, RemReqType rtype, uint64_t t
   msg->copy_from_txn(txn);
 
   // copy latency here
+  msg->current_abort_cnt = txn->abort_cnt;
   msg->lat_work_queue_time = txn->txn_stats.work_queue_time_short;
   msg->lat_msg_queue_time = txn->txn_stats.msg_queue_time_short;
   msg->lat_cc_block_time = txn->txn_stats.cc_block_time_short;
@@ -217,6 +218,7 @@ Message * Message::create_message(RemReqType rtype) {
   msg->mq_time = 0;
   msg->ntwk_time = 0;
 
+  msg->current_abort_cnt = 0;
   msg->lat_work_queue_time = 0;
   msg->lat_msg_queue_time = 0;
   msg->lat_cc_block_time = 0;
@@ -241,6 +243,9 @@ uint64_t Message::mget_size() {
 
   // for stats, latency
   size += sizeof(uint64_t) * 7;
+
+  // for current_abort_cnt
+  size += sizeof(uint64_t);
   return size;
 }
 
@@ -263,6 +268,7 @@ void Message::mcopy_from_buf(char * buf) {
 #endif
   COPY_VAL(mq_time,buf,ptr);
 
+  COPY_VAL(current_abort_cnt,buf,ptr);
   COPY_VAL(lat_work_queue_time,buf,ptr);
   COPY_VAL(lat_msg_queue_time,buf,ptr);
   COPY_VAL(lat_cc_block_time,buf,ptr);
@@ -288,6 +294,7 @@ void Message::mcopy_to_buf(char * buf) {
 #endif
   COPY_BUF(buf,mq_time,ptr);
 
+  COPY_BUF(buf,current_abort_cnt,ptr);
   COPY_BUF(buf,lat_work_queue_time,ptr);
   COPY_BUF(buf,lat_msg_queue_time,ptr);
   COPY_BUF(buf,lat_cc_block_time,ptr);

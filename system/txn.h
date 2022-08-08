@@ -121,12 +121,14 @@ public:
 										uint64_t timespan_short);
 	uint64_t starttime;
 	uint64_t restart_starttime;
-  uint64_t init_complete_time;
+  	uint64_t init_complete_time;
 	uint64_t wait_starttime;
 	uint64_t write_cnt;
 	uint64_t abort_cnt;
 	uint64_t prepare_start_time;
 	uint64_t finish_start_time;
+	uint64_t log_start_time;
+
 	double total_process_time;
 	double process_time;
 	double total_local_wait_time;
@@ -406,6 +408,9 @@ public:
 	uint64_t _lock_acquire_time;
 	uint64_t _lock_acquire_time_commit;
 	uint64_t _lock_acquire_time_abort;
+	uint64_t start_rw_time;
+	uint64_t start_logging_time;
+	uint64_t start_fin_time;
 	////////////////////////////////
 	// LOGGING
 	////////////////////////////////
@@ -436,6 +441,8 @@ public:
 	bool unset_ready() {return ATOM_CAS(txn_ready,1,0);}
 	bool is_ready() {return txn_ready == true;}
 	volatile int txn_ready;
+	volatile bool finish_logging;
+
 	// Calvin
 	uint32_t lock_ready_cnt;
 	uint32_t calvin_expected_rsp_cnt;

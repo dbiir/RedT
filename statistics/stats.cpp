@@ -156,7 +156,21 @@ void Stats_thd::clear() {
   trans_get_access_count=0;
   trans_store_access_count=0;
 
+  trans_read_write_time=0;
+  trans_read_write_count=0;
+  trans_logging_time=0;
+  trans_logging_count=0;
+  trans_fin_time=0;
+  trans_fin_count=0;
+
+  trans_prepare_message_time=0;
+  trans_prepare_message_count=0;
+  trans_prepare_log_message_time=0;
+  trans_prepare_log_message_count=0;
+
   trans_total_run_time=0;
+  trans_commit_total_run_time=0;
+  trans_abort_total_run_time=0;
   trans_init_time=0;
   trans_process_time=0;
   trans_2pc_time=0;
@@ -689,6 +703,8 @@ void Stats_thd::print(FILE * outf, bool prog) {
   // trans
   fprintf(outf,
   ",trans_total_run_time=%f"
+  ",trans_commit_total_run_time=%f"
+  ",trans_abort_total_run_time=%f"
   ",trans_init_time=%f"
   ",trans_process_time=%f"
   ",trans_get_access_time=%f"
@@ -731,8 +747,19 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_msgsend_stage_three=%f"
   ",trans_get_client_wait=%f"
   ",trans_return_client_wait=%f"
-  ",trans_process_client=%f",
-          trans_total_run_time / BILLION, trans_init_time / BILLION, trans_process_time / BILLION,
+  ",trans_process_client=%f"
+  ",trans_read_write_time=%f"
+  ",trans_read_write_count=%ld"
+  ",trans_logging_time=%f"
+  ",trans_logging_count=%ld"
+  ",trans_fin_time=%f"
+  ",trans_fin_count=%ld"
+  ",trans_prepare_message_time=%f"
+  ",trans_prepare_message_count=%lu"
+  ",trans_prepare_log_message_time=%f"
+  ",trans_prepare_log_message_count=%lu",
+          trans_total_run_time / BILLION, trans_commit_total_run_time / BILLION, trans_abort_total_run_time /BILLION,
+          trans_init_time / BILLION, trans_process_time / BILLION,
           trans_get_access_time / BILLION, trans_store_access_time / BILLION, trans_get_row_time /BILLION, trans_benchmark_compute_time /BILLION,
           trans_2pc_time / BILLION,
           trans_prepare_time / BILLION,
@@ -750,10 +777,15 @@ void Stats_thd::print(FILE * outf, bool prog) {
           trans_msg_local_wait / BILLION, trans_msg_remote_wait / BILLION,
           trans_network_wait / BILLION, trans_network_send /BILLION, trans_network_recv / BILLION,
           trans_msgsend_stage_one / BILLION, trans_msgsend_stage_three / BILLION,
-          trans_get_client_wait / BILLION, trans_return_client_wait / BILLION, trans_process_client / BILLION);
+          trans_get_client_wait / BILLION, trans_return_client_wait / BILLION, trans_process_client / BILLION,
+          trans_read_write_time / BILLION, trans_read_write_count, trans_logging_time / BILLION, trans_logging_count, trans_fin_time / BILLION, trans_fin_count,
+          trans_prepare_message_time / BILLION, trans_prepare_message_count,
+          trans_prepare_log_message_time / BILLION, trans_prepare_log_message_count);
 
   fprintf(outf,
   ",avg_trans_total_run_time=%f"
+  ",avg_trans_commit_total_run_time=%f"
+  ",avg_trans_abort_total_run_time=%f"
   ",avg_trans_init_time=%f"
   ",avg_trans_process_time=%f"
   ",avg_trans_get_access_time=%f"
@@ -768,7 +800,10 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",avg_trans_finish_time=%f"
   ",avg_trans_commit_time=%f"
   ",avg_trans_abort_time=%f",
-          trans_total_run_time / (trans_total_count * BILLION), trans_init_time / (trans_init_count * BILLION), trans_process_time / (trans_process_count * BILLION),
+          trans_total_run_time / (trans_total_count * BILLION), 
+          trans_commit_total_run_time / (trans_commit_count * BILLION),
+          trans_commit_total_run_time / (trans_abort_count * BILLION),
+          trans_init_time / (trans_init_count * BILLION), trans_process_time / (trans_process_count * BILLION),
           trans_get_access_time / (trans_get_access_count * BILLION), trans_store_access_time / (trans_store_access_count * BILLION), trans_get_row_time / (trans_get_row_count * BILLION),
           trans_2pc_time / (trans_2pc_count * BILLION),
           trans_prepare_time / (trans_prepare_count * BILLION),
@@ -1524,8 +1559,21 @@ void Stats_thd::combine(Stats_thd * stats) {
   trans_get_row_count+=stats->trans_get_row_count;
   trans_get_access_count+=stats->trans_get_access_count;
   trans_store_access_count+=stats->trans_store_access_count;
+  trans_read_write_time+=stats->trans_read_write_time;
+  trans_read_write_count+=stats->trans_read_write_count;
+  trans_logging_time+=stats->trans_logging_time;
+  trans_logging_count+=stats->trans_logging_count;
+  trans_fin_time+=stats->trans_fin_time;
+  trans_fin_count+=stats->trans_fin_count;
+
+  trans_prepare_message_time+=stats->trans_prepare_message_time;
+  trans_prepare_message_count+=stats->trans_prepare_message_count;
+  trans_prepare_log_message_time+=stats->trans_prepare_log_message_time;
+  trans_prepare_log_message_count+=stats->trans_prepare_log_message_count;
 
   trans_total_run_time+=stats->trans_total_run_time;
+  trans_commit_total_run_time+=stats->trans_commit_total_run_time;
+  trans_abort_total_run_time+=stats->trans_abort_total_run_time;
   trans_init_time+=stats->trans_init_time;
   trans_process_time+=stats->trans_process_time;
   trans_2pc_time+=stats->trans_2pc_time;

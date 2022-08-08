@@ -98,6 +98,7 @@ void TxnStats::init() {
 	total_msg_queue_time = 0;
 	msg_queue_time = 0;
 	total_abort_time = 0;
+	log_start_time = 0;
 	clear_short();
 }
 
@@ -133,7 +134,7 @@ void TxnStats::reset() {
 	work_queue_cnt = 0;
 	total_msg_queue_time += msg_queue_time;
 	msg_queue_time = 0;
-
+	log_start_time = 0;
 	clear_short();
 
 }
@@ -403,6 +404,9 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
   _cur_tid = 0;
   num_locks = 0;
   memset(write_set, 0, 100);
+  start_rw_time = 0;
+  start_logging_time = 0;
+  start_fin_time = 0;
   // write_set = (int *) mem_allocator.alloc(sizeof(int) * 100);
 #endif
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
@@ -423,6 +427,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	twopl_wait_start = 0;
 	txn_state = 0;
 	txn_stats.init();
+	finish_logging=false;
 }
 
 // reset after abort
@@ -441,6 +446,7 @@ void TxnManager::reset() {
 	aborted = false;
 	return_id = UINT64_MAX;
 	twopl_wait_start = 0;
+	finish_logging=false;
 #if USE_TAPIR
 	for(int i = 0; i < g_node_cnt; i++) {
 		ir_log_rsp_cnt[i] = 0;
@@ -456,6 +462,10 @@ void TxnManager::reset() {
 	greatest_write_timestamp = 0;
 	greatest_read_timestamp = 0;
 	commit_timestamp = 0;
+
+	start_rw_time = 0;
+	start_logging_time = 0;
+	start_fin_time = 0;
 #if CC_ALG == MAAT
 	uncommitted_writes->clear();
 	uncommitted_writes_y->clear();
@@ -679,22 +689,28 @@ RC TxnManager::start_abort(yield_func_t &yield, uint64_t cor_id) {
 	// printf("%ld start_abort\n",get_txn_id());
 	uint64_t finish_start_time = get_sys_clock();
 	txn_stats.finish_start_time = finish_start_time;
-	uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    INC_STATS(get_thd_id(), trans_prepare_count, 1);
+	// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
+	// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+    // INC_STATS(get_thd_id(), trans_prepare_count, 1);
+	if(IS_LOCAL(get_txn_id())) {
+		INC_STATS(get_thd_id(), trans_logging_count, 1);
+		INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
+		start_fin_time = get_sys_clock();
+	}
 	//RDMA_SILO:keep message or not
 #if USE_TAPIR
-		send_finish_messages();
-		txn_state = 2;
-		abort(yield, cor_id);
-		return Abort;
-#endif
+	send_finish_messages();
+	txn_state = 2;
+	abort(yield, cor_id);
+	return Abort;
+#else
 	if(query->partitions_touched.size() > 1 && !rdma_one_side()) {
 		send_finish_messages();
 		abort(yield, cor_id);
 		return Abort;
 	}
 	return abort(yield, cor_id);
+#endif
 }
 
 #ifdef NO_2PC
@@ -763,8 +779,9 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 				send_prepare_messages();
 				rc = WAIT_REM;
 			}
-		} else if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == DLI_BASE ||
-				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA) {
+		} else if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || 
+			CC_ALG == DLI_BASE ||
+			CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;
@@ -772,16 +789,21 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 			uint64_t finish_start_time = get_sys_clock();
 			txn_stats.finish_start_time = finish_start_time;
 			uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-			INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-      		INC_STATS(get_thd_id(), trans_prepare_count, 1);
+			// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+      		// INC_STATS(get_thd_id(), trans_prepare_count, 1);
 			if(CC_ALG == WSI) {
 				wsi_man.gene_finish_ts(this);
 			}
+			if(IS_LOCAL(get_txn_id())) {
+				INC_STATS(get_thd_id(), trans_logging_count, 1);
+				INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
+				start_fin_time = get_sys_clock();
+			}
 			send_finish_messages();
 			txn_state = 2;
-#if !USE_TAPIR
-			rsp_cnt = 0;
-#endif
+		#if !USE_TAPIR
+			// rsp_cnt = 0;
+		#endif
 			rc = commit(yield, cor_id);
 		}
 	} 
@@ -790,10 +812,14 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		// rc = RCOK;
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
-
+		if(IS_LOCAL(get_txn_id())) {
+			INC_STATS(get_thd_id(), trans_logging_count, 1);
+			INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
+			start_fin_time = get_sys_clock();
+		}
 		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-		INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    	INC_STATS(get_thd_id(), trans_prepare_count, 1);
+		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+    	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
 		if(CC_ALG == SSI) {
 			ssi_man.gene_finish_ts(this);
 		}
@@ -802,10 +828,15 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		}
 		if(rc == RCOK){   //for NO_WAIT , rc == RCOK
 			// printf("commit transaction\n");
-#if USE_TAPIR
+			// if(IS_LOCAL(get_txn_id())) {
+			// 	INC_STATS(get_thd_id(), trans_logging_count, 1);
+			// 	INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
+			// 	start_fin_time = get_sys_clock();
+			// }
+		#if USE_TAPIR
 			send_finish_messages();
 			txn_state = 2;
-#endif
+		#endif
 			rc = commit(yield, cor_id);
 		}		
 		else {
@@ -879,8 +910,9 @@ void TxnManager::send_prepare_messages() {
 			}
 		}
 	}
+	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),tar_nodes_cnt);
 	for(int i=0;i<tar_nodes_cnt;i++){
-		// printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
+		DEBUG("node id %d: txn id %d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
 	}
 #else
@@ -889,6 +921,7 @@ void TxnManager::send_prepare_messages() {
 	log_rsp_cnt = 0;
 	log_fin_rsp_cnt = 0;
 	local_log = false;
+	// printf("%d:%d start prepare modified: %d\n", g_node_id, get_txn_id(),query->partitions_modified.size());
 	for(int i=0;i<query->partitions_modified.size();i++){
 		uint64_t part_id = query->partitions_modified[i];
 		uint64_t l_node = GET_NODE_ID(part_id);
@@ -905,8 +938,10 @@ void TxnManager::send_prepare_messages() {
 		}
 		else local_log = true;
 	}
+	DEBUG("%d:%d start prepare rsp_cnt: %d\n", g_node_id, get_txn_id(),rsp_cnt);
 	for(int i=0;i<rsp_cnt;i++){
-			msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
+		DEBUG("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
+		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
 	}
 #endif
 #else
@@ -925,6 +960,11 @@ void TxnManager::send_prepare_messages() {
 }
 
 void TxnManager::send_finish_messages() {
+	// if(IS_LOCAL(get_txn_id())) {
+	// 	INC_STATS(get_thd_id(), trans_logging_count, 1);
+	// 	INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
+	// 	start_fin_time = get_sys_clock();
+	// }
 #if !USE_TAPIR
 	rsp_cnt = query->partitions_touched.size() - 1;
 	assert(IS_LOCAL(get_txn_id()));
@@ -936,6 +976,7 @@ void TxnManager::send_finish_messages() {
 #if USE_RDMA == CHANGE_MSG_QUEUE
         tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(query->partitions_touched[i]), Message::create_message(this, RFIN));
 #else
+		// printf("%d:%d send finish to %d\n", g_node_id, get_txn_id(), GET_NODE_ID(query->partitions_touched[i]));
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN),
 											GET_NODE_ID(query->partitions_touched[i]));
 #endif
@@ -948,60 +989,49 @@ void TxnManager::send_finish_messages() {
 	}
 	uint64_t tar_nodes[g_node_cnt];
 	uint64_t tar_nodes_cnt = 0;
+	// ! 2PC部分
 	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
 		uint64_t part_id = query->partitions_touched[i];
 		uint64_t l_node = GET_NODE_ID(part_id);
 		if(l_node == g_node_id) {
     	} else {
-			// rsp_cnt++;
 			//every part in different node
-			// if(g_part_cnt == g_node_cnt) assert(!exist);
 			tar_nodes[tar_nodes_cnt++] = l_node;
 		}
 	}
 	DEBUG("%ld Send FINISH messages to %d\n",get_txn_id(),rsp_cnt);
-	for(uint64_t i = 0; i < query->partitions_modified.size(); i++) {
-		uint64_t part_id = query->partitions_modified[i];
-		uint64_t l_node = GET_NODE_ID(part_id);
-		uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
-		uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
-		ir_log_rsp_cnt[i] = 3;
-		if(l_node == g_node_id) {
-			ir_log_rsp_cnt[i]--;
+	// ! 日志部分
+	if (txn->rc != Abort) {
+		for(uint64_t i = 0; i < query->partitions_modified.size(); i++) {
+			uint64_t part_id = query->partitions_modified[i];
+			uint64_t l_node = GET_NODE_ID(part_id);
+			uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
+			uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
+			ir_log_rsp_cnt[i] = 3;
+			if(l_node == g_node_id) {
+				ir_log_rsp_cnt[i]--;
+			}
+			if(f1 != g_node_id){
+				bool exist = false;
+				for(int j=0;j<tar_nodes_cnt;j++){
+					if(tar_nodes[j] == f1) {exist = true;break;}
+				}
+				//every part in different node
+				if(!exist){
+					tar_nodes[tar_nodes_cnt++] = f1;
+				}
+			}else {ir_log_rsp_cnt[i]--;}
+			if(f2 != g_node_id){
+				bool exist = false;
+				for(int j=0;j<tar_nodes_cnt;j++){
+					if(tar_nodes[j] == f2) {exist = true;break;}
+				}
+				//every part in different node
+				if(!exist){
+					tar_nodes[tar_nodes_cnt++] = f2;
+				}
+			}else {ir_log_rsp_cnt[i]--;}
 		}
-    	// } else {
-		// 	bool exist = false;
-		// 	for(int j=0;j<tar_nodes_cnt;j++){
-		// 		if(tar_nodes[j] == l_node) {exist = true;break;}
-		// 	}
-		// 	//every part in different node
-		// 	// if(g_part_cnt == g_node_cnt) assert(!exist);
-		// 	if(!exist){
-		// 		tar_nodes[tar_nodes_cnt++] = l_node;
-		// 	}
-		// }
-		if(f1 != g_node_id){
-			bool exist = false;
-			for(int j=0;j<tar_nodes_cnt;j++){
-				if(tar_nodes[j] == f1) {exist = true;break;}
-			}
-			//every part in different node
-			// if(g_part_cnt == g_node_cnt) assert(!exist);
-			if(!exist){
-				tar_nodes[tar_nodes_cnt++] = f1;
-			}
-		}else {ir_log_rsp_cnt[i]--;}
-		if(f2 != g_node_id){
-			bool exist = false;
-			for(int j=0;j<tar_nodes_cnt;j++){
-				if(tar_nodes[j] == f2) {exist = true;break;}
-			}
-			//every part in different node
-			// if(g_part_cnt == g_node_cnt) assert(!exist);
-			if(!exist){
-				tar_nodes[tar_nodes_cnt++] = f2;
-			}
-		}else {ir_log_rsp_cnt[i]--;}
 	}
 	for(int i = 0; i < tar_nodes_cnt; i++) {
 #if USE_RDMA == CHANGE_MSG_QUEUE
@@ -1029,7 +1059,7 @@ int TxnManager::received_response(RC rc) {
 int TxnManager::received_tapir_response(RC rc, uint64_t return_node_id) {
 	int responses_left = 0;
 	prepare_count++;
-	assert(txn->rc == RCOK || txn->rc == Abort);
+	// assert(txn->rc == RCOK || txn->rc == Abort);
 	if (txn->rc == RCOK) txn->rc = rc;
 	for(int i = 0; i < query->partitions_modified.size(); i++) {
 		uint64_t part_id = query->partitions_modified[i];
@@ -1057,7 +1087,7 @@ int TxnManager::received_tapir_response(RC rc, uint64_t return_node_id) {
 int TxnManager::received_tapir_fin_response(RC rc, uint64_t return_node_id) {
 	int responses_left = 0;
 	commit_count++;
-	assert(txn->rc == RCOK || txn->rc == Abort);
+	// assert(txn->rc == RCOK || txn->rc == Abort);
 	if (txn->rc == RCOK) txn->rc = rc;
 	for(int i = 0; i < query->partitions_touched.size(); i++) {
 		uint64_t part_id = query->partitions_touched[i];
@@ -1066,9 +1096,6 @@ int TxnManager::received_tapir_fin_response(RC rc, uint64_t return_node_id) {
 		if(l_node == g_node_id) continue;
 		if(l_node == return_node_id) {
 			rsp_cnt--;
-			if(rsp_cnt > 0) {
-				return rsp_cnt;
-			}
 		}
 	}
 	for(int i = 0; i < query->partitions_modified.size(); i++) {
@@ -1079,6 +1106,9 @@ int TxnManager::received_tapir_fin_response(RC rc, uint64_t return_node_id) {
 		if(return_node_id == l_node || return_node_id == f1 || return_node_id == f2) {
 			ir_log_rsp_cnt[i] --;
 		}
+	}
+	if(rsp_cnt > 0) {
+		return rsp_cnt;
 	}
 	for(int i = 0; i < g_node_cnt; i++) {
 #if MAJORITY
@@ -1538,89 +1568,27 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	this->last_row = row;
 	this->last_type = type;
   	uint64_t get_access_end_time = 0;
-#if CC_ALG == TICTOC
-	bool isexist = false;
-	uint64_t size = get_write_set_size();
-	size += get_read_set_size();
-	// UInt32 n = 0, m = 0;
-	for (uint64_t i = 0; i < size; i++) {
-		if (txn->accesses[i]->orig_row == row) {
-			access = txn->accesses[i];
-			access->orig_row->get_ts(access->orig_wts, access->orig_rts);
-			isexist = true;
-			// DEBUG("TxnManagerTictoc::find the exist access \n", access->orig_data, access->orig_row, access->data, access->orig_rts, access->orig_wts);
-			break;
-		}
-	}
-	if (!access) {
-		access_pool.get(get_thd_id(),access);
-
-    get_access_end_time = get_sys_clock();
-    INC_STATS(get_thd_id(), trans_get_access_count, 1);
-    INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
-
-		rc = row->get_row(type, this, access->data, access->orig_wts, access->orig_rts);
-		if (!OCC_WAW_LOCK || type == RD) {
-			_min_commit_ts = _min_commit_ts > access->orig_wts ? _min_commit_ts : access->orig_wts;
-		} else {
-			if (rc == WAIT)
-						ATOM_ADD_FETCH(_num_lock_waits, 1);
-						if (rc == Abort || rc == WAIT)
-								return rc;
-		}
-    INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
-    INC_STATS(get_thd_id(), trans_get_row_count, 1);
-	} else {
-    get_access_end_time = get_sys_clock();
-    INC_STATS(get_thd_id(), trans_get_access_count, 1);
-    INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
-  }
-	if (!OCC_WAW_LOCK || type == RD) {
-		access->locked = false;
-	} else {
-		_min_commit_ts = _min_commit_ts > access->orig_rts + 1 ? _min_commit_ts : access->orig_rts + 1;
-		access->locked = true;
-	}
-#else
 	access_pool.get(get_thd_id(),access);
 	get_access_end_time = get_sys_clock();
 	INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
 	INC_STATS(get_thd_id(), trans_get_access_count, 1);
-#endif
-	//uint64_t row_cnt = txn->row_cnt;
-	//assert(txn->accesses.get_count() - 1 == row_cnt);
-#if CC_ALG == RDMA_TS1 || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_TS
-	access->location = g_node_id;
-	access->offset = (char*)row - rdma_global_buffer;
-#endif
-#if CC_ALG != TICTOC
-  // uint64_t start_time = get_sys_clock();
-  //for NO_WAIT, lock and preserve access
-#if CC_ALG == WOUND_WAIT
-	if (txn_state == WOUNDED) 
-		rc = Abort;
-	else 
-		rc = row->get_row(yield,type, this, access,cor_id);
-#else
+
 	rc = row->get_row(yield,type, this, access,cor_id);
-#endif
 	INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
 	INC_STATS(get_thd_id(), trans_get_row_count, 1);
-#endif
-#if CC_ALG == FOCC
-	focc_man.active_storage(type, this, access);
-#endif
+
   	uint64_t middle_time = get_sys_clock();
 	if (rc == Abort || rc == WAIT) {
 		row_rtn = NULL;
 		DEBUG_M("TxnManager::get_row(abort) access free\n");
 		access_pool.put(get_thd_id(),access);
 		timespan = get_sys_clock() - starttime;
-    INC_STATS(get_thd_id(), trans_store_access_time, timespan + starttime - middle_time);
-    INC_STATS(get_thd_id(), trans_store_access_count, 1);
+		INC_STATS(get_thd_id(), trans_store_access_time, timespan + starttime - middle_time);
+		INC_STATS(get_thd_id(), trans_store_access_count, 1);
 		INC_STATS(get_thd_id(), txn_manager_time, timespan);
 		INC_STATS(get_thd_id(), txn_conflict_cnt, 1);
 		//cflt = true;
+		// printf("CONFLICT %ld %ld %ld\n",get_txn_id(), row->get_primary_key() ,get_sys_clock());
 #if DEBUG_TIMELINE
 		printf("CONFLICT %ld %ld\n",get_txn_id(),get_sys_clock());
 #endif
@@ -3410,22 +3378,26 @@ void TxnManager::log_replica(uint64_t ret_nid,bool finish) {
 		}
 	}
 #if USE_REPLICA
-	pthread_mutex_lock(&log_lock);
-	h_thd->log_count ++;
-	h_thd->log_content = h_thd->log_count;
-	pthread_mutex_unlock(&log_lock);
+	// pthread_mutex_lock(&log_lock);
+	// h_thd->log_count ++;
+	// h_thd->log_content = h_thd->log_count;
+	// pthread_mutex_unlock(&log_lock);
 #endif
 	uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
 	uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
 	if(finish){
 		log_fin_rsp_cnt = 2;
+		DEBUG("%d:%d send finish log to %d & %d\n", g_node_id, get_txn_id(), f1,f2);
 		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RFIN_LOG),f1);
 		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RFIN_LOG),f2);
 	}else{
 		log_rsp_cnt = 2;
+		DEBUG("%d:%d send prepare log to %d & %d\n", g_node_id, get_txn_id(), f1,f2);
 		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RLOG),f1);
 		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RLOG),f2);
 	}
+	txn_stats.log_start_time = get_sys_clock();
+	
 }
 
 RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {

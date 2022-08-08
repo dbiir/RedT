@@ -431,6 +431,7 @@ void WorkerThread::commit() {
   INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_commit_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
+  INC_STATS(get_thd_id(), trans_commit_total_run_time, timespan_short);
 
   INC_STATS(get_thd_id(), trans_2pc_count, 1);
   INC_STATS(get_thd_id(), trans_finish_count, 1);
@@ -443,6 +444,7 @@ void WorkerThread::commit() {
     tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->client_id, Message::create_message(txn_man,CL_RSP));
 #else
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,CL_RSP),txn_man->client_id);
+    // printf("CL_RSP txn %ld client %d, is local %d?\n", txn_man->get_txn_id(), txn_man->client_id, IS_LOCAL(txn_man->get_txn_id()));
 #endif
 #endif
   // remove txn from pool
@@ -471,6 +473,7 @@ void WorkerThread::abort() {
   INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_abort_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
+  INC_STATS(get_thd_id(), trans_abort_total_run_time, timespan_short);
 
   INC_STATS(get_thd_id(), trans_2pc_count, 1);
   INC_STATS(get_thd_id(), trans_finish_count, 1);
@@ -479,7 +482,7 @@ void WorkerThread::abort() {
   #if WORKLOAD != DA //actually DA do not need real abort. Just count it and do not send real abort msg.
   uint64_t penalty =
       abort_queue.enqueue(get_thd_id(), txn_man->get_txn_id(), txn_man->get_abort_cnt());
-
+  // printf("abort txn %ld client %d, is local %d?\n", txn_man->get_txn_id(), txn_man->client_id, IS_LOCAL(txn_man->get_txn_id()));
   txn_man->txn_stats.total_abort_time += penalty;
   #endif
 }
@@ -757,11 +760,23 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
       idle_starttime = 0;
     }
     //uint64_t starttime = get_sys_clock();
-
+    DEBUG("worker run txn %ld type %d \n", msg->get_txn_id(),msg->get_rtype());
     if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O && msg->rtype != RLOG && msg->rtype != RFIN_LOG) || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) {
       txn_man = get_transaction_manager(msg);
-      if(msg->rtype == RACK_LOG || msg->rtype == RACK_FIN_LOG){ 
-        if(!txn_man || !(txn_man->txn)){//txn already committed
+      if(msg->rtype == RACK_LOG || msg->rtype == RACK_FIN_LOG || msg->rtype == RACK_FIN || msg->rtype == RACK_PREP
+      //  || msg->rtype == RPREPARE
+       ){ 
+        // printf("txn %ld type %d check already commit\n", msg->get_txn_id(),msg->get_rtype());
+        if(!txn_man || !(txn_man->txn) || !txn_man->query || 
+        // txn_man->query->partitions_touched.size() == 0 || 
+        txn_man->abort_cnt != msg->current_abort_cnt) {//txn already committed
+          DEBUG("txn %ld type %d already commit, query?%d, partitions_touched?%d, abort cnt %d, msg abort cnt %d\n", msg->get_txn_id(),msg->get_rtype(), !txn_man->query, txn_man->query->partitions_touched.size() == 0 , txn_man->abort_cnt, msg->current_abort_cnt);
+          continue;
+        }
+        else if (txn_man->txn_state == 2 && msg->rtype == RACK_PREP) {
+          continue;
+        }
+        else if (txn_man->txn_state == 3 && msg->rtype == RACK_FIN) {
           continue;
         }
       }
@@ -802,7 +817,13 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
 
       ready_starttime = get_sys_clock();
-      bool ready = txn_man->unset_ready();
+      bool ready = txn_man->unset_ready(); 
+      // bool ready;
+      // if((msg->rtype == RQRY || msg->rtype == RFIN || msg->rtype == RPREPARE) && msg->current_abort_cnt > txn_man->txn_stats.abort_cnt){
+      //   ready = false;
+      // }
+      // else if(msg->rtype == RFIN && !txn_man->finish_logging) ready = false;
+      // else ready = txn_man->unset_ready(); 
       INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
       if(!ready) {
         // Return to work queue, end processing
@@ -823,7 +844,10 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
     ready_starttime = get_sys_clock();
     if(txn_man) {
       bool ready = txn_man->set_ready();
-      assert(ready);
+      if (!ready) {
+        DEBUG("txn %ld type %d set ready failed, ready %d\n", msg->get_txn_id(),msg->get_rtype(), txn_man->txn_ready);
+        assert(ready);
+      }
     }
     INC_STATS(get_thd_id(),worker_deactivate_txn_time,get_sys_clock() - ready_starttime);
 
@@ -850,31 +874,11 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
     CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_MVCC || CC_ALG == SILO
   txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
 #endif
-// printf("%d %d\n", txn_man->query->partitions_touched.size(), g_node_id);
-// #if USE_REPLICA && USE_TAPIR 
-//   bool leader_node = false;
-//   for(int i = 0; i < txn_man->query->partitions_touched.size(); i++) {
-//     uint64_t part_id = txn_man->query->partitions_touched[i];
-// 		uint64_t l_node = GET_NODE_ID(part_id);
-//     if(l_node == g_node_id) {
-//       leader_node = true;
-//       break;
-//     }
-//   }
-//   if(leader_node == false) {
-//     // printf("%d:%d send replica finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
-//     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_FIN), GET_NODE_ID(msg->get_txn_id()));
-//     // release_txn_man();
-//     txn_man->reset();
-//     // txn_man->reset_query();
-//     return ((FinishMessage*)msg)->rc;
-    
-//   }
-// #endif
   if(((FinishMessage*)msg)->rc == Abort) {
     txn_man->abort(yield, cor_id);
     txn_man->reset();
     txn_man->reset_query();
+    txn_man->abort_cnt = msg->current_abort_cnt;
 #if USE_RDMA == CHANGE_MSG_QUEUE
     tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->get_txn_id()), Message::create_message(txn_man, RACK_FIN));
 #else
@@ -898,7 +902,8 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
   if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC ||
        CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == DLI_BASE ||
-       CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == CICADA || USE_TAPIR)
+       CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == CICADA || USE_TAPIR || CC_ALG == NO_WAIT)
+    txn_man->abort_cnt = msg->current_abort_cnt;
 #if USE_RDMA == CHANGE_MSG_QUEUE
     tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->get_txn_id()), Message::create_message(txn_man, RACK_FIN));
 #else
@@ -913,34 +918,55 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
 
 RC WorkerThread::process_rlog(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   RC rc = RCOK;
+  DEBUG("RLOG %ld\n",msg->get_txn_id());
+  // txn_man->abort_cnt = msg->current_abort_cnt;
   // txn_man->set_rc(rc);
 #if USE_REPLICA
-  pthread_mutex_lock(&log_lock);
-	log_count ++;
-	log_content = log_count;
-	pthread_mutex_unlock(&log_lock);
+  // pthread_mutex_lock(&log_lock);
+	// log_count ++;
+	// log_content = log_count;
+	// pthread_mutex_unlock(&log_lock);
 #endif
-  msg_queue.enqueue(get_thd_id(),Message::create_message(NULL,RACK_LOG,msg->get_txn_id()),msg->return_node_id);
+  DEBUG("%d:%d send rack log to %d\n", g_node_id, msg->get_txn_id(), msg->return_node_id);
+  Message * return_msg = Message::create_message(NULL,RACK_LOG,msg->get_txn_id());
+  return_msg->current_abort_cnt = msg->current_abort_cnt;
+  msg_queue.enqueue(get_thd_id(),return_msg,msg->return_node_id);
   return rc;
 }
 
 RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   RC rc = RCOK;
+  DEBUG("RACK_LOG %ld\n",msg->get_txn_id());
   int responses_left = txn_man->received_log_response(((AckMessage*)msg)->rc);
+  // if(txn_man->get_return_node() == g_node_id){
+  uint64_t prepare_message_timespan  = get_sys_clock() - txn_man->txn_stats.log_start_time;
+  // INC_STATS(get_thd_id(), trans_prepare_log_message_time, prepare_message_timespan);
+  // INC_STATS(get_thd_id(), trans_prepare_log_message_count, 1);
+  // }
   assert(responses_left >=0);
 #if MAJORITY
   if(responses_left == 1){//able to return with 2 confirm(local+one remote)
 #else
   if(responses_left == 0){
 #endif
+    INC_STATS(get_thd_id(), trans_prepare_log_message_time, prepare_message_timespan);
+    INC_STATS(get_thd_id(), trans_prepare_log_message_count, 1);
 		if(txn_man->get_return_node() == g_node_id){
+      assert(IS_LOCAL(txn_man->get_txn_id()));
       if(txn_man->get_rsp_cnt() > 0) return WAIT;
       //finish
       uint64_t finish_start_time = get_sys_clock();
 			txn_man->txn_stats.finish_start_time = finish_start_time;
 			uint64_t prepare_timespan  = finish_start_time - txn_man->txn_stats.prepare_start_time;
-			INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-      		INC_STATS(get_thd_id(), trans_prepare_count, 1);
+      
+      INC_STATS(get_thd_id(), trans_logging_count, 1);
+      assert(txn_man->start_logging_time!=0);
+      // printf("logging time %lu", get_sys_clock() - txn_man->start_logging_time);
+      INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - txn_man->start_logging_time);
+      txn_man->start_fin_time = get_sys_clock();
+			
+			// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+      // INC_STATS(get_thd_id(), trans_prepare_count, 1);
       assert(!txn_man->query->readonly());
       txn_man->send_finish_messages();
       
@@ -949,6 +975,7 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
       rc = WAIT_REM;
       return rc;
     }else{
+      DEBUG("%d:%d send rack prep to %d\n", g_node_id, txn_man->get_txn_id(), txn_man->get_return_node());
       msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man,RACK_PREP),txn_man->get_return_node());
     }    
   }
@@ -958,17 +985,23 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
 RC WorkerThread::process_rfin_log(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   RC rc = RCOK;
   // txn_man->set_rc(rc);
+  DEBUG("RFIN LOG %ld\n",msg->get_txn_id());
+  // txn_man->abort_cnt = msg->current_abort_cnt;
 #if USE_REPLICA
-  pthread_mutex_lock(&log_lock);
-	log_count ++;
-	log_content = log_count;
-	pthread_mutex_unlock(&log_lock);
+  // pthread_mutex_lock(&log_lock);
+	// log_count ++;
+	// log_content = log_count;
+	// pthread_mutex_unlock(&log_lock);
 #endif
-  msg_queue.enqueue(get_thd_id(),Message::create_message(NULL,RACK_FIN_LOG,msg->get_txn_id()),msg->return_node_id);
+  // printf("%d:%d send rack fin log to %d\n", g_node_id, msg->get_txn_id(), msg->return_node_id);
+  Message * return_msg = Message::create_message(NULL,RACK_FIN_LOG,msg->get_txn_id());
+  return_msg->current_abort_cnt = msg->current_abort_cnt;
+  msg_queue.enqueue(get_thd_id(),return_msg,msg->return_node_id);
   return rc;
 }
 
 RC WorkerThread::process_rack_fin_log(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+  DEBUG("RACK FIN LOG %ld\n",msg->get_txn_id());
   int responses_left = txn_man->received_log_fin_response(((AckMessage*)msg)->rc);
   assert(responses_left >=0);
 
@@ -985,6 +1018,7 @@ RC WorkerThread::process_rack_fin_log(yield_func_t &yield, Message * msg, uint64
       txn_man->txn_stats.twopc_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
       commit();
     }else{
+      // printf("%d:%d send rack fin to %d\n", g_node_id, txn_man->get_txn_id(), txn_man->get_return_node());
       msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man,RACK_FIN),txn_man->get_return_node());
       release_txn_man();
     }    
@@ -993,15 +1027,27 @@ RC WorkerThread::process_rack_fin_log(yield_func_t &yield, Message * msg, uint64
 }
 
 RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t cor_id) {
-  DEBUG("RPREP_ACK %ld\n",msg->get_txn_id());
+  DEBUG("RPREP_ACK %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
   RC rc = RCOK;
   int responses_left = 0;
+
+  if (!txn_man || !(txn_man->txn) || !txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) {
+    DEBUG("RPREP_ACK skip %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
+    return RCOK;
+  }
+  // if(!txn_man || !(txn_man->txn)){//txn already committed
+  //   return rc;
+  // }
 #if USE_TAPIR
   responses_left = txn_man->received_tapir_response(((AckMessage*)msg)->rc, msg->return_node_id);
   assert(responses_left >= 0);
   // if (responses_left == 0) printf("recive prepare %d message\n", txn_man->prepare_count);
 #else
   responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+
+  uint64_t prepare_message_timespan = get_sys_clock() - txn_man->txn_stats.prepare_start_time;
+  INC_STATS(get_thd_id(), trans_prepare_message_time, prepare_message_timespan);
+  INC_STATS(get_thd_id(), trans_prepare_message_count, 1);
 
   assert(responses_left >= 0);
 #endif
@@ -1078,11 +1124,18 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     else
       rc = txn_man->validate(yield, cor_id);
   }
+  if(IS_LOCAL(txn_man->get_txn_id())) {
+		INC_STATS(get_thd_id(), trans_logging_count, 1);
+    // assert(txn_man->start_logging_time!=0);
+    // printf("logging time %lu", get_sys_clock() - txn_man->start_logging_time);
+		INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - txn_man->start_logging_time);
+		txn_man->start_fin_time = get_sys_clock();
+	}
   uint64_t finish_start_time = get_sys_clock();
   txn_man->txn_stats.finish_start_time = finish_start_time;
   uint64_t prepare_timespan  = finish_start_time - txn_man->txn_stats.prepare_start_time;
-  INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-  INC_STATS(get_thd_id(), trans_prepare_count, 1);
+  // INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+  // INC_STATS(get_thd_id(), trans_prepare_count, 1);
   if(rc == Abort || txn_man->get_rc() == Abort) {
     txn_man->txn->rc = Abort;
     rc = Abort;
@@ -1125,10 +1178,15 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 }
 
 RC WorkerThread::process_rack_rfin(Message * msg) {
-  DEBUG("RFIN_ACK %ld\n",msg->get_txn_id());
+  DEBUG("RFIN_ACK %ld from %d\n",msg->get_txn_id(), msg->return_node_id);
 
   RC rc = RCOK;
   int responses_left = 0;
+  if (!txn_man || !(txn_man->txn) || !txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) {
+    DEBUG("RPREP_ACK skip %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
+    return RCOK;
+  }
+
 #if USE_TAPIR
   responses_left = txn_man->received_tapir_fin_response(((AckMessage*)msg)->rc, msg->return_node_id);
   assert(responses_left >= 0);
@@ -1147,25 +1205,25 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
 #endif
 #endif
   // Done waiting
+  txn_man->txn_state = 3;
+  INC_STATS(get_thd_id(), trans_fin_count, 1);
+	INC_STATS(get_thd_id(), trans_fin_time, get_sys_clock() - txn_man->start_fin_time);
+	// start_fin_time = get_sys_clock();
   txn_man->txn_stats.twopc_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
 #if USE_TAPIR
   // printf("responses_left %d %d\n", responses_left, txn_man->txn_state);
-  if(txn_man->txn_state != 2) return rc;
+  if(txn_man->txn_state != 3) return rc;
   // if (responses_left == 0) printf("%d recive commit %d message\n",txn_man->get_txn_id(), txn_man->commit_count);
   if(txn_man->get_rc() == RCOK) {
-    // txn_man->commit();
       commit();
   } else {
-    // txn_man->abort();
       abort();
   }
   // txn_man->txn_state = 0;
 #else
   if(txn_man->get_rc() == RCOK) {
-    //txn_man->commit();
       commit();
   } else {
-    //txn_man->abort();
       abort();
   }
 #endif
@@ -1176,6 +1234,7 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
   DEBUG("RQRY_RSP %ld\n",msg->get_txn_id());
   assert(IS_LOCAL(msg->get_txn_id()));
 #if PARAL_SUBTXN == true
+  if (!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) return RCOK;
   if(((QueryResponseMessage*)msg)->rc == Abort) {
     txn_man->start_abort(yield, cor_id);
     return Abort;
@@ -1190,17 +1249,16 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
     txn_man->start_abort(yield, cor_id);
     return Abort;
   }
-#if CC_ALG == TICTOC
-  // Integrate bounds
-  TxnManager * txn_man = txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),0);
-  QueryResponseMessage* qmsg = (QueryResponseMessage*)msg;
-  txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ?
-                            txn_man->_min_commit_ts : qmsg->_min_commit_ts;
-#endif
   txn_man->send_RQRY_RSP = false;
   RC rc = ((QueryResponseMessage*)msg)->rc;
 #if PARAL_SUBTXN
 	if(IS_LOCAL(txn_man->get_txn_id())) {  //for one-side rdma, must be local
+    
+		INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - txn_man->start_rw_time);
+    INC_STATS(get_thd_id(), trans_read_write_count, 1);
+    // printf("enter prepare phase %ld\n", get_sys_clock() - txn_man->start_rw_time);
+    // printf("read/write time %ld\n", get_sys_clock() - txn_man->start_rw_time);
+		txn_man->start_logging_time = get_sys_clock();
 		if(rc == RCOK && !txn_man->aborted) {
 			// printf("a txn is done\n");
 #if CC_ALG == WOUND_WAIT
@@ -1208,9 +1266,9 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
 #endif
 			rc = txn_man->start_commit(yield, cor_id);
 		}
-		else if(rc == Abort)
-		rc = txn_man->start_abort(yield, cor_id);
+		else if(rc == Abort) rc = txn_man->start_abort(yield, cor_id);
   } else if(rc == Abort){
+    assert(false);
 		rc = txn_man->abort(yield, cor_id);
 	}
 #else
@@ -1256,6 +1314,8 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
   dta_time_table.init(get_thd_id(), txn_man->get_txn_id(), txn_man->get_start_timestamp());
 #endif
   txn_man->send_RQRY_RSP = true;
+  txn_man->finish_logging = true;
+  txn_man->abort_cnt = msg->current_abort_cnt;
   rc = txn_man->run_txn(yield, cor_id);
 
   // Send response
@@ -1306,13 +1366,15 @@ RC WorkerThread::process_rtxn_cont(yield_func_t &yield, Message * msg, uint64_t 
 RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t cor_id) {
     DEBUG("RPREP %ld\n",msg->get_txn_id());
     RC rc = RCOK;
+    txn_man->abort_cnt = msg->current_abort_cnt;
 #if USE_REPLICA
 #if USE_TAPIR
-    // printf("%d:%d send prepare ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
-    pthread_mutex_lock(&log_lock);
-    log_count ++;
-    log_content = log_count;
-    pthread_mutex_unlock(&log_lock);
+    DEBUG("%d:%d send prepare ack to %d\n", g_node_id, msg->get_txn_id(), msg->return_node_id);
+    
+    // pthread_mutex_lock(&log_lock);
+    // log_count ++;
+    // log_content = log_count;
+    // pthread_mutex_unlock(&log_lock);
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
     return rc;
 #else

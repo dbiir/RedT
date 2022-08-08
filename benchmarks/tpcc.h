@@ -139,12 +139,13 @@ private:
 
   uint64_t next_item_id;
 
-void next_tpcc_state();
-RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
+  void next_tpcc_state();
+  RC generate_center_master(uint64_t w_id, access_t type);
+  RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
   bool is_done();
   bool is_local_item(uint64_t idx);
   RC send_remote_request();
-
+  RC send_remote_subtxn();
   itemid_t* tpcc_read_remote_index(TPCCQuery * query);
   RC send_remote_one_side_request(yield_func_t &yield, TPCCQuery * query,row_t *& row_local, uint64_t cor_id);
 
@@ -184,6 +185,8 @@ RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
 	RC run_order_status(TPCCQuery * query);
 	RC run_delivery(TPCCQuery * query);
 	RC run_stock_level(TPCCQuery * query);
+
+  vector<vector<uint64_t>> remote_node{g_node_cnt};
 };
 
 #endif
