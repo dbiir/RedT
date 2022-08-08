@@ -431,6 +431,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	num_msgs_rw = 0;
 	num_msgs_prep = 0;
 	num_msgs_commit = 0;
+	finish_logging=false;
 }
 
 // reset after abort
@@ -453,6 +454,7 @@ void TxnManager::reset() {
 	num_msgs_rw = 0;
 	num_msgs_prep = 0;
 	num_msgs_commit = 0;
+	finish_logging=false;
 #if USE_TAPIR
 	for(int i = 0; i < g_node_cnt; i++) {
 		ir_log_rsp_cnt[i] = 0;
@@ -698,9 +700,9 @@ RC TxnManager::start_abort(yield_func_t &yield, uint64_t cor_id) {
 	// printf("%ld start_abort\n",get_txn_id());
 	uint64_t finish_start_time = get_sys_clock();
 	txn_stats.finish_start_time = finish_start_time;
-	uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-	INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    INC_STATS(get_thd_id(), trans_prepare_count, 1);
+	// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
+	// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+    // INC_STATS(get_thd_id(), trans_prepare_count, 1);
 	if(IS_LOCAL(get_txn_id())) {
 		INC_STATS(get_thd_id(), trans_logging_count, 1);
 		INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
@@ -710,7 +712,6 @@ RC TxnManager::start_abort(yield_func_t &yield, uint64_t cor_id) {
 #if USE_TAPIR
 	send_finish_messages();
 	txn_state = 2;
-	// rsp_cnt = 0;
 	abort(yield, cor_id);
 	return Abort;
 #else
@@ -799,8 +800,8 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 			uint64_t finish_start_time = get_sys_clock();
 			txn_stats.finish_start_time = finish_start_time;
 			uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-			INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-      		INC_STATS(get_thd_id(), trans_prepare_count, 1);
+			// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+      		// INC_STATS(get_thd_id(), trans_prepare_count, 1);
 			if(CC_ALG == WSI) {
 				wsi_man.gene_finish_ts(this);
 			}
@@ -828,8 +829,8 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 			start_fin_time = get_sys_clock();
 		}
 		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-		INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    	INC_STATS(get_thd_id(), trans_prepare_count, 1);
+		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+    	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
 		if(CC_ALG == SSI) {
 			ssi_man.gene_finish_ts(this);
 		}
@@ -920,6 +921,7 @@ void TxnManager::send_prepare_messages() {
 			}
 		}
 	}
+	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),tar_nodes_cnt);
 	for(int i=0;i<tar_nodes_cnt;i++){
 #if TAPIR_DEBUG
 		printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
@@ -1073,66 +1075,43 @@ void TxnManager::send_finish_messages() {
 		uint64_t l_node = GET_NODE_ID(part_id);
 		if(l_node == g_node_id) {
     	} else {
-			// rsp_cnt++;
 			//every part in different node
-			// if(g_part_cnt == g_node_cnt) assert(!exist);
 			tar_nodes[tar_nodes_cnt++] = l_node;
 		}
 	}
 	DEBUG("%ld Send FINISH messages to %d\n",get_txn_id(),rsp_cnt);
-	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
-		uint64_t part_id = query->partitions_touched[i];
-		uint64_t l_node = GET_NODE_ID(part_id);
-		uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
-		uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
-		ir_log_rsp_cnt[i] = 3;
-		if(l_node == g_node_id) {
-			ir_log_rsp_cnt[i]--;
-		} else {
-			// // bool exist = false;
-			// // for(int j=0;j<tar_nodes_cnt;j++){
-			// // 	if(tar_nodes[j] == l_node) {exist = true;break;}
-			// // }
-			// //every part in different node
-			// // if(g_part_cnt == g_node_cnt) assert(!exist);
-			// // if(!exist){
-			// 	tar_nodes[tar_nodes_cnt++] = l_node;
-			// // }
-			// // tar_nodes[tar_nodes_cnt++] = l_node;
+	// ! 日志部分
+	if (txn->rc != Abort) {
+		for(uint64_t i = 0; i < query->partitions_modified.size(); i++) {
+			uint64_t part_id = query->partitions_modified[i];
+			uint64_t l_node = GET_NODE_ID(part_id);
+			uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
+			uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
+			ir_log_rsp_cnt[i] = 3;
+			if(l_node == g_node_id) {
+				ir_log_rsp_cnt[i]--;
+			}
+			if(f1 != g_node_id){
+				bool exist = false;
+				for(int j=0;j<tar_nodes_cnt;j++){
+					if(tar_nodes[j] == f1) {exist = true;break;}
+				}
+				//every part in different node
+				if(!exist){
+					tar_nodes[tar_nodes_cnt++] = f1;
+				}
+			}else {ir_log_rsp_cnt[i]--;}
+			if(f2 != g_node_id){
+				bool exist = false;
+				for(int j=0;j<tar_nodes_cnt;j++){
+					if(tar_nodes[j] == f2) {exist = true;break;}
+				}
+				//every part in different node
+				if(!exist){
+					tar_nodes[tar_nodes_cnt++] = f2;
+				}
+			}else {ir_log_rsp_cnt[i]--;}
 		}
-    	// } else {
-		// 	bool exist = false;
-		// 	for(int j=0;j<tar_nodes_cnt;j++){
-		// 		if(tar_nodes[j] == l_node) {exist = true;break;}
-		// 	}
-		// 	//every part in different node
-		// 	// if(g_part_cnt == g_node_cnt) assert(!exist);
-		// 	if(!exist){
-		// 		tar_nodes[tar_nodes_cnt++] = l_node;
-		// 	}
-		// }
-		if(f1 != g_node_id){
-			bool exist = false;
-			for(int j=0;j<tar_nodes_cnt;j++){
-				if(tar_nodes[j] == f1) {exist = true;break;}
-			}
-			//every part in different node
-			// if(g_part_cnt == g_node_cnt) assert(!exist);
-			if(!exist){
-				tar_nodes[tar_nodes_cnt++] = f1;
-			}
-		}else {ir_log_rsp_cnt[i]--;}
-		if(f2 != g_node_id){
-			bool exist = false;
-			for(int j=0;j<tar_nodes_cnt;j++){
-				if(tar_nodes[j] == f2) {exist = true;break;}
-			}
-			//every part in different node
-			// if(g_part_cnt == g_node_cnt) assert(!exist);
-			if(!exist){
-				tar_nodes[tar_nodes_cnt++] = f2;
-			}
-		}else {ir_log_rsp_cnt[i]--;}
 	}
 
 
@@ -1209,23 +1188,23 @@ int TxnManager::received_tapir_fin_response(RC rc, uint64_t return_node_id) {
 		if(l_node == g_node_id) continue;
 		if(l_node == return_node_id) {
 			rsp_cnt--;
-			if(rsp_cnt > 0) {
-				return rsp_cnt;
-			}
 		}
 	}
 	// 	if(return_node_id == l_node || return_node_id == f1 || return_node_id == f2) {
 	// 		ir_log_rsp_cnt[i] --;
 	// 	}
 	// }
-	for(int i = 0; i < query->partitions_touched.size(); i++) {
-		uint64_t part_id = query->partitions_touched[i];
+	for(int i = 0; i < query->partitions_modified.size(); i++) {
+		uint64_t part_id = query->partitions_modified[i];
 		uint64_t l_node = GET_NODE_ID(part_id);
 		uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
 		uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
 		if(return_node_id == l_node || return_node_id == f1 || return_node_id == f2) {
 			ir_log_rsp_cnt[i] --;
 		}
+	}
+	if(rsp_cnt > 0) {
+		return rsp_cnt;
 	}
 	for(int i = 0; i < g_node_cnt; i++) {
 #if MAJORITY
@@ -1686,78 +1665,15 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	this->last_row = row;
 	this->last_type = type;
   	uint64_t get_access_end_time = 0;
-#if CC_ALG == TICTOC
-	bool isexist = false;
-	uint64_t size = get_write_set_size();
-	size += get_read_set_size();
-	// UInt32 n = 0, m = 0;
-	for (uint64_t i = 0; i < size; i++) {
-		if (txn->accesses[i]->orig_row == row) {
-			access = txn->accesses[i];
-			access->orig_row->get_ts(access->orig_wts, access->orig_rts);
-			isexist = true;
-			// DEBUG("TxnManagerTictoc::find the exist access \n", access->orig_data, access->orig_row, access->data, access->orig_rts, access->orig_wts);
-			break;
-		}
-	}
-	if (!access) {
-		access_pool.get(get_thd_id(),access);
-
-    get_access_end_time = get_sys_clock();
-    INC_STATS(get_thd_id(), trans_get_access_count, 1);
-    INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
-
-		rc = row->get_row(type, this, access->data, access->orig_wts, access->orig_rts);
-		if (!OCC_WAW_LOCK || type == RD) {
-			_min_commit_ts = _min_commit_ts > access->orig_wts ? _min_commit_ts : access->orig_wts;
-		} else {
-			if (rc == WAIT)
-						ATOM_ADD_FETCH(_num_lock_waits, 1);
-						if (rc == Abort || rc == WAIT)
-								return rc;
-		}
-    INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
-    INC_STATS(get_thd_id(), trans_get_row_count, 1);
-	} else {
-    get_access_end_time = get_sys_clock();
-    INC_STATS(get_thd_id(), trans_get_access_count, 1);
-    INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
-  }
-	if (!OCC_WAW_LOCK || type == RD) {
-		access->locked = false;
-	} else {
-		_min_commit_ts = _min_commit_ts > access->orig_rts + 1 ? _min_commit_ts : access->orig_rts + 1;
-		access->locked = true;
-	}
-#else
 	access_pool.get(get_thd_id(),access);
 	get_access_end_time = get_sys_clock();
 	INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
 	INC_STATS(get_thd_id(), trans_get_access_count, 1);
-#endif
-	//uint64_t row_cnt = txn->row_cnt;
-	//assert(txn->accesses.get_count() - 1 == row_cnt);
-#if CC_ALG == RDMA_TS1 || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_TS
-	access->location = g_node_id;
-	access->offset = (char*)row - rdma_global_buffer;
-#endif
-#if CC_ALG != TICTOC
-  // uint64_t start_time = get_sys_clock();
-  //for NO_WAIT, lock and preserve access
-#if CC_ALG == WOUND_WAIT
-	if (txn_state == WOUNDED) 
-		rc = Abort;
-	else 
-		rc = row->get_row(yield,type, this, access,cor_id);
-#else
+
 	rc = row->get_row(yield,type, this, access,cor_id);
-#endif
 	INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
 	INC_STATS(get_thd_id(), trans_get_row_count, 1);
-#endif
-#if CC_ALG == FOCC
-	focc_man.active_storage(type, this, access);
-#endif
+
   	uint64_t middle_time = get_sys_clock();
 	if (rc == Abort || rc == WAIT) {
 		row_rtn = NULL;
@@ -3559,10 +3475,10 @@ void TxnManager::log_replica(uint64_t ret_nid,bool finish) {
 		}
 	}
 #if USE_REPLICA
-	pthread_mutex_lock(&log_lock);
-	h_thd->log_count ++;
-	h_thd->log_content = h_thd->log_count;
-	pthread_mutex_unlock(&log_lock);
+	// pthread_mutex_lock(&log_lock);
+	// h_thd->log_count ++;
+	// h_thd->log_content = h_thd->log_count;
+	// pthread_mutex_unlock(&log_lock);
 #endif
 	uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
 	uint64_t f2 = GET_FOLLOWER2_NODE(part_id);

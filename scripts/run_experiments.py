@@ -29,6 +29,7 @@ skip = False
 exps=[]
 arg_cluster = False
 merge_mode = False
+use_delay = "false"
 perfTime = 60
 fromtimelist=[]
 totimelist=[]
@@ -60,6 +61,8 @@ for arg in sys.argv[1:]:
         arg_cluster = True
     elif arg == '-m':
         merge_mode = True
+    elif arg == '-d':
+        use_delay = "true"
     elif arg_cluster:
         cluster = arg
         arg_cluster = False
@@ -146,7 +149,7 @@ for exp in exps:
                 if cluster == 'istc':
                     cmd = './deploy.sh \'{}\' /{}/ {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"])
                 elif cluster == 'vcloud':
-                    cmd = './vcloud_deploy.sh \'{}\' /{}/ {} {} {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"], perfTime, uname2)
+                    cmd = './vcloud_deploy.sh \'{}\' /{}/ {} {} {} {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"], perfTime, uname2, use_delay)
                 print cmd
                 fromtimelist.append(str(int(time.time())) + "000")
                 os.system(cmd)

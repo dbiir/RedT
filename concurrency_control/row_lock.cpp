@@ -388,8 +388,9 @@ RC Row_lock::lock_release(TxnManager * txn) {
             INC_STATS(txn->get_thd_id(),twopl_ex_owned_cnt,1);
         }
         lock_type = LOCK_NONE;
-      }
-
+    }
+    DEBUG("unlock (%ld,%ld) success: owners %d, own type %d, key %ld %lx\n", txn->get_txn_id(),
+            txn->get_batch_id(), owner_cnt, lock_type, _row->get_primary_key(), (uint64_t)_row);
 #else
     // Try to find the entry in the owners
     LockEntry * en = owners[hash(txn->get_txn_id())];

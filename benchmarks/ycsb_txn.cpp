@@ -153,14 +153,14 @@ RC YCSBTxnManager::send_remote_subtxn() {
 		if(req->acctype == WR) ycsb_query->partitions_modified.add_unique(_wl->key_to_part(ycsb_query->requests[i]->key));
 	}
 	rsp_cnt = query->partitions_touched.size() - 1;
-#if TAPIR_DEBUG
-	printf("send %d rqry %d messages\n",get_txn_id(), rsp_cnt);
-#endif
+	#if TAPIR_DEBUG
+		printf("send %d rqry %d messages\n",get_txn_id(), rsp_cnt);
+	#endif
 	for(int i = 0; i < query->partitions_touched.size(); i++) {
 		if(query->partitions_touched[i] != g_node_id) {
-#if TAPIR_DEBUG
-			printf("send %d rqry message to node:%d \n",get_txn_id(), query->partitions_touched[i]);
-#endif
+	#if TAPIR_DEBUG
+				printf("send %d rqry message to node:%d \n",get_txn_id(), query->partitions_touched[i]);
+	#endif
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),query->partitions_touched[i]);
 		}
 		
@@ -203,7 +203,7 @@ RC YCSBTxnManager::send_remote_subtxn() {
 #endif
 			num_msgs_rw++;
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
-			// printf("send subtxn to %d\n", i);
+			// printf("txn %ld send subtxn to %d\n", get_txn_id(), i);
 		}
 	}
 #endif

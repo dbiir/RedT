@@ -220,8 +220,8 @@
 
 #define DEBUG_PRINTF  false
 #define USE_REPLICA true
-#define USE_TAPIR false
-#define MAJORITY true
+#define USE_TAPIR true
+#define MAJORITY false
 #define INTER_DC_CONTROL true
 
 #define TAPIR_DEBUG false

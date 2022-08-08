@@ -67,6 +67,7 @@ void TxnManPool::get(uint64_t thd_id, TxnManager *& item) {
 
 void TxnManPool::put(uint64_t thd_id, TxnManager * item) {
   item->release();
+  // item->reset();
   int tries = 0;
 #if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
   while (!pool->push(item) && tries++ < TRY_LIMIT) {

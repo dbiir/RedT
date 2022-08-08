@@ -309,6 +309,7 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 
 #if INTER_DC_CONTROL
 	bool cross_dc_txn = false;
+	int cross_dc_id = 0;
 	double cc = (double)(mrand->next() % 10000) / 10000;
 	if(cc < g_cross_dc_txn_perc){
 		cross_dc_txn = true;
@@ -349,7 +350,19 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 			partition_id = mrand->next() % g_part_cnt;
 			if(g_strict_ppt && g_part_per_txn <= g_part_cnt) {
 
-#if INTER_DC_CONTROL
+#if INTER_DC_CONTROL && CROSS_DC_COUNT == 2
+				while ((partitions_accessed.size() < g_part_per_txn &&
+								partitions_accessed.count(partition_id) > 0)||
+					   (partitions_accessed.size() == g_part_per_txn &&
+								partitions_accessed.count(partition_id) == 0)||
+					   (!cross_dc_txn && 
+								GET_CENTER_ID(GET_NODE_ID(partition_id)) != GET_CENTER_ID(GET_NODE_ID(home_partition_id)))||
+					   (cross_dc_txn && !has_cross_dc_part &&
+								GET_CENTER_ID(GET_NODE_ID(partition_id)) == GET_CENTER_ID(GET_NODE_ID(home_partition_id))) ||
+						(cross_dc_txn && has_cross_dc_part && (GET_CENTER_ID(GET_NODE_ID(partition_id)) != GET_CENTER_ID(GET_NODE_ID(home_partition_id)) && GET_CENTER_ID(GET_NODE_ID(partition_id)) != cross_dc_id ))) {
+					partition_id = mrand->next() % g_part_cnt;
+				}
+#elif INTER_DC_CONTROL
 				while ((partitions_accessed.size() < g_part_per_txn &&
 								partitions_accessed.count(partition_id) > 0)||
 					   (partitions_accessed.size() == g_part_per_txn &&
@@ -360,7 +373,7 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 								GET_CENTER_ID(GET_NODE_ID(partition_id)) == GET_CENTER_ID(GET_NODE_ID(home_partition_id)))) {
 					partition_id = mrand->next() % g_part_cnt;
 				}
-#else 
+#else
 				while ((partitions_accessed.size() < g_part_per_txn &&
 								partitions_accessed.count(partition_id) > 0) ||
 					    (partitions_accessed.size() == g_part_per_txn &&
@@ -389,6 +402,7 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 #if INTER_DC_CONTROL
 		if(cross_dc_txn && !has_cross_dc_part && GET_CENTER_ID(GET_NODE_ID(partition_id)) != GET_CENTER_ID(GET_NODE_ID(home_partition_id))){
 			has_cross_dc_part = true;
+			cross_dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
 		}
 #endif
 
