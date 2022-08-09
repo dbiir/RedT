@@ -1,0 +1,70 @@
+digraph graphname {
+  total [label="trans total time \n trans_total_run_time \n 100 %",
+		shape=box]
+	process [label="trans process time \n trans_process_time \n trans_process_time_percent %",
+			shape=box]
+    process_network [label="trans process network time \n trans_process_network \n trans_process_network_percent %", shape=box]
+    txn_process [label="run benchmark read and write \n txn_process_time \n txn_process_time_percent %",
+			shape=box]
+      init [label="trans init time \n trans_init_time \n trans_init_time_percent %",
+        shape=box]
+      index [label="trans index time \n txn_index_time \n txn_index_time_percent %",
+          shape=box]
+      txn_compute [label="run benchmark compute \n trans_benchmark_compute_time \n trans_benchmark_compute_time_percent %",
+			            shape=box]
+      access_rwset [label="access data and store in rwset \n txn_manager_time \n txn_manager_time_percent %",
+            shape=box]
+        get_access [label="get rwset struct \n trans_get_access_time \n trans_get_access_time_percent %",
+            shape=box]
+        get_row [label="get row \n trans_get_row_time \n trans_get_row_time_percent %",
+            shape=box]
+          init_row [label="init row \n trans_cur_row_init_time \n trans_cur_row_init_time_percent %",
+              shape=box]
+          rw_row [label="read and write row \n lat_l_loc_cc_time \n lat_l_loc_cc_time_percent %",
+              shape=box]
+          cur_row_copy [label="copy row \n trans_cur_row_copy_time \n trans_cur_row_copy_time_percent %",
+              shape=box]
+        store_access [label="store row into rwset \n trans_store_access_time \n trans_store_access_time_percent %",
+              shape=box]
+    block [label="trans block time \n trans_block_time \n trans_block_time_percent %",
+        shape=box]
+	twopc [label="trans 2pc time \n trans_2pc_time \n trans_2pc_time_percent %",
+		shape=box]
+		prepare [label="trans prepare time \n trans_prepare_time \n trans_prepare_time_percent %",
+				shape=box]
+			validate [label="trans validate time \n trans_validate_time \n trans_validate_time_percent %",
+					shape=box]
+      validate_network [label="trans validate network time \n trans_validation_network \n trans_validation_network_percent %", shape=box]
+		finish [label="trans finish time \n trans_finish_time \n trans_finish_time_percent %",
+				shape=box]
+			commit [label="trans commit time \n trans_commit_time \n trans_commit_time_percent %",
+				shape=box]
+      commit_network [label="trans commit network time \n trans_commit_network \n trans_commit_network_percent %", shape=box]
+			abort [label="trans abort time \n trans_abort_time \n trans_abort_time_percent %",
+				shape=box]
+      abort_network [label="trans abort network time \n trans_abort_network \n trans_abort_network_percent %", shape=box]
+
+  total->process
+    process->txn_process
+      txn_process->init
+      txn_process->index
+      txn_process->txn_compute
+      txn_process->access_rwset
+        access_rwset->get_access
+        access_rwset->get_row
+          get_row->init_row
+          get_row->rw_row
+          get_row->cur_row_copy
+        access_rwset->store_access
+    process->block
+    process->process_network
+  total->twopc
+    twopc->prepare
+      prepare->validate
+      prepare->validate_network
+    twopc->finish
+      finish->commit
+        commit->commit_network
+      finish->abort
+        abort->abort_network
+};

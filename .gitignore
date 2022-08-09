@@ -1,0 +1,17 @@
+*.o
+results*
+figs*
+rundb
+runcl
+.vscode/*
+obj/*
+gnuplot-5.2.8/
+input.txt
+*.out
+0results*
+1results*
+lat*
+scripts/lat-*
+scripts/tmp*
+.cache/*
+scripts/tmp-*
