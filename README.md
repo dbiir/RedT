@@ -1,45 +1,35 @@
-DDBMS
+RedT
 =======
 
-DDBMS is a testbed of an OLTP distributed database management system (DBMS). It supports 6 concurrency control algorithms.
+RedT is an RDMA-enhanced distributed transaction processing protocol with availability guarantees atop of the opensourced distributed framework Deneva, whose study can be found in the following paper:
 
-This testbed is based on the DBx1000 system, whose concurrency control scalability study can be found in the following paper:
+    Rachael Harding, Dana Van Aken, Andrew Pavlo, and Michael Stonebraker. 2017.
+    An Evaluation of Distributed Concurrency Control. PVLDB 10, 5 (2017), 553–564.
+    
+We evaluate the performance of RedT/Tapir/2PC+Paxos on both YCSB and TPC-C workload, and the currency control algorithm is No-Wait.
 
-    Staring into the Abyss: An Evaluation of Concurrency Control with One Thousand Cores
-    Xiangyao Yu, George Bezerra, Andrew Pavlo, Srinivas Devadas, Michael Stonebraker
-    http://voltdb.com/downloads/datasheets_collateral/vdb_whitepaper_staring_into_the_abyss.pdf
-
-Build & Test
+Dependencies
 ------------
+For build:
+- g++ >= 6.4.0
+- Boost = 1.6.1
+- jemalloc >= 5.2.1
+- nanomsg >= 1.1.5
+- libevent >= 1.2
+- libibverbs
 
-To build the database.
-
-    make deps
-    make -j
+Build
+--------------
+- `git clone https://github.com/rhaaaa123/RedT.git`
+- `make clean`
+- `make deps`
+- `make -j16`
 
 Configuration
 -------------
-
-DBMS configurations can be changed in the config.h file. Please refer to README for the meaning of each configuration. Here we only list several most important ones.
-
-    NODE_CNT          : Number of server nodes in the database
-    THREAD_CNT        : Number of worker threads running per server
-    WORKLOAD          : Supported workloads include YCSB and TPCC
-    CC_ALG            : Concurrency control algorithm. Six algorithms are supported
-                        (NO_WAIT, WAIT_DIE, TIMESTAMP, MVCC, OCC, CALVIN)
-    MAX_TXN_IN_FLIGHT  : Maximum number of active transactions at each server at a given time
-    DONE_TIMER        : Amount of time to run experiment
-
-Configurations can also be specified as command argument at runtime. Run the following command for a full list of program argument.
-
-    ./rundb -h
+In `scripts\run_config.py`, the `vcloud_uname` and `vcloud_machines` need to be changed for running. and the experiments specific configuration can be found in `scripts\experiments.py`.
 
 Run
----
-
-The DBMS can be run with
-
-    ./rundb -nid[N]
-    ./runcl -nid[M]
-
-where N and M are the ID of a server and client, respectively
+-------------
+- `cd scripts`
+- `python run_experiments.py -e -c vcloud ycsb_cross_dc`
