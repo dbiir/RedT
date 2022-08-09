@@ -22,13 +22,9 @@
 #include "thread.h"
 #include "mem_alloc.h"
 #include "occ.h"
-#include "focc.h"
-#include "bocc.h"
 #include "row_occ.h"
 #include "table.h"
 #include "catalog.h"
-#include "dli.h"
-#include "dta.h"
 #include "index_btree.h"
 #include "index_hash.h"
 #include "index_rdma.h"
@@ -45,15 +41,9 @@
 #include "pps_query.h"
 #include "array.h"
 #include "maat.h"
-#include "wkdb.h"
-#include "tictoc.h"
-#include "ssi.h"
-#include "wsi.h"
 #include "manager.h"
 #include "row_rdma_2pl.h"
 #include "rdma_2pl.h"
-#include "cicada.h"
-#include "row_cicada.h"
 #include "transport.h"
 #include "dbpa.hpp"
 #include "routine.h"
@@ -302,10 +292,7 @@ void Transaction::release_accesses(uint64_t thd_id) {
 void Transaction::release_inserts(uint64_t thd_id) {
 	for(uint64_t i = 0; i < insert_rows.size(); i++) {
 	row_t * row = insert_rows[i];
-#if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != WOOKONG && \
-		CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != DTA && CC_ALG != DLI_MVCC_OCC && \
-		CC_ALG != DLI_MVCC_BASE && CC_ALG != DLI_DTA && CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && \
-		CC_ALG != DLI_BASE && CC_ALG != DLI_OCC
+#if CC_ALG != MAAT && CC_ALG != OCC
 		DEBUG_M("TxnManager::cleanup row->manager free\n");
 		mem_allocator.free(row->manager, 0);
 #endif
@@ -359,33 +346,10 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	uncommitted_writes_y = new std::set<uint64_t>();
 	uncommitted_reads = new std::set<uint64_t>();
 #endif
-#if CC_ALG == TICTOC
-	_is_sub_txn = true;
-	_min_commit_ts = glob_manager.get_max_cts();;
-	_num_lock_waits = 0;
-	_signal_abort = false;
-	_timestamp = glob_manager.get_ts(get_thd_id());
-#endif
 #if CC_ALG == CALVIN 
 	phase = CALVIN_RW_ANALYSIS;
 	locking_done = false;
 	calvin_locked_rows.init(MAX_ROW_PER_TXN);
-#endif
-#if CC_ALG == DLI_MVCC || CC_ALG == DLI_MVCC_OCC
-	is_abort = nullptr;
-#endif
-#if CC_ALG == SILO
-	_pre_abort = (g_params["pre_abort"] == "true");
-	if (g_params["validation_lock"] == "no-wait")
-		_validation_no_wait = true;
-	else if (g_params["validation_lock"] == "waiting")
-		_validation_no_wait = false;
-	else
-		assert(false);
-  _cur_tid = 0;
-  num_locks = 0;
-  memset(write_set, 0, 100);
-  // write_set = (int *) mem_allocator.alloc(sizeof(int) * 100);
 #endif
 #if CC_ALG == RDMA_NO_WAIT
 	num_atomic_retry = 0;
@@ -439,9 +403,6 @@ void TxnManager::reset() {
 	lock_ready = false;
 	lock_ready_cnt = 0;
 	locking_done = true;
-#if CC_ALG == DLI_MVCC || CC_ALG == DLI_MVCC_OCC
-	is_abort = nullptr;
-#endif
 	ready_part = 0;
 	rsp_cnt = 0;
 	aborted = false;
@@ -528,11 +489,6 @@ void TxnManager::release() {
 #if CC_ALG == CALVIN
 	calvin_locked_rows.release();
 #endif
-#if CC_ALG == SILO
-  num_locks = 0;
-  memset(write_set, 0, 100);
-  // mem_allocator.free(write_set, sizeof(int) * 100);
-#endif
 	txn_ready = true;
 	num_msgs_commit = 0;
 	num_msgs_rw_prep = 0;
@@ -585,16 +541,6 @@ RC TxnManager::commit(yield_func_t &yield, uint64_t cor_id) {
 #if CC_ALG == MAAT
 	time_table.release(get_thd_id(),get_txn_id());
 #endif
-#if CC_ALG == WOOKONG
-	wkdb_time_table.release(get_thd_id(),get_txn_id());
-#endif
-#if CC_ALG == TICTOC
-	tictoc_man.cleanup(RCOK, this);
-#endif
-#if CC_ALG == SSI
-	inout_table.set_commit_ts(get_thd_id(), get_txn_id(), get_commit_timestamp());
-	inout_table.set_state(get_thd_id(), get_txn_id(), SSI_COMMITTED);
-#endif
 	commit_stats();
 #if LOGGING
 	LogRecord * record = logger.createRecord(get_txn_id(),L_NOTIFY,0,0);
@@ -614,10 +560,6 @@ RC TxnManager::commit(yield_func_t &yield, uint64_t cor_id) {
 
 RC TxnManager::abort(yield_func_t &yield, uint64_t cor_id) {
 	if (aborted) return Abort;
-#if CC_ALG == SSI
-	inout_table.set_state(get_thd_id(), get_txn_id(), SSI_ABORTED);
-	inout_table.clear_Conflict(get_thd_id(), get_txn_id());
-#endif
 	DEBUG("Abort %ld\n",get_txn_id());
 	//printf("Abort %ld\n",get_txn_id());
 	txn->rc = Abort;
@@ -635,13 +577,6 @@ RC TxnManager::abort(yield_func_t &yield, uint64_t cor_id) {
 #if CC_ALG == MAAT
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
 	time_table.release(get_thd_id(),get_txn_id());
-#endif
-#if CC_ALG == WOOKONG
-	wkdb_time_table.release(get_thd_id(),get_txn_id());
-#endif
-#if CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
-	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
-	dta_time_table.release(get_thd_id(), get_txn_id());
 #endif
 
 	uint64_t timespan = get_sys_clock() - txn_stats.restart_starttime;
@@ -701,12 +636,6 @@ RC TxnManager::start_commit() {
 	_is_sub_txn = false;
 
 	rc = validate();
-	if(CC_ALG == SSI) {
-		ssi_man.gene_finish_ts(this);
-	}
-	if(CC_ALG == WSI) {
-		wsi_man.gene_finish_ts(this);
-	}
 	if(rc == RCOK)
 		rc = commit();
 	else
@@ -725,14 +654,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
 	if(true) {
-		if(CC_ALG == TICTOC) {
-			rc = validate(yield, cor_id);
-			if (rc != Abort) {
-				send_prepare_messages();
-				rc = WAIT_REM;
-			}
-		} else if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == DLI_BASE ||
-				CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == CICADA || CC_ALG == RDMA_NO_WAIT) {
+		if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == RDMA_NO_WAIT) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;
@@ -742,9 +664,6 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 			// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
 			// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
       		// INC_STATS(get_thd_id(), trans_prepare_count, 1);
-			if(CC_ALG == WSI) {
-				wsi_man.gene_finish_ts(this);
-			}
 			send_finish_messages();
 			rsp_cnt = 0;
 			rc = commit(yield, cor_id);
@@ -759,12 +678,6 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
 		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
-		if(CC_ALG == SSI) {
-			ssi_man.gene_finish_ts(this);
-		}
-		if(CC_ALG == WSI) {
-			wsi_man.gene_finish_ts(this);
-		}
 		if(rc == RCOK){   //for NO_WAIT , rc == RCOK
 			rc = commit(yield, cor_id);
 		}		
@@ -1066,8 +979,6 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 		}
 #endif
 	}
-#elif CC_ALG == CICADA
-	version = orig_r->manager->commit(this, type);
 #else
   if (ROLL_BACK && type == XP &&
       (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT )) {
@@ -1100,31 +1011,15 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 #endif
 
 	if (type == WR) txn->accesses[rid]->version = version;
-#if CC_ALG == TICTOC
-	if (_min_commit_ts > glob_manager.get_max_cts())
-		glob_manager.set_max_cts(_min_commit_ts);
-#endif
 
-#if CC_ALG != SILO && CC_ALG != RDMA_NO_WAIT
+#if CC_ALG != RDMA_NO_WAIT
   txn->accesses[rid]->data = NULL;
 #endif
 }
 
 void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
-#if CC_ALG == SILO
-    finish(rc);
-#endif
 #if CC_ALG == OCC && MODE == NORMAL_MODE
 	occ_man.finish(rc,this);
-#endif
-#if CC_ALG == BOCC && MODE == NORMAL_MODE
-	bocc_man.finish(rc,this);
-#endif
-#if CC_ALG == FOCC && MODE == NORMAL_MODE
-	focc_man.finish(rc,this);
-#endif
-#if (CC_ALG == WSI) && MODE == NORMAL_MODE
-	wsi_man.finish(rc,this);
 #endif
 
 	ts_t starttime = get_sys_clock();
@@ -1144,20 +1039,12 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 #if CC_ALG == RDMA_NO_WAIT
     r2pl_man.finish(yield,rc,this,cor_id);
 #endif
-#if CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || \
-		CC_ALG == DLI_MVCC_BASE
-	dli_man.finish_trans(rc, this);
-#endif
 #if CC_ALG == CALVIN 
 	// cleanup locked rows
 	for (uint64_t i = 0; i < calvin_locked_rows.size(); i++) {
 		row_t * row = calvin_locked_rows[i];
 		row->return_row(rc,RD,this,row);
 	}
-#endif
-
-#if CC_ALG == DTA
-	dta_man.finish(rc, this);
 #endif
 	if (rc == Abort) {
 		txn->release_inserts(get_thd_id());
@@ -1188,58 +1075,13 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	this->last_row = row;
 	this->last_type = type;
   	uint64_t get_access_end_time = 0;
-#if CC_ALG == TICTOC
-	bool isexist = false;
-	uint64_t size = get_write_set_size();
-	size += get_read_set_size();
-	// UInt32 n = 0, m = 0;
-	for (uint64_t i = 0; i < size; i++) {
-		if (txn->accesses[i]->orig_row == row) {
-			access = txn->accesses[i];
-			access->orig_row->get_ts(access->orig_wts, access->orig_rts);
-			isexist = true;
-			// DEBUG("TxnManagerTictoc::find the exist access \n", access->orig_data, access->orig_row, access->data, access->orig_rts, access->orig_wts);
-			break;
-		}
-	}
-	if (!access) {
-		access_pool.get(get_thd_id(),access);
 
-    get_access_end_time = get_sys_clock();
-    INC_STATS(get_thd_id(), trans_get_access_count, 1);
-    INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
-
-		rc = row->get_row(type, this, access->data, access->orig_wts, access->orig_rts);
-		if (!OCC_WAW_LOCK || type == RD) {
-			_min_commit_ts = _min_commit_ts > access->orig_wts ? _min_commit_ts : access->orig_wts;
-		} else {
-			if (rc == WAIT)
-						ATOM_ADD_FETCH(_num_lock_waits, 1);
-						if (rc == Abort || rc == WAIT)
-								return rc;
-		}
-    INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
-    INC_STATS(get_thd_id(), trans_get_row_count, 1);
-	} else {
-    get_access_end_time = get_sys_clock();
-    INC_STATS(get_thd_id(), trans_get_access_count, 1);
-    INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
-  }
-	if (!OCC_WAW_LOCK || type == RD) {
-		access->locked = false;
-	} else {
-		_min_commit_ts = _min_commit_ts > access->orig_rts + 1 ? _min_commit_ts : access->orig_rts + 1;
-		access->locked = true;
-	}
-#else
 	access_pool.get(get_thd_id(),access);
 	get_access_end_time = get_sys_clock();
 	INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
 	INC_STATS(get_thd_id(), trans_get_access_count, 1);
-#endif
 	//uint64_t row_cnt = txn->row_cnt;
 	//assert(txn->accesses.get_count() - 1 == row_cnt);
-#if CC_ALG != TICTOC
   // uint64_t start_time = get_sys_clock();
   //for NO_WAIT, lock and preserve access
 #if CC_ALG == WOUND_WAIT
@@ -1252,10 +1094,6 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 #endif
 	INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
 	INC_STATS(get_thd_id(), trans_get_row_count, 1);
-#endif
-#if CC_ALG == FOCC
-	focc_man.active_storage(type, this, access);
-#endif
   	uint64_t middle_time = get_sys_clock();
 	if (rc == Abort || rc == WAIT) {
 		row_rtn = NULL;
@@ -1275,9 +1113,6 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	++num_locks;
 	access->type = type;
 	access->orig_row = row; //access->data == access->orig_row
-#if CC_ALG == SILO
-	access->tid = last_tid;
-#endif
 #if CC_ALG ==RDMA_NO_WAIT
 	access->location = g_node_id;
 	access->offset = (char*)row - rdma_global_buffer;
@@ -1317,18 +1152,9 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	}
 #endif
 
-#if CC_ALG == TICTOC
-	if (!isexist) {
-		++txn->row_cnt;
-		if (type == WR)
-			++txn->write_cnt;
-			txn->accesses.add(access);
-	}
-#else
 	++txn->row_cnt;
 	if (type == WR) ++txn->write_cnt;
 	txn->accesses.add(access);
-#endif
    
 	timespan = get_sys_clock() - starttime;
     INC_STATS(get_thd_id(), trans_store_access_time, timespan + starttime - middle_time);
@@ -1519,22 +1345,12 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 #if MODE != NORMAL_MODE
 	return RCOK;
 #endif
-	if (CC_ALG != OCC && CC_ALG != MAAT  && CC_ALG != WOOKONG &&
-			CC_ALG != TICTOC && CC_ALG != BOCC && CC_ALG != FOCC && CC_ALG != WSI &&
-			CC_ALG != SSI && CC_ALG != DLI_BASE && CC_ALG != DLI_OCC &&
-			CC_ALG != DLI_MVCC_OCC && CC_ALG != DTA && CC_ALG != DLI_DTA &&
-			CC_ALG != DLI_DTA2 && CC_ALG != DLI_DTA3 && CC_ALG != DLI_MVCC && CC_ALG != SILO && 
-			CC_ALG != CICADA) {
+	if (CC_ALG != OCC && CC_ALG != MAAT) {
 		return RCOK; //no validate in NO_WAIT
 	}
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
 	if (CC_ALG == OCC && rc == RCOK) rc = occ_man.validate(this);
-	if(CC_ALG == BOCC && rc == RCOK) rc = bocc_man.validate(this);
-	if(CC_ALG == FOCC && rc == RCOK) rc = focc_man.validate(this);
-	if(CC_ALG == SSI && rc == RCOK) rc = ssi_man.validate(this);
-	if(CC_ALG == WSI && rc == RCOK) rc = wsi_man.validate(this);
-	if(CC_ALG == CICADA && rc == RCOK) rc = cicada_man.validate(this);
 	if(CC_ALG == MAAT  && rc == RCOK) {
 		rc = maat_man.validate(this);
 		// Note: home node must be last to validate
@@ -1542,51 +1358,6 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 			rc = maat_man.find_bound(this);
 		}
 	}
-	if(CC_ALG == TICTOC  && rc == RCOK) {
-		rc = tictoc_man.validate(this);
-		// Note: home node must be last to validate
-		// if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
-		//   rc = tictoc_man.find_bound(this);
-		// }
-	}
-	if ((CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 ||
-			 CC_ALG == DLI_MVCC) &&
-			rc == RCOK) {
-		rc = dli_man.validate(this);
-		if (IS_LOCAL(get_txn_id()) && rc == RCOK) {
-#if CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
-			rc = dli_man.find_bound(this);
-#else
-			set_commit_timestamp(glob_manager.get_ts(get_thd_id()));
-#endif
-		}
-	}
-	if(CC_ALG == WOOKONG  && rc == RCOK) {
-		rc = wkdb_man.validate(this);
-		// Note: home node must be last to validate
-		if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
-			rc = wkdb_man.find_bound(this);
-		}
-	}
-	if ((CC_ALG == DTA) && rc == RCOK) {
-		rc = dta_man.validate(this);
-		// Note: home node must be last to validate
-		if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
-				rc = dta_man.find_bound(this);
-		}
-	}
-#if CC_ALG == SILO
-  if(CC_ALG == SILO && rc == RCOK) {
-    rc = validate_silo();
-	//rc = RCOK;
-    if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
-      _cur_tid ++;
-      commit_timestamp = _cur_tid;
-      DEBUG("Validate success: %ld, cts: %ld \n", get_txn_id(), commit_timestamp);
-    }
-  }
-#endif
-
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);
     INC_STATS(get_thd_id(),trans_validate_count, 1);

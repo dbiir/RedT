@@ -17,11 +17,8 @@
 #include "abort_thread.h"
 #include "calvin_thread.h"
 #include "client_query.h"
-#include "dli.h"
-#include "dta.h"
 #include "global.h"
 #include "io_thread.h"
-#include "key_xid.h"
 #include "log_thread.h"
 #include "logger.h"
 #include "maat.h"
@@ -31,7 +28,6 @@
 #include "occ.h"
 #include "pps.h"
 #include "query.h"
-#include "rts_cache.h"
 #include "sequencer.h"
 #include "sim_manager.h"
 #include "abort_queue.h"
@@ -44,16 +40,7 @@
 #include "ycsb_query.h"
 #include "da.h"
 #include "maat.h"
-#include "cicada.h"
-#include "ssi.h"
-#include "wsi.h"
-#include "focc.h"
-#include "bocc.h"
 #include "client_query.h"
-#include "wkdb.h"
-#include "tictoc.h"
-#include "key_xid.h"
-#include "rts_cache.h"
 #include "lib.hh"
 #include "rdma.h"
 #include "log_rdma.h"
@@ -259,63 +246,6 @@ int main(int argc, char *argv[]) {
 	redo_log_buf.init();
 	printf("Done\n");	
 #endif
-#if CC_ALG == CICADA
-	printf("Initializing CICADA manager... ");
-	cicada_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == SSI
-	printf("Initializing In Out Table... ");
-	fflush(stdout);
-	inout_table.init();
-	printf("Done\n");
-	printf("Initializing SSI manager... ");
-	fflush(stdout);
-	ssi_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == WSI
-	printf("Initializing WSI manager... ");
-	fflush(stdout);
-	wsi_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == WOOKONG
-	printf("Initializing WKDB Time Table... ");
-	fflush(stdout);
-	wkdb_time_table.init();
-	printf("Done\n");
-	// printf("Initializing WKDB KeyxidCache and RtsCache... ");
-	// fflush(stdout);
-	// wkdb_key_xid_cache.init();
-	// wkdb_rts_cache.init();
-	// printf("Done\n");
-	printf("Initializing WKDB manager... ");
-	fflush(stdout);
-	wkdb_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == TICTOC
-	printf("Initializing MaaT manager... ");
-	fflush(stdout);
-	tictoc_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
-	printf("Initializing DTA Time Table... ");
-	fflush(stdout);
-	dta_time_table.init();
-	printf("Done\n");
-	// printf("Initializing DTA KeyxidCache and RtsCache... ");
-	// fflush(stdout);
-	// dta_key_xid_cache.init();
-	// dta_rts_cache.init();
-	// printf("Done\n");
-	printf("Initializing DTA manager... ");
-	fflush(stdout);
-	dta_man.init();
-	printf("Done\n");
-#endif
 #if LOGGING
 	printf("Initializing logger... ");
 	fflush(stdout);
@@ -387,25 +317,6 @@ int main(int argc, char *argv[]) {
 #if CC_ALG == OCC
 	printf("Initializing occ lock manager... ");
 	occ_man.init();
-	printf("Done\n");
-#endif
-
-#if CC_ALG == BOCC
-	printf("Initializing occ lock manager... ");
-	bocc_man.init();
-	printf("Done\n");
-#endif
-
-#if CC_ALG == FOCC
-	printf("Initializing occ lock manager... ");
-	focc_man.init();
-	printf("Done\n");
-#endif
-
-#if CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || \
-		CC_ALG == DLI_MVCC
-	printf("Initializing si manager... ");
-	dli_man.init();
 	printf("Done\n");
 #endif
 	/*

@@ -64,7 +64,7 @@ RC ClientThread::run() {
 		//uint32_t next_node = iters++ % g_node_cnt;
 		progress_stats();
 		int32_t inf_cnt;
-	#if CC_ALG == BOCC || CC_ALG == FOCC || ONE_NODE_RECIEVE == 1
+	#if ONE_NODE_RECIEVE == 1
 		uint32_t next_node = 0;
 		uint32_t next_node_id = next_node;
 	#else

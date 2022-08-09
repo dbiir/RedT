@@ -17,7 +17,6 @@
 #include "worker_thread.h"
 
 #include "abort_queue.h"
-#include "dta.h"
 #include "global.h"
 #include "helper.h"
 #include "logger.h"
@@ -34,12 +33,6 @@
 #include "work_queue.h"
 #include "ycsb_query.h"
 #include "maat.h"
-#include "wkdb.h"
-#include "tictoc.h"
-#include "wsi.h"
-#include "ssi.h"
-#include "focc.h"
-#include "bocc.h"
 #include "transport.h"
 #include "routine.h"
 #include "log_rdma.h"
@@ -110,7 +103,7 @@ void WorkerThread::fakeprocess(yield_func_t &yield, Message * msg, uint64_t cor_
 			case RFIN:
         rc = RCOK;
         txn_man->set_rc(rc);
-        if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC || CC_ALG == BOCC || CC_ALG == SSI)
+        if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC)
         // if(!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC)
 #if USE_RDMA == CHANGE_MSG_QUEUE
           tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->get_txn_id()), Message::create_message(txn_man,RACK_FIN));
@@ -852,9 +845,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
 
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()), "RFIN local: %ld %ld/%d\n", msg->get_txn_id(),
              msg->get_txn_id() % g_node_cnt, g_node_id);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || \
-    CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_MVCC || CC_ALG == SILO || USE_REPLICA
+#if CC_ALG == MAAT || USE_REPLICA
   txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
 #endif
 
@@ -873,9 +864,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
   }
   txn_man->commit(yield, cor_id);
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
-  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || CC_ALG == TICTOC ||
-       CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == DLI_BASE ||
-       CC_ALG == DLI_OCC || CC_ALG == SILO || CC_ALG == CICADA || USE_REPLICA)
+  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_REPLICA)
     txn_man->abort_cnt = msg->current_abort_cnt;
 #if USE_RDMA == CHANGE_MSG_QUEUE
     tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(msg->get_txn_id()), Message::create_message(txn_man, RACK_FIN));
@@ -953,43 +942,6 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   }
 #endif
 
-#if CC_ALG == WOOKONG
-  // Integrate bounds
-  uint64_t lower = ((AckMessage*)msg)->lower;
-  uint64_t upper = ((AckMessage*)msg)->upper;
-  if(lower > wkdb_time_table.get_lower(get_thd_id(),msg->get_txn_id())) {
-    wkdb_time_table.set_lower(get_thd_id(),msg->get_txn_id(),lower);
-  }
-  if(upper < wkdb_time_table.get_upper(get_thd_id(),msg->get_txn_id())) {
-    wkdb_time_table.set_upper(get_thd_id(),msg->get_txn_id(),upper);
-  }
-  DEBUG("%ld bound set: [%ld,%ld] -> [%ld,%ld]\n",msg->get_txn_id(),lower,upper,wkdb_time_table.get_lower(get_thd_id(),msg->get_txn_id()),wkdb_time_table.get_upper(get_thd_id(),msg->get_txn_id()));
-  if(((AckMessage*)msg)->rc != RCOK) {
-    wkdb_time_table.set_state(get_thd_id(),msg->get_txn_id(),WKDB_ABORTED);
-  }
-#endif
-#if CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
-  // Integrate bounds
-  uint64_t lower = ((AckMessage*)msg)->lower;
-  uint64_t upper = ((AckMessage*)msg)->upper;
-  if (lower > dta_time_table.get_lower(get_thd_id(), msg->get_txn_id())) {
-    dta_time_table.set_lower(get_thd_id(), msg->get_txn_id(), lower);
-  }
-  if (upper < dta_time_table.get_upper(get_thd_id(), msg->get_txn_id())) {
-    dta_time_table.set_upper(get_thd_id(), msg->get_txn_id(), upper);
-  }
-  DEBUG("%ld bound set: [%ld,%ld] -> [%ld,%ld]\n", msg->get_txn_id(), lower, upper,
-        dta_time_table.get_lower(get_thd_id(), msg->get_txn_id()),
-        dta_time_table.get_upper(get_thd_id(), msg->get_txn_id()));
-  if(((AckMessage*)msg)->rc != RCOK) {
-    dta_time_table.set_state(get_thd_id(), msg->get_txn_id(), DTA_ABORTED);
-  }
-#endif
-#if CC_ALG == SILO
-  uint64_t max_tid = ((AckMessage*)msg)->max_tid;
-  txn_man->find_tid_silo(max_tid);
-#endif
-
   if (responses_left > 0) return WAIT;
   #if WORKLOAD == YCSB
   for(int i=0;i<REQ_PER_QUERY;i++){
@@ -1012,15 +964,11 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   txn_man->txn_stats.wait_for_rsp_time = curr_time;
 
   if(txn_man->get_rc() == RCOK) {
-    if (CC_ALG == TICTOC)
-      rc = RCOK;
-    else{
-      rc = txn_man->validate(yield, cor_id); 
+    rc = txn_man->validate(yield, cor_id); 
 #if USE_REPLICA
-      // if(rc != Abort) 
-      assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
+    // if(rc != Abort) 
+    assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
 #endif
-    }
   }
   uint64_t finish_start_time = get_sys_clock();
   txn_man->txn_stats.finish_start_time = finish_start_time;
@@ -1030,12 +978,6 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   if(rc == Abort || txn_man->get_rc() == Abort) {
     txn_man->txn->rc = Abort;
     rc = Abort;
-  }
-  if(CC_ALG == SSI) {
-    ssi_man.gene_finish_ts(txn_man);
-  }
-  if(CC_ALG == WSI) {
-    wsi_man.gene_finish_ts(txn_man);
   }
   //commit phase: now commit or abort
   txn_man->send_finish_messages();
@@ -1159,13 +1101,6 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
     txn_man->start_abort(yield, cor_id);
     return Abort;
   }
-#if CC_ALG == TICTOC
-  // Integrate bounds
-  TxnManager * txn_man = txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),0);
-  QueryResponseMessage* qmsg = (QueryResponseMessage*)msg;
-  txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ?
-                            txn_man->_min_commit_ts : qmsg->_min_commit_ts;
-#endif
   txn_man->send_RQRY_RSP = false;
   RC rc = txn_man->run_txn(yield, cor_id);
   check_if_done(rc);
@@ -1187,23 +1122,8 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 #if CC_ALG == MVCC
   txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
 #endif
-#if CC_ALG == WSI || CC_ALG == SSI
-    txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_start_timestamp());
-#endif
 #if CC_ALG == MAAT
     time_table.init(get_thd_id(),txn_man->get_txn_id());
-#endif
-#if CC_ALG == WOOKONG
-    txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
-    wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id(),txn_man->get_timestamp());
-#endif
-#if CC_ALG == DTA
-    txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
-  dta_time_table.init(get_thd_id(), txn_man->get_txn_id(), txn_man->get_timestamp());
-#endif
-#if CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
-  txn_table.update_min_ts(get_thd_id(), txn_man->get_txn_id(), 0, txn_man->get_start_timestamp());
-  dta_time_table.init(get_thd_id(), txn_man->get_txn_id(), txn_man->get_start_timestamp());
 #endif
 #if USE_REPLICA
 	for(int i=0;i<g_node_cnt;i++) txn_man->log_idx[i] = redo_log_buf.get_size();
@@ -1276,14 +1196,6 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
   DEBUG("RPREP %ld\n",msg->get_txn_id());
     RC rc = RCOK;
 
-#if CC_ALG == TICTOC
-    // Integrate bounds
-    TxnManager * txn_man = txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),0);
-    PrepareMessage* pmsg = (PrepareMessage*)msg;
-    txn_man->_min_commit_ts = pmsg->_min_commit_ts;
-    // txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ?
-    //                         txn_man->_min_commit_ts : qmsg->_min_commit_ts;
-#endif
     // Validate transaction
     rc  = txn_man->validate(yield, cor_id);
     txn_man->set_rc(rc);
@@ -1379,11 +1291,11 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     #endif
   }
 
-  #if CC_ALG == MVCC|| CC_ALG == WSI || CC_ALG == SSI
+  #if CC_ALG == MVCC
       txn_table.update_min_ts(get_thd_id(),txn_id,0,cor_txn_man[cor_id]->get_timestamp());
   #endif
 
-  #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+  #if CC_ALG == OCC
     #if WORKLOAD==DA
       if(da_start_stamp_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
       {
@@ -1394,9 +1306,6 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     #else
         cor_txn_man[cor_id]->set_start_timestamp(co_get_next_ts(cor_id));
     #endif
-  #endif
-  #if CC_ALG == WSI || CC_ALG == SSI
-      txn_table.update_min_ts(get_thd_id(),txn_id,0,cor_txn_man[cor_id]->get_start_timestamp());
   #endif
   #if CC_ALG == MAAT
     #if WORKLOAD==DA
@@ -1414,24 +1323,6 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     assert(time_table.get_upper(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == UINT64_MAX);
     assert(time_table.get_state(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == MAAT_RUNNING);
     #endif
-  #endif
-  #if CC_ALG == WOOKONG
-    txn_table.update_min_ts(get_thd_id(),txn_id,0,cor_txn_man[cor_id]->get_timestamp());
-    wkdb_time_table.init(get_thd_id(),cor_txn_man[cor_id]->get_txn_id(), cor_txn_man[cor_id]->get_timestamp());
-    //assert(wkdb_time_table.get_lower(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == 0);
-    assert(wkdb_time_table.get_upper(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == UINT64_MAX);
-    assert(wkdb_time_table.get_state(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == WKDB_RUNNING);
-  #endif
-  #if CC_ALG == DTA
-    txn_table.update_min_ts(get_thd_id(),txn_id,0,cor_txn_man[cor_id]->get_timestamp());
-    dta_time_table.init(get_thd_id(), cor_txn_man[cor_id]->get_txn_id(), cor_txn_man[cor_id]->get_timestamp());
-    // assert(dta_time_table.get_lower(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == 0);
-    assert(dta_time_table.get_upper(get_thd_id(), cor_txn_man[cor_id]->get_txn_id()) == UINT64_MAX);
-    assert(dta_time_table.get_state(get_thd_id(), cor_txn_man[cor_id]->get_txn_id()) == DTA_RUNNING);
-  #endif
-  #if CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
-    txn_table.update_min_ts(get_thd_id(), txn_id, 0, cor_txn_man[cor_id]->get_start_timestamp());
-    dta_time_table.init(get_thd_id(), cor_txn_man[cor_id]->get_txn_id(), cor_txn_man[cor_id]->get_start_timestamp());
   #endif
   rc = init_phase();
 
@@ -1534,12 +1425,11 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
       txn_man->set_start_timestamp(get_next_ts());
 #endif
 
-#if CC_ALG == MVCC|| CC_ALG == WSI || CC_ALG == SSI
+#if CC_ALG == MVCC
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
 #endif
 
-#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+#if CC_ALG == OCC
   #if WORKLOAD==DA
     if(da_start_stamp_tab.count(txn_man->get_txn_id())==0)
     {
@@ -1551,9 +1441,6 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   #else
       txn_man->set_start_timestamp(get_next_ts());
   #endif
-#endif
-#if CC_ALG == WSI || CC_ALG == SSI
-    txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_start_timestamp());
 #endif
 #if CC_ALG == MAAT
   #if WORKLOAD==DA
@@ -1571,24 +1458,6 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   assert(time_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
   assert(time_table.get_state(get_thd_id(),txn_man->get_txn_id()) == MAAT_RUNNING);
   #endif
-#endif
-#if CC_ALG == WOOKONG
-  txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
-  wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id(), txn_man->get_timestamp());
-  //assert(wkdb_time_table.get_lower(get_thd_id(),txn_man->get_txn_id()) == 0);
-  assert(wkdb_time_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
-  assert(wkdb_time_table.get_state(get_thd_id(),txn_man->get_txn_id()) == WKDB_RUNNING);
-#endif
-#if CC_ALG == DTA
-  txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
-  dta_time_table.init(get_thd_id(), txn_man->get_txn_id(), txn_man->get_timestamp());
-  // assert(dta_time_table.get_lower(get_thd_id(),txn_man->get_txn_id()) == 0);
-  assert(dta_time_table.get_upper(get_thd_id(), txn_man->get_txn_id()) == UINT64_MAX);
-  assert(dta_time_table.get_state(get_thd_id(), txn_man->get_txn_id()) == DTA_RUNNING);
-#endif
-#if CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
-  txn_table.update_min_ts(get_thd_id(), txn_id, 0, txn_man->get_start_timestamp());
-  dta_time_table.init(get_thd_id(), txn_man->get_txn_id(), txn_man->get_start_timestamp());
 #endif
   rc = init_phase();
 
@@ -1724,7 +1593,7 @@ RC WorkerThread::process_calvin_rtxn(yield_func_t &yield, Message * msg, uint64_
 }
 
 bool WorkerThread::is_cc_new_timestamp() {
-  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == CICADA);
+  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP);
 }
 
 ts_t WorkerThread::get_next_ts() {

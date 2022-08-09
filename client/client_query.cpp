@@ -94,7 +94,7 @@ Client_query_queue::initQueriesParallel(uint64_t thd_id) {
 	request_cnt = g_max_txn_per_part + 4;
 
 	uint32_t final_request;
-#if CC_ALG == BOCC || CC_ALG == FOCC || ONE_NODE_RECIEVE == 1
+#if ONE_NODE_RECIEVE == 1
 	if (tid == g_init_parallelism-1) {
 		final_request = request_cnt * g_servers_per_client;
 	} else {
@@ -119,7 +119,7 @@ Client_query_queue::initQueriesParallel(uint64_t thd_id) {
 	DAQueryGenerator  * gen = new DAQueryGenerator;
 #endif
 #if SERVER_GENERATE_QUERIES
-  #if CC_ALG == BOCC || CC_ALG == FOCC || ONE_NODE_RECIEVE == 1
+  #if ONE_NODE_RECIEVE == 1
   for (UInt32 query_id = request_cnt / g_init_parallelism * tid; query_id < final_request; query_id ++) {
 	queries[thread_id][query_id] = gen->create_query(_wl,g_node_id);
   }
@@ -134,7 +134,7 @@ Client_query_queue::initQueriesParallel(uint64_t thd_id) {
 #elif WORKLOAD == DA
   gen->create_query(_wl,thd_id);
 #else
-#if CC_ALG == BOCC || CC_ALG == FOCC || ONE_NODE_RECIEVE == 1
+#if ONE_NODE_RECIEVE == 1
   for (UInt32 query_id = request_cnt / g_init_parallelism * tid; query_id < final_request; query_id ++) {
 	queries[0][query_id] = gen->create_query(_wl,g_server_start_node);
   }

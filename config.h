@@ -536,7 +536,6 @@ enum PPSTxnType {
 #define SILO 27
 #define CNULL 28
 #define RDMA_NO_WAIT 31
-#define CICADA  40
 #define WOUND_WAIT 41
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1

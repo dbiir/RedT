@@ -117,12 +117,10 @@ static uint64_t mget_size() {
 
 uint64_t cget_size(QueryMessage * msg) {
   uint64_t size = mget_size();
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == CICADA || CC_ALG == WOUND_WAIT
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOUND_WAIT
   size += sizeof(msg->ts);
 #endif
-#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
-    CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC || USE_REPLICA
+#if CC_ALG == OCC || USE_REPLICA
   size += sizeof(msg->start_ts);
 #endif
   return size;
@@ -157,13 +155,11 @@ void fake_copy_to_buf(Message * msg, char* buf) {
     // !copy_to_buf
     ptr = mget_size();
     QueryMessage* cmsg = (QueryMessage*) msg;
-    #if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA
+    #if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC
     COPY_BUF(buf,cmsg->ts,ptr);
       assert(ts != 0);
     #endif
-    #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
-        CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
-        CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+    #if CC_ALG == OCC
     COPY_BUF(buf,cmsg->start_ts,ptr);
     #endif
     // !YCSBClientQueryMessage:copy_to_buf
@@ -181,9 +177,6 @@ void fake_copy_to_buf(Message * msg, char* buf) {
     ptr = mget_size();
     QueryResponseMessage* qmsg = (QueryResponseMessage*)msg;
     COPY_BUF(buf,qmsg->rc,ptr);
-    #if CC_ALG == TICTOC
-      COPY_BUF(buf,_min_commit_ts,ptr);
-    #endif
     assert(ptr == qmsg->get_size());
   }
   
@@ -221,13 +214,11 @@ Message* fake_create_message(char * buf) {
     // !QueryMessage::copy_from_buf(txn);
     ptr = mget_size();
     QueryMessage* cmsg = (QueryMessage*) msg;
-    #if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA
+    #if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC
     COPY_VAL(cmsg->ts,buf,ptr);
       assert(cmsg->ts != 0);
     #endif
-    #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
-        CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
-        CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
+    #if CC_ALG == OCC
     COPY_VAL(cmsg->start_ts,buf,ptr);
     #endif
     YCSBQueryMessage* ymsg = (YCSBQueryMessage*) msg;
@@ -248,9 +239,6 @@ Message* fake_create_message(char * buf) {
     QueryResponseMessage *qmsg = (QueryResponseMessage*)msg;
     ptr = mget_size();
     COPY_VAL(qmsg->rc,buf,ptr);
-    #if CC_ALG == TICTOC
-    COPY_VAL(qmsg->_min_commit_ts,buf,ptr);
-    #endif
     assert(ptr == qmsg->get_size());
   }
   

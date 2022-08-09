@@ -111,7 +111,6 @@ class DAQuery;
 class DABlockQueue;
 class DtaTimeTable;
 class KeyXidCache;
-class RtsCache;
 class Workload;
 // class QTcpQueue;
 // class TcpTimestamp;
@@ -169,11 +168,9 @@ extern Logger logger;
 extern TimeTable time_table;
 extern DtaTimeTable dta_time_table;
 extern KeyXidCache dta_key_xid_cache;
-extern RtsCache dta_rts_cache;
 extern InOutTable inout_table;
 extern WkdbTimeTable wkdb_time_table;
 extern KeyXidCache wkdb_key_xid_cache;
-extern RtsCache wkdb_rts_cache;
 // extern QTcpQueue tcp_queue;
 // extern TcpTimestamp tcp_ts;
 
@@ -467,8 +464,6 @@ enum access_t {RD, WR, XP, SCAN};
 enum lock_t {DLOCK_EX = 0, DLOCK_SH, LOCK_NONE };
 /* TIMESTAMP */
 enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
-/* CICADA */
-enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 
 /*DA query build queue*/
 //queue<DAQuery> query_build_queue;

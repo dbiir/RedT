@@ -47,10 +47,6 @@ fmt_title=["NODE_CNT","CC_ALG","ACCESS_PERC","TXN_WRITE_PERC","PERC_PAYMENT","MP
 ##############################
 # PLOTS
 ##############################
-#dta_target_algos=['DLI_BASE','DLI_MVCC_OCC','DLI_MVCC_BASE','DLI_OCC','MAAT']#['DLI_MVCC_OCC','DLI_DTA','TIMESTAMP','WAIT_DIE']#['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','OCC','DLI_MVCC_OCC','DLI_OCC','DLI_BASE','DLI_MVCC_BASE','DLI_DTA']
-#dta_target_algos=['NO_WAIT', 'MVCC', 'CALVIN', 'MAAT']
-#dta_target_algos=['DLI_DTA3']
-#dta_target_algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','OCC','DLI_MVCC_OCC','DLI_BASE','DLI_MVCC_BASE']
 dta_target_algos=['TIMESTAMP']
 # tpcc load
 #tpcc_loads = ['50', '100', '200', '500', '1000', '2000', '5000']
@@ -61,7 +57,7 @@ ycsb_loads = ['50', '100', '200', '500', '1000', '2000', '5000']
 def pps_scaling():
     wl = 'PPS'
     nnodes = [1,2,4,8,16,32,64]
-    nalgos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    nalgos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP']
     load = [10000]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","MAX_TXN_IN_FLIGHT"]
     exp = [[wl,n,cc,tif] for tif,n,cc in itertools.product(load,nnodes,nalgos)]
@@ -72,7 +68,7 @@ def ycsb_thread():
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
     nnodes = [4]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
+    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','TIMESTAMP','WAIT_DIE']
     algos=['RDMA_NO_WAIT']
     base_table_size=1048576
     # base_table_size=1048576*8
@@ -99,7 +95,7 @@ def ycsb_coroutine():
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
     nnodes = [4]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
+    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','TIMESTAMP','WAIT_DIE']
     algos = ['RDMA_NO_WAIT']
     base_table_size=1048576
     # base_table_size=1048576*8
@@ -128,8 +124,7 @@ def ycsb_one_sided_cnt():
     #nnodes = [1,2,4,8,16,32]
     nnodes =[4]
     # nnodes = [1,2,4,8,12,16]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
+
     algos=['RDMA_NO_WAIT']
     base_table_size=1048576*10
     # base_table_size=1048576*8
@@ -184,8 +179,7 @@ def ycsb_scaling_l():
     # nnodes = [9,12,15]
     nnodes = [12]
     # nnodes = [3,6,9,12,15]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
+
     algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
@@ -214,8 +208,7 @@ def ycsb_scaling_m():
     # nnodes = [9,12,15]
     # nnodes = [9]
     nnodes = [3,6,9,12,15]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
+
     algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
@@ -244,8 +237,7 @@ def ycsb_scaling_h():
     # nnodes = [9,12,15]
     # nnodes = [2]
     nnodes = [3,6,9,12,15]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
+
     algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
@@ -274,8 +266,8 @@ def ycsb_scaling_tcp():
     nnodes = [4]
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
+    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','TIMESTAMP','WAIT_DIE']
+    algos=['MAAT','MVCC','NO_WAIT','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -304,8 +296,8 @@ def ycsb_scaling_two_sided():
     nnodes = [4]
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
+    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','TIMESTAMP','WAIT_DIE']
+    algos=['MAAT','MVCC','NO_WAIT','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -334,8 +326,6 @@ def ycsb_scaling_one_sided():
     nnodes = [4]
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
     algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
@@ -366,8 +356,6 @@ def ycsb_scaling_coroutine():
     nnodes = [4]
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
     algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
@@ -398,8 +386,7 @@ def ycsb_scaling_dbpa():
     nnodes = [4]
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
+
     algos=['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
@@ -430,8 +417,7 @@ def ycsb_scaling_all():
     nnodes = [4]
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
+
     algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
@@ -460,7 +446,7 @@ def ycsb_scaling1():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     nnodes = [1,2,3,4,5]
-    algos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
+    algos=['MAAT','MVCC','TIMESTAMP','OCC']
     base_table_size=1048576*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
@@ -475,7 +461,7 @@ def ycsb_scaling1():
 def ecwc():
     wl = 'YCSB'
     nnodes = [2]
-    algos=['NO_WAIT','WAIT_DIE','MVCC','CALVIN','TIMESTAMP','MAAT','WOOKONG']
+    algos=['NO_WAIT','WAIT_DIE','MVCC','CALVIN','TIMESTAMP','MAAT']
     base_table_size=2097152*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
@@ -490,7 +476,7 @@ def ecwc():
 def ycsb_scaling_abort():
     wl = 'YCSB'
     nnodes = [1,2,4,8,16,32,64]
-    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP']
     base_table_size=2097152*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
@@ -579,7 +565,6 @@ def ycsb_skew1():
 def ycsb_stress1():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.5]
@@ -596,7 +581,7 @@ def ycsb_stress1():
 def ycsb_stress2():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.5]
@@ -613,7 +598,7 @@ def ycsb_stress2():
 def ycsb_stress3():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.5]
@@ -630,7 +615,7 @@ def ycsb_stress3():
 def ycsb_stress4():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.5]
@@ -647,7 +632,7 @@ def ycsb_stress4():
 def ycsb_stress5():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.5]
@@ -664,7 +649,7 @@ def ycsb_stress5():
 def ycsb_stress6():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.5]
@@ -681,7 +666,7 @@ def ycsb_stress6():
 def ycsb_stress7():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.0]
@@ -698,7 +683,7 @@ def ycsb_stress7():
 def ycsb_stress8():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.2]
@@ -715,7 +700,7 @@ def ycsb_stress8():
 def ycsb_stress9():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.4]
@@ -732,7 +717,7 @@ def ycsb_stress9():
 def ycsb_stress10():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.6]
@@ -749,7 +734,7 @@ def ycsb_stress10():
 def ycsb_stress11():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [0.8]
@@ -766,7 +751,7 @@ def ycsb_stress11():
 def ycsb_stress12():
     wl = 'YCSB'
     nnodes = [1]
-    #algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    #algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     algos=dta_target_algos
     base_table_size=2097152*8
     txn_write_perc = [1.0]
@@ -783,7 +768,7 @@ def ycsb_stress12():
 def ycsb_writes():
     wl = 'YCSB'
     nnodes = [8]
-    # algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
+    # algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=dta_target_algos
     algos=['RDMA_NO_WAIT']
     base_table_size=1048576
@@ -836,7 +821,7 @@ def ycsb_partitions():
 def ycsb_partitions_distr():
     wl = 'YCSB'
     nnodes = [16]
-    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP']
     load = [10000]
     nparts = [2,4,6,8,10,12,14,16]
     base_table_size=2097152*8
@@ -853,9 +838,6 @@ def tpcc_scaling():
     wl = 'TPCC'
     nnodes = [8]
     # nnodes = [8,16]
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    # nalgos=['MAAT','MVCC','NO_WAIT','WAIT_DIE']
     nalgos = ['RDMA_NO_WAIT']
     # npercpay=[1.0]
     npercpay=[0.0]
@@ -872,8 +854,6 @@ def tpcc_scaling_n():
     wl = 'TPCC'
     nnodes = [4]
     # nnodes = [3,6,9,12,15]
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     nalgos=['RDMA_NO_WAIT']
     npercpay=[0.0]
     # npercpay=[1.0]
@@ -892,8 +872,6 @@ def tpcc_scaling_p():
     wl = 'TPCC'
     nnodes = [15]
     # nnodes = [3,6,9,12,15]
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     nalgos=['RDMA_NO_WAIT']
     npercpay=[1.0]
     # npercpay=[1.0]
@@ -912,7 +890,7 @@ def tpcc_thread():
     #nnodes = [1,2,4,8,16,32,64]
     #nnodes = [1,2,4,8,16,32]
     nnodes = [4]
-    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
+    # algos=['CALVIN','MAAT','MVCC','NO_WAIT','TIMESTAMP','WAIT_DIE']
     algos = ['RDMA_NO_WAIT']
     npercpay=[0.0]
     # npercpay=[1.0]
@@ -933,11 +911,7 @@ def tpcc_thread():
 def tpcc_cstress():
     wl = 'TPCC'
     nnodes = [1]
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
-    # nalgos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
     nalgos=['MVCC']
-    #nalgos=['NO_WAIT']
     npercpay=[0.0]
     # npercpay=[0.0]
     wh=128
@@ -956,10 +930,7 @@ def tpcc_cstress():
 def tpcc_cstress1():
     wl = 'TPCC'
     nnodes = [1]
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
-    # nalgos=['WOOKONG']
-    nalgos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
+    nalgos=['MAAT','MVCC','TIMESTAMP','OCC']
     #nalgos=['NO_WAIT']
     npercpay=[0.0]
     # npercpay=[0.0]
@@ -979,11 +950,7 @@ def tpcc_cstress1():
 def tpcc_cstress2():
     wl = 'TPCC'
     nnodes = [1]
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
-    # nalgos=['MAAT','MVCC','TIMESTAMP','OCC','DLI_DTA3','DLI_OCC']
-    # nalgos=['WOOKONG']
-    nalgos=['DLI_DTA3','DLI_OCC']
+    nalgos=['MAAT','MVCC','TIMESTAMP','OCC']
     npercpay=[0.0]
     # npercpay=[0.0]
     wh=128
@@ -1002,9 +969,7 @@ def tpcc_cstress2():
 # def tpcc_cstress2():
 #     wl = 'YCSB'
 #     nnodes = [2]
-#     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-#     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
-#     nalgos=['MAAT','MVCC','TIMESTAMP','OCC','WOOKONG']
+#     nalgos=['MAAT','MVCC','TIMESTAMP','OCC']
 #     # npercpay=[0.0]
 #     base_table_size=2097152*8
 #     txn_write_perc = [0.5]
@@ -1026,10 +991,7 @@ def tpcc_cstress2():
 def tpcc_cstress3():
     wl = 'TPCC'
     nnodes = [1]
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
-    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN','WOOKONG','TICTOC','DLI_DTA','DLI_DTA1','DLI_DTA2','DLI_DTA3','DLI_MVCC_OCC','DLI_MVCC']
-    # nalgos=['WOOKONG']
-    #nalgos=['NO_WAIT']
+    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC','CALVIN']
     npercpay=[0.0]
     # npercpay=[0.0]
     wh=128
@@ -1071,7 +1033,7 @@ def tpcc_stress1():
 def tpcc_scaling_debug():
     wl = 'TPCC'
     nnodes = [1,2]
-    nalgos=['WOOKONG']
+    nalgos=['NO_WAIT']
     npercpay=[1.0]
     wh=32
     load = [20000]
@@ -1083,8 +1045,7 @@ def tpcc_scaling_debug():
 #    wl = 'TPCC'
     # nnodes = [1,2,4,8,16,32]
 #    nnodes = [32]
-    # nalgos=['WOOKONG','MAAT','MVCC','TIMESTAMP']
-#    nalgos=['WOOKONG']
+#    nalgos=['NO_WAIT']
 #    npercpay=[0.0]
 #    wh=32
 #    load = [10000]
@@ -1096,7 +1057,7 @@ def tpcc_scaling2():
     wl = 'TPCC'
     nnodes = [1,2]
     # nnodes = [4]
-    #nalgos=['WOOKONG','MAAT','MVCC','TIMESTAMP']
+    #nalgos=['MAAT','MVCC','TIMESTAMP']
     nalgos=dta_target_algos
     npercpay=[1.0]
     wh=128
@@ -1109,7 +1070,6 @@ def tpcc_stress2():
     wl = 'TPCC'
     nnodes = [1]
     # nnodes = [4]
-    #nalgos=['WOOKONG','MAAT','MVCC','TIMESTAMP']
     #nalgos=['TIMESTAMP']
     nalgos=dta_target_algos
     npercpay=[1.0]
@@ -1124,7 +1084,7 @@ def tpcc_scaling3():
     wl = 'TPCC'
     nnodes = [1,2]
     # nnodes = [4]
-    #nalgos=['WOOKONG','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC']
+    #nalgos=['WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC']
     nalgos=dta_target_algos
     npercpay=[0.5]
     wh=128
@@ -1136,7 +1096,7 @@ def tpcc_scaling3():
 def tpcc_dist_ratio():
     wl = 'TPCC'
     nnodes = [16]
-    nalgos=['WOOKONG','WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC']
+    nalgos=['WAIT_DIE','MAAT','MVCC','TIMESTAMP','OCC']
     npercpay=[1.0]
     wh=32
     load = [10000]
@@ -1148,7 +1108,7 @@ def tpcc_dist_ratio():
 def tpcc_scaling_whset():
     wl = 'TPCC'
     nnodes = [1,2,4,8,16,32,64]
-    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
+    nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN']
     npercpay=[0.0,0.5,1.0]
     wh=128
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH"]
@@ -1160,7 +1120,7 @@ def tpcc_scaling_whset():
 def ycsb_skew_abort_writes():
     wl = 'YCSB'
     nnodes = [16]
-    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP']
     base_table_size=2097152*8
     txn_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
     tup_write_perc = [0.5]
@@ -1174,7 +1134,7 @@ def ycsb_skew_abort_writes():
 def ycsb_skew_abort():
     wl = 'YCSB'
     nnodes = [16]
-    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP']
     base_table_size=2097152*8
     txn_write_perc = [0.5]
     tup_write_perc = [0.5]
@@ -1189,7 +1149,7 @@ def ycsb_skew_abort():
 def ycsb_partitions_abort():
     wl = 'YCSB'
     nnodes = [16]
-    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP','WOOKONG']
+    algos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','CALVIN','TIMESTAMP']
     load = [10000]
     nparts = [1,2,4,6,8,10,12,14,16]
     base_table_size=2097152*8
@@ -1204,7 +1164,7 @@ def ycsb_partitions_abort():
 
 def network_sweep():
     wl = 'YCSB'
-    nalgos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','TIMESTAMP','CALVIN','WOOKONG']
+    nalgos=['NO_WAIT','WAIT_DIE','MVCC','MAAT','TIMESTAMP','CALVIN']
     algos=['CALVIN']
 # Network delay in ms
     ndelay=[0,0.05,0.1,0.25,0.5,0.75,1,1.75,2.5,5,7.5,10,17.5,25,50]

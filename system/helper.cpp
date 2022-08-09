@@ -95,7 +95,7 @@ void init_client_globals() {
     g_servers_per_client = 1;
     g_clients_per_server = g_client_node_cnt / g_node_cnt;
   }
-#if CC_ALG == BOCC || CC_ALG == FOCC || ONE_NODE_RECIEVE == 1
+#if ONE_NODE_RECIEVE == 1
   g_server_start_node = 0; 
 #else
   uint32_t client_node_id = g_node_id - g_node_cnt;

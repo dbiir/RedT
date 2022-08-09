@@ -21,24 +21,14 @@
 #include "txn.h"
 
 #include "catalog.h"
-#include "dli.h"
 #include "global.h"
 #include "mem_alloc.h"
-#include "row_dli_based.h"
-#include "row_dta.h"
 #include "row_lock.h"
 #include "row_maat.h"
-#include "row_wkdb.h"
 #include "row_mvcc.h"
 #include "row_occ.h"
-#include "row_si.h"
 #include "row_ts.h"
-#include "row_tictoc.h"
-#include "row_ssi.h"
-#include "row_wsi.h"
-#include "row_cicada.h"
 #include "row_null.h"
-#include "row_silo.h"
 #include "row_rdma_2pl.h"
 #include "mem_alloc.h"
 #include "manager.h"
@@ -100,32 +90,14 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_ts *) mem_allocator.align_alloc(sizeof(Row_ts));
 #elif CC_ALG == MVCC
 	manager = (Row_mvcc *) mem_allocator.align_alloc(sizeof(Row_mvcc));
-#elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
+#elif CC_ALG == OCC 
 	manager = (Row_occ *) mem_allocator.align_alloc(sizeof(Row_occ));
-#elif CC_ALG == DLI_BASE || CC_ALG == DLI_OCC
-	manager = (Row_dli_base *)mem_allocator.align_alloc(sizeof(Row_dli_base));
-#elif CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
-	manager = (Row_si *)mem_allocator.align_alloc(sizeof(Row_si));
 #elif CC_ALG == MAAT
 	manager = (Row_maat *) mem_allocator.align_alloc(sizeof(Row_maat));
-#elif CC_ALG == DTA
-	manager = (Row_dta *)mem_allocator.align_alloc(sizeof(Row_dta));
-#elif CC_ALG == WOOKONG
-	manager = (Row_wkdb *) mem_allocator.align_alloc(sizeof(Row_wkdb));
-#elif CC_ALG == TICTOC
-	manager = new Row_tictoc(this);
-#elif CC_ALG == SSI
-	manager = (Row_ssi *) mem_allocator.align_alloc(sizeof(Row_ssi));
-#elif CC_ALG == WSI
-	manager = (Row_wsi *) mem_allocator.align_alloc(sizeof(Row_wsi));
 #elif CC_ALG == CNULL
 	manager = (Row_null *) mem_allocator.align_alloc(sizeof(Row_null));
-#elif CC_ALG == SILO
-  manager = (Row_silo *) mem_allocator.align_alloc(sizeof(Row_silo));
 #elif CC_ALG == RDMA_NO_WAIT 
   manager = (Row_rdma_2pl *) mem_allocator.align_alloc(sizeof(Row_rdma_2pl));
-#elif CC_ALG == CICADA
-	manager = (Row_cicada *) mem_allocator.align_alloc(sizeof(Row_cicada));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -328,110 +300,6 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #endif
-#if CC_ALG == CICADA
-	uint64_t init_time = get_sys_clock();
-	DEBUG_M("row_t::get_row CICADA alloc \n");
-	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t));
-	txn->cur_row->init(get_table(), get_part_id());
-	INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-	
-	rc = this->manager->access(txn, type, access);
-	
-	uint64_t copy_time = get_sys_clock();
-	if (rc == RCOK ) {
-		txn->cur_row->copy(this);
-		access->data = txn->cur_row;
-	} else if (rc == WAIT) {
-		rc = WAIT;
-		INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
-		goto end;
-	} else if (rc == Abort) {
-	}
-	goto end;
-#endif
-
-#if CC_ALG == TICTOC
-		DEBUG_M("row_t::get_row TICTOC alloc \n");
-	// txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-	// txn->cur_row->init(get_table(), get_part_id());
-		// rc = this->manager->access(type,txn);
-		// txn->cur_row->copy(this);
-	// access->data = txn->cur_row;
-		// assert(rc == RCOK);
-	goto end;
-#endif
-#if CC_ALG == WOOKONG
-  uint64_t init_time = get_sys_clock();
-  uint64_t copy_time = get_sys_clock();
-	if ((type == WR && rc == RCOK) || type == RD || type == SCAN) {
-    INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-		if (type == WR)
-			rc = this->manager->access(P_REQ, txn, NULL);
-		else
-			rc = this->manager->access(R_REQ, txn, NULL);
-
-    copy_time = get_sys_clock();
-		if (rc == RCOK ) {
-			access->data = txn->cur_row;
-		} else if (rc == WAIT) {
-			rc = WAIT;
-      INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
-			goto end;
-		} else if (rc == Abort) {
-		}
-		if (rc != Abort) {
-			assert(access->data->get_data() != NULL);
-			assert(access->data->get_table() != NULL);
-			assert(access->data->get_schema() == this->get_schema());
-			assert(access->data->get_table_name() != NULL);
-		}
-	}
-
-	if (rc != Abort && type == WR) {
-		DEBUG_M("row_t::get_row WKDB alloc \n");
-		row_t * newr = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
-		newr->init(this->get_table(), this->get_part_id());
-		newr->copy(access->data);
-		access->data = newr;
-	}
-  INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
-	goto end;
-
-#endif
-#if CC_ALG == DTA
-	if (type == WR) {
-		rc = this->manager->access(P_REQ, txn, NULL, access->version);
-		if (rc != RCOK) goto end;
-	}
-	if ((type == WR && rc == RCOK) || type == RD || type == SCAN) {
-		rc = this->manager->access(R_REQ, txn, NULL, access->version);
-		if (type == WR) access->version = UINT64_MAX;
-		if (rc == RCOK ) {
-			access->data = txn->cur_row;
-		} else if (rc == WAIT) {
-					rc = WAIT;
-					goto end;
-
-		} else if (rc == Abort) {
-		}
-				if (rc != Abort) {
-			assert(access->data->get_data() != NULL);
-			assert(access->data->get_table() != NULL);
-			assert(access->data->get_schema() == this->get_schema());
-			assert(access->data->get_table_name() != NULL);
-				}
-	}
-
-	if (rc != Abort && type == WR) {
-		DEBUG_M("row_t::get_row DTA alloc \n");
-		row_t * newr = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
-		newr->init(this->get_table(), get_part_id());
-		newr->copy(access->data);
-		access->data = newr;
-	}
-	goto end;
-
-#endif
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == WOUND_WAIT
   	uint64_t init_time = get_sys_clock();
 	//uint64_t thd_id = txn->get_thd_id();
@@ -452,7 +320,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	}
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
-#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI
+#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC
 	//uint64_t thd_id = txn->get_thd_id();
 // For TIMESTAMP RD, a new copy of the access->data will be returned.
 
@@ -494,7 +362,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 			assert(access->data->get_table_name() != NULL);
 		}
 	}
-	if (rc != Abort && (CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI) && type == WR) {
+	if (rc != Abort && (CC_ALG == MVCC) && type == WR) {
 			DEBUG_M("row_t::get_row MVCC alloc \n");
 		row_t * newr = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 		newr->init(this->get_table(), get_part_id());
@@ -503,7 +371,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	}
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
-#elif CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC
+#elif CC_ALG == OCC 
 	// OCC always make a local copy regardless of read or write
   uint64_t init_time = get_sys_clock();
 	DEBUG_M("row_t::get_row OCC alloc \n");
@@ -516,59 +384,6 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
   uint64_t copy_time = get_sys_clock();
 	access->data = txn->cur_row;
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
-	goto end;
-#elif CC_ALG == DLI_BASE || CC_ALG == DLI_OCC
-  uint64_t init_time = get_sys_clock();
-	// DLI always make a local copy regardless of read or write
-	DEBUG_M("row_t::get_row DLI alloc \n");
-	txn->cur_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(tuple_size));
-	txn->cur_row->init(get_table(), get_part_id());
-  INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-
-	rc = this->manager->access(txn, type == WR ? P_REQ : R_REQ, access->version);
-
-  uint64_t copy_time = get_sys_clock();
-	access->data = txn->cur_row;
-#if CC_ALG == DLI_BASE
-	if (rc == RCOK) {
-		rc = dli_man.validate(txn, false);
-	}
-#endif
-  INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
-	goto end;
-#elif CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
-	rc = this->manager->access(txn, R_REQ, access->version);
-
-  uint64_t copy_time = get_sys_clock();
-	if (type == WR) {
-		DEBUG_M("row_t::get_row SI alloc \n");
-		row_t *newer = (row_t *)mem_allocator.alloc(row_t::get_row_size(tuple_size));
-		newer->init(get_table(), get_part_id());
-		newer->copy(txn->cur_row);
-		txn->cur_row = newer;
-	}
-
-	access->data = txn->cur_row;
-#if CC_ALG == DLI_MVCC
-	rc = dli_man.validate(txn, false);
-#endif
-  INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
-	goto end;
-
-#elif CC_ALG == SILO 
-	// like OCC, tictoc also makes a local copy for each read/write
- 	uint64_t init_time = get_sys_clock();
- 	DEBUG_M("row_t::get_row SILO alloc \n");
-	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
-	txn->cur_row->init(get_table(), get_part_id());
-	TsType ts_type = (type == RD)? R_REQ : P_REQ;
-    INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-
-	rc = this->manager->access(txn, ts_type, txn->cur_row);
-
-  	uint64_t copy_time = get_sys_clock();
-  	access->data = txn->cur_row;
-  	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN 
 #if CC_ALG == HSTORE_SPEC
@@ -595,9 +410,6 @@ end:
 
 RC row_t::get_ts(uint64_t &orig_wts, uint64_t &orig_rts) {
 	RC rc = RCOK;
-#if CC_ALG == TICTOC
-	this->manager->get_ts(orig_wts, orig_rts);
-#endif
 	return rc;
 }
 
@@ -607,34 +419,20 @@ RC row_t::get_row(access_t type, TxnManager * txn, row_t *& row, uint64_t &orig_
 		row = this;
 		return rc;
 #endif
-#if CC_ALG == TICTOC
-  uint64_t init_time = get_sys_clock();
-  DEBUG_M("row_t::get_row tictoc alloc \n");
-	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
-	txn->cur_row->init(get_table(), get_part_id());
-  INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-  rc = this->manager->access(type,txn,row,orig_wts,orig_rts);
-  uint64_t copy_time = get_sys_clock();
-  txn->cur_row->copy(this);
-	row = txn->cur_row;
-  assert(rc == RCOK);
-  INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
-#endif
 	return rc;
 }
 // Return call for get_row if waiting
 RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 	RC rc = RCOK;
   uint64_t init_time = get_sys_clock();
-	assert(CC_ALG == WAIT_DIE || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TIMESTAMP || CC_ALG == TICTOC || CC_ALG == SSI || CC_ALG == WSI || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 ||
-				 CC_ALG == TIMESTAMP || CC_ALG == WOUND_WAIT);
+	assert(CC_ALG == WAIT_DIE || CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == TIMESTAMP || CC_ALG == WOUND_WAIT);
 #if CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT
 	assert(txn->lock_ready);
 	rc = RCOK;
 	//ts_t endtime = get_sys_clock();
 	row = this;
 
-#elif CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == WOOKONG || CC_ALG == TICTOC || CC_ALG == SSI || CC_ALG == WSI || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
+#elif CC_ALG == MVCC || CC_ALG == TIMESTAMP
 	assert(txn->ts_ready);
 	//INC_STATS(thd_id, time_wait, t2 - t1);
 	row = txn->cur_row;
@@ -643,7 +441,7 @@ RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 	assert(row->get_table() != NULL);
 	assert(row->get_schema() == this->get_schema());
 	assert(row->get_table_name() != NULL);
-	if (( CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == TICTOC || CC_ALG == SSI || CC_ALG == WSI) && type == WR) {
+	if (( CC_ALG == MVCC ) && type == WR) {
 		DEBUG_M("row_t::get_row_post_wait MVCC alloc \n");
 		row_t * newr = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 		newr->init(this->get_table(), get_part_id());
@@ -652,14 +450,6 @@ RC row_t::get_row_post_wait(access_t type, TxnManager * txn, row_t *& row) {
 		newr->copy(row);
 		row = newr;
     INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
-	}
-	if ((CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3) && type == WR) {
-		//DEBUG_M("row_t::get_row_post_wait MVCC alloc \n");
-		//row_t *newr = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
-		//newr->init(this->get_table(), get_part_id());
-
-		//newr->copy(row);
-		//row = newr;
 	}
 #endif
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
@@ -695,7 +485,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		this->copy(row);  //for abort of local txn ABORT, copy orig_data to orig_row. remote ABORT dont need this operate
 	}
 	return 0;
-#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SSI || CC_ALG == WSI
+#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC 
 	// for RD or SCAN or XP, the row should be deleted.
 	// because all WR should be companied by a RD
 	// for MVCC RD, the row is not copied, so no need to free.
@@ -716,7 +506,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		assert(rc == RCOK);
 	}
 	return 0;
-#elif CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC
+#elif CC_ALG == OCC 
 	assert (row != NULL);
 	if (type == WR) manager->write(row, txn->get_end_timestamp());
 	row->free_row();
@@ -724,25 +514,6 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	manager->release();
 	return 0;
-#elif CC_ALG == DLI_BASE || CC_ALG == DLI_OCC
-	assert (row != NULL);
-	uint64_t version = 0;
-	version = manager->write(row, txn, type);
-	row->free_row();
-	DEBUG_M("row_t::return_row DLT1 free \n");
-	mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-	return version;
-#elif CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
-	assert(row != NULL);
-	uint64_t version = 0;
-	if (type == WR) {
-		version = manager->write(row, txn, type);
-	} else if (type == XP) {
-		manager->write(row, txn, type);
-		row->free_row();
-		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-	}
-	return version;
 #elif CC_ALG == CNULL
 	assert (row != NULL);
 	if (rc == Abort) {
@@ -762,63 +533,12 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
     }
 	return 0;
-#elif CC_ALG == TICTOC
-	assert (row != NULL);
-	if (rc == Abort) {
-		manager->abort(type,txn);
-	} else {
-		manager->commit(type,txn,row);
-	}
-
-	if (type == XP) {
-		row->free_row();
-			DEBUG_M("row_t::return_row XP free \n");
-		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-	}
-	return 0;
-#elif CC_ALG == WOOKONG
-	assert (row != NULL);
-
-	if (rc == Abort) {
-		manager->abort(type,txn);
-	} else {
-		manager->commit(type,txn,row);
-	}
-
-	if (type == XP) {
-		row->free_row();
-		DEBUG_M("row_t::return_row XP free \n");
-		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-	}
-	return 0;
-#elif CC_ALG == DTA
-	assert (row != NULL);
-	uint64_t version = 0;
-	if (rc == Abort) {
-		manager->abort(type,txn);
-	} else {
-		manager->commit(type, txn, row, version);
-	}
-
-	if (type == XP) {
-		row->free_row();
-			DEBUG_M("row_t::return_row XP free \n");
-		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-	}
-	return version;
 #elif CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC
 	assert (row != NULL);
 	if (ROLL_BACK && type == XP) {// recover from previous writes.
 		this->copy(row);
 	}
 	return 0;
-#elif CC_ALG == SILO
-	assert (row != NULL);
-	row->free_row();
-  DEBUG_M("row_t::return_row XP free \n");
-	mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-	return 0;
-
 #else
 	assert(false);
 #endif

@@ -334,11 +334,7 @@ void Stats_thd::clear() {
   sched_txn_table_time=0;
   sched_epoch_cnt=0;
   sched_epoch_diff=0;
-  // DLI_MVCC_OCC
-  dli_mvcc_occ_validate_time = 0;
-  dli_mvcc_occ_check_cnt = 0;
-  dli_mvcc_occ_abort_check_cnt = 0;
-  dli_mvcc_occ_ts_abort_cnt = 0;
+
   //OCC
   occ_validate_time=0;
   occ_cs_wait_time=0;
@@ -352,12 +348,6 @@ void Stats_thd::clear() {
   occ_ts_abort_cnt=0;
   occ_finish_time=0;
 
-  // WSI
-  wsi_validate_time=0;
-  wsi_cs_wait_time=0;
-  wsi_check_cnt=0;
-  wsi_abort_check_cnt=0;
-
   // MAAT
   maat_validate_cnt=0;
   maat_validate_time=0;
@@ -370,41 +360,6 @@ void Stats_thd::clear() {
   maat_case6_cnt=0;
   maat_range=0;
   maat_commit_cnt=0;
-
-  // DTA
-  dta_validate_cnt = 0;
-  dta_validate_time = 0;
-  dta_cs_wait_time = 0;
-  dta_case1_cnt = 0;
-  dta_case2_cnt = 0;
-  dta_case3_cnt = 0;
-  dta_case4_cnt = 0;
-  dta_case5_cnt = 0;
-  dta_range = 0;
-  dta_commit_cnt = 0;
-
-  // CICADA
-  // dta_validate_cnt = 0;
-  // dta_validate_time = 0;
-  // dta_cs_wait_time = 0;
-  cicada_case1_cnt = 0;
-  cicada_case2_cnt = 0;
-  cicada_case3_cnt = 0;
-  cicada_case4_cnt = 0;
-  cicada_case5_cnt = 0;
-  cicada_case6_cnt = 0;
-
-  // WKDB
-  wkdb_validate_cnt=0;
-  wkdb_validate_time=0;
-  wkdb_cs_wait_time=0;
-  wkdb_case1_cnt=0;
-  wkdb_case2_cnt=0;
-  wkdb_case3_cnt=0;
-  wkdb_case4_cnt=0;
-  wkdb_case5_cnt=0;
-  wkdb_range=0;
-  wkdb_commit_cnt=0;
 
   // Logging
   log_write_cnt=0;
@@ -1125,14 +1080,6 @@ void Stats_thd::print(FILE * outf, bool prog) {
           sched_queue_dequeue_time / BILLION, calvin_sched_time / BILLION,
           sched_idle_time / BILLION, sched_txn_table_time / BILLION, sched_epoch_cnt,
           sched_epoch_diff / BILLION);
-  // DLI_MVCC_OCC
-  fprintf(outf,
-          ",dli_mvcc_occ_validate_time=%f"
-          ",dli_mvcc_occ_check_cnt=%ld"
-          ",dli_mvcc_occ_abort_check_cnt=%ld"
-          ",dli_mvcc_occ_ts_abort_cnt=%ld",
-          dli_mvcc_occ_validate_time / BILLION, dli_mvcc_occ_check_cnt,
-          dli_mvcc_occ_abort_check_cnt, dli_mvcc_occ_ts_abort_cnt);
   //OCC
   fprintf(outf,
   ",occ_validate_time=%f"
@@ -1182,46 +1129,6 @@ void Stats_thd::print(FILE * outf, bool prog) {
           maat_cs_wait_time / BILLION, maat_cs_wait_avg / BILLION, maat_case1_cnt, maat_case2_cnt,
           maat_case3_cnt, maat_case4_cnt, maat_case5_cnt, maat_case6_cnt, maat_range / BILLION, maat_commit_cnt,
           maat_commit_avg, maat_range_avg);
-  // DTA
-  double dta_range_avg = 0;
-  double dta_validate_avg = 0;
-  double dta_cs_wait_avg = 0;
-  uint64_t dta_commit_avg = 0;
-  if (dta_commit_cnt > 0) dta_range_avg = dta_range / dta_commit_cnt;
-  if (dta_validate_cnt > 0) {
-    dta_validate_avg = dta_validate_time / dta_validate_cnt;
-    dta_cs_wait_avg = dta_cs_wait_time / dta_validate_cnt;
-    dta_commit_avg = dta_commit_cnt / dta_validate_cnt;
-  }
-  fprintf(outf,
-          ",dta_validate_cnt=%ld"
-          ",dta_validate_time=%f"
-          ",dta_validate_avg=%f"
-          ",dta_cs_wait_time=%f"
-          ",dta_cs_wait_avg=%f"
-          ",dta_case1_cnt=%ld"
-          ",dta_case2_cnt=%ld"
-          ",dta_case3_cnt=%ld"
-          ",dta_case4_cnt=%ld"
-          ",dta_case5_cnt=%ld"
-          ",dta_range=%f"
-          ",dta_commit_cnt=%ld"
-          ",dta_commit_avg=%ld"
-          ",dta_range_avg=%f",
-          dta_validate_cnt, dta_validate_time / BILLION, dta_validate_avg / BILLION,
-          dta_cs_wait_time / BILLION, dta_cs_wait_avg / BILLION, dta_case1_cnt, dta_case2_cnt,
-          dta_case3_cnt, dta_case4_cnt, dta_case5_cnt, dta_range / BILLION, dta_commit_cnt,
-          dta_commit_avg, dta_range_avg);
-  fprintf(outf,
-          ",cicada_case1_cnt=%ld"
-          ",cicada_case2_cnt=%ld"
-          ",cicada_case3_cnt=%ld"
-          ",cicada_case4_cnt=%ld"
-          ",cicada_case5_cnt=%ld"
-          ",cicada_case6_cnt=%ld",
-          cicada_case1_cnt, cicada_case2_cnt,
-          cicada_case3_cnt, cicada_case4_cnt, 
-          cicada_case5_cnt, cicada_case6_cnt);
   // Logging
   double log_write_avg_time = 0;
   if (log_write_cnt > 0) log_write_avg_time = log_write_time / log_write_cnt;
@@ -1719,11 +1626,7 @@ void Stats_thd::combine(Stats_thd * stats) {
   sched_txn_table_time+=stats->sched_txn_table_time;
   sched_epoch_cnt+=stats->sched_epoch_cnt;
   sched_epoch_diff+=stats->sched_epoch_diff;
-  // DLI_MVCC_OCC
-  dli_mvcc_occ_validate_time += stats->dli_mvcc_occ_validate_time;
-  dli_mvcc_occ_check_cnt += stats->dli_mvcc_occ_check_cnt;
-  dli_mvcc_occ_abort_check_cnt += stats->dli_mvcc_occ_abort_check_cnt;
-  dli_mvcc_occ_ts_abort_cnt += stats->dli_mvcc_occ_ts_abort_cnt;
+
   //OCC
   occ_validate_time+=stats->occ_validate_time;
   occ_cs_wait_time+=stats->occ_cs_wait_time;
@@ -1749,38 +1652,6 @@ void Stats_thd::combine(Stats_thd * stats) {
   maat_case6_cnt+=stats->maat_case6_cnt;
   maat_range+=stats->maat_range;
   maat_commit_cnt+=stats->maat_commit_cnt;
-
-  // DTA
-  dta_validate_cnt += stats->dta_validate_cnt;
-  dta_validate_time += stats->dta_validate_time;
-  dta_cs_wait_time += stats->dta_cs_wait_time;
-  dta_case1_cnt += stats->dta_case1_cnt;
-  dta_case2_cnt += stats->dta_case2_cnt;
-  dta_case3_cnt += stats->dta_case3_cnt;
-  dta_case4_cnt += stats->dta_case4_cnt;
-  dta_case5_cnt += stats->dta_case5_cnt;
-  dta_range += stats->dta_range;
-  dta_commit_cnt += stats->dta_commit_cnt;
-
-  // CICADA
-  cicada_case1_cnt += stats->cicada_case1_cnt;
-  cicada_case2_cnt += stats->cicada_case2_cnt;
-  cicada_case3_cnt += stats->cicada_case3_cnt;
-  cicada_case4_cnt += stats->cicada_case4_cnt;
-  cicada_case5_cnt += stats->cicada_case5_cnt;
-  cicada_case6_cnt += stats->cicada_case6_cnt;
-
-  // WKDB
-  wkdb_validate_cnt+=stats->wkdb_validate_cnt;
-  wkdb_validate_time+=stats->wkdb_validate_time;
-  wkdb_cs_wait_time+=stats->wkdb_cs_wait_time;
-  wkdb_case1_cnt+=stats->wkdb_case1_cnt;
-  wkdb_case2_cnt+=stats->wkdb_case2_cnt;
-  wkdb_case3_cnt+=stats->wkdb_case3_cnt;
-  wkdb_case4_cnt+=stats->wkdb_case4_cnt;
-  wkdb_case5_cnt+=stats->wkdb_case5_cnt;
-  wkdb_range+=stats->wkdb_range;
-  wkdb_commit_cnt+=stats->wkdb_commit_cnt;
 
   // Logging
   log_write_cnt+=stats->log_write_cnt;

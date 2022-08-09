@@ -49,21 +49,9 @@ public:
 	row_t * 	data;
 	row_t * 	orig_data;
 	uint64_t    version;
-#if CC_ALG == TICTOC
-	uint64_t    orig_wts;
-	uint64_t    orig_rts;
-	bool         locked;
-#endif
-#if CC_ALG == SILO
-	ts_t 		tid;
-	// ts_t 		epoch;
-#endif
 #if CC_ALG == RDMA_NO_WAIT
 	uint64_t    location;   //node id of server the data location
 	uint64_t    offset;
-#endif
-#if CC_ALG == CICADA
-	uint64_t	recordId;	//already readed record id
 #endif
 	void cleanup();
 };
@@ -303,16 +291,6 @@ public:
 	int extra_wait[MAX_ITEMS_PER_TXN][2];
 	bool req_need_wait[MAX_ITEMS_PER_TXN];
 	#endif
-#if CC_ALG == SILO
-	ts_t 			last_tid;
-    ts_t            max_tid;
-    uint64_t        num_locks;
-    // int*            write_set;
-    int             write_set[100];
-    int*            read_set;
-    RC              find_tid_silo(ts_t max_tid);
-    RC              finish(RC rc);
-#endif
 	bool send_RQRY_RSP;
 
 #if CC_ALG == RDMA_NO_WAIT
@@ -322,12 +300,6 @@ public:
 	int				num_locks;
 #endif
 
-#if CC_ALG == SILO 
-	bool 			_pre_abort;
-	bool 			_validation_no_wait;
-	ts_t 			_cur_tid;
-	RC				validate_silo();
-#endif
 #if CC_ALG == WOUND_WAIT
 	TxnStatus		txn_state;
 #endif
@@ -421,11 +393,6 @@ public:
 	int last_txn_id;
 	Message* last_msg;
 	uint64_t log_idx[NODE_CNT]; //redo_log_buf.get_size() if no log 
-
-#if CC_ALG == DLI_MVCC || CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || \
-	CC_ALG == DLI_OCC
-	std::atomic<bool>* is_abort = nullptr;
-#endif
 
 protected:
 

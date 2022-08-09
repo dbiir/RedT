@@ -109,9 +109,7 @@ public:
   //uint64_t txn_id;
   //uint64_t batch_id;
   bool readonly;
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SSI || CC_ALG == WSI || \
-    CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_MVCC || CC_ALG == SILO || USE_REPLICA
+#if CC_ALG == MAAT || USE_REPLICA
   uint64_t commit_timestamp;
 #endif
 };
@@ -167,9 +165,6 @@ public:
 
   RC rc;
   uint64_t pid;
-#if CC_ALG == TICTOC
-  uint64_t _min_commit_ts;
-#endif
 };
 
 class AckMessage : public Message {
@@ -183,12 +178,9 @@ public:
   void release() {}
 
   RC rc;
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
+#if CC_ALG == MAAT 
   uint64_t lower;
   uint64_t upper;
-#endif
-#if CC_ALG == SILO
-  uint64_t max_tid;
 #endif
 
   // For Calvin PPS: part keys from secondary lookup for sequencer response
@@ -207,9 +199,6 @@ public:
 
   uint64_t pid;
   RC rc;
-#if CC_ALG == TICTOC
-  uint64_t _min_commit_ts;
-#endif
   uint64_t txn_id;
 };
 
@@ -384,15 +373,13 @@ public:
   void release() {}
 
   uint64_t pid;
-#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == CICADA || CC_ALG == WOUND_WAIT
+#if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOUND_WAIT
   uint64_t ts;
 #endif
-#if CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
+#if CC_ALG == MVCC
   uint64_t thd_id;
 #endif
-#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
-    CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
-    CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC || USE_REPLICA
+#if CC_ALG == OCC || USE_REPLICA
   uint64_t start_ts;
 #endif
 #if MODE==QRY_ONLY_MODE

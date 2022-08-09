@@ -310,11 +310,7 @@ public:
   double sched_txn_table_time;
   uint64_t sched_epoch_cnt;
   double sched_epoch_diff;
-  // DLI_MVCC_OCC
-  double dli_mvcc_occ_validate_time;
-  uint64_t dli_mvcc_occ_check_cnt;
-  uint64_t dli_mvcc_occ_abort_check_cnt;
-  uint64_t dli_mvcc_occ_ts_abort_cnt;
+
   // OCC
   double occ_validate_time;
   double occ_cs_wait_time;
@@ -327,12 +323,6 @@ public:
   uint64_t occ_abort_check_cnt;
   uint64_t occ_ts_abort_cnt;
   double occ_finish_time;
-
-  // WSI
-  double wsi_validate_time;
-  double wsi_cs_wait_time;
-  uint64_t wsi_check_cnt;
-  uint64_t wsi_abort_check_cnt;
 
   // MAAT
   uint64_t maat_validate_cnt;
@@ -347,43 +337,6 @@ public:
   uint64_t maat_commit_cnt;
 
   uint64_t maat_case6_cnt;
-
-  // // SSI
-  // uint64_t ssi_validate_cnt;
-  // double ssi_validate_time;
-  // uint64_t ssi_commit_cnt;
-
-  // WKDB
-  uint64_t wkdb_validate_cnt;
-  double wkdb_validate_time;
-  double wkdb_cs_wait_time;
-  uint64_t wkdb_case1_cnt;
-  uint64_t wkdb_case2_cnt;
-  uint64_t wkdb_case3_cnt;
-  uint64_t wkdb_case4_cnt;
-  uint64_t wkdb_case5_cnt;
-  double wkdb_range;
-  uint64_t wkdb_commit_cnt;
-
-  // DTA
-  uint64_t dta_validate_cnt;
-  double dta_validate_time;
-  double dta_cs_wait_time;
-  uint64_t dta_case1_cnt;
-  uint64_t dta_case2_cnt;
-  uint64_t dta_case3_cnt;
-  uint64_t dta_case4_cnt;
-  uint64_t dta_case5_cnt;
-  double dta_range;
-  uint64_t dta_commit_cnt;
-
-  //CICADA
-  uint64_t cicada_case1_cnt;
-  uint64_t cicada_case2_cnt;
-  uint64_t cicada_case3_cnt;
-  uint64_t cicada_case4_cnt;
-  uint64_t cicada_case5_cnt;
-  uint64_t cicada_case6_cnt;
 
   // Logging
   uint64_t log_write_cnt;

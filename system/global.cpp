@@ -22,11 +22,6 @@
 #include "query.h"
 #include "client_query.h"
 #include "occ.h"
-#include "bocc.h"
-#include "focc.h"
-#include "ssi.h"
-#include "wsi.h"
-#include "cicada.h"
 #include "transport.h"
 #include "rdma.h"
 #include "work_queue.h"
@@ -41,22 +36,16 @@
 #include "pool.h"
 #include "query.h"
 #include "sequencer.h"
-#include "dli.h"
 #include "sim_manager.h"
 #include "stats.h"
 #include "transport.h"
 #include "txn_table.h"
 #include "work_queue.h"
-#include "dta.h"
 #include "client_txn.h"
 #include "sequencer.h"
 #include "logger.h"
 #include "maat.h"
-#include "wkdb.h"
-#include "tictoc.h"
 #include "rdma_2pl.h"
-#include "key_xid.h"
-#include "rts_cache.h"
 #include "src/allocator_master.hh"
 //#include "rdma_ctrl.hpp"
 #include "lib.hh"
@@ -81,16 +70,7 @@ Manager glob_manager;
 Query_queue query_queue;
 Client_query_queue client_query_queue;
 OptCC occ_man;
-Dli dli_man;
-Focc focc_man;
-Bocc bocc_man;
 Maat maat_man;
-Dta dta_man;
-Wkdb wkdb_man;
-ssi ssi_man;
-wsi wsi_man;
-Cicada cicada_man;
-Tictoc tictoc_man;
 Transport tport_man;
 Rdma rdma_man;
 
@@ -116,13 +96,6 @@ Client_txn client_man;
 Sequencer seq_man;
 Logger logger;
 TimeTable time_table;
-DtaTimeTable dta_time_table;
-KeyXidCache dta_key_xid_cache;
-RtsCache dta_rts_cache;
-InOutTable inout_table;
-WkdbTimeTable wkdb_time_table;
-KeyXidCache wkdb_key_xid_cache;
-RtsCache wkdb_rts_cache;
 // QTcpQueue tcp_queue;
 // TcpTimestamp tcp_ts;
 
