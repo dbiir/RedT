@@ -41,7 +41,7 @@ public:
   void free_all();
 
 private:
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   boost::lockfree::queue<TxnManager*> * pool;
 #else
   boost::lockfree::queue<TxnManager*> ** pool;
@@ -59,7 +59,7 @@ public:
   void free_all();
 
 private:
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   boost::lockfree::queue<Transaction*> * pool;
 #else
   boost::lockfree::queue<Transaction*> ** pool;
@@ -76,7 +76,7 @@ public:
   void free_all();
 
 private:
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   boost::lockfree::queue<BaseQuery* > * pool;
 #else
   boost::lockfree::queue<BaseQuery* > ** pool;

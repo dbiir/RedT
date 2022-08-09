@@ -73,11 +73,6 @@ def ycsb_thread():
     #nnodes = [1,2,4,8,16,32]
     nnodes = [4]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
-    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
-    #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    # algos = ['RDMA_NO_WAIT']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
     algos=['RDMA_NO_WAIT']
     base_table_size=1048576
     # base_table_size=1048576*8
@@ -105,10 +100,7 @@ def ycsb_coroutine():
     #nnodes = [1,2,4,8,16,32]
     nnodes = [4]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
-    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
-    algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # algos = ['RDMA_CICADA']
+    algos = ['RDMA_NO_WAIT']
     base_table_size=1048576
     # base_table_size=1048576*8
     #base_table_size=2097152*8
@@ -138,10 +130,7 @@ def ycsb_one_sided_cnt():
     # nnodes = [1,2,4,8,12,16]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
-    # algos=['RDMA_NO_WAIT']
-    # algos=['RDMA_WOUND_WAIT','RDMA_WOUND_WAIT2','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE','RDMA_WAIT_DIE2']
-    algos=['RDMA_CNULL']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
+    algos=['RDMA_NO_WAIT']
     base_table_size=1048576*10
     # base_table_size=1048576*8
     # base_table_size=2097152*8
@@ -197,11 +186,7 @@ def ycsb_scaling_l():
     # nnodes = [3,6,9,12,15]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # algos = ['RDMA_CICADA','RDMA_MVCC','RDMA_TS1']
-    # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT']
-    # algos = ['RDMA_SILO']
-    algos = ['RDMA_CICADA']#,'RDMA_WOUND_WAIT2']
+    algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -231,11 +216,7 @@ def ycsb_scaling_m():
     nnodes = [3,6,9,12,15]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # algos = ['RDMA_CICADA','RDMA_MVCC','RDMA_TS1']
-    # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT']
-    # algos = ['RDMA_SILO']
-    algos = ['RDMA_CICADA']#,'RDMA_WOUND_WAIT2']
+    algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -265,11 +246,7 @@ def ycsb_scaling_h():
     nnodes = [3,6,9,12,15]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # algos = ['RDMA_CICADA','RDMA_MVCC','RDMA_TS1']
-    # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT']
-    # algos = ['RDMA_SILO']
-    algos = ['RDMA_CICADA']#,'RDMA_WOUND_WAIT2']
+    algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -298,14 +275,7 @@ def ycsb_scaling_tcp():
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
-    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # algos = ['RDMA_CICADA','RDMA_MVCC','RDMA_TS1']
-    # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT']
-    # algos = ['RDMA_SILO']
-    # algos = ['RDMA_WOUND_WAIT2']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -335,14 +305,7 @@ def ycsb_scaling_two_sided():
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
-    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # algos = ['RDMA_CICADA','RDMA_MVCC','RDMA_TS1']
-    # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT']
-    # algos = ['RDMA_SILO']
-    # algos = ['RDMA_WOUND_WAIT2']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -372,14 +335,8 @@ def ycsb_scaling_one_sided():
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
-    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # algos = ['RDMA_CICADA','RDMA_MVCC','RDMA_TS1']
-    algos = ['RDMA_CICADA']
-    # algos = ['RDMA_SILO']
-    # algos = ['RDMA_WOUND_WAIT2']
+    algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -410,15 +367,8 @@ def ycsb_scaling_coroutine():
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
-    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # algos = ['RDMA_WAIT_DIE']
-    # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT','RDMA_CICADA']
-    # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT']
-    algos = ['RDMA_MOCC']
-    # algos = ['RDMA_WOUND_WAIT2']
+    algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -449,15 +399,8 @@ def ycsb_scaling_dbpa():
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
-    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
-    algos=['RDMA_SILO']
-    # algos = ['RDMA_CICADA','RDMA_MVCC','RDMA_TS1']
-    # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT','RDMA_CICADA']
-    # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT']
-    # algos = ['RDMA_CICADA']
-    # algos = ['RDMA_WOUND_WAIT2']
+    algos=['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -488,15 +431,8 @@ def ycsb_scaling_all():
     # nnodes = [3,6]
     # nnodes = [3,6,9,12,15]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
-    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
     # algos=['CICADA','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE','WOUND_WAIT']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # algos = ['RDMA_CICADA','RDMA_MVCC','RDMA_TS1']
-    algos = ['RDMA_CICADA']
-    # algos = ['RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT']
-    # algos = ['RDMA_SILO']
-    # algos = ['RDMA_WOUND_WAIT2']
+    algos = ['RDMA_NO_WAIT']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -606,8 +542,6 @@ def ycsb_network_delay():
 def ycsb_skew():
     wl = 'YCSB'
     nnodes = [4]
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    # algos=['RDMA_CICADA','RDMA_MVCC','RDMA_TS1']
     algos=['RDMA_NO_WAIT']
     # base_table_size=1048576*10
     base_table_size=1048576  
@@ -851,7 +785,6 @@ def ycsb_writes():
     nnodes = [8]
     # algos=['WOOKONG','WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=dta_target_algos
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
     algos=['RDMA_NO_WAIT']
     base_table_size=1048576
     txn_write_perc = [1.0]
@@ -885,10 +818,7 @@ def isolation_levels():
 def ycsb_partitions():
     wl = 'YCSB'
     nnodes = [15]
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # algos=['RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    algos=['RDMA_CICADA']
-    # algos=['RDMA_NO_WAIT2','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
+    algos=['RDMA_NO_WAIT']
     # load = [10000,12000]
     load = [20000]
     # nparts = [6]
@@ -926,14 +856,7 @@ def tpcc_scaling():
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     # nalgos=['MAAT','MVCC','NO_WAIT','WAIT_DIE']
-    # nalgos=['RDMA_WAIT_DIE2']
-    # nalgos=['RDMA_SILO']
-    # nalgos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2']
-    # nalgos=['RDMA_SILO','RDMA_MVCC']
-    # nalgos = ['RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WOUND_WAIT2','RDMA_WAIT_DIE2']
-    # nalgos = ['RDMA_TS1']
     nalgos = ['RDMA_NO_WAIT']
-    # nalgos = ['RDMA_CALVIN']
     # npercpay=[1.0]
     npercpay=[0.0]
     wh=16
@@ -952,8 +875,6 @@ def tpcc_scaling_n():
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
     nalgos=['RDMA_NO_WAIT']
-    # nalgos=['RDMA_SILO']
-    # nalgos=['RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2','RDMA_MAAT']
     npercpay=[0.0]
     # npercpay=[1.0]
     wh=8
@@ -973,9 +894,7 @@ def tpcc_scaling_p():
     # nnodes = [3,6,9,12,15]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN','WOOKONG']
     # nalgos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    # nalgos=['RDMA_CICADA']
-    nalgos=['RDMA_CICADA']
-    # nalgos=['RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2','RDMA_MAAT']
+    nalgos=['RDMA_NO_WAIT']
     npercpay=[1.0]
     # npercpay=[1.0]
     wh=8
@@ -994,13 +913,7 @@ def tpcc_thread():
     #nnodes = [1,2,4,8,16,32]
     nnodes = [4]
     # algos=['CALVIN','MAAT','MVCC','NO_WAIT','SILO','TIMESTAMP','WAIT_DIE']
-    #'RDMA_CICADA','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_WAIT_DIE2'
-    # algos=['RDMA_NO_WAIT','RDMA_NO_WAIT2']
-    #algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_NO_WAIT','RDMA_NO_WAIT2','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2']
-    # algos = ['RDMA_WOUND_WAIT','RDMA_WAIT_DIE']
-    algos = ['RDMA_CICADA']
-    # algos=['RDMA_CICADA','RDMA_MAAT','RDMA_MVCC','RDMA_SILO','RDMA_TS1','RDMA_WAIT_DIE2','RDMA_WOUND_WAIT2','RDMA_NO_WAIT2','RDMA_WAIT_DIE','RDMA_WOUND_WAIT','RDMA_NO_WAIT']
-    # algos=['RDMA_SILO']
+    algos = ['RDMA_NO_WAIT']
     npercpay=[0.0]
     # npercpay=[1.0]
     wh=40

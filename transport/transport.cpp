@@ -616,7 +616,7 @@ void Transport::rdma_thd_send_msg(uint64_t send_thread_id, uint64_t dest_node_id
 	DEBUG("%ld Buffered Msg %d, (%ld,%ld) to %ld\n", send_thread_id, msg->rtype, msg->txn_id, msg->batch_id, dest_node_id);
 	sbuf->cnt += 1;
     sbuf->ptr += msg->get_size();
-	if(CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) {
+	if(CC_ALG != CALVIN ) {
         Message::release_message(msg);
     }
 	if (sbuf->starttime == 0) sbuf->starttime = get_sys_clock();

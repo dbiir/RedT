@@ -49,7 +49,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn) {
 }
 
 RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txncnt) {
-    assert (CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN || CC_ALG == WOUND_WAIT);
+    assert (CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT);
     RC rc;
     uint64_t starttime = get_sys_clock();
     uint64_t lock_get_start_time = starttime;
@@ -81,7 +81,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
               ,owner_cnt, lock_type, type, _row->get_primary_key(), (uint64_t)_row);
 		}
 	}
-    if ((CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) && !conflict) {
+    if ((CC_ALG == CALVIN) && !conflict) {
     if (waiters_head) conflict = true;
     }
 
@@ -279,7 +279,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
             }
         }
 #endif
-        else if (CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN){
+        else if (CC_ALG == CALVIN){
             LockEntry * entry = get_entry();
             entry->start_ts = get_sys_clock();
             entry->txn = txn;
@@ -350,7 +350,7 @@ final:
 
 RC Row_lock::lock_release(TxnManager * txn) {
 
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
     if (txn->isRecon()) {
         return RCOK;
     }
@@ -456,7 +456,7 @@ RC Row_lock::lock_release(TxnManager * txn) {
           _row->get_primary_key(), (uint64_t)_row);
           uint64_t timespan = get_sys_clock() - entry->txn->twopl_wait_start;
           entry->txn->twopl_wait_start = 0;
-#if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
+#if CC_ALG != CALVIN
           entry->txn->txn_stats.cc_block_time += timespan;
           entry->txn->txn_stats.cc_block_time_short += timespan;
 #endif
@@ -474,7 +474,7 @@ RC Row_lock::lock_release(TxnManager * txn) {
       //if(entry->txn->decr_lr() == 0 && entry->txn->locking_done) {
           if(entry->txn->decr_lr() == 0) {
               if(ATOM_CAS(entry->txn->lock_ready,false,true)) {
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
                   entry->txn->txn_stats.cc_block_time += timespan;
                   entry->txn->txn_stats.cc_block_time_short += timespan;
 #endif

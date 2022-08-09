@@ -21,8 +21,6 @@
 #include "helper.h"
 #include "semaphore.h"
 #include "array.h"
-#include "row_rdma_maat.h"
-#include "rdma_maat.h"
 #include "transport/message.h"
 #include "worker_thread.h"
 #include "routine.h"
@@ -60,26 +58,9 @@ public:
 	ts_t 		tid;
 	// ts_t 		epoch;
 #endif
-#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_MOCC
-    uint64_t 	key;
-	ts_t 		tid;
-	ts_t		timestamp;
-    row_t * 	test_row;
-	uint64_t    location;
-	uint64_t    offset;
-    uint64_t    old_version_num;
-#endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT ||  CC_ALG == RDMA_DSLR_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT
 	uint64_t    location;   //node id of server the data location
 	uint64_t    offset;
-#endif
-#if CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_TS
-	uint64_t 	key;
-    uint64_t	location;
-	uint64_t	offset;
-#endif
-#if CC_ALG == RDMA_TS1 
-	uint64_t	wid[LOCK_LENGTH];
 #endif
 #if CC_ALG == CICADA
 	uint64_t	recordId;	//already readed record id
@@ -245,7 +226,7 @@ public:
 	void release_locks(yield_func_t &yield, RC rc, uint64_t cor_id);
 
 	bool rdma_one_side() {
-	if (CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_MAAT || CC_ALG ==RDMA_TS1 ||CC_ALG ==RDMA_TS || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_DSLR_NO_WAIT || CC_ALG == RDMA_MOCC) return true;
+	if (CC_ALG == RDMA_NO_WAIT) return true;
 	else return false;
 	}
 
@@ -253,9 +234,6 @@ public:
 	RC get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, itemid_t *m_item, row_t *& row_local, uint64_t cor_id);
     row_t * read_remote_row(uint64_t target_server,uint64_t remote_offset);
     itemid_t * read_remote_index(uint64_t target_server,uint64_t remote_offset,uint64_t key);
-// #if CC_ALG == RDMA_MAAT
-    RdmaTxnTableNode * read_remote_timetable(uint64_t target_server,uint64_t remote_offset);
-// #endif
 
     bool write_remote_row(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content);
     bool write_remote_index(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content);
@@ -265,10 +243,6 @@ public:
     uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
 	bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
-#if USE_DBPAOR == true
-	void batch_unlock_remote(yield_func_t &yield, uint64_t cor_id, int loc, RC rc, TxnManager * txnMng , vector<vector<uint64_t>> remote_index_origin,ts_t time = 0, vector<vector<uint64_t>> remote_num = {{0}});
-	row_t * cas_and_read_remote(yield_func_t &yield, uint64_t& try_lock, uint64_t target_server, uint64_t cas_offset, uint64_t read_offset, uint64_t compare, uint64_t swap, uint64_t cor_id);
-#endif
 #if BATCH_INDEX_AND_READ
     void batch_read(yield_func_t &yield, BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin, uint64_t cor_id);
 	void get_batch_read(yield_func_t &yield, BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin, uint64_t cor_id);
@@ -282,11 +256,6 @@ public:
  	char* read_remote_log(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
 #endif
 	void read_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t operate_size, char* local_buf, uint64_t cor_id);
-
-// #if CC_ALG == RDMA_MAAT
-    RdmaTxnTableNode * read_remote_timetable(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
-	char * read_remote_txntable(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
-// #endif
 
     bool write_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
     bool write_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
@@ -302,7 +271,7 @@ public:
 
 
 	bool isRecon() {
-		assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN || !recon);
+		assert(CC_ALG == CALVIN || !recon);
 		return recon;
 	};
 		bool recon;
@@ -344,48 +313,20 @@ public:
     RC              find_tid_silo(ts_t max_tid);
     RC              finish(RC rc);
 #endif
-#if CC_ALG == RDMA_MVCC 
-    int             write_set[100];
-    int*            read_set;
-    uint64_t        num_locks;
-#endif
 	bool send_RQRY_RSP;
 
-
-#if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MOCC
-	ts_t 			last_tid;
-    ts_t            max_tid;
-	uint64_t        num_locks;
-    int             write_set[100];
-    int*            read_set;
-	// RC              find_tid_silo(ts_t max_tid);
-    // RC              finish(RC rc);
-#endif
-#if CC_ALG == RDMA_MOCC
-	std::set<uint64_t> lock_set;
-#endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_DSLR_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT
     int             write_set[100];
     int*            read_set;
 	int				num_atomic_retry; //num of txn atomic_retry
 	int				num_locks;
 #endif
 
-#if CC_ALG == RDMA_TS1
-	int             write_set[100];
-#endif
-
-#if CC_ALG == SILO || CC_ALG == RDMA_SILO
+#if CC_ALG == SILO 
 	bool 			_pre_abort;
 	bool 			_validation_no_wait;
 	ts_t 			_cur_tid;
 	RC				validate_silo();
-#endif
-#if CC_ALG == RDMA_MOCC
-	bool 			_pre_abort;
-	bool 			_validation_no_wait;
-	ts_t 			_cur_tid;
-	// RC				validate_silo();
 #endif
 #if CC_ALG == WOUND_WAIT
 	TxnStatus		txn_state;
@@ -419,26 +360,9 @@ public:
 	void set_commit_timestamp(uint64_t timestamp) {commit_timestamp = timestamp;}
 	uint64_t greatest_write_timestamp;
 	uint64_t greatest_read_timestamp;
-#if CC_ALG == RDMA_MAAT
-	std::set<uint64_t> uncommitted_reads;
-	std::set<uint64_t> uncommitted_writes;
-	std::set<uint64_t> uncommitted_writes_y;
-	int             write_set[100];
-    int*            read_set;
-	std::set<uint64_t> unread_set;
-	std::set<uint64_t> unwrite_set;
-#else
 	std::set<uint64_t> * uncommitted_reads;
 	std::set<uint64_t> * uncommitted_writes;
 	std::set<uint64_t> * uncommitted_writes_y;
-#endif
-
-#if CC_ALG == RDMA_CICADA
-	uint64_t start_ts;
-	std::unordered_map<uint64_t, uint64_t> uncommitted_set;
-	int write_set[100];
-	std::vector<uint64_t> version_num; 
-#endif
 
 	uint64_t twopl_wait_start;
 

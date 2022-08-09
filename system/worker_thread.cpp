@@ -131,7 +131,7 @@ void WorkerThread::fakeprocess(yield_func_t &yield, Message * msg, uint64_t cor_
       case CL_QRY:
       case CL_QRY_O:
 			case RTXN:
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
         rc = process_calvin_rtxn(yield, msg, cor_id);
 #else
         rc = process_rtxn(yield, msg, cor_id);
@@ -225,7 +225,7 @@ void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) 
       case CL_QRY:
       case CL_QRY_O:
 			case RTXN:
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
         rc = process_calvin_rtxn(yield, msg, cor_id);
 #else
         rc = process_rtxn(yield, msg, cor_id);
@@ -483,7 +483,7 @@ void WorkerThread::abort() {
 }
 
 TxnManager * WorkerThread::get_transaction_manager(Message * msg) {
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   TxnManager* local_txn_man =
       txn_table.get_transaction_manager(get_thd_id(), msg->get_txn_id(), msg->get_batch_id());
 #else
@@ -567,10 +567,10 @@ RC WorkerThread::co_run(yield_func_t &yield, uint64_t cor_id) {
     }
     simulation->last_da_query_time = get_sys_clock();
 
-    if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O) || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) {
+    if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O) || CC_ALG == CALVIN) {
       cor_txn_man[cor_id] = get_transaction_manager(msg);
 
-      if ((CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) && IS_LOCAL(cor_txn_man[cor_id]->get_txn_id())) {
+      if ((CC_ALG != CALVIN ) && IS_LOCAL(cor_txn_man[cor_id]->get_txn_id())) {
         if (msg->rtype != RTXN_CONT &&
             ((msg->rtype != RACK_PREP) || (cor_txn_man[cor_id]->get_rsp_cnt() == 1))) {
           cor_txn_man[cor_id]->txn_stats.work_queue_time_short += msg->lat_work_queue_time;
@@ -591,7 +591,7 @@ RC WorkerThread::co_run(yield_func_t &yield, uint64_t cor_id) {
       } else {
           cor_txn_man[cor_id]->txn_stats.clear_short();
       }
-      if (CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) {
+      if (CC_ALG != CALVIN ) {
         cor_txn_man[cor_id]->txn_stats.lat_network_time_start = msg->lat_network_time;
         cor_txn_man[cor_id]->txn_stats.lat_other_time_start = msg->lat_other_time;
       }
@@ -630,7 +630,7 @@ RC WorkerThread::co_run(yield_func_t &yield, uint64_t cor_id) {
 
     // delete message
     ready_starttime = get_sys_clock();
-#if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
+#if CC_ALG != CALVIN 
     msg->release();
 #endif
     INC_STATS(get_thd_id(),worker_release_msg_time,get_sys_clock() - ready_starttime);
@@ -755,7 +755,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
     }
     //uint64_t starttime = get_sys_clock();
 
-    if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O) || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) {
+    if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O) || CC_ALG == CALVIN) {
       txn_man = get_transaction_manager(msg);
 
       ready_starttime = get_sys_clock();
@@ -782,7 +782,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
         continue; // in majority, txn_man may has been destroyed when receive msgs
       } 
 
-      if ((CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) && IS_LOCAL(txn_man->get_txn_id())) {
+      if ((CC_ALG != CALVIN ) && IS_LOCAL(txn_man->get_txn_id())) {
         if (msg->rtype != RTXN_CONT &&
             ((msg->rtype != RACK_PREP) || (txn_man->get_rsp_cnt() == 1))) {
           txn_man->txn_stats.work_queue_time_short += msg->lat_work_queue_time;
@@ -803,7 +803,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
       } else {
           txn_man->txn_stats.clear_short();
       }
-      if (CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) {
+      if (CC_ALG != CALVIN ) {
         txn_man->txn_stats.lat_network_time_start = msg->lat_network_time;
         txn_man->txn_stats.lat_other_time_start = msg->lat_other_time;
       }
@@ -835,7 +835,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
     // delete message
     ready_starttime = get_sys_clock();
-#if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
+#if CC_ALG != CALVIN 
     msg->release();
 #endif
     INC_STATS(get_thd_id(),worker_release_msg_time,get_sys_clock() - ready_starttime);
@@ -848,7 +848,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
 RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RFIN %ld\n",msg->get_txn_id());
-  assert(CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN);
+  assert(CC_ALG != CALVIN );
 
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()), "RFIN local: %ld %ld/%d\n", msg->get_txn_id(),
              msg->get_txn_id() % g_node_cnt, g_node_id);
@@ -1212,7 +1212,7 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
   rc = txn_man->run_txn(yield, cor_id);
 
   // Send response
-#if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT)
+#if USE_REPLICA && CC_ALG == RDMA_NO_WAIT
   assert(rc != WAIT);
 #endif 
 
@@ -1221,18 +1221,7 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
     tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->return_id, Message::create_message(txn_man,RQRY_RSP));
 #else
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
-#if CC_ALG == RDMA_SILO
-    rc  = txn_man->validate(yield, cor_id);
-    txn_man->set_rc(rc);
-#if USE_REPLICA
-    // if(rc != Abort) 
-    assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
-#endif
-    msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
-    if(rc == Abort) {
-      txn_man->abort(yield, cor_id);
-    }
-#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT
 #if USE_REPLICA
     if(rc != Abort) assert(txn_man->redo_log(yield,rc,cor_id) == RCOK);
     txn_man->finish_logging = true;
@@ -1342,7 +1331,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     bool ready = cor_txn_man[cor_id]->unset_ready();
     INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
     assert(ready);
-    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_MOCC) {
+    if (CC_ALG == WAIT_DIE) {
       #if WORKLOAD == DA //mvcc use timestamp
         if (da_stamp_tab.count(cor_txn_man[cor_id]->get_txn_id())==0)
         {
@@ -1426,12 +1415,6 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     assert(time_table.get_state(get_thd_id(),cor_txn_man[cor_id]->get_txn_id()) == MAAT_RUNNING);
     #endif
   #endif
-  #if CC_ALG == RDMA_TS1 || CC_ALG == RDMA_TS
-    rdma_txn_table.init(get_thd_id(),cor_txn_man[cor_id]->get_txn_id());
-  #endif
-  #if CC_ALG == RDMA_MAAT
-    rdma_txn_table.init(get_thd_id(),cor_txn_man[cor_id]->get_txn_id());
-  #endif
   #if CC_ALG == WOOKONG
     txn_table.update_min_ts(get_thd_id(),txn_id,0,cor_txn_man[cor_id]->get_timestamp());
     wkdb_time_table.init(get_thd_id(),cor_txn_man[cor_id]->get_txn_id(), cor_txn_man[cor_id]->get_timestamp());
@@ -1499,7 +1482,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     bool ready = txn_man->unset_ready();
     INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
     assert(ready);
-    if (CC_ALG == WAIT_DIE || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_MOCC) {
+    if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT) {
       #if WORKLOAD == DA //mvcc use timestamp
         if (da_stamp_tab.count(txn_man->get_txn_id())==0)
         {
@@ -1589,12 +1572,6 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   assert(time_table.get_state(get_thd_id(),txn_man->get_txn_id()) == MAAT_RUNNING);
   #endif
 #endif
-#if CC_ALG == RDMA_MAAT
-  rdma_txn_table.init(get_thd_id(),txn_man->get_txn_id());
-  // assert(rdma_txn_table.get_lower(get_thd_id(),txn_man->get_txn_id()) == 0);
-  // assert(rdma_txn_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
-  // assert(rdma_txn_table.get_state(get_thd_id(),txn_man->get_txn_id()) == MAAT_RUNNING);
-#endif
 #if CC_ALG == WOOKONG
   txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
   wkdb_time_table.init(get_thd_id(),txn_man->get_txn_id(), txn_man->get_timestamp());
@@ -1646,7 +1623,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     rc = txn_man->run_txn(yield, cor_id);
   }
 
-#if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT)
+#if USE_REPLICA && CC_ALG == RDMA_NO_WAIT
   if(txn_man->get_rsp_cnt() == 0 && !txn_man->need_extra_wait()){
     // assert(false);
 		assert(IS_LOCAL(txn_man->get_txn_id()));
@@ -1717,7 +1694,7 @@ RC WorkerThread::process_log_flushed(Message * msg) {
 RC WorkerThread::process_rfwd(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RFWD (%ld,%ld)\n",msg->get_txn_id(),msg->get_batch_id());
   txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
-  assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+  assert(CC_ALG == CALVIN);
   int responses_left = txn_man->received_response(((ForwardMessage*)msg)->rc);
   assert(responses_left >=0);
   if(txn_man->calvin_collect_phase_done()) {
@@ -1747,7 +1724,7 @@ RC WorkerThread::process_calvin_rtxn(yield_func_t &yield, Message * msg, uint64_
 }
 
 bool WorkerThread::is_cc_new_timestamp() {
-  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == RDMA_MVCC || CC_ALG ==RDMA_TS1 || CC_ALG == RDMA_CICADA || CC_ALG == CICADA || CC_ALG ==RDMA_TS);
+  return (CC_ALG == MVCC || CC_ALG == TIMESTAMP || CC_ALG == DTA || CC_ALG == WOOKONG || CC_ALG == CICADA);
 }
 
 ts_t WorkerThread::get_next_ts() {

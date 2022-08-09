@@ -34,15 +34,7 @@
 #include "row_lock.h"
 #include "row_ts.h"
 #include "row_mvcc.h"
-#include "row_rdma_mvcc.h"
 #include "row_rdma_2pl.h"
-#include "row_rdma_ts1.h"
-#include "row_rdma_ts.h"
-#include "row_rdma_cicada.h"
-#include "rdma_mvcc.h"
-#include "rdma_ts1.h"
-#include "rdma_ts.h"
-#include "rdma_null.h"
 #include "mem_alloc.h"
 #include "query.h"
 #include "msg_queue.h"
@@ -73,7 +65,7 @@ void YCSBTxnManager::reset() {
 
 RC YCSBTxnManager::acquire_locks() {
   uint64_t starttime = get_sys_clock();
-	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+	assert(CC_ALG == CALVIN);
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
   locking_done = false;
   RC rc = RCOK;
@@ -114,7 +106,7 @@ RC YCSBTxnManager::acquire_locks() {
 RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
-	assert(CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN);
+	assert(CC_ALG != CALVIN);
 #if DEBUG_PRINTF
 		printf("[txn start]txn %d on node %u, is_local?%d\n",txn->txn_id,g_node_id,IS_LOCAL(txn->txn_id));
 #endif
@@ -458,12 +450,6 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	RC rc = RCOK;
 	switch (state) {
 	case YCSB_0 :
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
-        // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
-		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
-			rc = Abort;
-		} else {
-#endif
 		if(is_local) {
 			rc = run_ycsb_0(yield,req,row,cor_id);
 		} else if (rdma_one_side() && center_id == g_center_id) {
@@ -482,9 +468,6 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			rc = send_remote_request();
 #endif
 		}
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
-		}
-#endif
 	  	break;
 	case YCSB_1 :
 		//read local row,for message queue by TCP/IP,write set has actually been written in this point,
@@ -633,7 +616,7 @@ RC YCSBTxnManager::run_calvin_txn(yield_func_t &yield,uint64_t cor_id) {
 
 RC YCSBTxnManager::run_ycsb(yield_func_t &yield,uint64_t cor_id) {
   RC rc = RCOK;
-  assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+  assert(CC_ALG == CALVIN);
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
 
   for (uint64_t i = 0; i < ycsb_query->requests.size(); i++) {
@@ -659,14 +642,13 @@ RC YCSBTxnManager::run_ycsb(yield_func_t &yield,uint64_t cor_id) {
 
 #if USE_REPLICA
 RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
-	if(CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT){
+	if(CC_ALG == RDMA_NO_WAIT){
 		assert(status != Abort);
 		status = RCOK;		
 	}
 	
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	RC rc = RCOK;
-	ts_t ts = get_sys_clock(); //for RDMA_SILO, which is problematic
 
 	//for every node
 	int change_cnt[g_node_cnt];
@@ -692,12 +674,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			node_id.push_back(GET_NODE_ID(part_id));
 		}
 		else if(status == Abort){ //validate fail, only log the primary replicas that have been locked
-#if CC_ALG == RDMA_SILO
-			int sum = 0;
-			for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
-			if(sum>=num_locks) break;
-			node_id.push_back(GET_NODE_ID(part_id));	
-#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT
 			// int sum = 0;
 			// for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
 			// if(sum>=num_locks) break;
@@ -718,11 +695,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			//for simulation purpose, only write back metadata here
 			//in actual application, data in req should also be written back
 			temp_row->_tid_word = 0;
-#if CC_ALG == RDMA_SILO
-			temp_row->timestamp = ts;
-			uint64_t op_size = sizeof(temp_row->_tid_word)+sizeof(temp_row->timestamp);
-			newChange.set_change_info(req->key,op_size,(char *)temp_row); //local 
-#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT
 			uint64_t op_size = sizeof(temp_row->_tid_word);
 			bool is_primary = (node_id[i] == GET_NODE_ID(part_id));
 			newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 

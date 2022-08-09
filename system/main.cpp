@@ -44,9 +44,6 @@
 #include "ycsb_query.h"
 #include "da.h"
 #include "maat.h"
-#include "rdma_maat.h"
-#include "rdma_calvin.h"
-#include "rdma_cicada.h"
 #include "cicada.h"
 #include "ssi.h"
 #include "wsi.h"
@@ -76,7 +73,7 @@ InputThread * input_thds;
 OutputThread * output_thds;
 AbortThread * abort_thds;
 LogThread * log_thds;
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 CalvinLockThread * calvin_lock_thds;
 CalvinSequencerThread * calvin_seq_thds;
 #endif
@@ -240,16 +237,11 @@ int main(int argc, char *argv[]) {
 	printf("Done\n");
 	fflush(stdout);
 #endif
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN 
 	printf("Initializing sequencer... ");
 	fflush(stdout);
 	seq_man.init(m_wl);
 	printf("Done\n");
-#if CC_ALG == RDMA_CALVIN
-	printf("Initializing RDMA_CALVIN manager... ");
-	calvin_man.init();
-	printf("Done\n");
-#endif
 #endif
 #if CC_ALG == MAAT
 	printf("Initializing Time Table... ");
@@ -261,33 +253,11 @@ int main(int argc, char *argv[]) {
 	maat_man.init();
 	printf("Done\n");
 #endif
-#if CC_ALG == RDMA_MAAT
-	printf("Initializing Time Table... ");
-	fflush(stdout);
-	rdma_txn_table.init();
-	printf("Done\n");
-	printf("Initializing MaaT manager... ");
-	fflush(stdout);
-	rmaat_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
-    printf("Initializing Txn Table... ");
-	fflush(stdout);
-	rdma_txn_table.init();
-	printf("Done\n");
-#endif
 #if USE_REPLICA
     printf("Initializing Redo Log Buffer... ");
 	fflush(stdout);
 	redo_log_buf.init();
 	printf("Done\n");	
-#endif
-#if CC_ALG == RDMA_CICADA
-	printf("Initializing CICADA manager... ");
-	fflush(stdout);
-	rcicada_man.init();
-	printf("Done\n");
 #endif
 #if CC_ALG == CICADA
 	printf("Initializing CICADA manager... ");
@@ -370,7 +340,7 @@ int main(int argc, char *argv[]) {
 #if LOGGING
 		all_thd_cnt += 1; // logger thread
 #endif
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 		all_thd_cnt += 2; // sequencer + scheduler thread
 #endif
 #if USE_REPLICA
@@ -401,7 +371,7 @@ int main(int argc, char *argv[]) {
 	output_thds = new OutputThread[sthd_cnt];
 	abort_thds = new AbortThread[1];
 	log_thds = new LogThread[1];
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 	calvin_lock_thds = new CalvinLockThread[1];
 	calvin_seq_thds = new CalvinSequencerThread[1];
 #endif
@@ -501,12 +471,12 @@ int main(int argc, char *argv[]) {
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&log_thds[0]);
 #endif
 
-#if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
+#if CC_ALG != CALVIN
 	abort_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&abort_thds[0]);
 #endif
 
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 #if SET_AFFINITY
 	CPU_ZERO(&cpus);
 	CPU_SET(cpu_cnt, &cpus);

@@ -49,8 +49,8 @@
 /***********************************************/
 // Concurrency Control
 /***********************************************/
-// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2
-#define CC_ALG                                          RDMA_NO_WAIT2
+// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
+#define CC_ALG                                          RDMA_NO_WAIT
 
 // all transactions acquire tuples according to the primary key order.
 #define KEY_ORDER                                       false

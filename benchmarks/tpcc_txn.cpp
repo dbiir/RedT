@@ -84,7 +84,7 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
 
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN 
 	rc = run_calvin_txn(yield, cor_id);//run_calvin_txn();
 	return rc;
 #endif
@@ -105,13 +105,6 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	while(rc == RCOK && !is_done()) {
 		rc = run_txn_state(yield, cor_id);
 	}
-#if CC_ALG == RDMA_WOUND_WAIT2
-        // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
-		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
-			// printf("read local WOUND_ABORTING:%ld\n", txn->txn_id);
-			rc = Abort;
-		}
-#endif
 	uint64_t curr_time = get_sys_clock();
 	txn_stats.process_time += curr_time - starttime;
 	txn_stats.process_time_short += curr_time - starttime;
@@ -148,7 +141,7 @@ bool TPCCTxnManager::is_done() {
 
 RC TPCCTxnManager::acquire_locks() {
 	uint64_t starttime = get_sys_clock();
-	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+	assert(CC_ALG == CALVIN);
 	locking_done = false;
 	RC rc = RCOK;
 	RC rc2;
@@ -704,14 +697,6 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
 	INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
-#if CC_ALG == RDMA_WOUND_WAIT2
-        // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
-		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
-			// printf("read local WOUND_ABORTING:%ld\n", txn->txn_id);
-			rc = Abort;
-			return rc;
-		}
-#endif
 	switch (state) {
 		case TPCC_PAYMENT0 :
 			if(w_loc)
@@ -1419,7 +1404,7 @@ RC TPCCTxnManager::run_calvin_txn(yield_func_t &yield, uint64_t cor_id) {
 RC TPCCTxnManager::run_tpcc_phase2(yield_func_t &yield, uint64_t cor_id) {
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	RC rc = RCOK;
-	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+	assert(CC_ALG == CALVIN);
 
 	uint64_t w_id = tpcc_query->w_id;
 	uint64_t d_id = tpcc_query->d_id;
@@ -1478,7 +1463,7 @@ RC TPCCTxnManager::run_tpcc_phase2(yield_func_t &yield, uint64_t cor_id) {
 RC TPCCTxnManager::run_tpcc_phase5(yield_func_t &yield, uint64_t cor_id) {
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	RC rc = RCOK;
-	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+	assert(CC_ALG == CALVIN);
 
 	uint64_t w_id = tpcc_query->w_id;
 	uint64_t d_id = tpcc_query->d_id;
@@ -1552,13 +1537,8 @@ RC construct_log(uint64_t w_id,
 		node_id.push_back(GET_FOLLOWER2_NODE(part_id));
 		node_id.push_back(GET_NODE_ID(part_id));
 	}
-	else if(status == Abort){ //validate fail, only log the primary replicas that have been locked
-	#if CC_ALG == RDMA_SILO
-		int sum = 0;
-		for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
-		if(sum>=num_locks) break;
-		node_id.push_back(GET_NODE_ID(part_id));	
-	#elif CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT
+	else if(status == Abort){ //validate fail, only log the primary replicas that have been locked	
+	#if CC_ALG == RDMA_NO_WAIT
 		// int sum = 0;
 		// for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
 		// if(sum>=num_locks) break;
@@ -1580,15 +1560,13 @@ RC construct_log(uint64_t w_id,
 
 RC TPCCTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	// return RCOK;
-	if(CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_NO_WAIT){
+	if(CC_ALG == RDMA_NO_WAIT){
 		assert(status != Abort);
 		status = RCOK;		
 	}
 	
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	RC rc = RCOK;
-	ts_t ts = get_sys_clock(); //for RDMA_SILO, which is problematic
-
 	//for every node
 	int change_cnt[g_node_cnt];
 	for(int i=0;i<g_node_cnt;i++){

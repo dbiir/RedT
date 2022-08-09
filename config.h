@@ -43,7 +43,7 @@
 //   #define RDMA_TWO_SIDE true
 //   #define USE_COROUTINE false
 //   #define USE_DBPAOR false
-// #elif RDMA_SIT == SIT_COROUTINE //|| CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE
+// #elif RDMA_SIT == SIT_COROUTINE
 //   #define RDMA_ONE_SIDE true
 //   #define RDMA_TWO_SIDE true
 //   #define USE_COROUTINE true
@@ -222,8 +222,7 @@
 // #define RDMA_ONE_SIDE true
 // #define RDMA_TWO_SIDE false
 
-// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2, RDMA_WAIT_DIE2,RDMA_TS1,RDMA_SILO,RDMA_MVCC,RDMA_MAAT,RDMA_CICADA
-//RDMA_NO_WAIT2, RDMA_WAIT_DIE2:no matter read or write, mutex lock is used 
+// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
 #define CC_ALG RDMA_NO_WAIT
@@ -240,7 +239,7 @@
 /***********************************************/
 // USE RDMA
 /**********************************************/
-#if (CC_ALG == RDMA_MAAT || CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_TS1 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_CICADA || CC_ALG == RDMA_CNULL || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_MOCC || RDMA_TWO_SIDE == true) && RDMA_SIT != 0
+#if (CC_ALG == RDMA_NO_WAIT || RDMA_TWO_SIDE == true) && RDMA_SIT != 0
 // #define USE_RDMA CHANGE_MSG_QUEUE
 // #define USE_RDMA CHANGE_TCP_ONLY
 #endif
@@ -264,7 +263,7 @@
 #else
   #define LOG_THREAD_NUM 0
 #endif
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   #define CALVIN_THREAD_NUM 2
 #else
   #define CALVIN_THREAD_NUM 0
@@ -323,24 +322,6 @@
 #define VALIDATION_LOCK				"no-wait" // no-wait or waiting
 #define PRE_ABORT2					"true"
 #define ATOMIC_WORD					false
-// [RDMA_MAAT]
-#define RDMA_TXNTABLE_MAX (COROUTINE_CNT + 1) * THREAD_CNT
-#define COMMIT_ADJUST false
-#define MAAT_NODES_COUNT 2
-// [RDMA_TS1]
-#define RDMA_TSSTATE_COUNT 5
-// [RDMA_TS1]
-#define USE_READ_WAIT_QUEUE false
-#define YIELD_WHEN_WAITING_READ false
-#define TS_RETRY_COUNT int(ZIPF_THETA * 20 + 1)
-#define CASCADING_LENGTH 10
-// #define ROW_SET_LENGTH 100
-#define MAX_RETRY_TIME 2
-#define LOCK_LENGTH 10
-// [RDMA_DSLR]
-#define DSLR_MAX_RETRY_TIME 50
-// [RDMA_CICADA]
-#define CICADA_MAX_RETRY_TIME 50
 /***********************************************/
 // Logging
 /***********************************************/
@@ -554,24 +535,9 @@ enum PPSTxnType {
 #define DLI_DTA3 26
 #define SILO 27
 #define CNULL 28
-#define RDMA_SILO 29
-#define RDMA_MVCC 30
 #define RDMA_NO_WAIT 31
-#define RDMA_NO_WAIT2 32
-#define RDMA_WAIT_DIE2 33
-#define RDMA_TS1 34
-#define RDMA_MAAT 35
-#define RDMA_CICADA 36
-#define RDMA_CALVIN 38
-#define RDMA_CNULL 37
-#define RDMA_WOUND_WAIT2 39
 #define CICADA  40
 #define WOUND_WAIT 41
-#define RDMA_WAIT_DIE 42
-#define RDMA_WOUND_WAIT 43
-#define RDMA_MOCC 44
-#define RDMA_TS 46
-#define RDMA_DSLR_NO_WAIT 45
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1
 #define TS_CAS            2

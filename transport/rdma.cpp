@@ -12,7 +12,6 @@
 #include "index_rdma.h"
 #include "storage/row.h"
 #include "storage/table.h"
-#include "system/rdma_calvin.h"
 #include "storage/log_rdma.h"
 char *Rdma::rdma_buffer; //= new char[RDMA_BUFFER_SIZE];
 char ** Rdma::ifaddr = new char *[g_total_node_cnt+20];
@@ -125,18 +124,10 @@ void * Rdma::client_qp(void *arg){
 	remote_mr_attr[node_id] = std::get<1>(fetch_res.desc);
 	#if USE_COROUTINE
 		for(int thread_id = 0;thread_id < g_total_thread_cnt * (COROUTINE_CNT + 1); thread_id ++){
-		#if CC_ALG == RDMA_CALVIN
-			if (thread_id > g_thread_cnt * (COROUTINE_CNT + 1) && thread_id <= (g_total_thread_cnt - 2)* (COROUTINE_CNT + 1)) continue;
-		#else 
 			if (thread_id > g_thread_cnt * (COROUTINE_CNT + 1)) continue;
-		#endif
 	#else
 		for(int thread_id = 0;thread_id < g_total_thread_cnt ; thread_id ++){
-		#if CC_ALG == RDMA_CALVIN
-			if (thread_id > g_thread_cnt && thread_id <= g_total_thread_cnt - 2) continue;
-		#else 
 			if (thread_id > g_thread_cnt) continue;
-		#endif
 	#endif
 		
 		// pthread_mutex_lock( RDMA_QP_LATCH );
@@ -228,18 +219,6 @@ char* Rdma::get_table_client_memory(uint64_t thd_id) {
   	return temp;
 }
 */
-
-#if CC_ALG == RDMA_CALVIN
-char* Rdma::get_queue_client_memory() {
-	char * temp =  (char *)(client_rdma_rm->raw_ptr);
-  	return temp;
-}
-
-char* Rdma::get_rear_client_memory() {
-	char * temp =  (char *)(client_rdma_rm->raw_ptr) + g_msg_size;
-  	return temp;
-}
-#endif
 
 #if 0
 void *malloc_huge_pages(size_t size,uint64_t huge_page_sz,bool flag)

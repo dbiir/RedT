@@ -82,40 +82,8 @@ class Wkdb;
 class Tictoc;
 class Transport;
 class Rdma;
-#if CC_ALG == RDMA_SILO
-class RDMA_silo;
-#elif CC_ALG == RDMA_MOCC
-class RDMA_mocc;
-#elif CC_ALG == RDMA_MVCC
-class rdma_mvcc;
-#endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_NO_WAIT
 class RDMA_2pl;
-#endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || RDMA_TS
-class RdmaTxnTable;
-#endif
-#if CC_ALG == RDMA_DSLR_NO_WAIT
-class RDMA_dslr_no_wait;
-#endif
-#if CC_ALG == RDMA_MAAT
-class RDMA_Maat;
-class RdmaTxnTable;
-#endif
-#if CC_ALG == RDMA_TS1
-class RDMA_ts1;
-#endif
-#if CC_ALG == RDMA_TS
-class RDMA_ts;
-#endif
-#if CC_ALG == RDMA_CICADA
-class RDMA_Cicada;
-#endif
-#if CC_ALG == RDMA_CALVIN
-class RDMA_calvin;
-#endif
-#if CC_ALG == RDMA_CNULL
-class RDMA_Null;
 #endif
 #if USE_REPLICA
 class RedoLogBuffer;
@@ -177,40 +145,8 @@ extern Wkdb wkdb_man;
 extern Tictoc tictoc_man;
 extern Transport tport_man;
 extern Rdma rdma_man;
-#if CC_ALG == RDMA_SILO
-extern RDMA_silo rsilo_man;
-#elif CC_ALG == RDMA_MOCC
-extern RDMA_mocc rmocc_man;
-#elif CC_ALG == RDMA_MVCC
-extern rdma_mvcc rmvcc_man;
-#endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_NO_WAIT
 extern RDMA_2pl r2pl_man;
-#endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
-extern RdmaTxnTable rdma_txn_table;
-#endif
-#if CC_ALG == RDMA_DSLR_NO_WAIT
-extern  RDMA_dslr_no_wait dslr_man;
-#endif
-#if CC_ALG == RDMA_MAAT
-extern RDMA_Maat rmaat_man;
-extern RdmaTxnTable rdma_txn_table;
-#endif
-#if CC_ALG ==RDMA_TS1
-extern RDMA_ts1 rdmats_man;
-#endif
-#if CC_ALG ==RDMA_TS
-extern RDMA_ts rdmats_man;
-#endif
-#if CC_ALG == RDMA_CICADA
-extern RDMA_Cicada rcicada_man;
-#endif
-#if CC_ALG == RDMA_CALVIN
-extern RDMA_calvin calvin_man;
-#endif
-#if CC_ALG == RDMA_CNULL
-extern RDMA_Null rcnull_man;
 #endif
 #if USE_REPLICA
 extern RedoLogBuffer redo_log_buf;
@@ -564,8 +500,8 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
   (id >= g_node_cnt + g_client_node_cnt && \
    id < g_node_cnt + g_client_node_cnt + g_repl_cnt * g_node_cnt)
 #define ISCLIENTN(id) (id >= g_node_cnt && id < g_node_cnt + g_client_node_cnt)
-#define IS_LOCAL(tid) (tid % g_node_cnt == g_node_id || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN)
-#define IS_REMOTE(tid) (tid % g_node_cnt != g_node_id || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN)
+#define IS_LOCAL(tid) (tid % g_node_cnt == g_node_id || CC_ALG == CALVIN)
+#define IS_REMOTE(tid) (tid % g_node_cnt != g_node_id || CC_ALG == CALVIN)
 #define IS_LOCAL_KEY(key) (key % g_node_cnt == g_node_id)
 
 /*

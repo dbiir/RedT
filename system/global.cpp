@@ -54,17 +54,7 @@
 #include "maat.h"
 #include "wkdb.h"
 #include "tictoc.h"
-#include "rdma_silo.h"
-#include "rdma_mocc.h"
-#include "rdma_mvcc.h"
 #include "rdma_2pl.h"
-#include "rdma_maat.h"
-#include "rdma_ts1.h"
-#include "rdma_ts.h"
-#include "rdma_cicada.h"
-#include "rdma_calvin.h"
-#include "rdma_null.h"
-#include "rdma_dslr_no_wait.h"
 #include "key_xid.h"
 #include "rts_cache.h"
 #include "src/allocator_master.hh"
@@ -104,40 +94,8 @@ Tictoc tictoc_man;
 Transport tport_man;
 Rdma rdma_man;
 
-#if CC_ALG == RDMA_SILO
-RDMA_silo rsilo_man;
-#elif CC_ALG == RDMA_MOCC
-RDMA_mocc rmocc_man;
-#elif CC_ALG == RDMA_MVCC
-rdma_mvcc rmvcc_man;
-#endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
+#if CC_ALG == RDMA_NO_WAIT
 RDMA_2pl r2pl_man;
-#endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
-RdmaTxnTable rdma_txn_table;
-#endif
-#if CC_ALG == RDMA_DSLR_NO_WAIT
-RDMA_dslr_no_wait dslr_man;
-#endif
-#if CC_ALG == RDMA_MAAT
-RDMA_Maat rmaat_man;
-RdmaTxnTable rdma_txn_table;
-#endif
-#if CC_ALG == RDMA_TS1
-RDMA_ts1 rdmats_man;
-#endif
-#if CC_ALG == RDMA_TS
-RDMA_ts rdmats_man;
-#endif
-#if CC_ALG == RDMA_CICADA
-RDMA_Cicada rcicada_man;
-#endif
-#if CC_ALG == RDMA_CALVIN
-RDMA_calvin calvin_man;
-#endif
-#if CC_ALG == RDMA_CNULL
-RDMA_Null rcnull_man;
 #endif
 #if USE_REPLICA
 RedoLogBuffer redo_log_buf;
@@ -247,7 +205,7 @@ UInt32 g_async_redo_thread_cnt = 1;
 UInt32 g_async_redo_thread_cnt = 0;
 #endif
 
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 // sequencer + scheduler thread
 UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + 2 + g_work_thread_cnt + g_async_redo_thread_cnt;
 #else
