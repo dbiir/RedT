@@ -1,0 +1,8 @@
+W0a R1b W1a R1c C1 W0b W0b C0 
+W0a R1b W1a R1c C1 W0b W0b C0 
+W0a R1b W1a R1c W0b R0c A0 A1 
+W0a R1b W1a R1c C1 W0b W0b C0 
+W0a R1b W1a R1c W0b R0c A0 A1 
+R0a R1a W0a W1a C0 C1 
+R0a R1a W0a W1a C0 C1 
+R0a W0a R1a A0 C1 
