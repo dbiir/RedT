@@ -34,14 +34,14 @@
 
 void TxnManPool::init(Workload * wl, uint64_t size) {
   _wl = wl;
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   pool = new boost::lockfree::queue<TxnManager* > (size);
 #else
   pool = new boost::lockfree::queue<TxnManager* > * [g_total_thread_cnt];
 #endif
   TxnManager * txn;
   for(uint64_t thd_id = 0; thd_id < g_total_thread_cnt; thd_id++) {
-#if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
+#if CC_ALG != CALVIN
     pool[thd_id] = new boost::lockfree::queue<TxnManager* > (size);
 #endif
     for(uint64_t i = 0; i < size; i++) {
@@ -54,7 +54,7 @@ void TxnManPool::init(Workload * wl, uint64_t size) {
 }
 
 void TxnManPool::get(uint64_t thd_id, TxnManager *& item) {
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   bool r = pool->pop(item);
 #else
   bool r = pool[thd_id]->pop(item);
@@ -69,7 +69,7 @@ void TxnManPool::put(uint64_t thd_id, TxnManager * item) {
   item->release();
   // item->reset();
   int tries = 0;
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   while (!pool->push(item) && tries++ < TRY_LIMIT) {
   }
 #else
@@ -84,7 +84,7 @@ void TxnManPool::put(uint64_t thd_id, TxnManager * item) {
 void TxnManPool::free_all() {
   TxnManager * item;
   for(uint64_t thd_id = 0; thd_id < g_total_thread_cnt; thd_id++) {
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   while(pool->pop(item)) {
 #else
   while(pool[thd_id]->pop(item)) {
@@ -96,14 +96,14 @@ void TxnManPool::free_all() {
 
 void TxnPool::init(Workload * wl, uint64_t size) {
   _wl = wl;
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   pool = new boost::lockfree::queue<Transaction*  > (size);
 #else
   pool = new boost::lockfree::queue<Transaction* > * [g_total_thread_cnt];
 #endif
   Transaction * txn;
   for(uint64_t thd_id = 0; thd_id < g_total_thread_cnt; thd_id++) {
-#if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
+#if CC_ALG != CALVIN
     pool[thd_id] = new boost::lockfree::queue<Transaction*  > (size);
 #endif
     for(uint64_t i = 0; i < size; i++) {
@@ -116,7 +116,7 @@ void TxnPool::init(Workload * wl, uint64_t size) {
 }
 
 void TxnPool::get(uint64_t thd_id, Transaction *& item) {
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   bool r = pool->pop(item);
 #else
   bool r = pool[thd_id]->pop(item);
@@ -131,7 +131,7 @@ void TxnPool::put(uint64_t thd_id,Transaction * item) {
   //item->release();
   item->reset(thd_id);
   int tries = 0;
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   while (!pool->push(item) && tries++ < TRY_LIMIT) {
   }
 #else
@@ -147,7 +147,7 @@ void TxnPool::put(uint64_t thd_id,Transaction * item) {
 void TxnPool::free_all() {
   TxnManager * item;
     for(uint64_t thd_id = 0; thd_id < g_total_thread_cnt; thd_id++) {
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   while(pool->pop(item)) {
 #else
   while(pool[thd_id]->pop(item)) {
@@ -160,7 +160,7 @@ void TxnPool::free_all() {
 
 void QryPool::init(Workload * wl, uint64_t size) {
   _wl = wl;
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   pool = new boost::lockfree::queue<BaseQuery* > (size);
 #else
   pool = new boost::lockfree::queue<BaseQuery*> * [g_total_thread_cnt];
@@ -168,7 +168,7 @@ void QryPool::init(Workload * wl, uint64_t size) {
   BaseQuery * qry=NULL;
   DEBUG_M("QryPool alloc init\n");
   for(uint64_t thd_id = 0; thd_id < g_total_thread_cnt; thd_id++) {
-#if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
+#if CC_ALG != CALVIN
     pool[thd_id] = new boost::lockfree::queue<BaseQuery* > (size);
 #endif
     for(uint64_t i = 0; i < size; i++) {
@@ -194,7 +194,7 @@ void QryPool::init(Workload * wl, uint64_t size) {
 }
 
 void QryPool::get(uint64_t thd_id, BaseQuery *& item) {
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   bool r = pool->pop(item);
 #else
   bool r = pool[thd_id]->pop(item);
@@ -235,7 +235,7 @@ void QryPool::put(uint64_t thd_id, BaseQuery * item) {
   DEBUG_R("put 0x%lx\n",(uint64_t)item);
   //mem_allocator.free(item,sizeof(item));
   int tries = 0;
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   while (!pool->push(item) && tries++ < TRY_LIMIT) {
   }
 #else
@@ -258,7 +258,7 @@ void QryPool::free_all() {
   BaseQuery * item;
   DEBUG_M("query_pool free\n");
     for(uint64_t thd_id = 0; thd_id < g_total_thread_cnt; thd_id++) {
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   while(pool->pop(item)) {
 #else
   while(pool[thd_id]->pop(item)) {
@@ -293,31 +293,6 @@ void AccessPool::get(uint64_t thd_id, Access *& item) {
   item->orig_row = NULL;
   item->data = NULL;
   item->orig_data = NULL;
-  #if CC_ALG == TICTOC
-  item->orig_rts = 0;
-  item->orig_wts = 0;
-  item->locked = false;
-  #endif
-  #if CC_ALG == RDMA_SILO || CC_ALG == RDMA_MVCC || CC_ALG == RDMA_MOCC
-  item->location = g_node_id;
-  item->key = 0;
-  item->tid = 0;
-  item->test_row = NULL;
-  item->offset = 0;
-  #endif
-  #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT|| CC_ALG == RDMA_DSLR_NO_WAIT
-  item->location = g_node_id;
-  item->offset = 0;
-  #endif
-  #if CC_ALG == RDMA_MAAT || CC_ALG == RDMA_CICADA
-  item->location = g_node_id;
-  item->offset = 0;
-  item->key = 0;
-  #endif
-#if CC_ALG ==RDMA_TS1
-  item->location = g_node_id;
-  item->offset = 0;
-#endif
 }
 
 void AccessPool::put(uint64_t thd_id, Access * item) {

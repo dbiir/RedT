@@ -14,6 +14,7 @@ done
 
 # if ["${USE_DELAY}" == 'true' ]
 # then
+    sh set_delay1.sh 20
     # sh set_delay.sh 20 50 0 0
 # fi
 
@@ -49,5 +50,5 @@ done
 
 # if ["${USE_DELAY}" == 'true' ]
 # then
-    # sh clean_delay.sh
+    sh clean_delay.sh
 # fi

@@ -454,11 +454,7 @@ RC PPSTxnManager::send_remote_request() {
   msg->state = state;
   query->partitions_touched.add_unique(GET_PART_ID(0,dest_node_id));
 
-#if USE_RDMA == CHANGE_MSG_QUEUE
-  tport_man.rdma_thd_send_msg(get_thd_id(), dest_node_id, msg);
-#else
   msg_queue.enqueue(get_thd_id(),msg,dest_node_id);
-#endif
 
   state = next_state;
   return WAIT_REM;

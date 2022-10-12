@@ -54,14 +54,6 @@
 #include "lib.hh"
 using namespace std;
 
-#ifdef USE_RDMA
-  #include "qps/rc_recv_manager.hh"
-  #include "qps/recv_iter.hh"
-  #include "qps/mod.hh"
-  using namespace rdmaio;
-  using namespace rdmaio::rmem;
-  using namespace rdmaio::qp;
-#endif
 //#endif
 
 class mem_alloc;
@@ -70,53 +62,8 @@ class SimManager;
 class Manager;
 class Query_queue;
 class OptCC;
-class Dli;
-class Focc;
-class Bocc;
-class ssi;
-class wsi;
-class Cicada;
 class Maat;
-class Dta;
-class Wkdb;
-class Tictoc;
 class Transport;
-class Rdma;
-#if CC_ALG == RDMA_SILO
-class RDMA_silo;
-#elif CC_ALG == RDMA_MOCC
-class RDMA_mocc;
-#elif CC_ALG == RDMA_MVCC
-class rdma_mvcc;
-#endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
-class RDMA_2pl;
-#endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || RDMA_TS
-class RdmaTxnTable;
-#endif
-#if CC_ALG == RDMA_DSLR_NO_WAIT
-class RDMA_dslr_no_wait;
-#endif
-#if CC_ALG == RDMA_MAAT
-class RDMA_Maat;
-class RdmaTxnTable;
-#endif
-#if CC_ALG == RDMA_TS1
-class RDMA_ts1;
-#endif
-#if CC_ALG == RDMA_TS
-class RDMA_ts;
-#endif
-#if CC_ALG == RDMA_CICADA
-class RDMA_Cicada;
-#endif
-#if CC_ALG == RDMA_CALVIN
-class RDMA_calvin;
-#endif
-#if CC_ALG == RDMA_CNULL
-class RDMA_Null;
-#endif
 class Remote_query;
 class TxnManPool;
 class TxnPool;
@@ -138,9 +85,6 @@ class InOutTable;
 class WkdbTimeTable;
 class DAQuery;
 class DABlockQueue;
-class DtaTimeTable;
-class KeyXidCache;
-class RtsCache;
 class Workload;
 // class QTcpQueue;
 // class TcpTimestamp;
@@ -162,53 +106,8 @@ extern Manager glob_manager;
 extern Query_queue query_queue;
 extern Client_query_queue client_query_queue;
 extern OptCC occ_man;
-extern Dli dli_man;
-extern Focc focc_man;
-extern Bocc bocc_man;
-extern ssi ssi_man;
-extern wsi wsi_man;
-extern Cicada cicada_man;
 extern Maat maat_man;
-extern Dta dta_man;
-extern Wkdb wkdb_man;
-extern Tictoc tictoc_man;
 extern Transport tport_man;
-extern Rdma rdma_man;
-#if CC_ALG == RDMA_SILO
-extern RDMA_silo rsilo_man;
-#elif CC_ALG == RDMA_MOCC
-extern RDMA_mocc rmocc_man;
-#elif CC_ALG == RDMA_MVCC
-extern rdma_mvcc rmvcc_man;
-#endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
-extern RDMA_2pl r2pl_man;
-#endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
-extern RdmaTxnTable rdma_txn_table;
-#endif
-#if CC_ALG == RDMA_DSLR_NO_WAIT
-extern  RDMA_dslr_no_wait dslr_man;
-#endif
-#if CC_ALG == RDMA_MAAT
-extern RDMA_Maat rmaat_man;
-extern RdmaTxnTable rdma_txn_table;
-#endif
-#if CC_ALG ==RDMA_TS1
-extern RDMA_ts1 rdmats_man;
-#endif
-#if CC_ALG ==RDMA_TS
-extern RDMA_ts rdmats_man;
-#endif
-#if CC_ALG == RDMA_CICADA
-extern RDMA_Cicada rcicada_man;
-#endif
-#if CC_ALG == RDMA_CALVIN
-extern RDMA_calvin calvin_man;
-#endif
-#if CC_ALG == RDMA_CNULL
-extern RDMA_Null rcnull_man;
-#endif
 extern Workload * m_wl;
 extern TxnManPool txn_man_pool;
 extern TxnPool txn_pool;
@@ -225,48 +124,12 @@ extern Client_txn client_man;
 extern Sequencer seq_man;
 extern Logger logger;
 extern TimeTable time_table;
-extern DtaTimeTable dta_time_table;
-extern KeyXidCache dta_key_xid_cache;
-extern RtsCache dta_rts_cache;
 extern InOutTable inout_table;
 extern WkdbTimeTable wkdb_time_table;
-extern KeyXidCache wkdb_key_xid_cache;
-extern RtsCache wkdb_rts_cache;
 // extern QTcpQueue tcp_queue;
 // extern TcpTimestamp tcp_ts;
 
 extern map<string, string> g_params;
-
-extern char *rdma_global_buffer;
-extern char *rdma_txntable_buffer;
-// CALVIN share memory
-extern char *rdma_calvin_buffer;
-//extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
-extern rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
-extern rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
-extern rdmaio::Arc<rdmaio::rmem::RegHandler> rm_handler;
-extern rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
-
-extern std::vector<rdmaio::ConnectManager> cm;
-extern rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
-extern rdmaio::Arc<rdmaio::RNic> nic;
-// extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
-extern rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][RDMA_MAX_CLIENT_QP * (COROUTINE_CNT + 1)];
-extern pthread_mutex_t * RDMA_QP_LATCH;
-
-extern rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
-
-extern string rdma_server_add[NODE_CNT];
-// #if USE_COROUTINE
-extern string qp_name[NODE_CNT][RDMA_MAX_CLIENT_QP * (COROUTINE_CNT + 1)];
-// else
-// extern string qp_name[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
-// #endif
-
-//extern rdmaio::ConnectManager cm[NODE_CNT];
-//extern r2::Allocator *r2_allocator;
-
-extern int rdma_server_port[NODE_CNT];
 
 extern bool volatile warmup_done;
 extern bool volatile enable_thread_mem_pool;
@@ -333,13 +196,7 @@ extern uint64_t g_log_flush_timeout;
 extern UInt64 memory_count;
 extern UInt64 tuple_count;
 extern UInt64 max_tuple_size;
-extern pthread_mutex_t * RDMA_MEMORY_LATCH;
-
-extern uint64_t rdma_buffer_size;
-extern uint64_t client_rdma_buffer_size;
-extern uint64_t rdma_index_size;
 // MAAT
-extern uint64_t rdma_txntable_size;
 extern uint64_t row_set_length;
 
 extern UInt32 g_max_txn_per_part;
@@ -438,7 +295,6 @@ extern ofstream commit_file;
 extern ofstream abort_file;
 // CALVIN
 extern UInt32 g_seq_thread_cnt;
-extern UInt64 rdma_calvin_buffer_size;
 
 // TICTOC
 extern uint32_t g_max_num_waits;
@@ -550,8 +406,8 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
   (id >= g_node_cnt + g_client_node_cnt && \
    id < g_node_cnt + g_client_node_cnt + g_repl_cnt * g_node_cnt)
 #define ISCLIENTN(id) (id >= g_node_cnt && id < g_node_cnt + g_client_node_cnt)
-#define IS_LOCAL(tid) (tid % g_node_cnt == g_node_id || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN)
-#define IS_REMOTE(tid) (tid % g_node_cnt != g_node_id || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN)
+#define IS_LOCAL(tid) (tid % g_node_cnt == g_node_id || CC_ALG == CALVIN)
+#define IS_REMOTE(tid) (tid % g_node_cnt != g_node_id || CC_ALG == CALVIN)
 #define IS_LOCAL_KEY(key) (key % g_node_cnt == g_node_id)
 
 /*
@@ -569,10 +425,6 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
 #define INDEX		index_btree
 #elif (INDEX_STRUCT == IDX_HASH)
 #define  INDEX		IndexHash
-// #elif (INDEX_STRUCT == IDX_RDMA_TPCC)
-// #define INDEX       IndexRdmaTpcc
-#else
-#define INDEX		IndexRdma
 #endif
 
 /************************************************/

@@ -28,7 +28,7 @@
 
 void MessageThread::init(uint64_t thd_id) {
   buffer_cnt = g_total_node_cnt;
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   buffer_cnt++;
 #endif
   DEBUG_M("MessageThread::init buffer[] alloc\n");
@@ -65,11 +65,8 @@ void MessageThread::send_batch(uint64_t dest_node_id) {
     DEBUG("Send batch of %ld msgs to %ld\n",sbuf->cnt,dest_node_id);
     fflush(stdout);
     sbuf->set_send_time(get_sys_clock());
-#ifdef USE_RDMA
-    tport_man.rdma_send_msg(_thd_id, dest_node_id, sbuf->buffer, sbuf->ptr);
-#else
     tport_man.send_msg(_thd_id,dest_node_id,sbuf->buffer,sbuf->ptr);
-#endif
+
     INC_STATS(_thd_id,msg_batch_size_msgs,sbuf->cnt);
     INC_STATS(_thd_id,msg_batch_size_bytes,sbuf->ptr);
     if(ISSERVERN(dest_node_id)) {
@@ -104,7 +101,7 @@ static uint64_t mget_size() {
   uint64_t size = 0;
   size += sizeof(RemReqType);
   size += sizeof(uint64_t);
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   size += sizeof(uint64_t);
 #endif
   // for stats, send message queue time
@@ -278,8 +275,8 @@ void fake_copy_to_buf(Message * msg, char* buf) {
   *(double*)(buf+ptr) = msg->lat_process_time;
   ptr += sizeof(double);
 
-  if (((CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) && (msg->rtype == CL_QRY||msg->rtype == CL_QRY_O) && msg->txn_id % g_node_cnt == g_node_id) ||
-      ((CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) && IS_LOCAL(msg->txn_id))) {
+  if (((CC_ALG == CALVIN) && (msg->rtype == CL_QRY||msg->rtype == CL_QRY_O) && msg->txn_id % g_node_cnt == g_node_id) ||
+      ((CC_ALG != CALVIN) && IS_LOCAL(msg->txn_id))) {
     msg->lat_network_time = get_sys_clock();
   } else {
     msg->lat_other_time = get_sys_clock() - msg->lat_other_time;
@@ -348,8 +345,8 @@ Message* fake_create_message(char * buf) {
   ptr += sizeof(double);
   msg->lat_other_time = *(double*)(buf+ptr);
   ptr += sizeof(double);
-  if (((CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) && rtype == CALVIN_ACK && msg->txn_id % g_node_cnt == g_node_id) ||
-      ((CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) && IS_LOCAL(msg->txn_id))) {
+  if (((CC_ALG == CALVIN) && rtype == CALVIN_ACK && msg->txn_id % g_node_cnt == g_node_id) ||
+      ((CC_ALG != CALVIN) && IS_LOCAL(msg->txn_id))) {
     msg->lat_network_time = (get_sys_clock() - msg->lat_network_time) - msg->lat_other_time;
   } else {
     msg->lat_other_time = get_sys_clock();
@@ -538,7 +535,7 @@ void MessageThread::run() {
   sbuf->cnt += 1;
   sbuf->ptr += msg->get_size();
   // Free message here, no longer needed unless CALVIN sequencer
-  if(CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN) {
+  if(CC_ALG != CALVIN) {
     Message::release_message(msg);
   }
   if (sbuf->starttime == 0) sbuf->starttime = get_sys_clock();

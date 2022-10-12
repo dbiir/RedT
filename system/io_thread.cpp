@@ -37,11 +37,7 @@ void InputThread::setup() {
 
 	std::vector<Message*> * msgs;
 	while(!simulation->is_setup_done()) {
-#ifdef USE_RDMA
-        msgs = tport_man.rdma_recv_msg(get_thd_id());
-#else
 		msgs = tport_man.recv_msg(get_thd_id());
-#endif
 		if (msgs == NULL) continue;
 		while(!msgs->empty()) {
 			Message * msg = msgs->front();
@@ -54,7 +50,7 @@ void InputThread::setup() {
 			} else {
 				assert(ISSERVER || ISREPLICA);
 				//printf("Received Msg %d from node %ld\n",msg->rtype,msg->return_node_id);
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 			if(msg->rtype == CALVIN_ACK ||(msg->rtype == CL_QRY && ISCLIENTN(msg->get_return_id())) ||
 				(msg->rtype == CL_QRY_O && ISCLIENTN(msg->get_return_id()))) {
 				work_queue.sequencer_enqueue(get_thd_id(),msg);
@@ -111,11 +107,7 @@ RC InputThread::client_recv_loop() {
 	while (!simulation->is_done()) {
 		heartbeat();
 		uint64_t starttime = get_sys_clock();
-#ifdef USE_RDMA
-        msgs = tport_man.rdma_recv_msg(get_thd_id());
-#else
 		msgs = tport_man.recv_msg(get_thd_id());
-#endif
 		INC_STATS(_thd_id,mtx[28], get_sys_clock() - starttime);
 		starttime = get_sys_clock();
 		//while((m_query = work_queue.get_next_query(get_thd_id())) != NULL) {
@@ -124,7 +116,7 @@ RC InputThread::client_recv_loop() {
 		while(!msgs->empty()) {
 			Message * msg = msgs->front();
 			assert(msg->rtype == CL_RSP);
-		#if CC_ALG == BOCC || CC_ALG == FOCC || ONE_NODE_RECIEVE == 1
+		#if ONE_NODE_RECIEVE == 1
 			return_node_offset = msg->return_node_id;
 		#else
 			return_node_offset = msg->return_node_id - g_server_start_node;
@@ -164,19 +156,13 @@ RC InputThread::server_recv_loop() {
 	uint64_t starttime;
 
 	std::vector<Message*> * msgs;
-// #if RDMA_ONE_SIDE == true && SERVER_GENERATE_QUERIES == true
-// 	while (!simulation->is_setup_done()) {
-// #else
+
 	while (!simulation->is_done()) {
-// #endif
 		heartbeat();
 		starttime = get_sys_clock();
 
-#ifdef USE_RDMA
-        msgs = tport_man.rdma_recv_msg(get_thd_id());
-#else
 		msgs = tport_man.recv_msg(get_thd_id());
-#endif
+
 		INC_STATS(_thd_id,mtx[28], get_sys_clock() - starttime);
 		starttime = get_sys_clock();
 
@@ -187,7 +173,7 @@ RC InputThread::server_recv_loop() {
 				msgs->erase(msgs->begin());
 				continue;
 			}
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 			if(msg->rtype == CALVIN_ACK ||(msg->rtype == CL_QRY && ISCLIENTN(msg->get_return_id())) ||
 			(msg->rtype == CL_QRY_O && ISCLIENTN(msg->get_return_id()))) {
 				work_queue.sequencer_enqueue(get_thd_id(),msg);
@@ -227,11 +213,7 @@ RC OutputThread::run() {
 
 	tsetup();
 	printf("Running OutputThread %ld\n",_thd_id);
-// #if RDMA_ONE_SIDE == true && SERVER_GENERATE_QUERIES == true
-// 	while (!simulation->is_setup_done()) {
-// #else
 	while (!simulation->is_done()) {
-// #endif
 		heartbeat();
 		messager->run();
 	}

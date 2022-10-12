@@ -83,12 +83,6 @@ public:
     uint64_t cor_process_starttime[COROUTINE_CNT + 1];
     int64_t pendings[COROUTINE_CNT + 1];
 private:
-#if USE_COROUTINE
-    uint64_t _cor_txn_id[COROUTINE_CNT + 1];
-    
-    TxnManager * cor_txn_man[COROUTINE_CNT + 1];
-// #else
-#endif
     uint64_t _thd_txn_id;
     TxnManager * txn_man;
 // #endif

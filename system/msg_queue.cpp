@@ -86,7 +86,7 @@ void MessageQueue::enqueue(uint64_t thd_id, Message * msg,uint64_t dest) {
   entry->touchedtime = UINT64_MAX;
   assert(entry->dest < g_total_node_cnt);
   uint64_t mtx_time_start = get_sys_clock();
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
   // Need to have strict message ordering for sequencer thread
   uint64_t rand = thd_id % g_this_send_thread_cnt;
 #elif WORKLOAD == DA

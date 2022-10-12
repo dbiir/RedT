@@ -23,8 +23,6 @@ class row_t;
 class table_t;
 class IndexHash;
 class index_btree;
-class IndexRdma;
-//class IndexRdmaTpcc;
 class Catalog;
 class lock_man;
 class TxnManager;

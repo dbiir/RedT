@@ -17,11 +17,8 @@
 #include "abort_thread.h"
 #include "calvin_thread.h"
 #include "client_query.h"
-#include "dli.h"
-#include "dta.h"
 #include "global.h"
 #include "io_thread.h"
-#include "key_xid.h"
 #include "log_thread.h"
 #include "logger.h"
 #include "maat.h"
@@ -31,7 +28,6 @@
 #include "occ.h"
 #include "pps.h"
 #include "query.h"
-#include "rts_cache.h"
 #include "sequencer.h"
 #include "sim_manager.h"
 #include "abort_queue.h"
@@ -44,23 +40,8 @@
 #include "ycsb_query.h"
 #include "da.h"
 #include "maat.h"
-#include "rdma_maat.h"
-#include "rdma_calvin.h"
-#include "rdma_cicada.h"
-#include "cicada.h"
-#include "ssi.h"
-#include "wsi.h"
-#include "focc.h"
-#include "bocc.h"
 #include "client_query.h"
-#include "wkdb.h"
-#include "tictoc.h"
-#include "key_xid.h"
-#include "rts_cache.h"
 #include "lib.hh"
-#include "rdma.h"
-// #include "http.h"
-//#include "rdma_ctrl.hpp"
 #include "qps/rc_recv_manager.hh"
 #include "qps/recv_iter.hh"
 //#include "src/allocator_master.hh"
@@ -75,7 +56,7 @@ InputThread * input_thds;
 OutputThread * output_thds;
 AbortThread * abort_thds;
 LogThread * log_thds;
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 CalvinLockThread * calvin_lock_thds;
 CalvinSequencerThread * calvin_seq_thds;
 #endif
@@ -84,13 +65,9 @@ CalvinSequencerThread * calvin_seq_thds;
 void parser(int argc, char * argv[]);
 
 int main(int argc, char *argv[]) {
-	RDMA_MEMORY_LATCH = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(RDMA_MEMORY_LATCH, NULL);
 #if USE_REPLICA
 	pthread_mutex_init(&log_lock, NULL);
 #endif
-	RDMA_QP_LATCH = (pthread_mutex_t *)mem_allocator.alloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(RDMA_QP_LATCH, NULL);
     // 0. initialize global data structure
     parser(argc, argv);
 #if SEED != 0
@@ -126,13 +103,6 @@ int main(int argc, char *argv[]) {
 	fflush(stdout);
 
     //item_index_size = item_index_size ;
-    
-	//register memeory
-	//prepare QP connection with rdma_global_buffer(as registry memory)
-	#if RDMA_ONE_SIDE == true//== CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
-    //#if CC_ALG == RDMA_SILO
-        rdma_man.init();
-    #endif
 
    //prepare workload
 	// Workload * m_wl;
@@ -149,10 +119,6 @@ int main(int argc, char *argv[]) {
 			cl_index_size = cl_index_size * (g_num_wh/g_node_cnt) ;
 			order_index_size = order_index_size * (g_num_wh/g_node_cnt);
 			ol_index_size = ol_index_size * (g_num_wh/g_node_cnt);
-
-			rdma_index_size = item_index_size + wh_index_size + stock_index_size + dis_index_size +
-							+ cust_index_size +  cl_index_size + order_index_size + ol_index_size 
-							+ (1024*1024L);
 			break;
 		case PPS :
 			m_wl = new PPSWorkload;
@@ -231,16 +197,12 @@ int main(int argc, char *argv[]) {
 	printf("Done\n");
 	fflush(stdout);
 #endif
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 	printf("Initializing sequencer... ");
 	fflush(stdout);
 	seq_man.init(m_wl);
 	printf("Done\n");
-#if CC_ALG == RDMA_CALVIN
-	printf("Initializing RDMA_CALVIN manager... ");
-	calvin_man.init();
-	printf("Done\n");
-#endif
+
 #endif
 #if CC_ALG == MAAT
 	printf("Initializing Time Table... ");
@@ -250,85 +212,6 @@ int main(int argc, char *argv[]) {
 	printf("Initializing MaaT manager... ");
 	fflush(stdout);
 	maat_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == RDMA_MAAT
-	printf("Initializing Time Table... ");
-	fflush(stdout);
-	rdma_txn_table.init();
-	printf("Done\n");
-	printf("Initializing MaaT manager... ");
-	fflush(stdout);
-	rmaat_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
-    printf("Initializing Txn Table... ");
-	fflush(stdout);
-	rdma_txn_table.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == RDMA_CICADA
-	printf("Initializing CICADA manager... ");
-	fflush(stdout);
-	rcicada_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == CICADA
-	printf("Initializing CICADA manager... ");
-	cicada_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == SSI
-	printf("Initializing In Out Table... ");
-	fflush(stdout);
-	inout_table.init();
-	printf("Done\n");
-	printf("Initializing SSI manager... ");
-	fflush(stdout);
-	ssi_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == WSI
-	printf("Initializing WSI manager... ");
-	fflush(stdout);
-	wsi_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == WOOKONG
-	printf("Initializing WKDB Time Table... ");
-	fflush(stdout);
-	wkdb_time_table.init();
-	printf("Done\n");
-	// printf("Initializing WKDB KeyxidCache and RtsCache... ");
-	// fflush(stdout);
-	// wkdb_key_xid_cache.init();
-	// wkdb_rts_cache.init();
-	// printf("Done\n");
-	printf("Initializing WKDB manager... ");
-	fflush(stdout);
-	wkdb_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == TICTOC
-	printf("Initializing MaaT manager... ");
-	fflush(stdout);
-	tictoc_man.init();
-	printf("Done\n");
-#endif
-#if CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
-	printf("Initializing DTA Time Table... ");
-	fflush(stdout);
-	dta_time_table.init();
-	printf("Done\n");
-	// printf("Initializing DTA KeyxidCache and RtsCache... ");
-	// fflush(stdout);
-	// dta_key_xid_cache.init();
-	// dta_rts_cache.init();
-	// printf("Done\n");
-	printf("Initializing DTA manager... ");
-	fflush(stdout);
-	dta_man.init();
 	printf("Done\n");
 #endif
 #if LOGGING
@@ -355,7 +238,7 @@ int main(int argc, char *argv[]) {
 #if LOGGING
 		all_thd_cnt += 1; // logger thread
 #endif
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 		all_thd_cnt += 2; // sequencer + scheduler thread
 #endif
 
@@ -383,7 +266,7 @@ int main(int argc, char *argv[]) {
 	output_thds = new OutputThread[sthd_cnt];
 	abort_thds = new AbortThread[1];
 	log_thds = new LogThread[1];
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 	calvin_lock_thds = new CalvinLockThread[1];
 	calvin_seq_thds = new CalvinSequencerThread[1];
 #endif
@@ -452,35 +335,31 @@ int main(int argc, char *argv[]) {
 #endif
 		assert(id >= 0 && id < wthd_cnt);
 		worker_thds[i].init(id,g_node_id,m_wl);
-#if USE_COROUTINE
-		pthread_create(&p_thds[id++], &attr, run_co_thread, (void *)&worker_thds[i]);
-#else
 		pthread_create(&p_thds[id++], &attr, run_nco_thread, (void *)&worker_thds[i]);
-#endif
 	}
 	for (uint64_t j = 0; j < rthd_cnt ; j++) {
 		assert(id >= wthd_cnt && id < wthd_cnt + rthd_cnt);
 		input_thds[j].init(id,g_node_id,m_wl);
 		pthread_create(&p_thds[id++], NULL, run_thread, (void *)&input_thds[j]);
 	}
-//#if USE_RDMA != CHANGE_MSG_QUEUE
+
 	for (uint64_t j = 0; j < sthd_cnt; j++) {
 		assert(id >= wthd_cnt + rthd_cnt && id < wthd_cnt + rthd_cnt + sthd_cnt);
 		output_thds[j].init(id,g_node_id,m_wl);
 		pthread_create(&p_thds[id++], NULL, run_thread, (void *)&output_thds[j]);
 	}
-//#endif
+
 #if LOGGING
 	log_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&log_thds[0]);
 #endif
 
-#if CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN
+#if CC_ALG != CALVIN
 	abort_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&abort_thds[0]);
 #endif
 
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 #if SET_AFFINITY
 	CPU_ZERO(&cpus);
 	CPU_SET(cpu_cnt, &cpus);
@@ -518,11 +397,6 @@ int main(int argc, char *argv[]) {
 	//tport_man.shutdown();
 	m_wl->index_delete_all();
 
-// #if USE_RDMA
-// 	if(g_node_id == 0) {
-// 		system("killall memcached");  
-// 	}
-// #endif
 
 	/*
 	txn_table.delete_all();
@@ -551,14 +425,6 @@ void * run_nco_thread(void * id) {
 	thd->start_routine();
 	return NULL;
 }
-#if USE_COROUTINE
-void * run_co_thread(void * id) {
-		WorkerThread * thd = (WorkerThread *) id;
-	thd->create_routines(COROUTINE_CNT);
-	thd->start_routine();
-	return NULL;
-}
-#endif
 void network_test() {
 
 			/*

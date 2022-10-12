@@ -22,13 +22,7 @@
 #include "query.h"
 #include "client_query.h"
 #include "occ.h"
-#include "bocc.h"
-#include "focc.h"
-#include "ssi.h"
-#include "wsi.h"
-#include "cicada.h"
 #include "transport.h"
-#include "rdma.h"
 #include "work_queue.h"
 #include "abort_queue.h"
 #include "client_query.h"
@@ -41,47 +35,21 @@
 #include "pool.h"
 #include "query.h"
 #include "sequencer.h"
-#include "dli.h"
 #include "sim_manager.h"
 #include "stats.h"
 #include "transport.h"
 #include "txn_table.h"
 #include "work_queue.h"
-#include "dta.h"
 #include "client_txn.h"
 #include "sequencer.h"
 #include "logger.h"
 #include "maat.h"
-#include "wkdb.h"
-#include "tictoc.h"
-#include "rdma_silo.h"
-#include "rdma_mocc.h"
-#include "rdma_mvcc.h"
-#include "rdma_2pl.h"
-#include "rdma_maat.h"
-#include "rdma_ts1.h"
-#include "rdma_ts.h"
-#include "rdma_cicada.h"
-#include "rdma_calvin.h"
-#include "rdma_null.h"
-#include "rdma_dslr_no_wait.h"
-#include "key_xid.h"
-#include "rts_cache.h"
 #include "src/allocator_master.hh"
-//#include "rdma_ctrl.hpp"
 #include "lib.hh"
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
 #include "wl.h"
-#ifdef USE_RDMA
-  #include "qps/rc_recv_manager.hh"
-  #include "qps/recv_iter.hh"
-  #include "qps/mod.hh"
-  using namespace rdmaio;
-  using namespace rdmaio::rmem;
-  using namespace rdmaio::qp;
-  using namespace std;
-#endif
+
 
 mem_alloc mem_allocator;
 Stats stats;
@@ -90,53 +58,8 @@ Manager glob_manager;
 Query_queue query_queue;
 Client_query_queue client_query_queue;
 OptCC occ_man;
-Dli dli_man;
-Focc focc_man;
-Bocc bocc_man;
 Maat maat_man;
-Dta dta_man;
-Wkdb wkdb_man;
-ssi ssi_man;
-wsi wsi_man;
-Cicada cicada_man;
-Tictoc tictoc_man;
 Transport tport_man;
-Rdma rdma_man;
-#if CC_ALG == RDMA_SILO
-RDMA_silo rsilo_man;
-#elif CC_ALG == RDMA_MOCC
-RDMA_mocc rmocc_man;
-#elif CC_ALG == RDMA_MVCC
-rdma_mvcc rmvcc_man;
-#endif
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2 || CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WAIT_DIE || CC_ALG == RDMA_WOUND_WAIT
-RDMA_2pl r2pl_man;
-#endif
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_TS || CC_ALG == RDMA_TS1
-RdmaTxnTable rdma_txn_table;
-#endif
-#if CC_ALG == RDMA_DSLR_NO_WAIT
-RDMA_dslr_no_wait dslr_man;
-#endif
-#if CC_ALG == RDMA_MAAT
-RDMA_Maat rmaat_man;
-RdmaTxnTable rdma_txn_table;
-#endif
-#if CC_ALG == RDMA_TS1
-RDMA_ts1 rdmats_man;
-#endif
-#if CC_ALG == RDMA_TS
-RDMA_ts rdmats_man;
-#endif
-#if CC_ALG == RDMA_CICADA
-RDMA_Cicada rcicada_man;
-#endif
-#if CC_ALG == RDMA_CALVIN
-RDMA_calvin calvin_man;
-#endif
-#if CC_ALG == RDMA_CNULL
-RDMA_Null rcnull_man;
-#endif
 Workload * m_wl;
 TxnManPool txn_man_pool;
 TxnPool txn_pool;
@@ -153,13 +76,6 @@ Client_txn client_man;
 Sequencer seq_man;
 Logger logger;
 TimeTable time_table;
-DtaTimeTable dta_time_table;
-KeyXidCache dta_key_xid_cache;
-RtsCache dta_rts_cache;
-InOutTable inout_table;
-WkdbTimeTable wkdb_time_table;
-KeyXidCache wkdb_key_xid_cache;
-RtsCache wkdb_rts_cache;
 // QTcpQueue tcp_queue;
 // TcpTimestamp tcp_ts;
 
@@ -236,7 +152,7 @@ UInt32 g_work_thread_cnt = 1;
 UInt32 g_work_thread_cnt = 0;
 #endif
 UInt32 g_send_thread_cnt = SEND_THREAD_CNT;
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 // sequencer + scheduler thread
 UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + 2 + g_work_thread_cnt;
 #else
@@ -278,14 +194,8 @@ UInt64 g_log_flush_timeout = LOG_BUF_TIMEOUT;
 UInt64 memory_count = 0;
 UInt64 tuple_count = 0;
 UInt64 max_tuple_size = 0;
-pthread_mutex_t * RDMA_MEMORY_LATCH;
-
-UInt64 rdma_buffer_size = 30*(1024*1024*1024L);
-UInt64 client_rdma_buffer_size = 600*(1024*1024L);
-UInt64 rdma_index_size = (1024*1024*1024L);
 
 // MAAT
-UInt64 rdma_txntable_size = 30*1024*1024; //4*(1024*1024*1024L);//30*1024*1024;
 UInt64 row_set_length = floor(ROW_SET_LENGTH);
 
 // MVCC
@@ -295,7 +205,6 @@ UInt64 g_his_recycle_len = HIS_RECYCLE_LEN;
 
 // CALVIN
 UInt32 g_seq_thread_cnt = SEQ_THREAD_CNT;
-UInt64 rdma_calvin_buffer_size = 400*1024*1024;
 
 // TICTOC
 uint32_t g_max_num_waits = MAX_NUM_WAITS;
@@ -365,48 +274,6 @@ uint64_t ol_index_size = (20 * 1024 *1024L);
 
 map<string, string> g_params;
 
-char *rdma_global_buffer;
-char *rdma_txntable_buffer;
-// CALVIN shared memory
-char *rdma_calvin_buffer;
-//rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;
-rdmaio::Arc<rdmaio::rmem::RMem> rdma_rm;
-//Each thread uses only its own piece of client memory address
-/* client_rdma_rm suppose there are 4 work thd 
- * size:IndexInfo //thd 0 read index
- * size:IndexInfo //thd 1 read index
- * size:IndexInfo //thd 2 read index
- * size:IndexInfo //thd 3 read index
- * size:Row //thd 0 read row
- * size:Row //thd 1 read row
- * size:Row //thd 2 read row
- * size:Row //thd 3 read row
- */
-rdmaio::Arc<rdmaio::rmem::RMem> client_rdma_rm;
-rdmaio::Arc<rdmaio::rmem::RegHandler> rm_handler;
-rdmaio::Arc<rdmaio::rmem::RegHandler> client_rm_handler;
-
-std::vector<rdmaio::ConnectManager> cm;
-rdmaio::Arc<rdmaio::RCtrl> rm_ctrl;
-rdmaio::Arc<rdmaio::RNic> nic;
-// rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
-rdmaio::Arc<rdmaio::qp::RDMARC> rc_qp[NODE_CNT][RDMA_MAX_CLIENT_QP * (COROUTINE_CNT + 1)];
-pthread_mutex_t * RDMA_QP_LATCH;
-rdmaio::rmem::RegAttr remote_mr_attr[NODE_CNT];
-
-string rdma_server_add[NODE_CNT];
-// string qp_name[NODE_CNT][THREAD_CNT * (COROUTINE_CNT + 1)];
-string qp_name[NODE_CNT][RDMA_MAX_CLIENT_QP * (COROUTINE_CNT + 1)];
-//rdmaio::ConnectManager cm[NODE_CNT];
-
-int rdma_server_port[NODE_CNT];
-
-//rdmaio::Arc<rdmaio::rmem::RegHandler> local_mr[NODE_CNT][THREAD_CNT];
-
-
-
-//r2::Allocator *r2_allocator;
-//rdmaio::RCQP *qp[NODE_CNT][THREAD_CNT];
 bool g_init_done[50] = {false};
 int g_init_cnt = 0;
 

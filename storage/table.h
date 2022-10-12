@@ -23,41 +23,10 @@
 // only index access is supported for table.
 
 class row_t;
-
-#if RDMA_ONE_SIDE == true
-#include "catalog.h"
-class table_t
-{
-public:
-	void test_read();
-	void init(const char * table_name, int table_id);
-	void init(Catalog schema);
-	// row lookup should be done with index. But index does not have
-	// records for new rows. get_new_row returns the pointer to a
-	// new row.
-	RC get_new_row(row_t *& row); // this is equivalent to insert()
-	RC get_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id);
-    RC get_general_new_row(row_t *& row, uint64_t part_id, uint64_t &row_id);
-
-	void delete_row(); // TODO delete_row is not supportet yet
-
-	Catalog*  get_schema() { return &schema; };
-	const char*  get_table_name() { return table_name; };
-	uint32_t get_table_id() { return table_id; };
-
-	Catalog  		schema;
-	uint32_t        table_id;
-	// r2::Allocator	allocator;
-private:
-	char  	table_name[20];
-	char 			pad[CL_SIZE - sizeof(void *)*3 - sizeof(uint32_t)];
-};
-#else
 class Catalog;
 class table_t
 {
 public:
-    void test_read();
 
 	void init(Catalog * schema);
 	// row lookup should be done with index. But index does not have
@@ -83,4 +52,3 @@ private:
 };
 #endif
 
-#endif

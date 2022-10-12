@@ -22,70 +22,6 @@
 #include "global.h"
 #include "helper.h"
 
-#if RDMA_ONE_SIDE == true
-class Column {
-public:
-	Column() {	}
-  	Column(uint64_t size, char *type, char *name, uint64_t id, uint64_t index) {
-		this->size = size;
-		this->id = id;
-		this->index = index;
-		strcpy(this->type, type);
-		strcpy(this->name, name);
-	};
-
-	UInt64 id;
-	UInt32 size;
-	UInt32 index;
-	char type[80];
-	char name[80];
-	char pad[CL_SIZE - sizeof(uint64_t)*3 - sizeof(char *)*2];
-};
-
-class Catalog {
-public:
-	// abandoned init function
-	// field_size is the size of each each field.
-	Catalog() {
-		table_id = 0;
-		field_cnt = 0;
-		tuple_size = 0;
-	};
-	void init(const char * table_name, uint32_t table_id, int field_cnt);
-	void add_col(char * col_name, uint64_t size, char * type);
-
-	UInt32 			field_cnt;
-	char			table_name[20];
- 	uint32_t 	  table_id;
-
-	UInt32 get_tuple_size() {
-		return tuple_size;
-	};
-
-	uint64_t get_field_cnt() {
-		return field_cnt;
-	};
-	uint64_t get_field_size(int id) {
-		return _columns[id].size;
-	};
-	uint64_t get_field_index(int id) {
-		return _columns[id].index;
-	};
-	char * 			get_field_type(uint64_t id);
-	char * 			get_field_name(uint64_t id);
-	uint64_t 		get_field_id(const char * name);
-	char * 			get_field_type(char * name);
-	uint64_t 		get_field_index(char * name);
-
-	void 			print_schema();
-	Column  		_columns[25];
-	UInt32 			tuple_size;
-private:
-	char pad[CL_SIZE - sizeof(uint64_t)*2 - sizeof(int) - sizeof(char *)*2 - sizeof(uint32_t)];
-};
-
-#else
-
 class Column {
 public:
 	Column() {
@@ -146,6 +82,4 @@ public:
 private:
 	char pad[CL_SIZE - sizeof(uint64_t)*2 - sizeof(int) - sizeof(char *)*2 - sizeof(uint32_t)];
 };
-#endif
-
 #endif

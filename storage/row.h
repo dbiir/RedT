@@ -22,8 +22,6 @@
 #include "routine.h"
 
 #define ROW_DEFAULT_SIZE 1000
-#include "row_rdma_cicada.h"
-
 
 #define DECL_SET_VALUE(type) void set_value(int col_id, type value);
 
@@ -52,54 +50,9 @@ class Row_lock;
 class Row_mvcc;
 class Row_ts;
 class Row_occ;
-class Row_ssi;
-class Row_wsi;
 class Row_maat;
 class Row_specex;
-class Row_dli_base;
-class Row_dta;
-class Row_wkdb;
-class Row_tictoc;
-class Row_si;
 class Row_null;
-class Row_silo;
-class Row_rdma_silo;
-class Row_rdma_mocc;
-class Row_rdma_mvcc;
-class rdma_mvcc;
-class Row_rdma_2pl;
-class Row_rdma_maat;
-class Row_rdma_ts1;
-class Row_rdma_ts;
-class Row_rdma_cicada;
-class Row_cicada;
-class Row_rdma_dslr_no_wait;
-
-//struct RdmaMVHis;
-
-struct RdmaMVHis {
-    uint64_t mutex;//lock
-    uint64_t rts;
-    uint64_t start_ts;
-    uint64_t end_ts;
-    uint64_t txn_id;
-    //RTS、start_ts、end_ts、txn-id：
-	char data[ROW_DEFAULT_SIZE];
-};
-
-#if CC_ALG == RDMA_TS
-class RdmaTS {
-public:
-	RdmaTS() {
-		txn_id_ = 0;
-		ts_ = 0;
-		commit_ = false;
-	}
-	uint64_t txn_id_;
-	uint64_t ts_;
-	bool commit_;
-};
-#endif
 
 class row_t {
 public:
@@ -155,117 +108,24 @@ public:
 	RC get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *access,uint64_t cor_id);
 	RC get_row_post_wait(access_t type, TxnManager * txn, row_t *& row);
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
-#if CC_ALG == RDMA_TS1 || CC_ALG == RDMA_TS
-	uint64_t return_row(yield_func_t &yield, access_t type, TxnManager *txn, Access *access, uint64_t cor_id);
-#endif
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
-    #if CC_ALG == RDMA_SILO
-        volatile uint64_t	_tid_word;  //lcok info ：txn_id
-        ts_t 			timestamp;
-        Row_rdma_silo * manager;
-	#elif CC_ALG == RDMA_MOCC
-		volatile uint64_t	_tid_word;
-		volatile uint64_t	is_hot;
-		volatile uint64_t 	lock_type;
-		volatile uint64_t 	ts[LOCK_LENGTH];
-		volatile uint64_t 	lock_owner[LOCK_LENGTH];
-		// volatile uint64_t 	conflict_num;
-		ts_t				timestamp;
-		Row_rdma_mocc * manager;
-	#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT2 || CC_ALG == RDMA_WAIT_DIE2
-		volatile uint64_t _tid_word; //RDMA_NO_WAIT2: only 0 or 1; RDMA_WAIT_DIE2: only 0 or ts
-		volatile uint64_t lock_owner; //解锁
-		Row_rdma_2pl * manager;
-    #elif CC_ALG == RDMA_DSLR_NO_WAIT
-        volatile uint64_t _tid_word; //read lock(4个16进制) | write lock | read txn | write txn
-		volatile uint64_t _reset_from;
-		Row_rdma_dslr_no_wait * manager;
-	#elif CC_ALG == RDMA_WOUND_WAIT2
-		volatile uint64_t _tid_word; //RDMA_WOUND_WAIT2: only 0 or ts
-		volatile uint64_t lock_owner; //解锁
-		Row_rdma_2pl * manager;
-	#elif CC_ALG == RDMA_WOUND_WAIT || CC_ALG == RDMA_WAIT_DIE
-		volatile uint64_t _tid_word;
-		volatile uint64_t lock_type;
-		volatile uint64_t ts[LOCK_LENGTH];
-		volatile uint64_t lock_owner[LOCK_LENGTH];
-		Row_rdma_2pl * manager;
-	#elif CC_ALG == RDMA_MAAT
-	    volatile uint64_t _tid_word;
-		Row_rdma_maat * manager;
-        uint64_t ucreads_len;
-        uint64_t ucwrites_len;
-		uint64_t timestamp_last_read;
-		uint64_t timestamp_last_write;
-		uint64_t uncommitted_reads[ROW_SET_LENGTH];
-		uint64_t uncommitted_writes[ROW_SET_LENGTH];
-	#elif CC_ALG == RDMA_CICADA
-		volatile uint64_t _tid_word;
-		RdmaCicadaVersion cicada_version[HIS_CHAIN_NUM];
-		Row_rdma_cicada * manager;
-		int64_t version_cnt;
-	#elif CC_ALG == CICADA
-		Row_cicada * manager;
-	#elif CC_ALG == RDMA_TS1
-		volatile uint64_t	mutx;
-		volatile uint64_t	tid[CASCADING_LENGTH];
-		ts_t wts;
-    	ts_t rts;
-		Row_rdma_ts1 * manager;
-	#elif CC_ALG == RDMA_TS
-		volatile uint64_t	mutx;
-		ts_t wts;
-    	ts_t rts;
-		uint32_t ur_size;
-		uint32_t up_size;
- 		RdmaTS ur[WAIT_QUEUE_LENGTH];
-		RdmaTS up[WAIT_QUEUE_LENGTH];
-		// RdmaTS uw[ROW_SET_LENGTH];
-		Row_rdma_ts * manager;
-	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN || CC_ALG == WOUND_WAIT
+	#if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT
 		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP
 	 	Row_ts * manager;
 	#elif CC_ALG == MVCC
 		Row_mvcc * manager;
-	#elif CC_ALG == RDMA_MVCC
-        volatile uint64_t	_tid_word;
-        uint64_t version_num;
-        //RdmaMVHis historyVer[HIS_CHAIN_NUM];
-        //char datas[HIS_CHAIN_NUM][ROW_DEFAULT_SIZE];
-        uint64_t txn_id[HIS_CHAIN_NUM];
-        uint64_t rts[HIS_CHAIN_NUM];
-        uint64_t start_ts[HIS_CHAIN_NUM];
-        uint64_t end_ts[HIS_CHAIN_NUM];
-		Row_rdma_mvcc *manager;
-	#elif CC_ALG == OCC || CC_ALG == BOCC || CC_ALG == FOCC
+	#elif CC_ALG == OCC 
 		Row_occ * manager;
-
-	#elif CC_ALG == DLI_BASE || CC_ALG == DLI_OCC
-		Row_dli_base *manager;
 	#elif CC_ALG == MAAT
 		Row_maat * manager;
-	#elif CC_ALG == WOOKONG
-		Row_wkdb * manager;
-	#elif CC_ALG == TICTOC
-		Row_tictoc * manager;
 	#elif CC_ALG == HSTORE_SPEC
 		Row_specex * manager;
 	#elif CC_ALG == AVOID
 		Row_avoid * manager;
-	#elif CC_ALG == DLI_MVCC_OCC || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
-		Row_si *manager;
-	#elif CC_ALG == DTA
-		Row_dta *manager;
-	#elif CC_ALG == SSI
-		Row_ssi * manager;
-	#elif CC_ALG == WSI
-		Row_wsi * manager;
 	#elif CC_ALG == CNULL
 		Row_null * manager;
-	#elif CC_ALG == SILO
-		Row_silo * manager;
 	#endif
 	int tuple_size;
 	table_t * table;
@@ -278,14 +138,7 @@ private:
 	bool part_info;
 	uint64_t _row_id;
 public:
-#if RDMA_ONE_SIDE == true// == CHANGE_MSG_QUEUE || USE_RDMA == CHANGE_TCP_ONLY
-	//#if CC_ALG != RDMA_MVCC
-    char data[1];
-	// char data[HIS_CHAIN_NUM * sizeof(get_row_size)]
-    //#endif
-#else
 	char * data;
-#endif
 };
 
 #endif

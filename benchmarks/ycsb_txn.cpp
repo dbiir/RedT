@@ -26,28 +26,16 @@
 #include "row.h"
 #include "index_hash.h"
 #include "index_btree.h"
-#include "index_rdma.h"
-#include "transport/rdma.h"
 #include "catalog.h"
 #include "manager.h"
 #include "row.h"
 #include "row_lock.h"
 #include "row_ts.h"
 #include "row_mvcc.h"
-#include "row_rdma_mvcc.h"
-#include "row_rdma_2pl.h"
-#include "row_rdma_ts1.h"
-#include "row_rdma_ts.h"
-#include "row_rdma_cicada.h"
-#include "rdma_mvcc.h"
-#include "rdma_ts1.h"
-#include "rdma_ts.h"
-#include "rdma_null.h"
 #include "mem_alloc.h"
 #include "query.h"
 #include "msg_queue.h"
 #include "message.h"
-#include "src/rdma/sop.hh"
 #include "qps/op.hh"
 #include "src/sshed.hh"
 #include "transport.h"
@@ -73,7 +61,7 @@ void YCSBTxnManager::reset() {
 
 RC YCSBTxnManager::acquire_locks() {
   	uint64_t starttime = get_sys_clock();
-	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+	assert(CC_ALG == CALVIN);
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	locking_done = false;
 	RC rc = RCOK;
@@ -239,7 +227,7 @@ RC YCSBTxnManager::send_remote_subtxn() {
 RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
-	assert(CC_ALG != CALVIN && CC_ALG != RDMA_CALVIN);
+	assert(CC_ALG != CALVIN);
 	// printf("centerID: %d\n", g_center_id);
 	if(IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
 		DEBUG("Running txn %ld\n",txn->txn_id);
@@ -300,7 +288,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 		// 	start_logging_time = get_sys_clock();
 		// }
 	}
-	if(IS_LOCAL(get_txn_id())) {  //for one-side rdma, must be local
+	if(IS_LOCAL(get_txn_id())) {  
 		if(is_done() && rc == RCOK) {
 			// printf("a txn is done\n");
 #if CC_ALG == WOUND_WAIT
@@ -386,55 +374,12 @@ void YCSBTxnManager::ycsb_batch_read(yield_func_t &yield,BatchReadType rtype, ui
  }
 #endif
 
-itemid_t* YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id) {
-	uint64_t part_id = _wl->key_to_part( req->key );
-  	uint64_t loc = GET_NODE_ID(part_id);
-	// printf("loc:%d and g_node_id:%d\n", loc, g_node_id);
-	assert(loc != g_node_id);
-	uint64_t thd_id = get_thd_id();
-
-	//get corresponding index
-  // uint64_t index_key = 0;
-	uint64_t index_key = req->key / g_node_cnt;
-	uint64_t index_addr = (index_key) * sizeof(IndexInfo);
-	uint64_t index_size = sizeof(IndexInfo);
-
-    itemid_t* item = read_remote_index(yield, loc, index_addr,req->key, cor_id);
-	return item;
-}
-
-RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_request * req, row_t *& row_local, uint64_t cor_id) {
-	// get the index of row to be operated
-	
-	itemid_t * m_item;
-#if BATCH_INDEX_AND_READ
-	m_item = reqId_index.find(next_record_id)->second;
-#else
-    m_item = ycsb_read_remote_index(yield, req, cor_id);
-#endif
-	uint64_t part_id = _wl->key_to_part( req->key );
-    uint64_t loc = GET_NODE_ID(part_id);
-	assert(loc != g_node_id);
-    
-    RC rc = RCOK;
-    uint64_t version = 0;
-
-	rc = get_remote_row(yield, req->acctype, loc, m_item, row_local, cor_id);
-	// mem_allocator.free(m_item, sizeof(itemid_t));
-	return rc;
-}
-
-
 RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
 	ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,dest_node_id));
-#if USE_RDMA == CHANGE_MSG_QUEUE
-	tport_man.rdma_thd_send_msg(get_thd_id(), dest_node_id, Message::create_message(this,RQRY));
-#else
     // DEBUG("ycsb send remote request %ld, %ld\n",txn->txn_id,txn->batch_id);
     msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),dest_node_id);
-#endif
 
 	return WAIT_REM;
 }
@@ -483,19 +428,10 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	RC rc = RCOK;
 	switch (state) {
 	case YCSB_0 :
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
-        // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
-		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
-			rc = Abort;
-		} else {
-#endif
 		if(loc) {
 			if(ycsb_query->requests[next_record_id]->acctype == WR && IS_LOCAL(get_txn_id())) 	
 				ycsb_query->partitions_modified.add_unique(part_id);
 			rc = run_ycsb_0(yield,req,row,cor_id);
-		} else if (rdma_one_side()) {
-			// printf("%ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
-			rc = send_remote_one_side_request(yield, req, row, cor_id);
 		} else {
 #if PARAL_SUBTXN == true
 			rc = RCOK;
@@ -503,13 +439,9 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			rc = send_remote_request();
 #endif
 		}
-#if CC_ALG == RDMA_WOUND_WAIT2 || CC_ALG == RDMA_WOUND_WAIT
-		}
-#endif
 	  break;
 	case YCSB_1 :
 		//read local row,for message queue by TCP/IP,write set has actually been written in this point,
-		//but for rdma, it was written in local, the remote data will actually be written when COMMIT
 		if(loc) {
 			rc = run_ycsb_1(req->acctype,row);  
 		} else {
@@ -538,9 +470,6 @@ RC YCSBTxnManager::run_ycsb_0(yield_func_t &yield,ycsb_request * req,row_t *& ro
   m_item = index_read(_wl->the_index, req->key, part_id);
   starttime = get_sys_clock();
   row_t * row = ((row_t *)m_item->location);
-  if (INDEX_STRUCT == IDX_RDMA) {
-    mem_allocator.free(m_item, sizeof(itemid_t));
-  }
   INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
   rc = get_row(yield,row, type,row_local,cor_id);
   return rc;
@@ -654,7 +583,7 @@ RC YCSBTxnManager::run_calvin_txn(yield_func_t &yield,uint64_t cor_id) {
 
 RC YCSBTxnManager::run_ycsb(yield_func_t &yield,uint64_t cor_id) {
   RC rc = RCOK;
-  assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+  assert(CC_ALG == CALVIN);
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
 
   for (uint64_t i = 0; i < ycsb_query->requests.size(); i++) {

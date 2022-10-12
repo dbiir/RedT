@@ -73,16 +73,6 @@ bool SimManager::timeout() {
 #endif
 }
 
-#ifdef USE_RDMA
-bool SimManager::client_timeout() {
-#if TIME_ENABLE
-  return (get_sys_clock() - run_starttime) >= g_done_timer + g_warmup_timer + 1000;
-#else
-  return (get_wall_clock() - run_starttime) >= g_done_timer + g_warmup_timer;
-#endif
-}
-#endif
-
 bool SimManager::is_done() {
 	bool done = sim_done || timeout();
 	if(done && !sim_done) {
@@ -90,16 +80,6 @@ bool SimManager::is_done() {
 	}
 	return done;
 }
-
-#ifdef USE_RDMA
-bool SimManager::is_client_done() {
-  bool done = sim_done || client_timeout();
-  if(done && !sim_done) {
-    set_done();
-  }
-  return done;
-}
-#endif
 
 bool SimManager::is_warmup_done() {
 	#if WORKLOAD == DA

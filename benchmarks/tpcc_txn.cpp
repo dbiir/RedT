@@ -24,14 +24,10 @@
 #include "row.h"
 #include "index_hash.h"
 #include "index_btree.h"
-#include "index_rdma.h"
 #include "tpcc_const.h"
 #include "transport.h"
 #include "msg_queue.h"
-#include "row_rdma_2pl.h"
 #include "message.h"
-#include "rdma.h"
-#include "src/rdma/sop.hh"
 #include "qps/op.hh"
 #include "src/sshed.hh"
 #include "transport.h"
@@ -82,7 +78,7 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
 
-#if CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN
+#if CC_ALG == CALVIN
 	rc = run_calvin_txn(yield, cor_id);//run_calvin_txn();
 	return rc;
 #endif
@@ -102,13 +98,6 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	while(rc == RCOK && !is_done()) {
 		rc = run_txn_state(yield, cor_id);
 	}
-#if CC_ALG == RDMA_WOUND_WAIT2
-        // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
-		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
-			// printf("read local WOUND_ABORTING:%ld\n", txn->txn_id);
-			rc = Abort;
-		}
-#endif
 	uint64_t curr_time = get_sys_clock();
 	txn_stats.process_time += curr_time - starttime;
 	txn_stats.process_time_short += curr_time - starttime;
@@ -156,7 +145,7 @@ bool TPCCTxnManager::is_done() {
 
 RC TPCCTxnManager::acquire_locks() {
 	uint64_t starttime = get_sys_clock();
-	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+	assert(CC_ALG == CALVIN);
 	locking_done = false;
 	RC rc = RCOK;
 	RC rc2;
@@ -449,11 +438,8 @@ RC TPCCTxnManager::send_remote_request() {
 	TPCCQueryMessage * msg = (TPCCQueryMessage*)Message::create_message(this,RQRY);
 	msg->state = state;
 	query->partitions_touched.add_unique(GET_PART_ID(0,dest_node_id));
-#if USE_RDMA == CHANGE_MSG_QUEUE
-    tport_man.rdma_thd_send_msg(get_thd_id(), dest_node_id, msg);
-#else
 	msg_queue.enqueue(get_thd_id(),msg,dest_node_id);
-#endif
+
 	state = next_state;
 	return WAIT_REM;
 }
@@ -470,109 +456,6 @@ void TPCCTxnManager::copy_remote_items(TPCCQueryMessage * msg) {
 		msg->items.add(req);
 	}
 }
-itemid_t* TPCCTxnManager::tpcc_read_remote_index(TPCCQuery * query) {
-    TPCCQuery* tpcc_query = (TPCCQuery*) query;
-	uint64_t w_id = tpcc_query->w_id;
-	uint64_t d_id = tpcc_query->d_id;
-	uint64_t c_id = tpcc_query->c_id;
-	uint64_t d_w_id = tpcc_query->d_w_id;
-	uint64_t c_w_id = tpcc_query->c_w_id;
-	uint64_t c_d_id = tpcc_query->c_d_id;
-    uint64_t ol_i_id = 0;
-	uint64_t ol_supply_w_id = 0;
-	uint64_t ol_quantity = 0;
-	if(tpcc_query->txn_type == TPCC_NEW_ORDER) {
-			ol_i_id = tpcc_query->items[next_item_id]->ol_i_id;
-			ol_supply_w_id = tpcc_query->items[next_item_id]->ol_supply_w_id;
-			ol_quantity = tpcc_query->items[next_item_id]->ol_quantity;
-	}
-
-    uint64_t part_id_w = wh_to_part(w_id);
-	uint64_t part_id_c_w = wh_to_part(c_w_id);
-	uint64_t part_id_ol_supply_w = wh_to_part(ol_supply_w_id);
-	uint64_t w_loc = GET_NODE_ID(part_id_w);
-    uint64_t remote_offset = 0;
-    int key = 0;
-    uint64_t loc = w_loc; 
-    switch(state){
-        	case TPCC_PAYMENT0 ://operate table WH
-                key = w_id/w_loc;
-                loc = GET_NODE_ID(wh_to_part(w_id));
-                remote_offset = item_index_size + (w_id/w_loc)*sizeof(IndexInfo);
-                break;
-            case TPCC_PAYMENT4 ://operate table CUSTOMER
-                if(query->by_last_name){
-                    key = custKey(c_id, c_d_id, c_w_id);
-                                                               // return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id );
-                    remote_offset = item_index_size + wh_index_size + dis_index_size + cust_index_size 
-                                    + (key ) * sizeof(IndexInfo);
-                }else{
-                    key = custKey(c_id, c_d_id, c_w_id);
-                                                               // return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id );
-                    remote_offset = item_index_size + wh_index_size + dis_index_size 
-                                    + (key ) * sizeof(IndexInfo);
-                }
-                loc = GET_NODE_ID(wh_to_part(c_w_id));
-                break;
-            case TPCC_NEWORDER0 ://operate table WH
-                key = w_id/w_loc;
-                loc = GET_NODE_ID(wh_to_part(w_id));
-                remote_offset = item_index_size + (w_id/w_loc )*sizeof(IndexInfo);
-                break;
-            case TPCC_NEWORDER8 ://operate table STOCK
-                key = stockKey(ol_i_id, ol_supply_w_id);
-                loc = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
-                //loc = GET_NODE_ID(part_id_ol_supply_w);
-                remote_offset = item_index_size + wh_index_size + dis_index_size + cust_index_size + cl_index_size
-                                + (key ) * sizeof(IndexInfo);
-                break;
-    }
-    
-	assert(loc != g_node_id);
-   // printf("【tpcc.cpp:451】read index key = %ld \n",key);
-    itemid_t *item = read_remote_index(loc,remote_offset,key);
-
-	return item;
-}
-
-RC TPCCTxnManager::send_remote_one_side_request(yield_func_t &yield, TPCCQuery * query,row_t *& row_local, uint64_t cor_id){
-    RC rc = RCOK;
-	// get the index of row to be operated
-	itemid_t * m_item;
-	m_item = tpcc_read_remote_index(query);
-
-    TPCCQuery* tpcc_query = (TPCCQuery*) query;
-	uint64_t w_id = tpcc_query->w_id;
-    uint64_t part_id_w = wh_to_part(w_id);
-    uint64_t w_loc = GET_NODE_ID(part_id_w);
-    uint64_t c_w_id = tpcc_query->c_w_id;
-
-    uint64_t loc = w_loc;
-    if(state == TPCC_PAYMENT0) {
-		loc = GET_NODE_ID(wh_to_part(w_id));
-	} else if(state == TPCC_PAYMENT4) {
-		loc = GET_NODE_ID(wh_to_part(c_w_id));
-	} else if(state == TPCC_NEWORDER0) {
-		loc = GET_NODE_ID(wh_to_part(w_id));
-	} else if(state == TPCC_NEWORDER8) {
-		loc = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
-    }
-	assert(loc != g_node_id);
-
-    uint64_t remote_offset = m_item->offset;
-
-    access_t type;
-    uint64_t version = 0;
-    uint64_t lock = get_txn_id() + 1;
-
-    if (g_wh_update) type = WR;
-    else type = RD;
-	rc = get_remote_row(yield, type, loc, m_item, row_local, cor_id);
-	query->partitions_touched.add_unique(GET_PART_ID(0,loc));
-	// mem_allocator.free(m_item, sizeof(itemid_t));
-	return rc;
-}
-
 
 RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	uint64_t starttime = get_sys_clock();
@@ -610,27 +493,17 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
 	INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
-#if CC_ALG == RDMA_WOUND_WAIT2
-        // printf("read local WOUNDState:%ld\n", rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id));
-		if(rdma_txn_table.local_get_state(get_thd_id(),txn->txn_id) == WOUND_ABORTING) {
-			// printf("read local WOUND_ABORTING:%ld\n", txn->txn_id);
-			rc = Abort;
-			return rc;
-		}
-#endif
+
 	switch (state) {
 		case TPCC_PAYMENT0 :
 			if(w_loc)
 				rc = run_payment_0(yield,w_id, d_id, d_w_id, h_amount, row,cor_id);
-			else if(rdma_one_side()){//rdma_silo
-				rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
-			}
 			else {
-			#if PARAL_SUBTXN == true
-				rc = RCOK;
-			#else
-				rc = send_remote_request();
-			#endif
+				#if PARAL_SUBTXN == true
+					rc = RCOK;
+				#else
+					rc = send_remote_request();
+				#endif
 			}
 			break;
 		case TPCC_PAYMENT1 :
@@ -644,15 +517,13 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			break;
 		case TPCC_PAYMENT4 :
 			if(c_w_loc)
-					rc = run_payment_4(yield, w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row,cor_id);
-			else if(rdma_one_side()){//rdma_silo
-				rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
-			}else {
-			#if PARAL_SUBTXN == true
-				rc = RCOK;
-			#else
-				rc = send_remote_request();
-			#endif
+				rc = run_payment_4(yield, w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row,cor_id);
+			else {
+				#if PARAL_SUBTXN == true
+					rc = RCOK;
+				#else
+					rc = send_remote_request();
+				#endif
 			}
 			break;
 		case TPCC_PAYMENT5 :
@@ -660,15 +531,13 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			break;
 		case TPCC_NEWORDER0 :
 			if(w_loc)
-					rc = new_order_0( yield,w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row,cor_id);
-			else if(rdma_one_side()){//rdma_silo
-				rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
-			}else {
-			#if PARAL_SUBTXN == true
-				rc = RCOK;
-			#else
-				rc = send_remote_request();
-			#endif
+				rc = new_order_0( yield,w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row,cor_id);
+			else {
+				#if PARAL_SUBTXN == true
+					rc = RCOK;
+				#else
+					rc = send_remote_request();
+				#endif
 			}
 			break;
 		case TPCC_NEWORDER1 :
@@ -697,14 +566,12 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		case TPCC_NEWORDER8 :
 			if(ol_supply_w_loc) {
 				rc = new_order_8(yield,w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,row,cor_id);
-			}else if(rdma_one_side()){//rdma_silo
-				rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
 			} else {
-			#if PARAL_SUBTXN == true
-				rc = RCOK;
-			#else
-				rc = send_remote_request();
-			#endif
+				#if PARAL_SUBTXN == true
+					rc = RCOK;
+				#else
+					rc = send_remote_request();
+				#endif
 			}
 			break;
 		case TPCC_NEWORDER9 :
@@ -1299,7 +1166,7 @@ RC TPCCTxnManager::run_calvin_txn(yield_func_t &yield, uint64_t cor_id) {
 RC TPCCTxnManager::run_tpcc_phase2(yield_func_t &yield, uint64_t cor_id) {
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	RC rc = RCOK;
-	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+	assert(CC_ALG == CALVIN);
 
 	uint64_t w_id = tpcc_query->w_id;
 	uint64_t d_id = tpcc_query->d_id;
@@ -1358,7 +1225,7 @@ RC TPCCTxnManager::run_tpcc_phase2(yield_func_t &yield, uint64_t cor_id) {
 RC TPCCTxnManager::run_tpcc_phase5(yield_func_t &yield, uint64_t cor_id) {
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	RC rc = RCOK;
-	assert(CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN);
+	assert(CC_ALG == CALVIN);
 
 	uint64_t w_id = tpcc_query->w_id;
 	uint64_t d_id = tpcc_query->d_id;

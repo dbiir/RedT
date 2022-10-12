@@ -18,23 +18,6 @@
 #include "global.h"
 #include "helper.h"
 
-#if RDMA_ONE_SIDE == true
-void Catalog::init(const char* table_name, uint32_t table_id, int field_cnt) {
-	strcpy(this->table_name,table_name);
-	// this->table_name = table_name;
-	this->table_id = table_id;
-	this->field_cnt = 0;
-	this->tuple_size = 0;
-	for (int i = 0; i < 25; i++) {
-		memset(_columns[i].type, 0, 80);
-		memset(_columns[i].name, 0, 80);
-		memset(_columns[i].pad, 0, CL_SIZE - sizeof(uint64_t)*3 - sizeof(char *)*2);
-		_columns[i].id = 0;
-		_columns[i].index = 0;
-		_columns[i].size = 0;
-	}
-}
-#else
 void Catalog::init(const char* table_name, uint32_t table_id, int field_cnt) {
 	this->table_name = table_name;
 	this->table_id = table_id;
@@ -42,9 +25,6 @@ void Catalog::init(const char* table_name, uint32_t table_id, int field_cnt) {
 	this->_columns = new Column [field_cnt];
 	this->tuple_size = 0;
 }
-#endif
-
-
 
 void Catalog::add_col(char * col_name, uint64_t size, char * type) {
 	_columns[field_cnt].size = size;

@@ -23,7 +23,6 @@
 #include "row.h"
 #include "index_hash.h"
 #include "index_btree.h"
-#include "index_rdma.h"
 #include "catalog.h"
 #include "manager.h"
 #include "row_lock.h"
@@ -212,9 +211,6 @@ void * YCSBWorkload::init_table_slice() {
 		uint64_t idx_key = primary_key;
 
 		rc = the_index->index_insert(idx_key, m_item, part_id);
-    if (INDEX_STRUCT == IDX_RDMA) {
-      mem_allocator.free(m_item, sizeof(itemid_t));
-    }
 		assert(rc == RCOK);
 #if USE_REPLICA
         key ++;

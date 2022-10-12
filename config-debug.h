@@ -99,8 +99,8 @@
 /***********************************************/
 // Concurrency Control
 /***********************************************/
-// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT, WOOKONG, RDMA_SILO, RDMA_NO_WAIT, RDMA_NO_WAIT2
-#define CC_ALG RDMA_NO_WAIT2
+// WAIT_DIE, NO_WAIT, TIMESTAMP, MVCC, CALVIN, MAAT
+#define CC_ALG NO_WAIT
 
 #define ISOLATION_LEVEL SERIALIZABLE
 #define YCSB_ABORT_MODE false
@@ -119,7 +119,7 @@
 #define ENABLE_LATCH        false
 #define CENTRAL_INDEX       false
 #define CENTRAL_MANAGER       false
-#define INDEX_STRUCT        IDX_RDMA
+#define INDEX_STRUCT        IDX_HASH
 
 #define BTREE_ORDER         16
 
@@ -296,7 +296,6 @@ enum PPSTxnType {
 // INDEX_STRUCT
 #define IDX_HASH          1
 #define IDX_BTREE         2
-#define IDX_RDMA          3
 
 // WORKLOAD
 #define YCSB            1

@@ -30,7 +30,6 @@
 #include "message.h"
 #include "stats.h"
 #include <boost/lockfree/queue.hpp>
-#include "rdma_calvin.h"
 
 void Sequencer::init(Workload * wl) {
 	next_txn_id = 0;
@@ -90,7 +89,7 @@ void Sequencer::process_ack(Message * msg, uint64_t thd_id) {
 			DAClientQueryMessage* cl_msg = (DAClientQueryMessage*)wait_list[id].msg;
 #endif
 #if WORKLOAD == PPS
-		if (WORKLOAD == PPS && (CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN) &&
+		if (WORKLOAD == PPS && (CC_ALG == CALVIN) &&
 				((cl_msg->txn_type == PPS_GETPARTBYSUPPLIER) ||
 				 (cl_msg->txn_type == PPS_GETPARTBYPRODUCT) || (cl_msg->txn_type == PPS_ORDERPRODUCT)) &&
 				(cl_msg->recon || ((AckMessage *)msg)->rc == Abort)) {
@@ -162,11 +161,8 @@ void Sequencer::process_ack(Message * msg, uint64_t thd_id) {
 			ClientResponseMessage *rsp_msg =
 					(ClientResponseMessage *)Message::create_message(msg->get_txn_id(), CL_RSP);
 					rsp_msg->client_startts = wait_list[id].client_startts;
-#if USE_RDMA == CHANGE_MSG_QUEUE
-                	tport_man.rdma_thd_send_msg(thd_id, wait_list[id].client_id, rsp_msg);
-#else
 					msg_queue.enqueue(thd_id, rsp_msg, wait_list[id].client_id);
-#endif
+
 #if WORKLOAD == PPS
 			}
 #endif
@@ -244,7 +240,7 @@ void Sequencer::process_txn(Message *msg, uint64_t thd_id, uint64_t early_start,
 		msg->return_node_id = g_node_id;
 		msg->lat_network_time = 0;
 		msg->lat_other_time = 0;
-#if  (CC_ALG == CALVIN || CC_ALG == RDMA_CALVIN)  && WORKLOAD == PPS
+#if  (CC_ALG == CALVIN)  && WORKLOAD == PPS
 		PPSClientQueryMessage* cl_msg = (PPSClientQueryMessage*) msg;
 		if (cl_msg->txn_type == PPS_GETPARTBYSUPPLIER || cl_msg->txn_type == PPS_GETPARTBYPRODUCT ||
 						cl_msg->txn_type == PPS_ORDERPRODUCT) {
@@ -285,64 +281,6 @@ void Sequencer::process_txn(Message *msg, uint64_t thd_id, uint64_t early_start,
 }
 
 // Assumes 1 thread does sequencer work
-#if CC_ALG == RDMA_CALVIN
-void Sequencer::send_next_batch(uint64_t thd_id) {
-	uint64_t prof_stat = get_sys_clock();
-	qlite_ll * en = wl_tail;
-	bool empty = true;
-	if(en && en->epoch == simulation->get_seq_epoch()) {
-		DEBUG("SEND NEXT BATCH %ld [%ld,%ld] %ld\n", thd_id, simulation->get_seq_epoch(), en->epoch,
-					en->size);
-		empty = false;
-
-		en->batch_send_time = prof_stat;
-	}
-	Message * msg = NULL;
-	sched_queue * temp_queue = NULL;
-	for(uint64_t j = 0; j < g_node_cnt; j++) {
-		if(j == g_node_id) {
-			temp_queue = calvin_man.rdma_sched_queue[j];
-
-			while(fill_queue[j].pop(msg)) {
-				assert(ISSERVERN(msg->return_node_id));
-				temp_queue->add_txnentry(thd_id, msg);
-			}
-			temp_queue->add_RDONE(thd_id);
-		}	
-		else {
-			assert(j != g_node_id);
-			temp_queue = (sched_queue *)mem_allocator.alloc(sizeof(sched_queue));
-			calvin_man.read_remote_queue(thd_id,temp_queue,j);
-			
-			//可以使用door-bell优化
-			while(fill_queue[j].pop(msg)) {
-				assert(ISSERVERN(msg->return_node_id));
-				temp_queue->write_entry(thd_id, msg, j);
-				// temp_queue->write_rear(thd_id, j);
-			}
-			msg = Message::create_message(RDONE);
-			temp_queue->write_entry(thd_id, msg, j);
-			temp_queue->write_rear(thd_id, j);
-			mem_allocator.free(temp_queue,sizeof(sched_queue));
-		}
-		if(!empty) {
-			DEBUG("Seq RDONE %ld\n",simulation->get_seq_epoch())
-		}
-	}
-	if(last_time_batch > 0) {
-		INC_STATS(thd_id,seq_batch_time,get_sys_clock() - last_time_batch);
-	}
-	last_time_batch = get_sys_clock();
-
-	INC_STATS(thd_id,seq_batch_cnt,1);
-	if(!empty) {
-		INC_STATS(thd_id,seq_full_batch_cnt,1);
-	}
-	INC_STATS(thd_id,seq_prep_time,get_sys_clock() - prof_stat);
-	next_txn_id = 0;
-}
-
-#else
 void Sequencer::send_next_batch(uint64_t thd_id) {
 	uint64_t prof_stat = get_sys_clock();
 	qlite_ll * en = wl_tail;
@@ -361,11 +299,7 @@ void Sequencer::send_next_batch(uint64_t thd_id) {
 			if(j == g_node_id) {
 					work_queue.sched_enqueue(thd_id,msg);
 			} else {
-#if USE_RDMA == CHANGE_MSG_QUEUE
-                tport_man.rdma_thd_send_msg(thd_id, j, msg);
-#else
 				msg_queue.enqueue(thd_id, msg, j);
-#endif
 			}
 		}
 		if(!empty) {
@@ -376,11 +310,7 @@ void Sequencer::send_next_batch(uint64_t thd_id) {
 		if(j == g_node_id) {
 			work_queue.sched_enqueue(thd_id,msg);
 		} else {
-#if USE_RDMA == CHANGE_MSG_QUEUE
-            tport_man.rdma_thd_send_msg(thd_id, j, msg);
-#else
 			msg_queue.enqueue(thd_id, msg, j);
-#endif
 		}
 	}
 
@@ -396,4 +326,3 @@ void Sequencer::send_next_batch(uint64_t thd_id) {
 	INC_STATS(thd_id,seq_prep_time,get_sys_clock() - prof_stat);
 	next_txn_id = 0;
 }
-#endif
