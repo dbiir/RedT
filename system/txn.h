@@ -206,8 +206,6 @@ public:
 	uint64_t num_msgs_prep;
 	uint64_t num_msgs_commit;	
 
-	bool send_RQRY_RSP;
-
 #if CC_ALG == WOUND_WAIT
 	TxnStatus		txn_state;
 #endif
@@ -297,7 +295,7 @@ public:
 	bool unset_ready() {return ATOM_CAS(txn_ready,1,0);}
 	bool is_ready() {return txn_ready == true;}
 	volatile int txn_ready;
-	volatile bool finish_logging;
+	volatile bool finish_read_write;
 
 	// Calvin
 	uint32_t lock_ready_cnt;

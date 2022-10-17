@@ -485,14 +485,17 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
 
       ready_starttime = get_sys_clock();
-      bool ready = txn_man->unset_ready(); 
-      // bool ready;
-      // if((msg->rtype == RQRY || msg->rtype == RFIN || msg->rtype == RPREPARE) && msg->current_abort_cnt > txn_man->txn_stats.abort_cnt){
+
+      bool ready;
+      // if((msg->rtype == RQRY || msg->rtype == RPREPARE || msg->rtype == RFIN) && msg->current_abort_cnt > txn_man->txn_stats.abort_cnt){
       //   ready = false;
       // }
-      // else if(msg->rtype == RFIN && !txn_man->finish_logging) ready = false;
-      // else ready = txn_man->unset_ready(); 
+      // else 
+      if(msg->rtype == RFIN && !txn_man->finish_read_write) ready = false;
+      else ready = txn_man->unset_ready(); 
+
       INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
+      
       if(!ready) {
         // Return to work queue, end processing
         work_queue.enqueue(get_thd_id(),msg,true);
@@ -533,17 +536,16 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG("RFIN %ld\n",msg->get_txn_id());
   assert(CC_ALG != CALVIN);
-
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()), "RFIN local: %ld %ld/%d\n", msg->get_txn_id(),
              msg->get_txn_id() % g_node_cnt, g_node_id);
 #if CC_ALG == MAAT
   txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
 #endif
+  txn_man->abort_cnt = msg->current_abort_cnt;
   if(((FinishMessage*)msg)->rc == Abort) {
     txn_man->abort(yield, cor_id);
     txn_man->reset();
     txn_man->reset_query();
-    txn_man->abort_cnt = msg->current_abort_cnt;
     // printf("%d:%d send abort finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));  
     msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN),
                       GET_NODE_ID(msg->get_txn_id()));
@@ -562,7 +564,6 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
   txn_man->commit(yield, cor_id);
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
   if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT)
-    txn_man->abort_cnt = msg->current_abort_cnt;
 
 #if TAPIR_DEBUG
     printf("%d:%d send commit finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
@@ -903,60 +904,46 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
 #if TAPIR_DEBUG
   printf("%d receive rqry rsp messages from %d\n", txn_man->get_txn_id(), msg->return_node_id);
 #endif
+
 #if PARAL_SUBTXN == true
   if (!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) return RCOK;
-  if(((QueryResponseMessage*)msg)->rc == Abort) {
-    txn_man->start_abort(yield, cor_id);
-    return Abort;
-  }
+
   int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
-  // if(responses_left < 0) {
-  //     printf("%d receive extra messages %d\n", txn_man->get_txn_id(), responses_left);
-  // }
-  // if(responses_left < 0) {
-  //   return RCOK;
-  // }
   assert(responses_left >=0);
-  //  if(!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt || txn_man->get_commit_timestamp() != 0) {
-  //   return RCOK;
-  // }
+  
+  if(!txn_man->aborted && ((QueryResponseMessage*)msg)->rc == Abort) {
+    txn_man->start_abort(yield, cor_id);
+  }
+
   if (responses_left > 0) return WAIT;
+  //Done Waiting
+  txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
+  INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - txn_man->start_rw_time);
+  INC_STATS(get_thd_id(), trans_read_write_count, 1);
+  // printf("enter prepare phase %ld\n", get_sys_clock() - txn_man->start_rw_time);
+  // printf("read/write time %ld\n", get_sys_clock() - txn_man->start_rw_time);
+  txn_man->start_logging_time = get_sys_clock();
+
+  RC rc = txn_man->get_rc();
+  if(rc == RCOK){
+#if CC_ALG == WOUND_WAIT
+        txn_state = STARTCOMMIT;
 #endif
+    rc = txn_man->start_commit(yield, cor_id);
+  }
+#else
   txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
   
   if(((QueryResponseMessage*)msg)->rc == Abort) {
     txn_man->start_abort(yield, cor_id);
     return Abort;
   }
-  txn_man->send_RQRY_RSP = false;
   RC rc = ((QueryResponseMessage*)msg)->rc;
-#if PARAL_SUBTXN
-	if(IS_LOCAL(txn_man->get_txn_id())) {  
-    
-		INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - txn_man->start_rw_time);
-    INC_STATS(get_thd_id(), trans_read_write_count, 1);
-    // printf("enter prepare phase %ld\n", get_sys_clock() - txn_man->start_rw_time);
-    // printf("read/write time %ld\n", get_sys_clock() - txn_man->start_rw_time);
-		txn_man->start_logging_time = get_sys_clock();
-		if(rc == RCOK && !txn_man->aborted) {
-			// printf("a txn is done\n");
-#if CC_ALG == WOUND_WAIT
-      		txn_state = STARTCOMMIT;
-#endif
-			rc = txn_man->start_commit(yield, cor_id);
-		}
-		else if(rc == Abort) rc = txn_man->start_abort(yield, cor_id);
-  } else if(rc == Abort){
-    assert(false);
-		rc = txn_man->abort(yield, cor_id);
-	}
-#else
   rc = txn_man->run_txn(yield, cor_id);
 #endif
 
   check_if_done(rc);
   return rc;
-
 }
 
 RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_id) {
@@ -977,8 +964,7 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 #if CC_ALG == MAAT
     time_table.init(get_thd_id(),txn_man->get_txn_id());
 #endif
-  txn_man->send_RQRY_RSP = true;
-  txn_man->finish_logging = true;
+  txn_man->finish_read_write = true;
   txn_man->abort_cnt = msg->current_abort_cnt;
   rc = txn_man->run_txn(yield, cor_id);
   txn_man->abort_cnt = msg->current_abort_cnt;
@@ -995,7 +981,6 @@ RC WorkerThread::process_rqry_cont(yield_func_t &yield, Message * msg, uint64_t 
   RC rc = RCOK;
 
   txn_man->run_txn_post_wait();
-  txn_man->send_RQRY_RSP = false;
   rc = txn_man->run_txn(yield, cor_id);
 
   // Send response
@@ -1013,7 +998,6 @@ RC WorkerThread::process_rtxn_cont(yield_func_t &yield, Message * msg, uint64_t 
   txn_man->txn_stats.local_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
 
   txn_man->run_txn_post_wait();
-  txn_man->send_RQRY_RSP = false;
   RC rc = txn_man->run_txn(yield, cor_id);
   check_if_done(rc);
   return RCOK;
@@ -1192,8 +1176,6 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     fflush(stdout);
   #endif
   // Execute transaction
-  txn_man->send_RQRY_RSP = false;
-
   if (is_cl_o) {
     rc = txn_man->send_remote_request();
   } else {

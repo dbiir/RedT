@@ -354,7 +354,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	num_msgs_rw = 0;
 	num_msgs_prep = 0;
 	num_msgs_commit = 0;
-	finish_logging=false;
+	finish_read_write = false;
 }
 
 // reset after abort
@@ -374,7 +374,7 @@ void TxnManager::reset() {
 	num_msgs_rw = 0;
 	num_msgs_prep = 0;
 	num_msgs_commit = 0;
-	finish_logging=false;
+	finish_read_write = false;
 #if USE_TAPIR
 	for(int i = 0; i < g_node_cnt; i++) {
 		ir_log_rsp_cnt[i] = 0;
@@ -504,9 +504,6 @@ RC TxnManager::abort(yield_func_t &yield, uint64_t cor_id) {
 	}
 	aborted = true;
 	release_locks(yield, Abort, cor_id);
-#if DEBUG_PRINTF
-	// printf("---thd %lu txn %lu，release_lock(Abort) end.\n",get_thd_id(), get_txn_id());
-#endif
 #if CC_ALG == MAAT
 	//assert(time_table.get_state(get_txn_id()) == MAAT_ABORTED);
 	time_table.release(get_thd_id(),get_txn_id());
@@ -602,19 +599,16 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	if(local_log){
 		log_replica(g_node_id, false);
 	}
-
 	if(rsp_cnt != 0 || log_rsp_cnt!=0){
 		return WAIT_REM;
 	}
-	assert(query->readonly());
-	assert(query->partitions_modified.size() == 0);	
 #else
 	// printf("%d query_partitions_modified size: %d\n", get_txn_id(), query->partitions_modified.size());
 	if(query->partitions_modified.size() != 0)
-		return WAIT_REM;
+		return WAIT_REM;	
+#endif
 	assert(query->readonly());
 	assert(query->partitions_modified.size() == 0);	
-#endif
 #endif
 
 	if(is_multi_part()) {
@@ -654,7 +648,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
 		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
-		if(rc == RCOK){   //for NO_WAIT , rc == RCOK
+		if(rc == RCOK){ 
 			// printf("commit transaction\n");
 			// if(IS_LOCAL(get_txn_id())) {
 			// 	INC_STATS(get_thd_id(), trans_logging_count, 1);
@@ -1495,7 +1489,6 @@ void TxnManager::log_replica(uint64_t ret_nid,bool finish) {
 		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RLOG),f2);
 	}
 	txn_stats.log_start_time = get_sys_clock();
-	
 }
 
 RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
@@ -1503,7 +1496,7 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 	return RCOK;
 #endif
 	if (CC_ALG != OCC && CC_ALG != MAAT) {
-		return RCOK; //no validate in NO_WAIT
+		return RCOK;
 	}
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();

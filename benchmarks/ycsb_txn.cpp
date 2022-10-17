@@ -93,54 +93,97 @@ RC YCSBTxnManager::acquire_locks() {
 	return rc;
 }
 
-RC YCSBTxnManager::send_remote_subtxn() {
-	YCSBQuery* ycsb_query = (YCSBQuery*) query;
-	RC rc = RCOK;
-
-	unordered_set<uint64_t> at;
-	unordered_set<uint64_t> bt;
-	unordered_set<uint64_t> ct;
-	uint64_t aa[g_center_cnt];	//write primary
-	uint64_t bb[g_center_cnt];	//read primary
-	uint64_t cc[g_center_cnt];	//write secondary
+void YCSBTxnManager::get_num_msgs_statistics() {
+	//node location of replicas
+	unordered_set<uint64_t> w_pry_loc;
+	unordered_set<uint64_t> r_pry_loc;
+	unordered_set<uint64_t> w_sec_loc;
+	//note: each node is counted only once, with priority in descending order.
+	uint64_t w_pry_num[g_center_cnt];	//num of nodes with primary replicas to write, in each center
+	uint64_t r_pry_num[g_center_cnt];	//num of nodes with primary replicas to read, in each center
+	uint64_t w_sec_num[g_center_cnt];	//num of nodes with secondary replicas to write, in each center
+	for(uint64_t i=0;i<g_center_cnt;i++){
+		w_pry_num[i] = 0; r_pry_num[i] = 0; w_sec_num[i] = 0;
+	}
+	//TAPIR may read from the nearest replica
 	unordered_set<uint64_t> read_to_reduce; 
 	uint64_t reduce_cnt = 0;
-	for(uint64_t i=0;i<g_center_cnt;i++){
-		aa[i] = 0; bb[i] = 0; cc[i] = 0;
-	}
-
-	bool is_primary[g_node_cnt]; //is center_master has primary replica or not
-	// int remote_replica_node[g_node_cnt];
+	
+	//get location
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	for(int i = 0; i < ycsb_query->requests.size(); i++) {
-		// next_record_id++;
 		ycsb_request * req = ycsb_query->requests[i];
 		uint64_t part_id = _wl->key_to_part(req->key);
-		vector<uint64_t> node_id;
-#if USE_REPLICA	
 		if(req->acctype == WR){
-			at.insert(GET_NODE_ID(part_id));
-			ct.insert(GET_FOLLOWER1_NODE(part_id));
-			ct.insert(GET_FOLLOWER2_NODE(part_id));
+			w_pry_loc.insert(GET_NODE_ID(part_id));
+			w_sec_loc.insert(GET_FOLLOWER1_NODE(part_id));
+			w_sec_loc.insert(GET_FOLLOWER2_NODE(part_id));
 		}else if(req->acctype == RD){
-			bt.insert(GET_NODE_ID(part_id));
+			r_pry_loc.insert(GET_NODE_ID(part_id));
 			if(GET_CENTER_ID(GET_NODE_ID(part_id)) != g_center_id && (GET_CENTER_ID(GET_FOLLOWER1_NODE(part_id)) == g_center_id || GET_CENTER_ID(GET_FOLLOWER2_NODE(part_id)) == g_center_id)){
 				read_to_reduce.insert(GET_NODE_ID(part_id));
 			}
 		}else assert(false);
-		// node_id.push_back(GET_NODE_ID(part_id));
-		// node_id.push_back(GET_FOLLOWER1_NODE(part_id));
-		// node_id.push_back(GET_FOLLOWER2_NODE(part_id));		
-#else
-		node_id.push_back(GET_NODE_ID(part_id));		
-#endif
-#if USE_TAPIR && TAPIR_REPLICA
-		for(int j = 0; j < node_id.size(); j++) {
-			// remote_replica_node[j] = 1;
-			ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id[j]));
+	}
+	
+	//get num of nodes per center
+	for(int j=0;j<g_node_cnt;j++){
+		if(w_pry_loc.count(j) > 0){
+			w_pry_num[GET_CENTER_ID(j)]++;
+		}else if(r_pry_loc.count(j) > 0){
+			r_pry_num[GET_CENTER_ID(j)]++;
+			if(read_to_reduce.count(j)>0) reduce_cnt++;				
+		}else if(w_sec_loc.count(j) > 0){
+			w_sec_num[GET_CENTER_ID(j)]++;
 		}
-		if(req->acctype == WR) ycsb_query->partitions_modified.add_unique(_wl->key_to_part(ycsb_query->requests[i]->key));
+	}
+	
+	//get number of messages
+	assert(num_msgs_rw==0);
+	assert(num_msgs_prep==0);
+	assert(num_msgs_commit==0);
+#if USE_TAPIR	
+	for(uint64_t i=0;i<g_center_cnt;i++){
+		if(i != g_center_id){
+			num_msgs_rw += w_pry_num[i] + r_pry_num[i];
+			num_msgs_prep += w_pry_num[i] + w_sec_num[i];
+			num_msgs_commit += w_pry_num[i] + r_pry_num[i] + w_sec_num[i];
+		}
+	}
+	assert(num_msgs_rw >= reduce_cnt);
+	num_msgs_rw -= reduce_cnt;
+#else 
+	for(uint64_t i=0;i<g_center_cnt;i++){
+		if(i == g_center_id){
+			num_msgs_prep += 2*w_pry_num[i];
+			num_msgs_commit += 2*w_pry_num[i];
+		}else{
+			num_msgs_rw += w_pry_num[i] + r_pry_num[i];
+			num_msgs_prep += 3*w_pry_num[i];
+			num_msgs_commit += 3*w_pry_num[i] + r_pry_num[i];
+		}
+	}
+#endif 
+
+}
+
+RC YCSBTxnManager::send_remote_subtxn() {
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	RC rc = RCOK;
+
+	for(int i = 0; i < ycsb_query->requests.size(); i++) {
+		ycsb_request * req = ycsb_query->requests[i];
+		uint64_t part_id = _wl->key_to_part(req->key);
+		//only primary replica is considered here, in r/w
+		uint64_t node_id = GET_NODE_ID(part_id);
+
+		ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id));
+		if(req->acctype == WR) ycsb_query->partitions_modified.add_unique(part_id);
+		remote_node[node_id].push_back(i);
 	}
 	rsp_cnt = query->partitions_touched.size() - 1;
+
+#if USE_TAPIR && TAPIR_REPLICA
 	#if TAPIR_DEBUG
 		printf("send %d rqry %d messages\n",get_txn_id(), rsp_cnt);
 	#endif
@@ -151,76 +194,19 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	#endif
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),query->partitions_touched[i]);
 		}
-		
 	}
-		// for(int i = 0; i < g_node_cnt; i++) {
-		// if(i != g_node_id && remote_node[i].size() > 0) {//send message to all masters
-		// 	remote_next_node_id = i;
-		// 	// printf("%d \n",remote_node[i].size());
-		// 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
-		// 	// printf("send subtxn to %d\n", i);
-		// }
 #else
-		uint64_t n_id = GET_NODE_ID(part_id);
-		remote_node[n_id].push_back(i);
-		// ycsb_query->centers_touched.add_unique(center_id);
-		ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,n_id));
-		//center_master is set as the first toughed primary, if not exist, use the first toughed backup.
-		// auto ret = center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id[j]));
-		if(req->acctype == WR) ycsb_query->partitions_modified.add_unique(_wl->key_to_part(ycsb_query->requests[i]->key));
-	}
-	
-	for(int j=0;j<g_node_cnt;j++){
-		if(at.count(j) > 0){
-			aa[GET_CENTER_ID(j)]++;
-		}else if(bt.count(j) > 0){
-			bb[GET_CENTER_ID(j)]++;
-			if(read_to_reduce.count(j)>0) reduce_cnt++;				
-		}else if(ct.count(j) > 0){
-			cc[GET_CENTER_ID(j)]++;
-		}
-	}
-	rsp_cnt = query->partitions_touched.size() - 1;
-	assert(num_msgs_rw==0);
 	for(int i = 0; i < g_node_cnt; i++) {
 		if(i != g_node_id && remote_node[i].size() > 0) {//send message to all masters
 			remote_next_node_id = i;
-			// printf("%d \n",remote_node[i].size());
-#if TAPIR_DEBUG
+	#if TAPIR_DEBUG
 			printf("send %d rqry message to node:%d \n",get_txn_id(), i);
-#endif
-			num_msgs_rw++;
+	#endif
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
-			// printf("txn %ld send subtxn to %d\n", get_txn_id(), i);
 		}
 	}
 #endif
-	// printf("txn %d send subtxn success \n", get_txn_id());
-	assert(num_msgs_prep==0);
-	assert(num_msgs_commit==0);
-#if USE_TAPIR	
-	assert(num_msgs_rw >= reduce_cnt);
-	num_msgs_rw -= reduce_cnt;
-	for(uint64_t i=0;i<g_center_cnt;i++){
-		if(i != g_center_id){
-			num_msgs_prep += aa[i] + cc[i];
-			num_msgs_commit += aa[i] + bb[i] + cc[i];
-		}
-	}
-#else 
-	// uint64_t temp_num_msgs_rw;
-	for(uint64_t i=0;i<g_center_cnt;i++){
-		if(i == g_center_id){
-			num_msgs_prep += 2*aa[i];
-			num_msgs_commit += 2*aa[i];
-		}else{
-			num_msgs_prep += 3*aa[i];
-			num_msgs_commit += 3*aa[i] + bb[i];
-			// temp_num_msgs_rw += aa[i] + bb[i];
-		}
-	}
-	// assert(temp_num_msgs_rw == num_msgs_rw);
-#endif 
+	get_num_msgs_statistics();
 	return rc;
 }
 
@@ -228,13 +214,8 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
 	assert(CC_ALG != CALVIN);
-	// printf("centerID: %d\n", g_center_id);
 	if(IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
 		DEBUG("Running txn %ld\n",txn->txn_id);
-#if DEBUG_PRINTF
-		// printf("[txn start]txn：%d，ts：%lu\n",txn->txn_id,get_timestamp());
-#endif
-		//query->print();
 		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
 #if PARAL_SUBTXN
 		rc = send_remote_subtxn();
@@ -244,12 +225,6 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	
 	uint64_t starttime = get_sys_clock();
 
-#if BATCH_INDEX_AND_READ
-	//batch read all index for remote access
-	ycsb_batch_read(yield,R_INDEX,cor_id);
-	//batch read all row for remote access
-	ycsb_batch_read(yield,R_ROW,cor_id);
-#endif
 	while(rc == RCOK && !is_done()) {
 #if CC_ALG == WOUND_WAIT
 		if (txn_state == WOUNDED) {
@@ -263,10 +238,6 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	if (txn_state == WOUNDED) 
 		rc = Abort;
 #endif
-#if BATCH_INDEX_AND_READ
-	reqId_index.erase(reqId_index.begin(),reqId_index.end());
-	reqId_row.erase(reqId_row.begin(),reqId_row.end());
-#endif
 
     if(rc == Abort) total_num_atomic_retry++;
 	uint64_t curr_time = get_sys_clock();
@@ -274,35 +245,24 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time_short += curr_time - starttime;
 	txn_stats.wait_starttime = get_sys_clock();
 
-	// if(IS_LOCAL(get_txn_id())) {
-	// 	INC_STATS(get_thd_id(), trans_read_write_count, 1);
-	// 	INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - start_rw_time);
-	// 	start_logging_time = get_sys_clock();
-	// }
-	if(rsp_cnt > 0) {
-		return WAIT;
-	} else {
-		// if(IS_LOCAL(get_txn_id())) {
-		// 	INC_STATS(get_thd_id(), trans_read_write_count, 1);
-		// 	INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - start_rw_time);
-		// 	start_logging_time = get_sys_clock();
-		// }
+	if(!IS_LOCAL(get_txn_id())){
+		if(rc == Abort) rc = abort(yield, cor_id);
+		return rc;
 	}
-	if(IS_LOCAL(get_txn_id())) {  
-		if(is_done() && rc == RCOK) {
-			// printf("a txn is done\n");
+
+	if(rc == Abort){
+		rc = start_abort(yield, cor_id);
+	}else{
+		if(rsp_cnt > 0) return WAIT;
+		if(is_done()){
 #if CC_ALG == WOUND_WAIT
-      		txn_state = STARTCOMMIT;
+			txn_state = STARTCOMMIT;
 #endif
 			rc = start_commit(yield, cor_id);
 		}
-		else if(rc == Abort)
-		rc = start_abort(yield, cor_id);
-	} else if(rc == Abort){
-		rc = abort(yield, cor_id);
 	}
-// #endif
-  return rc;
+
+	return rc;
 }
 
 RC YCSBTxnManager::run_txn_post_wait() {
@@ -317,11 +277,7 @@ RC YCSBTxnManager::run_txn_post_wait() {
 }
 
 bool YCSBTxnManager::is_done() { 
-// #if PARAL_SUBTXN
-// 	return (next_record_id >= ((YCSBQuery*)query)->requests.size() && rsp_cnt == 0);
-// #else
 	return next_record_id >= ((YCSBQuery*)query)->requests.size();
-// #endif
 }
 
 void YCSBTxnManager::next_ycsb_state() {
@@ -347,32 +303,6 @@ void YCSBTxnManager::next_ycsb_state() {
 bool YCSBTxnManager::is_local_request(uint64_t idx) {
   return GET_NODE_ID(_wl->key_to_part(((YCSBQuery*)query)->requests[idx]->key)) == g_node_id;
 }
-
-#if BATCH_INDEX_AND_READ
-void YCSBTxnManager::ycsb_batch_read(yield_func_t &yield,BatchReadType rtype, uint64_t cor_id){
-  	YCSBQuery* ycsb_query = (YCSBQuery*) query;
-	vector<vector<uint64_t>> remote_index(g_node_cnt);
-
-	for(int i=0;i<ycsb_query->requests.size();i++){
-		ycsb_request * req = ycsb_query->requests[i];
-		uint64_t part_id = _wl->key_to_part( req->key );
-		uint64_t loc = GET_NODE_ID(part_id);
-		if(loc != g_node_id){  //remote
-			remote_index[loc].push_back(i);
-		}
-	}
-	for(int i=0;i<g_node_cnt;i++){
-		if(remote_index[i].size()>0){
-			batch_read(yield, rtype, i, remote_index, cor_id);
-		}
-	}
-	for(int i=0;i<g_node_cnt;i++){
-		if(remote_index[i].size()>0){
-			get_batch_read(yield, rtype,i, remote_index, cor_id);
-		}
-	}
- }
-#endif
 
 RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;

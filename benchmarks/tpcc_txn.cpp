@@ -363,8 +363,6 @@ RC TPCCTxnManager::generate_center_master(uint64_t w_id, access_t type) {
 	uint64_t n_id = GET_NODE_ID(wh_to_part(w_id));
 	remote_node[n_id].push_back(1);
 	tpcc_query->partitions_touched.add_unique(GET_PART_ID(0,n_id));
-	//center_master is set as the first toughed primary, if not exist, use the first toughed backup.
-	// auto ret = center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id[j]));
 	if(type == WR) tpcc_query->partitions_modified.add_unique(wh_to_part(w_id));
 }
 

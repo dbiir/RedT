@@ -83,8 +83,8 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 1
-#define NODE_CNT 1
+#define CENTER_CNT 2
+#define NODE_CNT 4
 #define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -119,14 +119,14 @@
 // # of transactions to run for warmup
 #define WARMUP            0
 // YCSB or TPCC or PPS or DA
-#define WORKLOAD TPCC
+#define WORKLOAD YCSB
 // print the transaction latency distribution
 #define PRT_LAT_DISTR false
 #define STATS_ENABLE        true
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 80
+#define MAX_TXN_IN_FLIGHT 10000
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -186,10 +186,9 @@
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
 
-#define DEBUG_PRINTF  false
 #define USE_REPLICA true
-#define USE_TAPIR true
-#define MAJORITY false
+#define USE_TAPIR false
+#define MAJORITY true
 #define INTER_DC_CONTROL true
 
 #define TAPIR_DEBUG false
@@ -323,10 +322,10 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 65536
-#define ZIPF_THETA 0.3
-#define TXN_WRITE_PERC 0.2
-#define TUP_WRITE_PERC 0.2
+#define SYNTH_TABLE_SIZE 16777216
+#define ZIPF_THETA 0.2
+#define TXN_WRITE_PERC 0.5
+#define TUP_WRITE_PERC 1
 #define SCAN_PERC           0
 #define SCAN_LEN          20
 #define PART_PER_TXN 4
@@ -352,7 +351,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL       false
 #define WH_UPDATE         true
-#define NUM_WH 64
+#define NUM_WH 32
 #define TPCC_INDEX_NUM 700 000 
 // % of transactions that access multiple partitions
 #define MPR 1.0
@@ -387,7 +386,7 @@ enum DATxnType {
 #define MAX_DA_TABLE_SIZE 10000
 extern TPCCTxnType g_tpcc_txn_type;
 //#define TXN_TYPE          TPCC_ALL
-#define PERC_PAYMENT 1.0
+#define PERC_PAYMENT 0.0
 #define FIRSTNAME_MINLEN      8
 #define FIRSTNAME_LEN         16
 #define LASTNAME_LEN        16

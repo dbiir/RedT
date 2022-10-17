@@ -1,7 +1,7 @@
 NO_WAIT 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
-203.219401
+194275.575322
 0.0
-484.586248
-477.177569
-268.630477
+219918.394903
+230866.307584
+39888.329022
