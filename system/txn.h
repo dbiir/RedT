@@ -167,10 +167,11 @@ public:
 	void            set_start_timestamp(uint64_t start_timestamp);
 	ts_t            get_start_timestamp();
 	uint64_t        get_rsp_cnt() {return rsp_cnt;}
+	uint64_t        get_fin_rsp_cnt() {return fin_rsp_cnt;}
 	uint64_t        get_log_rsp_cnt() {return log_rsp_cnt;}
 	uint64_t        get_log_fin_rsp_cnt() {return log_fin_rsp_cnt;}
 	bool	        get_local_log() {return local_log;}
-	bool			need_finish_log();	
+	void			set_local_log(bool ll) {local_log = ll;}
 	uint64_t        incr_rsp(int i);
 	uint64_t        decr_rsp(int i);
 	uint64_t        incr_lr();
@@ -186,6 +187,15 @@ public:
     uint64_t get_part_num(uint64_t num,uint64_t part);
 
     bool get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn);
+
+	bool has_local_write() {
+		uint64_t row_cnt = txn->accesses.get_count();
+		assert(row_cnt == txn->row_cnt);
+		for (int rid = row_cnt - 1; rid >= 0; rid --) {
+			if(txn->accesses[rid]->type == WR) return true;
+		}
+		return false;
+	};
 
 	bool isRecon() {
 		assert(CC_ALG == CALVIN || !recon);
@@ -212,7 +222,7 @@ public:
 	bool aborted;
 	uint64_t return_id;
 	RC        validate(yield_func_t &yield, uint64_t cor_id);
-	void log_replica(uint64_t ret_nid, bool finish);
+	void log_replica(RemReqType req_type, uint64_t ret_nid);
 	uint64_t get_return_node();
 	void            cleanup(yield_func_t &yield, RC rc, uint64_t cor_id);
 	void            cleanup_row(yield_func_t &yield, RC rc,uint64_t rid, vector<vector<uint64_t>>&remote_access, uint64_t cor_id);
@@ -278,6 +288,7 @@ public:
 	uint64_t get_abort_cnt() {return abort_cnt;}
 	uint64_t abort_cnt;
 	int received_response(RC rc);
+	int received_fin_response(RC rc);
 	int received_log_response(RC rc);
 	int received_log_fin_response(RC rc);
 	int received_tapir_response(RC rc, uint64_t return_node_id);
@@ -317,6 +328,7 @@ public:
 protected:
 
 	int rsp_cnt;
+	int fin_rsp_cnt; //to not confuse early abort rsp_cnt, and read/write rsp_cnt.
 	int log_rsp_cnt;
 	int log_fin_rsp_cnt;
 	bool local_log;

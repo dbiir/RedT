@@ -245,6 +245,16 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time_short += curr_time - starttime;
 	txn_stats.wait_starttime = get_sys_clock();
 
+	// printf("xxx txn %lu exe, rc = %d, local_write %d\n", get_txn_id(), rc, has_local_write());
+
+#if EARLY_PREPARE
+	if(rc == RCOK && has_local_write()){
+		//send log message
+		log_replica(RLOG, GET_NODE_ID(get_txn_id()));
+		return WAIT;
+	}
+#endif
+
 	if(!IS_LOCAL(get_txn_id())){
 		if(rc == Abort) rc = abort(yield, cor_id);
 		return rc;
@@ -323,13 +333,8 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 		YCSBQuery::copy_request_to_msg(ycsb_query,msg,i);
 	}
 #else
-	uint64_t remote_node_id = remote_next_node_id;
-	uint64_t record_id = remote_node[remote_node_id][0];
-	uint64_t index = 0;
-	while(index < remote_node[remote_node_id].size()) {
-		YCSBQuery::copy_request_to_msg(ycsb_query,msg,record_id);
-		index++;
-		record_id = remote_node[remote_node_id][index];
+	for(uint64_t& i: remote_node[remote_next_node_id]){
+		YCSBQuery::copy_request_to_msg(ycsb_query,msg,i);
 	}
 #endif
 #else

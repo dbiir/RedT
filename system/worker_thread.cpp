@@ -259,7 +259,7 @@ void WorkerThread::calvin_wrapup(yield_func_t &yield, uint64_t cor_id) {
 
 // Can't use txn_man after this function
 void WorkerThread::commit() {
-
+  // printf("xxx txn %lu commit\n", txn_man->get_txn_id());
   total_local_txn_commit++;
   total_num_msgs_rw += txn_man->num_msgs_rw;
   total_num_msgs_prep += txn_man->num_msgs_prep;
@@ -309,7 +309,7 @@ void WorkerThread::abort() {
   DEBUG("ABORT %ld -- %f\n", txn_man->get_txn_id(),
         (double)get_sys_clock() - run_starttime / BILLION);
   // TODO: TPCC Rollback here
-
+	// printf("xxx txn %lu abort\n", txn_man->get_txn_id());
   ++txn_man->abort_cnt;
   txn_man->reset();
 
@@ -542,7 +542,18 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
   txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
 #endif
   txn_man->abort_cnt = msg->current_abort_cnt;
+  txn_man->set_rc(((FinishMessage*)msg)->rc);
+
+#if USE_REPLICA && !USE_TAPIR
+  if(txn_man->get_local_log()){
+    txn_man->log_replica(RFIN_LOG, GET_NODE_ID(msg->get_txn_id()));
+    RC rc = WAIT_REM;
+    return rc;
+  }
+#endif
+  
   if(((FinishMessage*)msg)->rc == Abort) {
+	  // printf("xxx txn %lu send rack_fin, rc = %d\n", txn_man->get_txn_id(), txn_man->get_rc());
     txn_man->abort(yield, cor_id);
     txn_man->reset();
     txn_man->reset_query();
@@ -553,24 +564,16 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
   }
 
 //now commit 
-#if USE_REPLICA && !USE_TAPIR
-  if(txn_man->need_finish_log()){
-    txn_man->log_replica(GET_NODE_ID(msg->get_txn_id()),true);
-    RC rc = WAIT_REM;
-    return rc;
-  }
-#endif
-
   txn_man->commit(yield, cor_id);
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
   if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT)
-
 #if TAPIR_DEBUG
     printf("%d:%d send commit finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
 #endif
     msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN),
                       GET_NODE_ID(msg->get_txn_id()));
   // release_txn_man();
+	// printf("xxx txn %lu send rack_fin, rc = %d\n", txn_man->get_txn_id(), txn_man->get_rc());
 
   return RCOK;
 }
@@ -619,22 +622,30 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
 			uint64_t prepare_timespan  = finish_start_time - txn_man->txn_stats.prepare_start_time;
       
       INC_STATS(get_thd_id(), trans_logging_count, 1);
-      assert(txn_man->start_logging_time!=0);
+      // assert(txn_man->start_logging_time!=0);
       // printf("logging time %lu", get_sys_clock() - txn_man->start_logging_time);
       INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - txn_man->start_logging_time);
       txn_man->start_fin_time = get_sys_clock();
 			
 			// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
       // INC_STATS(get_thd_id(), trans_prepare_count, 1);
-      assert(!txn_man->query->readonly());
+#if EARLY_PREPARE
+      if(txn_man->get_rc()==Abort) return Abort;
+      // if(txn_man->aborted) return Abort;
+#else
+      assert(txn_man->get_rc()==RCOK);
+#endif
       txn_man->send_finish_messages();
-      
       assert(txn_man->get_local_log());
-      txn_man->log_replica(g_node_id,true); 
+      txn_man->log_replica(RFIN_LOG, g_node_id); 
       rc = WAIT_REM;
       return rc;
     }else{
       DEBUG("%d:%d send rack prep to %d\n", g_node_id, txn_man->get_txn_id(), txn_man->get_return_node());
+#if EARLY_PREPARE
+	    // printf("xxx txn %lu send rack_prep, rc = %d\n", txn_man->get_txn_id(), txn_man->get_rc());
+      txn_man->finish_read_write = true;
+#endif
       msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man,RACK_PREP),txn_man->get_return_node());
     }    
   }
@@ -669,16 +680,29 @@ RC WorkerThread::process_rack_fin_log(yield_func_t &yield, Message * msg, uint64
 #else
   if(responses_left == 0){
 #endif
-    txn_man->commit(yield, cor_id);
-  	if(txn_man->get_return_node() == g_node_id){
-      if(txn_man->get_rsp_cnt() > 0) return WAIT;
+
+    bool is_local = txn_man->get_return_node() == g_node_id;
+    RC txn_rc = txn_man->get_rc();
+  
+  	if(is_local){
+      if(txn_rc == RCOK) txn_man->commit(yield, cor_id);
+      else txn_man->abort(yield, cor_id);
+      if(txn_man->get_fin_rsp_cnt() > 0) return WAIT;
       //finish
-      assert(txn_man->get_rc() == RCOK);
       txn_man->txn_stats.twopc_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
-      commit();
+      if(txn_rc == RCOK) {
+        commit();
+      }
+      else abort();
     }else{
-      // printf("%d:%d send rack fin to %d\n", g_node_id, txn_man->get_txn_id(), txn_man->get_return_node());
-      msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man,RACK_FIN),txn_man->get_return_node());
+  	  // printf("xxx txn %lu send rack_fin, rc = %d\n", txn_man->get_txn_id(), txn_man->get_rc());
+      if(txn_rc == RCOK) txn_man->commit(yield, cor_id);
+      else{
+        txn_man->abort(yield, cor_id);
+        txn_man->reset();
+        txn_man->reset_query();
+      }  
+      msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN), txn_man->get_return_node());      
       // release_txn_man();
     }    
   }
@@ -772,6 +796,18 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   txn_man->find_tid_silo(max_tid);
 #endif
 
+#if EARLY_PREPARE
+  if(txn_man->get_rc() == Abort && !txn_man->aborted) {
+    txn_man->send_finish_messages();
+    if(txn_man->get_local_log()){
+      txn_man->log_replica(RFIN_LOG, g_node_id); 
+      // rc = WAIT_REM;
+      // return rc;
+    }else
+      txn_man->abort(yield, cor_id);
+  }
+#endif
+
   if (responses_left > 0) return WAIT;
 #if !USE_TAPIR
 #if MAJORITY
@@ -781,9 +817,6 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #endif
 #endif
   // Done waiting
-#if USE_REPLICA
-  assert(txn_man->get_rc() == RCOK);
-#endif
   if(txn_man->get_rc() == RCOK) {
     rc = txn_man->validate(yield, cor_id);
   }
@@ -803,7 +836,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     txn_man->txn->rc = Abort;
     rc = Abort;
   }
-  #if USE_TAPIR
+#if USE_TAPIR
   // printf("prepare %d\n", txn_man->txn_state);
   if(txn_man->txn_state == 1) {
     txn_man->send_finish_messages();
@@ -811,16 +844,35 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   } else {
     return rc;
   }
-  #else
-    txn_man->send_finish_messages();
-  #endif
   if(rc == Abort) {
     txn_man->abort(yield, cor_id);
+  }else{
+    // if(txn_man->query->partitions_touched.size() != 0)
+      txn_man->commit(yield, cor_id);
+  }
+  return rc;
+#endif
+
+  if(rc == Abort) {
+#if !EARLY_PREPARE
+    txn_man->send_finish_messages();
+    txn_man->abort(yield, cor_id);
+#else
+    // if(!txn_man->aborted) {
+    //   txn_man->send_finish_messages();
+    //   if(txn_man->get_local_log()){
+    //     txn_man->log_replica(RFIN_LOG, g_node_id); 
+    //     rc = WAIT_REM;
+    //     return rc;
+    //   }else
+    //     txn_man->abort(yield, cor_id);
+    // }
+#endif
   } else {
-#if USE_REPLICA && !USE_TAPIR
-		assert(!txn_man->query->readonly());
+    txn_man->send_finish_messages();
+#if USE_REPLICA
     if(txn_man->get_local_log()){
-      txn_man->log_replica(g_node_id,true); 
+      txn_man->log_replica(RFIN_LOG, g_node_id); 
       rc = WAIT_REM;
       return rc;
     }else{
@@ -854,7 +906,7 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
   // }
   // if (responses_left == 0) printf("%d recive commit %d message\n",txn_man->get_txn_id(), txn_man->commit_count);
 #else
-  responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+  responses_left = txn_man->received_fin_response(((AckMessage*)msg)->rc);
   assert(responses_left >=0);
   
 #endif
@@ -964,13 +1016,18 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 #if CC_ALG == MAAT
     time_table.init(get_thd_id(),txn_man->get_txn_id());
 #endif
-  txn_man->finish_read_write = true;
   txn_man->abort_cnt = msg->current_abort_cnt;
   rc = txn_man->run_txn(yield, cor_id);
-  txn_man->abort_cnt = msg->current_abort_cnt;
+
   // Send response
-  if(rc != WAIT) {
+  if(rc != WAIT){
+	  // printf("xxx txn %lu send rack_prep, rc = %d\n", txn_man->get_txn_id(), txn_man->get_rc());
+    txn_man->finish_read_write = true;
+#if EARLY_PREPARE
+    msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),txn_man->return_id);
+#else
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),txn_man->return_id);
+#endif
   }
   return rc;
 }
@@ -1019,7 +1076,7 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
     return rc;
 #else
-    txn_man->log_replica(msg->return_node_id,false);
+    txn_man->log_replica(RLOG, msg->return_node_id);
     rc = WAIT_REM;
     return rc;
 #endif

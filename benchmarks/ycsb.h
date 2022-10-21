@@ -76,9 +76,6 @@ private:
   RC mvcc_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC send_timestamp_remote_one_side_request(ycsb_request * req,row_t *& row_local);
-#if BATCH_INDEX_AND_READ
-  void ycsb_batch_read(yield_func_t &yield,BatchReadType rtype, uint64_t cor_id);
-#endif
   itemid_t* ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id);
   // itemid_t* co_ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id);
 //   itemid_t* read_remote_index(ycsb_request * req);

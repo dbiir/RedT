@@ -85,7 +85,7 @@
 /***********************************************/
 #define CENTER_CNT 2
 #define NODE_CNT 4
-#define THREAD_CNT 10
+#define THREAD_CNT 20
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -126,7 +126,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 10000
+#define MAX_TXN_IN_FLIGHT 80
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -190,6 +190,7 @@
 #define USE_TAPIR false
 #define MAJORITY true
 #define INTER_DC_CONTROL true
+#define EARLY_PREPARE true
 
 #define TAPIR_DEBUG false
 #define TAPIR_REPLICA false
@@ -323,7 +324,7 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 16777216
-#define ZIPF_THETA 0.2
+#define ZIPF_THETA 0.7
 #define TXN_WRITE_PERC 0.5
 #define TUP_WRITE_PERC 1
 #define SCAN_PERC           0
