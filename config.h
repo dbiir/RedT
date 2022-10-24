@@ -105,7 +105,7 @@
 #define SECOND 200 // Set the queue monitoring time.
 // #define THD_ID_QUEUE
 #define ONE_NODE_RECIEVE 0 // only node 0 will receive the txn query
-#define USE_WORK_NUM_THREAD false
+#define USE_WORK_NUM_THREAD true
 #if 1
 // #define LESS_DIS // Reduce the number of yCSB remote data to 1
 // #define LESS_DIS_NUM 0 // Reduce the number of yCSB remote data to 1
@@ -126,8 +126,8 @@
 // Simulation + Hardware
 /***********************************************/
 #define CENTER_CNT  4
-#define NODE_CNT 8
-#define THREAD_CNT 40
+#define NODE_CNT 4
+#define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -168,7 +168,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 320
+#define MAX_TXN_IN_FLIGHT 10000
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -207,7 +207,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 0UL
+#define NETWORK_DELAY 10000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -215,6 +215,8 @@
 #define PRIORITY PRIORITY_ACTIVE
 #define MSG_SIZE_MAX 4096
 #define MSG_TIME_LIMIT 0
+
+#define LOCK_LENGTH 10
 
 /***********************************************/
 // Concurrency Control
@@ -225,7 +227,7 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_NO_WAIT
+#define CC_ALG RDMA_NO_WAIT3
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -349,7 +351,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 8388608
+#define SYNTH_TABLE_SIZE 4194304
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 1
 #define TUP_WRITE_PERC 0.5
@@ -536,6 +538,7 @@ enum PPSTxnType {
 #define SILO 27
 #define CNULL 28
 #define RDMA_NO_WAIT 31
+#define RDMA_NO_WAIT3 32 // add owner list
 #define WOUND_WAIT 41
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1

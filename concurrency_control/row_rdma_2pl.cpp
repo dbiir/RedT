@@ -8,7 +8,7 @@
 #include "row_rdma_2pl.h"
 #include "global.h"
 
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 
 void Row_rdma_2pl::init(row_t * row){
 	_row = row;
@@ -46,7 +46,7 @@ bool Row_rdma_2pl::conflict_lock(uint64_t lock_info, lock_t l2, uint64_t& new_lo
 }
 
 RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row_t * row,uint64_t cor_id) {  //本地加锁
-	assert(CC_ALG == RDMA_NO_WAIT);
+	assert(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3);
     RC rc;
 #if CC_ALG == RDMA_NO_WAIT
     atomic_retry_lock:
@@ -91,6 +91,58 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
     #endif
         rc = RCOK;
     } 
+#endif
+#if CC_ALG == RDMA_NO_WAIT3
+    uint64_t retry_time = 0;
+    uint64_t loc = g_node_id;
+local_retry_lock:
+
+    uint64_t try_lock = -1;
+    uint64_t lock_type = 0;
+    retry_time ++;
+    try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txn->get_txn_id(),cor_id);
+    if(try_lock != 0 && !simulation->is_done()) {
+        // rc = Abort;
+        // return rc;
+        goto local_retry_lock;
+    }
+    lock_type = _row->lock_type;
+    if(lock_type == 0) {
+        uint64_t lock_index = txn->get_txn_id() % LOCK_LENGTH;
+        _row->lock_owner[lock_index] = txn->get_txn_id();
+        _row->lock_type = type == DLOCK_EX? 1:2;
+        // _row->_tid_word = 0;
+        rc = RCOK;
+    } else if(lock_type == 1 || type == DLOCK_EX) {
+        // printf("row_rdma_2pl:119\n");
+        _row->_tid_word = 0;
+        rc = Abort;
+        return rc;
+    } else {
+        uint64_t lock_index = txn->get_txn_id() % LOCK_LENGTH;
+        uint64_t try_time = 0;
+        while(try_time <= LOCK_LENGTH) {
+            // printf("row_rdma_2pl:125 try_time: %d\n", try_time);
+            // printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
+            if(_row->lock_owner[lock_index] == 0) {
+                _row->lock_owner[lock_index] = txn->get_txn_id();
+                _row->lock_type = _row->lock_type + 1;
+                // _row->_tid_word = 0;
+                rc = RCOK;
+                break;
+            }
+            lock_index = (lock_index + 1) % LOCK_LENGTH;
+            try_time ++;
+        }
+        if(try_time > LOCK_LENGTH) {
+            // printf("row_rdma_2pl:138\n");
+            _row->_tid_word = 0;
+            rc = Abort;
+            return rc;
+        }      
+    }
+    _row->_tid_word = 0;
+    // printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
 #endif
 	return rc;
 }

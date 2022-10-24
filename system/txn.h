@@ -49,7 +49,7 @@ public:
 	row_t * 	data;
 	row_t * 	orig_data;
 	uint64_t    version;
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 	uint64_t    location;   //node id of server the data location
 	uint64_t    offset;
 #endif
@@ -214,7 +214,7 @@ public:
 	void release_locks(yield_func_t &yield, RC rc, uint64_t cor_id);
 
 	bool rdma_one_side() {
-	if (CC_ALG == RDMA_NO_WAIT) return true;
+	if (CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3) return true;
 	else return false;
 	}
 
@@ -293,7 +293,7 @@ public:
 	#endif
 	bool send_RQRY_RSP;
 
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
     int             write_set[100];
     int*            read_set;
 	int				num_atomic_retry; //num of txn atomic_retry

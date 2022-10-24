@@ -642,7 +642,7 @@ RC YCSBTxnManager::run_ycsb(yield_func_t &yield,uint64_t cor_id) {
 
 #if USE_REPLICA
 RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
-	if(CC_ALG == RDMA_NO_WAIT){
+	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3){
 		assert(status != Abort);
 		status = RCOK;		
 	}
@@ -674,7 +674,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			node_id.push_back(GET_NODE_ID(part_id));
 		}
 		else if(status == Abort){ //validate fail, only log the primary replicas that have been locked
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 			// int sum = 0;
 			// for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
 			// if(sum>=num_locks) break;
@@ -695,7 +695,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			//for simulation purpose, only write back metadata here
 			//in actual application, data in req should also be written back
 			temp_row->_tid_word = 0;
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 			uint64_t op_size = sizeof(temp_row->_tid_word);
 			bool is_primary = (node_id[i] == GET_NODE_ID(part_id));
 			newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 

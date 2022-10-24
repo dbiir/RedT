@@ -1382,6 +1382,7 @@ obj/query.o: system/query.cpp system/query.h system/global.h config.h \
  transport/message.h system/logger.h system/worker_thread.h \
  system/thread.h system/routine.h system/wl.h benchmarks/creator.h \
  benchmarks/generic.h
+obj/recovery_manager.o: system/recovery_manager.cpp
 obj/sequencer.o: system/sequencer.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \

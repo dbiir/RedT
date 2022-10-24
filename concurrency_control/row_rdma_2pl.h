@@ -1,5 +1,5 @@
 
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 
 class Row_rdma_2pl{
 public:

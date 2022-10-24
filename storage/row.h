@@ -127,7 +127,14 @@ public:
 	#if CC_ALG == RDMA_NO_WAIT 
 		volatile uint64_t _tid_word; 
 		volatile uint64_t wts; //commit timestamp of the latest transaction that writes this item
-		volatile uint64_t lock_owner; //解锁
+		// volatile uint64_t lock_type;
+		// volatile uint64_t lock_owner[LOCK_LENGTH]; //解锁
+		Row_rdma_2pl * manager;
+	#elif CC_ALG == RDMA_NO_WAIT3
+		volatile uint64_t _tid_word; 
+		volatile uint64_t wts; //commit timestamp of the latest transaction that writes this item
+		volatile uint64_t lock_type;
+		volatile uint64_t lock_owner[LOCK_LENGTH]; //解锁
 		Row_rdma_2pl * manager;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT
 		Row_lock * manager;

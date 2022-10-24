@@ -70,6 +70,14 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 	_tid_word = 0;
 	wts = 0;
 #endif
+#if CC_ALG == RDMA_NO_WAIT3
+	_tid_word = 0;
+	wts = 0;
+	lock_type = 0;
+	for(int i = 0; i < LOCK_LENGTH; i++) {
+		lock_owner[i] = 0;
+	}
+#endif
 
 	return RCOK;
 }
@@ -96,7 +104,7 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_maat *) mem_allocator.align_alloc(sizeof(Row_maat));
 #elif CC_ALG == CNULL
 	manager = (Row_null *) mem_allocator.align_alloc(sizeof(Row_null));
-#elif CC_ALG == RDMA_NO_WAIT 
+#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
   manager = (Row_rdma_2pl *) mem_allocator.align_alloc(sizeof(Row_rdma_2pl));
 #endif
 
@@ -300,12 +308,12 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #endif
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == WOUND_WAIT
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == RDMA_NO_WAIT || CC_ALG == WOUND_WAIT || CC_ALG == RDMA_NO_WAIT3
   	uint64_t init_time = get_sys_clock();
 	//uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN) ? DLOCK_SH : DLOCK_EX; // ! this wrong !!
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-	#if CC_ALG!=RDMA_NO_WAIT
+	#if CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT3
 		rc = this->manager->lock_get(lt, txn);
 	#else
 		rc = this->manager->lock_get(yield,lt,txn,this,cor_id);
@@ -479,7 +487,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	}
 	this->manager->lock_release(txn);
 	return 0;
-#elif CC_ALG == RDMA_NO_WAIT
+#elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 	assert(row == NULL || row == this || type == XP);
 	if (ROLL_BACK && type == XP) {  // recover from previous writes.
 		this->copy(row);  //for abort of local txn ABORT, copy orig_data to orig_row. remote ABORT dont need this operate

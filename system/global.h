@@ -82,7 +82,7 @@ class Wkdb;
 class Tictoc;
 class Transport;
 class Rdma;
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 class RDMA_2pl;
 #endif
 #if USE_REPLICA
@@ -112,6 +112,8 @@ class DABlockQueue;
 class DtaTimeTable;
 class KeyXidCache;
 class Workload;
+class RouteTable;
+class NodeStatus;
 // class QTcpQueue;
 // class TcpTimestamp;
 
@@ -144,7 +146,7 @@ extern Wkdb wkdb_man;
 extern Tictoc tictoc_man;
 extern Transport tport_man;
 extern Rdma rdma_man;
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 extern RDMA_2pl r2pl_man;
 #endif
 #if USE_REPLICA
@@ -171,6 +173,8 @@ extern KeyXidCache dta_key_xid_cache;
 extern InOutTable inout_table;
 extern WkdbTimeTable wkdb_time_table;
 extern KeyXidCache wkdb_key_xid_cache;
+extern RouteTable route_table;
+extern NodeStatus node_status;
 // extern QTcpQueue tcp_queue;
 // extern TcpTimestamp tcp_ts;
 

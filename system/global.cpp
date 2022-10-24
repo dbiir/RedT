@@ -46,6 +46,7 @@
 #include "logger.h"
 #include "maat.h"
 #include "rdma_2pl.h"
+#include "route_table.h"
 #include "src/allocator_master.hh"
 //#include "rdma_ctrl.hpp"
 #include "lib.hh"
@@ -74,7 +75,7 @@ Maat maat_man;
 Transport tport_man;
 Rdma rdma_man;
 
-#if CC_ALG == RDMA_NO_WAIT
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 RDMA_2pl r2pl_man;
 #endif
 #if USE_REPLICA
@@ -96,6 +97,8 @@ Client_txn client_man;
 Sequencer seq_man;
 Logger logger;
 TimeTable time_table;
+RouteTable route_table;
+NodeStatus node_status;
 // QTcpQueue tcp_queue;
 // TcpTimestamp tcp_ts;
 
@@ -226,7 +229,7 @@ UInt64 max_tuple_size = 0;
 pthread_mutex_t * RDMA_MEMORY_LATCH;
 
 // UInt64 rdma_buffer_size = 4*(1024*1024*1024L);
-UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
+UInt64 rdma_buffer_size = 8*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 300*(1024*1024L);
 #if USE_REPLICA
 // UInt64 rdma_index_size = (10*1024*1024L*g_part_cnt);

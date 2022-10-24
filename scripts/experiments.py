@@ -528,20 +528,20 @@ def ycsb_network_delay():
 def ycsb_skew():
     wl = 'YCSB'
     nnodes = [4]
-    algos=['RDMA_NO_WAIT']
+    algos=['RDMA_NO_WAIT3']
     # base_table_size=1048576*10
     base_table_size=1048576  
     #base_table_size=2097152*8
 
-    txn_write_perc = [0.5]
+    txn_write_perc = [1]
     tup_write_perc = [0.5]
     load = [10000]
 
     tcnt = [4]  #THREAD_CNT
 
-    skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
+    # skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
     # skew = [0.25,0.55,0.65,0.75]
-    # skew = [0.2]
+    skew = [0.2]
     # skew = [0.0,0.1,0.2,0.3,0.4,0.5]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
@@ -1288,7 +1288,7 @@ configs = {
     "PART_CNT": "NODE_CNT",
     "PART_PER_TXN": 2,
     "MAX_TXN_IN_FLIGHT": 10000,
-    "NETWORK_DELAY": '100000000UL',
+    "NETWORK_DELAY": '10000UL',
     "NETWORK_DELAY_TEST": 'false',
     "DONE_TIMER": "1 * 30 * BILLION // ~1 minutes",
     "WARMUP_TIMER": "1 * 20 * BILLION // ~1 minutes",
