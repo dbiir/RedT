@@ -815,6 +815,19 @@ int TxnManager::received_response(RC rc) {
 	return rsp_cnt;
 }
 
+int TxnManager::received_response(AckMessage* msg, OpStatus state) {
+	uint64_t return_id = msg->return_node_id;
+	if (txn->rc == RCOK) txn->rc = msg->rc;
+	update_query_status(return_id,state);
+	RC result = check_query_status(state);
+	if (result == Abort) {
+		set_rc(Abort);
+		return 0;
+	}
+	if (result == RCOK) return 0;
+	return 1;
+}
+
 bool TxnManager::waiting_for_response() { return rsp_cnt > 0; }
 
 bool TxnManager::is_multi_part() {
