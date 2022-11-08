@@ -24,12 +24,14 @@ void LogEntry::set_entry(int ccnt,const vector<ChangeInfo>& cinfo, uint64_t sts)
     c_ts = 0;
     s_ts = sts; 
     change_cnt = ccnt;
-    assert(cinfo.size() == ccnt);
-    assert(cinfo.size()>0 && cinfo.size()<=CHANGE_PER_ENTRY);
-    for(int i=0;i<CHANGE_PER_ENTRY;i++){
-        if(i<cinfo.size()) change[i].set_change_info(cinfo[i]);
-        else change[i].set_change_info(0,0,nullptr,true);
-    }
+    if (ccnt != 0) {
+        assert(cinfo.size() == ccnt);
+        assert(cinfo.size()>0 && cinfo.size()<=CHANGE_PER_ENTRY);
+        for(int i=0;i<CHANGE_PER_ENTRY;i++){
+            if(i<cinfo.size()) change[i].set_change_info(cinfo[i]);
+            else change[i].set_change_info(0,0,nullptr,true);
+        }
+    } 
 }
 
 void LogEntry::init(){ //initialize during system startup    

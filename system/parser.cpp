@@ -179,7 +179,7 @@ void parser(int argc, char * argv[]) {
 			assert(false);
     }
 	}
-  g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_work_thread_cnt + g_async_redo_thread_cnt;
+  g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_work_thread_cnt + g_async_redo_thread_cnt + g_recover_thread_cnt;
   g_center_id = GET_CENTER_ID(g_node_id);
 #if LOGGING
   g_total_thread_cnt += g_logger_thread_cnt; // logger thread

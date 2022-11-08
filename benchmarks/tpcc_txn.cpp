@@ -458,6 +458,11 @@ RC TPCCTxnManager::send_remote_subtxn() {
 			// printf("txn %lu, send message to %d\n", get_txn_id(), center_master[i]);
 		}
 	}
+	#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
+	is_enqueue = true;
+	#endif
 	return rc;
 }
 
@@ -518,6 +523,11 @@ RC TPCCTxnManager::send_remote_request() {
 #endif
 #endif
 	state = next_state;
+	#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
+	is_enqueue = true;
+	#endif
 	return WAIT_REM;
 }
 
@@ -1611,6 +1621,110 @@ RC TPCCTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 
 			newEntry->set_entry(change_cnt[i],change[i],get_start_timestamp());
 
+
+			if(i == g_node_id){ //local log
+				//consider possible overwritten:if no space, wait until cleaned 
+				//for head: there is local read and write, and remote RDMA read, conflicts are ignored here, which might be problematic
+				// while(start_idx + num_of_entry < *(redo_log_buf.get_head())){
+				// 	//wait for head to reset
+				// 	assert(false);
+				// }
+				while((start_idx + num_of_entry - *(redo_log_buf.get_head()) >= redo_log_buf.get_size()) && !simulation->is_done()){
+					//wait for AsyncRedoThread to clean buffer
+				}
+				if(simulation->is_done()) break;
+				
+				start_idx = start_idx % redo_log_buf.get_size();
+
+				char* start_addr = (char*)redo_log_buf.get_entry(start_idx);
+
+				assert(((LogEntry *)start_addr)->state == EMPTY);					
+				assert(((LogEntry *)start_addr)->change_cnt == 0);					
+
+				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
+				assert(((LogEntry *)start_addr)->state == LOGGED);						
+			}else{ //remote log
+				//consider possible overwritten: if no space, wait until cleaned 
+				//first prevent concurrent read and write among threads
+				pthread_mutex_lock( LOG_HEAD_LATCH[i] );
+
+				while(start_idx + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
+					//wait for AsyncRedoThread to clean buffer
+					rc = read_remote_log_head(yield, i, &log_head[i], cor_id);
+					// todo: I do not know whether I should abort here.
+				}
+				pthread_mutex_unlock( LOG_HEAD_LATCH[i] );
+				if(simulation->is_done()) break;
+				
+				start_idx = start_idx % redo_log_buf.get_size();
+
+				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx);
+
+				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id);
+			}
+			log_idx[i] = start_idx;
+			mem_allocator.free(newEntry, sizeof(LogEntry));
+		}
+	}
+	return rc;
+}
+
+
+RC TPCCTxnManager::redo_commit_log(yield_func_t &yield,RC status, uint64_t cor_id) {
+	// return RCOK;
+	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3){
+		assert(status != Abort);
+		status = RCOK;		
+	}
+	
+	TPCCQuery* tpcc_query = (TPCCQuery*) query;
+	RC rc = RCOK;
+	//for every node
+	int change_cnt[g_node_cnt];
+	for(int i=0;i<g_node_cnt;i++){
+		change_cnt[i] = 0;
+	}
+	vector<vector<ChangeInfo>> change(g_node_cnt);
+	
+	//construct log 
+	if (tpcc_query->txn_type == TPCC_PAYMENT) {
+		// update warehouse
+		if (g_wh_update) construct_log(tpcc_query->w_id, change, change_cnt, status);
+		// update district
+		construct_log(tpcc_query->w_id, change, change_cnt, status);
+		// update customer
+		construct_log(tpcc_query->c_w_id, change, change_cnt, status);
+	}
+	if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
+		// update district
+		construct_log(tpcc_query->w_id, change, change_cnt, status);
+
+		for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
+			uint64_t ol_number = i;
+			uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
+			// update stock
+			construct_log(ol_supply_w_id, change, change_cnt, status);
+		}
+	}
+	
+	//write log
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(change_cnt[i]>0){
+			int num_of_entry = 1;
+			//use RDMA_FAA for local and remote
+			uint64_t start_idx = -1;
+			rc = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, &start_idx, cor_id);
+			// todo: I do not know whether I should abort here.
+
+			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
+
+			newEntry->set_entry(0,change[i],get_start_timestamp());
+			if(status == Abort){
+				newEntry->state = LE_ABORTED;
+			}else{
+				newEntry->state = LE_COMMITTED;
+			}
+			newEntry->c_ts = get_commit_timestamp();
 
 			if(i == g_node_id){ //local log
 				//consider possible overwritten:if no space, wait until cleaned 

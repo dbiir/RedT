@@ -15,6 +15,8 @@
 */
 
 #include "work_queue.h"
+#include "unordered_map"
+#include "txn.h"
 #include "mem_alloc.h"
 #include "query.h"
 #include "message.h"
@@ -39,6 +41,7 @@ void QWorkQueue::init() {
 		sched_queue[i] = new boost::lockfree::queue<work_queue_entry* > (0);
 	}
 #endif
+	wait_list = new WaitList();
 	txn_queue_size = 0;
 	work_queue_size = 0;
 
@@ -404,17 +407,17 @@ void QWorkQueue::enqueue(uint64_t thd_id, Message * msg,bool busy) {
 	if(msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
 		while (!new_txn_queue->push(entry) && !simulation->is_done()) {
 		}
-		sem_wait(&_semaphore);
-		txn_queue_size ++;
-		txn_enqueue_size ++;
-		sem_post(&_semaphore);
+		// sem_wait(&_semaphore);
+		// txn_queue_size ++;
+		// txn_enqueue_size ++;
+		// sem_post(&_semaphore);
 	} else {
 		while (!work_queue->push(entry) && !simulation->is_done()) {
 		}
-		sem_wait(&_semaphore);
-		work_queue_size ++;
-		work_enqueue_size ++;
-		sem_post(&_semaphore);
+		// sem_wait(&_semaphore);
+		// work_queue_size ++;
+		// work_enqueue_size ++;
+		// sem_post(&_semaphore);
 	}
 	INC_STATS(thd_id,mtx[13],get_sys_clock() - mtx_wait_starttime);
 
@@ -478,13 +481,12 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 			valid = new_txn_queue->pop(entry);
 		else
 			valid = work_queue->pop(entry);
-		// if ((thd_id % THREAD_CNT) % 2 == 0)
-			// valid = new_txn_queue->pop(entry);
-		// else
-		// 	valid = work_queue->pop(entry);
 #endif
 	}
 #endif
+	#if RECOVERY_TXN_MECHANISM
+	if (!valid) return waittxn_dequeue(thd_id);
+	#endif
 	INC_STATS(thd_id,mtx[14],get_sys_clock() - mtx_wait_starttime);
 
 	if(valid) {
@@ -495,21 +497,7 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 		INC_STATS(thd_id,work_queue_wait_time,queue_time);
 		INC_STATS(thd_id,work_queue_cnt,1);
     	statqueue(thd_id, entry);
-		if(msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
-			sem_wait(&_semaphore);
-			txn_queue_size --;
-			txn_dequeue_size ++;
-			sem_post(&_semaphore);
-			INC_STATS(thd_id,work_queue_new_wait_time,queue_time);
-			INC_STATS(thd_id,work_queue_new_cnt,1);
-		} else {
-			sem_wait(&_semaphore);
-			txn_queue_size --;
-			txn_dequeue_size ++;
-			sem_post(&_semaphore);
-			INC_STATS(thd_id,work_queue_old_wait_time,queue_time);
-			INC_STATS(thd_id,work_queue_old_cnt,1);
-		}
+
 		msg->wq_time = queue_time;
 		// DEBUG("DEQUEUE (%ld,%ld) %ld; %ld; %d,
 		// 0x%lx\n",msg->txn_id,msg->batch_id,msg->return_node_id,queue_time,msg->rtype,(uint64_t)msg);
@@ -560,21 +548,21 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 		uint64_t queue_time = get_sys_clock() - entry->starttime;
 		INC_STATS(thd_id,work_queue_wait_time,queue_time);
 		INC_STATS(thd_id,work_queue_cnt,1);
-		if(msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
-			sem_wait(&_semaphore);
-			txn_queue_size --;
-			txn_dequeue_size ++;
-			sem_post(&_semaphore);
-			INC_STATS(thd_id,work_queue_new_wait_time,queue_time);
-			INC_STATS(thd_id,work_queue_new_cnt,1);
-		} else {
-			sem_wait(&_semaphore);
-			work_queue_size --;
-			work_dequeue_size ++;
-			sem_post(&_semaphore);
-			INC_STATS(thd_id,work_queue_old_wait_time,queue_time);
-			INC_STATS(thd_id,work_queue_old_cnt,1);
-		}
+		// if(msg->rtype == CL_QRY || msg->rtype == CL_QRY_O) {
+		// 	sem_wait(&_semaphore);
+		// 	txn_queue_size --;
+		// 	txn_dequeue_size ++;
+		// 	sem_post(&_semaphore);
+		// 	INC_STATS(thd_id,work_queue_new_wait_time,queue_time);
+		// 	INC_STATS(thd_id,work_queue_new_cnt,1);
+		// } else {
+		// 	sem_wait(&_semaphore);
+		// 	work_queue_size --;
+		// 	work_dequeue_size ++;
+		// 	sem_post(&_semaphore);
+		// 	INC_STATS(thd_id,work_queue_old_wait_time,queue_time);
+		// 	INC_STATS(thd_id,work_queue_old_cnt,1);
+		// }
 		msg->wq_time = queue_time;
 		//DEBUG("DEQUEUE (%ld,%ld) %ld; %ld; %d, 0x%lx\n",msg->txn_id,msg->batch_id,msg->return_node_id,queue_time,msg->rtype,(uint64_t)msg);
 		DEBUG("Work Dequeue (%ld,%ld)\n",entry->txn_id,entry->batch_id);
@@ -592,4 +580,63 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 	return msg;
 }
 
+
+void WaitList::enqueue(uint64_t thd_id, Message * msg) {
+	uint64_t starttime = get_sys_clock();
+	assert(msg);
+	wait_list_entry * entry = (wait_list_entry*)mem_allocator.align_alloc(sizeof(wait_list_entry));
+	entry->msg = msg;
+	entry->txn_id = msg->txn_id;
+
+	sem_wait(&_semaphore);
+	LIST_PUT_TAIL(head,tail,entry);
+	wait_hash[msg->txn_id] = entry;
+	sem_post(&_semaphore);
+}
+
+Message * WaitList::dequeue(uint64_t thd_id) {
+	uint64_t starttime = get_sys_clock();
+	assert(ISSERVER || ISREPLICA);
+	Message * msg = NULL;
+	wait_list_entry * entry = NULL;
+	uint64_t mtx_wait_starttime = get_sys_clock();
+	bool valid = false;
+	sem_wait(&_semaphore);
+	LIST_GET_HEAD(head,tail,entry);
+	// LIST_PUT_TAIL(head,tail,entry);
+	sem_post(&_semaphore);
+
+	//todo: check whether this txn timeout
+	if(entry != NULL) {
+		msg = entry->msg;
+		assert(msg);
+		WaitTxnMessage* wmsg = (WaitTxnMessage*)msg;
+		TxnManager *txn = wmsg->txn;
+		if (!txn->is_time_out()) {
+			msg = NULL;
+			sem_wait(&_semaphore);
+			LIST_PUT_TAIL(head,tail,entry);
+			sem_post(&_semaphore);
+		} else {
+			sem_wait(&_semaphore);
+			wait_hash[msg->txn_id] = NULL;
+			sem_post(&_semaphore);
+		}
+		//printf("%ld WQdequeue %ld\n",thd_id,entry->txn_id);
+		// DEBUG("Work Dequeue (%ld,%ld)\n",entry->txn_id,entry->batch_id);
+		// DEBUG_M("QWorkQueue::dequeue work_queue_entry free\n");
+		// mem_allocator.free(entry,sizeof(work_queue_entry));
+		// INC_STATS(thd_id,work_queue_dequeue_time,get_sys_clock() - starttime);
+	}
+	return msg;
+}
+
+void WaitList::remove(uint64_t thd_id, uint64_t txn_id) {
+	wait_list_entry * entry = wait_hash[txn_id];
+	sem_wait(&_semaphore);
+	LIST_REMOVE_HT(head,tail,entry);
+	wait_hash[txn_id] = NULL;
+	sem_post(&_semaphore);
+	mem_allocator.free(entry,sizeof(wait_list_entry));
+}
 #endif

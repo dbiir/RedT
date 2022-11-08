@@ -217,6 +217,10 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
 	query->ol_cnt = URand(5, g_max_items_per_txn);
 	query->o_entry_d = 2013;
 
+  query->c_w_primary.status = OpStatus::RUN;
+  query->c_w_second1.status = OpStatus::RUN;
+  query->c_w_second2.status = OpStatus::RUN;
+
   partitions_accessed.insert(wh_to_part(query->w_id));
 
   double r_mpr = (double)(rand() % 10000) / 10000;
@@ -253,7 +257,9 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
         }
       }
     }
-
+    item->ol_supply_w_primary.status=OpStatus::RUN;
+		item->ol_supply_w_second1.status=OpStatus::RUN;
+		item->ol_supply_w_second2.status=OpStatus::RUN;
     query->items.add(item);
   }
 

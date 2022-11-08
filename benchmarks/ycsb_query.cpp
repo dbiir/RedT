@@ -55,20 +55,6 @@ void YCSBQuery::print() {
 		printf("%d %ld, ",requests[i]->acctype,requests[i]->key);
 	}
 	printf("\n");
-	/* 	
-		printf("YCSBQuery: %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld\n"
-				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[0]->key))
-				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[1]->key))
-				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[2]->key))
-				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[3]->key))
-				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[4]->key))
-				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[5]->key))
-				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[6]->key))
-				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[7]->key))
-				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[8]->key))
-				,GET_NODE_ID(((YCSBWorkload*)wl)->key_to_part(requests[9]->key))
-				);
-				*/
 } 
 
 void YCSBQuery::init() {
@@ -414,6 +400,9 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 			i--;
 			continue;
 		}
+		req->primary.status=OpStatus::RUN;
+		req->second1.status=OpStatus::RUN;
+		req->second2.status=OpStatus::RUN;
 		partitions_accessed.insert(partition_id);
 		rid ++;
 

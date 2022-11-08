@@ -75,7 +75,7 @@ void MessageQueue::enqueue(uint64_t thd_id, Message * msg,uint64_t dest) {
   assert(dest < g_total_node_cnt);
 #if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
 #else
-  assert(dest != g_node_id);
+  assert(msg->get_rtype() == WAIT_TXN || dest != g_node_id);
 #endif
   DEBUG_M("MessageQueue::enqueue msg_entry alloc\n");
   msg_entry * entry = (msg_entry*) mem_allocator.alloc(sizeof(struct msg_entry));

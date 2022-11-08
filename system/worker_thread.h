@@ -30,7 +30,6 @@ public:
     void setup();
     void statqueue(uint64_t thd_id, Message * msg, uint64_t starttime);
     void process(yield_func_t &yield, Message * msg, uint64_t cor_id);
-    void fakeprocess(yield_func_t &yield, Message * msg, uint64_t cor_id);
     void check_if_done(RC rc);
     void release_txn_man();
     void commit();
@@ -54,6 +53,12 @@ public:
     RC process_log_msg(Message * msg);
     RC process_log_msg_rsp(Message * msg);
     RC process_log_flushed(Message * msg);
+    RC process_wait_txn(yield_func_t &yield, Message * msg, uint64_t cor_id);
+    RC process_recover_txn(yield_func_t &yield, Message * msg, uint64_t cor_id);
+    RC process_rack_recover_txn(yield_func_t &yield, Message * msg, uint64_t cor_id);
+    RC process_check_txn(yield_func_t &yield, Message * msg, uint64_t cor_id);
+    RC process_rack_check_txn(yield_func_t &yield, Message * msg, uint64_t cor_id);
+
     RC init_phase();
     uint64_t get_next_txn_id();
     bool is_cc_new_timestamp();

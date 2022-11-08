@@ -91,6 +91,8 @@ RowPool row_pool;
 QryPool qry_pool;
 TxnTable txn_table;
 QWorkQueue work_queue;
+QWorkQueue heartbeat_queue;
+QWorkQueue recover_queue;
 AbortQueue abort_queue;
 MessageQueue msg_queue;
 Client_txn client_man;
@@ -99,8 +101,6 @@ Logger logger;
 TimeTable time_table;
 RouteTable route_table;
 NodeStatus node_status;
-QWorkQueue heartbeat_queue;
-QWorkQueue recover_queue;
 // QTcpQueue tcp_queue;
 // TcpTimestamp tcp_ts;
 
@@ -183,11 +183,17 @@ UInt32 g_async_redo_thread_cnt = 1;
 UInt32 g_async_redo_thread_cnt = 0;
 #endif
 
+#if RECOVERY_MANAGER
+UInt32 g_recover_thread_cnt = 2;
+#else
+UInt32 g_recover_thread_cnt = 0;
+#endif
+
 #if CC_ALG == CALVIN
 // sequencer + scheduler thread
 UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + 2 + g_work_thread_cnt + g_async_redo_thread_cnt;
 #else
-UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + g_work_thread_cnt + g_async_redo_thread_cnt;
+UInt32 g_total_thread_cnt = g_thread_cnt + g_rem_thread_cnt + g_send_thread_cnt + g_abort_thread_cnt + g_logger_thread_cnt + g_work_thread_cnt + g_async_redo_thread_cnt + g_recover_thread_cnt;
 #endif
 
 

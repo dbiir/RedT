@@ -124,7 +124,7 @@ public:
   void copy_remote_items(PPSQueryMessage * msg);
 #if USE_REPLICA
 	RC redo_log(yield_func_t &yield, RC status, uint64_t cor_id);
-  RC redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_id);
+  RC redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_id){}
 #endif
   void insert_failed_partition(uint64_t key) {
     failed_partition.add(key);

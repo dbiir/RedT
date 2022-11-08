@@ -713,6 +713,11 @@ void TxnManager::send_prepare_messages() {
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),
 											this->center_master[query->centers_touched[i]]);
 #endif
+	#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
+	is_enqueue = true;
+	#endif
 #else
 	rsp_cnt = query->partitions_touched.size() - 1;
 	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
@@ -726,8 +731,14 @@ void TxnManager::send_prepare_messages() {
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),
 											GET_NODE_ID(query->partitions_touched[i]));
 #endif
+	#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
+	is_enqueue = true;
+	#endif
 #endif
 	}
+	
 }
 
 void TxnManager::send_finish_messages() {
@@ -800,6 +811,12 @@ void TxnManager::send_finish_messages() {
 #endif
 	}
 	assert(num_msgs_commit==num_msgs_rw_prep);
+	
+	#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
+	is_enqueue = true;
+	#endif
 }
 
 int TxnManager::received_response(RC rc) {

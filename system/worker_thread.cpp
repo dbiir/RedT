@@ -130,6 +130,21 @@ void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) 
 			case LOG_MSG_RSP:
         rc = process_log_msg_rsp(msg);
 				break;
+      case WAIT_TXN:
+        rc = process_wait_txn(yield, msg, cor_id);
+				break;
+      case RECOVER_TXN:
+        rc = process_recover_txn(yield, msg, cor_id);
+        break;
+      case RACK_RECOVER_TXN:
+        rc = process_rack_recover_txn(yield, msg, cor_id);
+        break;
+      case CHECK_TXN:
+        rc = process_check_txn(yield, msg, cor_id);
+        break;
+      case RACK_CHECK:
+        rc = process_rack_check_txn(yield, msg, cor_id);
+        break;
 			default:
         printf("Msg: %d\n",msg->get_rtype());
         fflush(stdout);
@@ -590,6 +605,7 @@ void WorkerThread::no_routines() {
      _routines[0] = coroutine_func_t(bind(&WorkerThread::run, this, _1, 0));
      printf("Init coroutine succ\n");
 }
+
 RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
   tsetup();
@@ -773,7 +789,6 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
 RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG_T("RPREP_ACK %ld from %ld\n",msg->get_txn_id(), msg->get_return_id());
   RC rc = RCOK;
-  uint64_t starttime = get_sys_clock();
   uint64_t center_from = GET_CENTER_ID(msg->return_node_id);
   msg->copy_to_txn(txn_man);
 
@@ -794,16 +809,29 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     time_table.set_state(get_thd_id(),msg->get_txn_id(),MAAT_ABORTED);
   }
 #endif
-  if(!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt || txn_man->get_commit_timestamp() != 0) {
+  if(!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt || txn_man->get_commit_timestamp() != 0) {   
     return RCOK;
   }
   if (txn_man->txn_stats.current_states >= FINISH_PHASE) {
     return RCOK;
   }
 
-  // int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
   int responses_left = txn_man->received_response((AckMessage*)msg, OpStatus::PREPARE);
   if (responses_left > 0) return WAIT;
+
+  // #if WORKLOAD == YCSB
+  // for(int i=0;i<REQ_PER_QUERY;i++){
+  //   if(txn_man->req_need_wait[i]) return WAIT;
+  // }
+  // #else 
+  // if (txn_man->wh_need_wait || txn_man->cus_need_wait) {
+  //   return WAIT;
+  // }
+  // for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+  //   if(txn_man->req_need_wait[i]) return WAIT;
+  // }
+  // #endif
+  
   // Done waiting
   txn_man->set_commit_timestamp(get_next_ts());
 
@@ -847,19 +875,30 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 RC WorkerThread::process_rack_rfin(Message * msg) {
   DEBUG_T("RFIN_ACK %ld from %ld\n",msg->get_txn_id(), msg->get_return_id());
   RC rc = RCOK;
-  uint64_t starttime = get_sys_clock();
   // txn_man->txn_stats.current_states = FINISH_PHASE;
   // if(txn_man->abort_cnt > 0) printf("acnt:%lu\n",txn_man->abort_cnt);
   uint64_t center_from = GET_CENTER_ID(msg->return_node_id);
   if(!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt || txn_man->get_commit_timestamp() == 0) 
+  // if( txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt)
+  // //  || txn_man->get_commit_timestamp() == 0) 
   {
     DEBUG_T("Txn %ld rack fin skip, because %p, part_touch %ld, abort %ld:%ld, ts %lu\n",msg->get_txn_id(), txn_man->query, txn_man->query->partitions_touched.size(), txn_man->abort_cnt, msg->current_abort_cnt, txn_man->get_commit_timestamp());
     return RCOK;
   }
 
-  // int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
   int responses_left = txn_man->received_response((AckMessage*)msg, OpStatus::COMMIT);
   if (responses_left > 0) return WAIT;
+  // !handle failed partition.
+  #if RECOVERY_TXN_MECHANISM
+  if (txn_man->failed_partition.size() != 0) {
+    //todo current txn has several failed replica.
+    txn_man->update_query_status(true);
+    DEBUG_T("878 resend txn %ld\n",msg->get_txn_id());
+    txn_man->resend_remote_subtxn();
+    return WAIT;
+  }
+  #endif
+
   #if WORKLOAD == YCSB
   for(int i=0;i<REQ_PER_QUERY;i++){
     if(txn_man->req_need_wait[i]) return WAIT;
@@ -888,7 +927,6 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
   }
   return rc;
 }
-
 
 RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG_T("RQRY_RSP %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
@@ -978,6 +1016,11 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),txn_man->return_id);
 #endif
 #endif
+    #if RECOVERY_TXN_MECHANISM
+    txn_man->update_send_time();
+    if (!txn_man->is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(txn_man,WAIT_TXN));
+    txn_man->is_enqueue = true;
+    #endif
   }
   return rc;
 }
@@ -1385,6 +1428,82 @@ RC WorkerThread::process_log_flushed(Message * msg) {
   txn_man->log_flushed = true;
   if (g_repl_cnt == 0 || txn_man->repl_finished) commit();
   return RCOK;
+}
+
+RC WorkerThread::process_wait_txn(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+  DEBUG_T("WAIT TXN %ld\n",msg->get_txn_id());
+  if (IS_LOCAL(txn_man->get_txn_id()) || txn_man->new_coordinator == g_node_id) {
+    // For coordinator, handle failed executor
+    // Check current state
+    if (txn_man->txn_stats.current_states == EXECUTION_PHASE) {
+      txn_man->set_rc(Abort);
+      txn_man->send_finish_messages();
+      txn_man->abort(yield, cor_id);
+      abort();
+    } else if (txn_man->txn_stats.current_states == FINISH_PHASE) {
+      txn_man->update_query_status(true);
+      DEBUG_T("1420 resend txn %ld\n",msg->get_txn_id());
+      txn_man->resend_remote_subtxn();
+    }
+  } else {
+    // For executor, handle failed coordinator
+    assert(txn_man->txn_stats.current_states == EXECUTION_PHASE);
+    txn_man->agent_check_commit();
+  }
+}
+
+RC WorkerThread::process_recover_txn(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+  DEBUG_T("RECOVER TXN %ld from %ld\n",msg->get_txn_id(), msg->get_return_id());
+  RC rc = RCOK;
+  txn_man->reset_query();
+  msg->copy_to_txn(txn_man);
+
+  txn_man->is_recover = true;
+  txn_man->send_RQRY_RSP = true;
+  rc = txn_man->run_txn(yield, cor_id);
+#if USE_REPLICA
+	for(int i=0;i<g_node_cnt;i++) txn_man->log_idx[i] = redo_log_buf.get_size();
+#endif
+
+  txn_man->txn_stats.current_states = FINISH_PHASE;
+  txn_man->commit(yield, cor_id);
+  msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_RECOVER_TXN),msg->return_node_id);
+  txn_man->update_send_time();
+
+  return rc;
+}
+
+RC WorkerThread::process_rack_recover_txn(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+  DEBUG_T("RACK RECOVER TXN %ld from %ld\n",msg->get_txn_id(), msg->get_return_id());
+
+  int responses_left = txn_man->received_response((AckMessage*)msg, OpStatus::COMMIT);
+  if (responses_left > 0) return WAIT;
+  if (txn_man->get_rc() == Abort) {
+    //! current txn has several failed replica.
+    txn_man->update_query_status(true);
+    DEBUG_T("1459 resend txn %ld\n",msg->get_txn_id());
+    txn_man->resend_remote_subtxn();
+    return WAIT;
+  }
+
+  txn_man->commit(yield, cor_id);
+  commit();
+}
+
+RC WorkerThread::process_check_txn(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+  DEBUG_T("CHECK TXN %ld from %ld\n",msg->get_txn_id(), msg->get_return_id());
+  txn_man->new_coordinator = msg->return_node_id;
+  msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_CHECK),msg->return_node_id);
+  txn_man->update_send_time();
+}
+
+RC WorkerThread::process_rack_check_txn(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+  DEBUG_T("RACK CHECK TXN %ld from %ld\n",msg->get_txn_id(), msg->get_return_id());
+  if (txn_man->new_coordinator != -1) txn_man->new_coordinator = g_node_id;
+
+  txn_man->update_query_status(true);
+  DEBUG_T("1480 resend txn %ld\n",msg->get_txn_id());
+  txn_man->resend_remote_subtxn();
 }
 
 RC WorkerThread::process_rfwd(yield_func_t &yield, Message * msg, uint64_t cor_id) {

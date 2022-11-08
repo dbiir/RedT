@@ -62,6 +62,10 @@ InputThread * input_thds;
 OutputThread * output_thds;
 AbortThread * abort_thds;
 LogThread * log_thds;
+#if RECOVERY_MANAGER
+HeartBeatThread * heartbeat_thds;
+RecoveryThread * recovery_thds;
+#endif
 #if CC_ALG == CALVIN
 CalvinLockThread * calvin_lock_thds;
 CalvinSequencerThread * calvin_seq_thds;
@@ -178,6 +182,16 @@ int main(int argc, char *argv[]) {
 	fflush(stdout);
 	work_queue.init();
 	printf("Done\n");
+
+	printf("Initializing heartbeat queue... ");
+	fflush(stdout);
+	heartbeat_queue.init();
+	printf("Done\n");
+	printf("Initializing recover queue... ");
+	fflush(stdout);
+	recover_queue.init();
+	printf("Done\n");
+
 	printf("Initializing abort queue... ");
 	fflush(stdout);
 	abort_queue.init();
@@ -242,14 +256,6 @@ int main(int argc, char *argv[]) {
 	maat_man.init();
 	printf("Done\n");
 #endif
-	printf("Initializing heartbeat queue... ");
-	fflush(stdout);
-	heartbeat_queue.init();
-	printf("Done\n");
-	printf("Initializing recover queue... ");
-	fflush(stdout);
-	recover_queue.init();
-	printf("Done\n");
 	printf("Initializing RouteTable and NodeStatus... ");
 	fflush(stdout);
 	route_table.init();
@@ -292,6 +298,10 @@ int main(int argc, char *argv[]) {
 		all_thd_cnt += 1;
 #endif
 
+#if RECOVERY_MANAGER
+		all_thd_cnt += 2;
+#endif
+
 	if (g_ts_alloc == LTS_TCP_CLOCK) {
 		printf("Initializing tcp queue... ");
 		fflush(stdout);
@@ -316,6 +326,10 @@ int main(int argc, char *argv[]) {
 	output_thds = new OutputThread[sthd_cnt];
 	abort_thds = new AbortThread[1];
 	log_thds = new LogThread[1];
+#if RECOVERY_MANAGER
+	heartbeat_thds = new HeartBeatThread[1];
+	recovery_thds = new RecoveryThread[1];
+#endif
 #if CC_ALG == CALVIN
 	calvin_lock_thds = new CalvinLockThread[1];
 	calvin_seq_thds = new CalvinSequencerThread[1];
@@ -396,7 +410,12 @@ int main(int argc, char *argv[]) {
 	log_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&log_thds[0]);
 #endif
-
+#if RECOVERY_MANAGER
+	heartbeat_thds[0].init(id, g_node_id, m_wl);
+	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&heartbeat_thds[0]);
+	recovery_thds[0].init(id, g_node_id, m_wl);
+	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&recovery_thds[0]);
+#endif
 #if CC_ALG != CALVIN
 	abort_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&abort_thds[0]);

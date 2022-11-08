@@ -313,11 +313,13 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	//uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN) ? DLOCK_SH : DLOCK_EX; // ! this wrong !!
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-	#if CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT3
-		rc = this->manager->lock_get(lt, txn);
-	#else
-		rc = this->manager->lock_get(yield,lt,txn,this,cor_id);
-	#endif
+	if (!txn->is_recover) {
+		#if CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT3
+			rc = this->manager->lock_get(lt, txn);
+		#else
+			rc = this->manager->lock_get(yield,lt,txn,this,cor_id);
+		#endif
+	}
   	uint64_t copy_time = get_sys_clock();
 	access->data = this;
 	if (rc == RCOK) {

@@ -23,6 +23,7 @@
 #include <boost/lockfree/queue.hpp>
 #include <boost/circular_buffer.hpp>
 #include "semaphore.h"
+#include "unordered_map"
 //#include "message.h"
 
 class BaseQuery;
@@ -35,6 +36,13 @@ struct work_queue_entry {
   uint64_t txn_id;
   RemReqType rtype;
   uint64_t starttime;
+};
+
+struct wait_list_entry {
+  Message * msg;
+  uint64_t txn_id;
+  wait_list_entry * next;
+  wait_list_entry * prev;
 };
 
 struct CompareSchedEntry {
@@ -63,6 +71,24 @@ struct CompareWQEntry {
 #endif
 };
 typedef boost::circular_buffer<work_queue_entry*> WCircularBuffer;
+
+class WaitList {
+public:
+  WaitList() {
+    head = NULL;
+    tail = NULL;
+    sem_init(&_semaphore, 0, 1);
+  }
+  void enqueue(uint64_t thd_id, Message * msg);
+  Message * dequeue(uint64_t thd_id);
+  void remove(uint64_t thd_id, uint64_t txn_id);
+private:
+  std::unordered_map<uint64_t, wait_list_entry*> wait_hash;
+  wait_list_entry* head;
+  wait_list_entry* tail;
+  sem_t _semaphore;
+};
+
 class QWorkQueue {
 public:
   void init();
@@ -74,6 +100,11 @@ public:
   Message * sched_dequeue(uint64_t thd_id);
   void sequencer_enqueue(uint64_t thd_id, Message * msg);
   Message * sequencer_dequeue(uint64_t thd_id);
+
+  void waittxn_enqueue(uint64_t thd_id, Message * msg) {wait_list->enqueue(thd_id, msg);}
+  //todo: 
+  void waittxn_remove(uint64_t thd_id, uint64_t txn_id) {wait_list->remove(thd_id, txn_id);}
+  Message * waittxn_dequeue(uint64_t thd_id){wait_list->dequeue(thd_id);}
 
   uint64_t get_cnt() {return get_wq_cnt() + get_rem_wq_cnt() + get_new_wq_cnt();}
   uint64_t get_wq_cnt() {return 0;}
@@ -109,6 +140,7 @@ private:
 #endif
   boost::lockfree::queue<work_queue_entry* > * seq_queue;
   boost::lockfree::queue<work_queue_entry* > ** sched_queue;
+  WaitList* wait_list;
 
   uint64_t sched_ptr;
   BaseQuery * last_sched_dq;

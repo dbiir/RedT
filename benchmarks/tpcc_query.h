@@ -31,11 +31,14 @@ struct Item_no {
 	uint64_t ol_i_id;
 	uint64_t ol_supply_w_id;
 	uint64_t ol_quantity;
-  void copy(Item_no * item) {
-    ol_i_id = item->ol_i_id;
-    ol_supply_w_id = item->ol_supply_w_id;
-    ol_quantity = item->ol_quantity;
-  }
+	void copy(Item_no * item) {
+		ol_i_id = item->ol_i_id;
+		ol_supply_w_id = item->ol_supply_w_id;
+		ol_quantity = item->ol_quantity;
+	}
+	execute_node ol_supply_w_primary;
+	execute_node ol_supply_w_second1;
+	execute_node ol_supply_w_second2;
 };
 
 
@@ -53,25 +56,32 @@ private:
 class TPCCQuery : public BaseQuery {
 public:
 	void init(uint64_t thd_id, Workload * h_wl);
-  void init();
-  void reset();
-  void release();
-  void release_items();
-  void print();
-  static std::set<uint64_t> participants(Message * msg, Workload * wl);
-  uint64_t participants(bool *& pps,Workload * wl);
-  uint64_t get_participants(Workload * wl);
-  bool readonly();
+	void init();
+	void reset();
+	void release();
+	void release_items();
+	void print();
+	static std::set<uint64_t> participants(Message * msg, Workload * wl);
+	uint64_t participants(bool *& pps,Workload * wl);
+	uint64_t get_participants(Workload * wl);
+	bool readonly();
 
 	TPCCTxnType txn_type;
 	// common txn input for both payment & new-order
 	uint64_t w_id;
 	uint64_t d_id;
 	uint64_t c_id;
+	execute_node w_primary;
+	execute_node w_second1;
+	execute_node w_second2;
 	// txn input for payment
 	uint64_t d_w_id;
 	uint64_t c_w_id;
 	uint64_t c_d_id;
+	execute_node c_w_primary;
+	execute_node c_w_second1;
+	execute_node c_w_second2;
+
 	char c_last[LASTNAME_LEN];
 	double h_amount;
 	bool by_last_name;
@@ -94,8 +104,7 @@ public:
 	uint64_t ol_number;
 	uint64_t ol_amount;
 	uint64_t o_id;
-  uint64_t rqry_req_cnt;
-
+ 	uint64_t rqry_req_cnt;
 };
 
 #endif

@@ -29,8 +29,6 @@ public:
   RC  server_recv_loop();
   void  check_for_init_done();
   void setup();
-
-  bool fakeprocess(Message * msg);
   TxnManager * txn_man;
 };
 

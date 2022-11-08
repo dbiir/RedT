@@ -269,8 +269,7 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
 RC YCSBTxnManager::send_remote_subtxn() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	RC rc = RCOK;
-
-	uint64_t starttime = get_sys_clock();
+	
 	for(int i = 0; i < ycsb_query->requests.size(); i++) {
 		ycsb_request * req = ycsb_query->requests[i];
 		uint64_t part_id = _wl->key_to_part(req->key);
@@ -355,8 +354,12 @@ RC YCSBTxnManager::send_remote_subtxn() {
 			DEBUG_T("txn %lu, send inter-txn to %lu\n", get_txn_id(),center_master[i]);
 		}
 	}
+	#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
+	is_enqueue = true;
+	#endif
 	// txn_stats.wait_for_rsp_time = get_sys_clock();
-	uint64_t curr_time = get_sys_clock();
 	return rc;
 }
 
@@ -388,6 +391,12 @@ RC YCSBTxnManager::send_remote_request() {
     msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),dest_node_id);
 #endif
 #endif
+	
+	#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
+	is_enqueue = true;
+	#endif
 	return WAIT_REM;
 }
 
@@ -442,8 +451,6 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	bool is_center = req->primary.execute_node == g_node_id;
 	bool is_local = req->primary.stored_node == g_node_id && req->primary.execute_node == g_node_id;
 
-	// DEBUG_T("txn %lu, handle req %d ? is_center %d, is_local %d\n", get_txn_id(),next_record_id,is_center,is_local);
-
 	// Get and check whether local route table is different from the origin.
 
 	
@@ -460,8 +467,6 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
   			else req->primary.status = OpStatus::PREPARE;
 		} else {
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
-			// if (waiting_for_response()) rc = WAIT_REM;
-			// else rc = RCOK;
 			rc = RCOK;
 #else
 			rc = send_remote_request();
@@ -904,6 +909,185 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 		}
 	}
 #endif
+	return rc;
+}
+
+// Write a new log, which records current transaction is committed.
+RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_id) {
+	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3){
+		assert(status != Abort);
+		status = RCOK;		
+	}
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	RC rc = RCOK;
+
+	int node_need_write_log[g_node_cnt];
+	for(int i=0;i<g_node_cnt;i++){
+		node_need_write_log[i] = 0;
+	}
+
+	//construct log 
+	for(int i=0;i<((YCSBQuery*)query)->requests.size();i++){
+		ycsb_request * req = ycsb_query->requests[i];
+		if(req->acctype!=WR) continue;
+		// key_to_part should be used here! but its only for YCSB workload, so manually set part_id
+		// this part should be considered and changed for other workload!
+		// uint64_t part_id = _wl->key_to_part( req->key );
+		uint64_t part_id = req->key % g_part_cnt;
+		
+		vector<uint64_t> node_id;
+		// Caculate the nodes need to write commit logs.
+		uint64_t loc = -1;
+		loc = get_follower1_node_id(part_id);
+		if (loc == -1) {
+			if (txn_stats.current_states == EXECUTION_PHASE) return Abort; 
+			else if (txn_stats.current_states == FINISH_PHASE ) {
+				return NODE_FAILED;
+			}
+		}
+		node_id.push_back(loc);
+		loc = get_follower2_node_id(part_id);
+		if (loc == -1) {
+			if (txn_stats.current_states == EXECUTION_PHASE) return Abort; 
+			else if (txn_stats.current_states == FINISH_PHASE) {
+				return NODE_FAILED;
+			}
+		}
+		node_id.push_back(loc);
+		loc = get_primary_node_id(part_id);
+		if (loc == -1) {
+			if (txn_stats.current_states == EXECUTION_PHASE) return Abort; 
+			else if (txn_stats.current_states == FINISH_PHASE) {
+				return NODE_FAILED;
+			}
+		}
+		node_id.push_back(loc);
+
+		for(int i=0;i<node_id.size();i++){
+			uint32_t center_id = GET_CENTER_ID(node_id[i]);
+			if(center_id != g_center_id) continue; //log is only for row in the same center
+			++node_need_write_log[node_id[i]];
+		}
+	}
+	//batch faa
+    uint64_t starttime = get_sys_clock();
+	uint64_t count = 0;
+	int num_of_entry = 1; //suppose one log per node is enough
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(node_need_write_log[i]>0){
+			//use RDMA_FAA for local and remote
+			uint64_t result = -1;
+			rc = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, &result, cor_id, count+1, true);
+			// todo: I do not know whether I should abort here.
+			if (rc != RCOK) {
+				rc = rc == NODE_FAILED ? Abort : rc;
+				return rc;
+			}
+			++count;
+		}
+	}
+	//poll faa results
+	uint64_t start_idx[g_node_cnt];
+	count = 0;
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(node_need_write_log[i]>0){
+			INC_STATS(get_thd_id(), worker_oneside_cnt, 1);
+			#if USE_COROUTINE
+			assert(false); //not support yet
+			#else
+			auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp();
+			// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+			uint64_t endtime = get_sys_clock();
+			INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+			DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+			INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+			if (res_p != rdmaio::IOCode::Ok) {
+				node_status.set_node_status(i, NS::Failure);
+				return NODE_FAILED;
+			}
+			#endif
+    		uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(get_thd_id(),count+1);
+			start_idx[i] = *local_buf;
+			++count;
+		}
+	}
+	//wait for AsyncRedoThread to clean buffer
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(node_need_write_log[i]>0){
+			if(i == g_node_id){ //local log
+				while((start_idx[i] + num_of_entry - *(redo_log_buf.get_head()) >= redo_log_buf.get_size()) && !simulation->is_done()){
+				}
+				if(simulation->is_done()) break;
+			}else{ //remote log
+				pthread_mutex_lock( LOG_HEAD_LATCH[i] );
+				while(start_idx[i] + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
+					rc = read_remote_log_head(yield, i, &log_head[i], cor_id);
+					if (rc != RCOK) {
+						rc = rc == NODE_FAILED ? Abort : rc;
+						return rc;
+					}
+					// todo: I do not know whether I should abort here.
+				}
+				pthread_mutex_unlock( LOG_HEAD_LATCH[i] );
+				if(simulation->is_done()) break;
+			}
+		}
+	}
+	//write log
+	count = 0;
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(node_need_write_log[i]>0){
+			LogEntry* le = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
+			le->state = LE_COMMITTED;
+    		le->c_ts = get_commit_timestamp();
+			uint64_t operate_size = sizeof(le->state) + sizeof(le->c_ts);
+			if(i == g_node_id){ //local log
+				start_idx[i] = start_idx[i] % redo_log_buf.get_size();
+				char* start_addr = (char*)redo_log_buf.get_entry(start_idx[i]);
+				assert(((LogEntry *)start_addr)->state == EMPTY);					
+				assert(((LogEntry *)start_addr)->change_cnt == 0);					
+				memcpy(start_addr, (char *)le, sizeof(LogEntry));
+				assert(((LogEntry *)start_addr)->state == LE_COMMITTED);						
+			}else{ //remote log
+				start_idx[i] = start_idx[i] % redo_log_buf.get_size();
+				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx[i]);
+
+				rc = write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)le, cor_id, count+1,true);
+				if (rc != RCOK) {
+					rc = rc == NODE_FAILED ? Abort : rc;
+					return rc;
+				}
+				++count;
+			}
+			log_idx[i] = start_idx[i];
+			mem_allocator.free(le, sizeof(LogEntry));
+		}
+	}
+	//poll write results
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(node_need_write_log[i]>0){
+			if(i != g_node_id){ //remote 
+				starttime = get_sys_clock();
+				INC_STATS(get_thd_id(), worker_oneside_cnt, 1);
+				#if USE_COROUTINE
+				assert(false); //not support yet
+				#else
+				auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp();
+				// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+				uint64_t endtime = get_sys_clock();
+				INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
+				INC_STATS(get_thd_id(), rdma_read_cnt, 1);
+				INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
+				INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+				DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+				if (res_p != rdmaio::IOCode::Ok) {
+					node_status.set_node_status(i, NS::Failure);
+					return NODE_FAILED;
+				}
+				#endif
+			}
+		}
+	}
 	return rc;
 }
 #endif

@@ -128,6 +128,7 @@ public:
 	RC run_txn(yield_func_t &yield, uint64_t cor_id);
 #if USE_REPLICA
 	RC redo_log(yield_func_t &yield, RC status, uint64_t cor_id);
+  RC redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_id);
 #endif
 	RC run_txn_post_wait();
 	RC run_calvin_txn(yield_func_t &yield, uint64_t cor_id);

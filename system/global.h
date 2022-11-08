@@ -282,6 +282,7 @@ extern int32_t g_inflight_max;
 extern uint64_t g_msg_size;
 extern uint64_t g_log_buf_max;
 extern uint64_t g_log_flush_timeout;
+extern UInt32 g_recover_thread_cnt;
 
 extern UInt64 memory_count;
 extern UInt64 tuple_count;
