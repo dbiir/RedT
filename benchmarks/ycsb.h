@@ -70,6 +70,14 @@ public:
   RC run_txn_post_wait();
 	RC run_calvin_txn(yield_func_t &yield,uint64_t cor_id);
   void copy_remote_requests(YCSBQueryMessage * msg);
+  void insert_failed_partition(uint64_t key) {
+    failed_partition.add(key);
+  }
+  void update_query_status(uint64_t return_id, OpStatus status);
+  void update_query_status(bool timeout_check);
+  RC check_query_status(OpStatus status);
+
+  RC resend_remote_subtxn();
 private:
   void next_ycsb_state();
   RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
@@ -79,12 +87,7 @@ private:
   RC mvcc_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC send_timestamp_remote_one_side_request(ycsb_request * req,row_t *& row_local);
-#if BATCH_INDEX_AND_READ
-  void ycsb_batch_read(yield_func_t &yield,BatchReadType rtype, uint64_t cor_id);
-#endif
-  itemid_t* ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id);
-  // itemid_t* co_ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id);
-//   itemid_t* read_remote_index(ycsb_request * req);
+  RC ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req,  itemid_t* item, uint64_t cor_id);
 
   RC run_ycsb_0(yield_func_t &yield,ycsb_request * req,row_t *& row_local,uint64_t cor_id);
   RC run_ycsb_1(access_t acctype, row_t * row_local);
@@ -93,6 +96,7 @@ private:
   bool is_local_request(uint64_t idx);
   RC send_remote_request();
   RC send_remote_subtxn();
+  RC agent_check_commit();
 
   row_t * row;
 	YCSBWorkload * _wl;

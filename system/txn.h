@@ -18,6 +18,7 @@
 #define _TXN_H_
 
 #include "global.h"
+#include "query.h"
 #include "helper.h"
 #include "semaphore.h"
 #include "array.h"
@@ -53,6 +54,8 @@ public:
 	uint64_t    location;   //node id of server the data location
 	uint64_t    offset;
 #endif
+	uint64_t	key;
+	uint64_t	partition_id;
 	void cleanup();
 };
 
@@ -223,50 +226,67 @@ public:
 
     uint64_t get_part_num(uint64_t num,uint64_t part);
 	RC get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, itemid_t *m_item, row_t *& row_local, uint64_t cor_id);
-    row_t * read_remote_row(uint64_t target_server,uint64_t remote_offset);
-    itemid_t * read_remote_index(uint64_t target_server,uint64_t remote_offset,uint64_t key);
+    RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc,uint64_t part_id);
 
-    bool write_remote_row(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content);
-    bool write_remote_index(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *write_content);
-    bool write_unlock_remote_content(uint64_t target_server,uint64_t operate_size,uint64_t remote_offset,char *local_buf);//TODO
-
-    bool get_version(row_t * temp_row,uint64_t * change_num,Transaction *txn);
-    uint64_t cas_remote_content(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value );
-	bool loop_cas_remote(uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value);
-    RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc);
-#if BATCH_INDEX_AND_READ
-    void batch_read(yield_func_t &yield, BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin, uint64_t cor_id);
-	void get_batch_read(yield_func_t &yield, BatchReadType rtype,int loc, vector<vector<uint64_t>> remote_index_origin, uint64_t cor_id);
-#endif
-//***********coroutine**********//
-
-	row_t * read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
-    itemid_t * read_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t key, uint64_t cor_id);
+	//---- Base RDMA primitives ----//
+	RC read_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t operate_size, char* local_buf, uint64_t cor_id);
+	RC write_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, char* local_buf, uint64_t cor_id, bool outstanding = false);
+	//---- Next step RDMA primitives ----//
+	RC read_remote_index(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,uint64_t key, itemid_t * item, uint64_t cor_id);
+	RC read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, row_t * row, uint64_t cor_id);
+	RC write_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
+    RC write_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
+    RC cas_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t old_value, uint64_t new_value, uint64_t *result, uint64_t cor_id);
+    RC faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t value_to_add, uint64_t *result, uint64_t cor_id, int num = 1, bool outstanding = false);
+	RC loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value, uint64_t cor_id);
 #if USE_REPLICA
-	uint64_t read_remote_log_head(yield_func_t &yield, uint64_t target_server, uint64_t cor_id);
- 	char* read_remote_log(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t cor_id);
+	RC read_remote_log_head(yield_func_t &yield, uint64_t target_server, uint64_t* result, uint64_t cor_id);
+ 	RC check_log_in_remote_buffer(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t *result_offset, uint64_t cor_id);
+ 	RC write_remote_log(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id, int num = 1, bool outstanding = false);
 #endif
-	void read_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t operate_size, char* local_buf, uint64_t cor_id);
 
-    bool write_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
-    bool write_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
-#if USE_REPLICA
- 	bool write_remote_log(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id, int num = 1, bool outstanding = false);
-#endif
-	bool write_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, char* local_buf, uint64_t cor_id, bool outstanding = false);
-
-    uint64_t cas_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t old_value, uint64_t new_value, uint64_t cor_id);
-    uint64_t faa_remote_content(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset, uint64_t value_to_add, uint64_t cor_id, int num = 1, bool outstanding = false);
-
-	bool loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value, uint64_t cor_id);
-
+	// For check timeout
+	bool is_time_out() {
+		uint64_t now = get_sys_clock();
+		return now - last_send_msg > EXECUTOR_FAILED_TIME;
+	}
+	void update_send_time() {
+		last_send_msg = get_sys_clock();
+	}
+	bool is_enqueue = false;
+	uint64_t new_coordinator = -1;
+	bool is_recover = false;
+	// For recover
 	Array<uint64_t> failed_partition;
+	virtual void insert_failed_partition(uint64_t key) = 0;
+	bool all_partition_alive(); 
+	// Check response
+	inline void update_single_query_status(execute_node &node,uint64_t return_id, OpStatus status) {
+		if (node.execute_node == return_id) {
+			for (int j = 0; j < failed_partition.size(); j++) {
+				if (failed_partition[j] == node.stored_node) {
+					// 当目前状态还没进入准备阶段之前，节点状态设置为PREP_ABORT
+					// 否则，设置为COM_ABORT。
+					node.status = status < PREP_ABORT ? PREP_ABORT : COM_ABORT;
+					break;
+				}
+			}	
+			if (node.status != PREP_ABORT &&
+				node.status != COM_ABORT &&
+				node.status < status) node.status = status;
+		}
+	}
+	virtual RC check_query_status(OpStatus status) = 0;
+	virtual void update_query_status(uint64_t return_id, OpStatus status) = 0;
+	virtual void update_query_status(bool timeout_check) = 0;
+  	virtual RC resend_remote_subtxn() = 0;
+	virtual RC agent_check_commit() = 0;
 
 	bool isRecon() {
 		assert(CC_ALG == CALVIN || !recon);
 		return recon;
 	};
-		bool recon;
+	bool recon;
 
 	row_t * volatile cur_row;
 	// [DL_DETECT, NO_WAIT, WAIT_DIE]
@@ -309,11 +329,11 @@ public:
 #endif
 	bool aborted;
 	uint64_t return_id;
-	RC        validate(yield_func_t &yield, uint64_t cor_id);
+	RC        		validate(yield_func_t &yield, uint64_t cor_id);
 	void            cleanup(yield_func_t &yield, RC rc, uint64_t cor_id);
 	void            cleanup_row(yield_func_t &yield, RC rc,uint64_t rid, vector<vector<uint64_t>>&remote_access, uint64_t cor_id);
-	void release_last_row_lock();
-	RC send_remote_reads();
+	void 			release_last_row_lock();
+	RC 				send_remote_reads();
 
 	void set_end_timestamp(uint64_t timestamp) {txn->end_timestamp = timestamp;}
 
@@ -330,7 +350,7 @@ public:
 	uint64_t get_batch_id() {return txn->batch_id;}
 	void set_batch_id(uint64_t batch_id) {txn->batch_id = batch_id;}
 
-		// For MaaT
+	// For MaaT
 	uint64_t commit_timestamp;
 	uint64_t get_commit_timestamp() {return commit_timestamp;}
 	void set_commit_timestamp(uint64_t timestamp) {commit_timestamp = timestamp;}
@@ -342,15 +362,8 @@ public:
 
 	uint64_t twopl_wait_start;
 
-	// For Tictoc
-	uint64_t _min_commit_ts;
-	uint64_t _max_commit_ts;
-	volatile uint32_t _num_lock_waits;
-	bool _signal_abort;
-	bool _is_sub_txn;
-
 	uint64_t _timestamp;
-	uint64_t     get_priority() { return _timestamp; }
+	uint64_t get_priority() { return _timestamp; }
 	// debug time
 	uint64_t _start_wait_time;
 	uint64_t _lock_acquire_time;
@@ -359,7 +372,6 @@ public:
 	////////////////////////////////
 	// LOGGING
 	////////////////////////////////
-//	void 			gen_log_entry(int &length, void * log);
 	bool log_flushed;
 	bool repl_finished;
 	Transaction * txn;
@@ -369,6 +381,7 @@ public:
 	uint64_t get_abort_cnt() {return abort_cnt;}
 	uint64_t abort_cnt;
 	int received_response(RC rc);
+	int received_response(AckMessage* msg, OpStatus state);
 	bool waiting_for_response();
 	RC get_rc() {return txn->rc;}
 	void set_rc(RC rc) {txn->rc = rc;}
@@ -399,7 +412,6 @@ public:
 	uint64_t log_idx[NODE_CNT]; //redo_log_buf.get_size() if no log 
 
 protected:
-
 	int rsp_cnt;
 	void            insert_row(row_t * row, table_t * table);
 
@@ -414,6 +426,11 @@ protected:
 	row_t * last_row;
 	row_t * last_row_rtn;
 	access_t last_type;
+
+	// For check timeout
+	//! For coordinator, it will be updated after each message is sent
+	//! For agent coordinator/executor, it will be updated after return RACK_PREP
+	uint64_t last_send_msg; 
 
 	sem_t rsp_mutex;
 	bool registed_;

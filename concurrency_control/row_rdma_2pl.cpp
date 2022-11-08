@@ -57,7 +57,7 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
     bool conflict = conflict_lock(lock_info, type, new_lock_info);
     if (conflict) {
         #if DEBUG_PRINTF
-        printf("---thread id:%lu, lock failed!!!!!!  nodeid-key : %u; %lu , txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, row->get_primary_key(), txn->get_txn_id(), lock_info, new_lock_info);  
+        printf("---thread id:%lu, lock %s failed!!!!!!  nodeid-key : %u; %lu , txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), type == DLOCK_EX ? "write" : "shared", g_node_id, row->get_primary_key(), txn->get_txn_id(), lock_info, new_lock_info);  
         #endif
         rc = Abort;
 	    return rc;
@@ -68,8 +68,11 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
     uint64_t thd_id = txn->get_thd_id();
 
     uint64_t try_lock = -1;
-    try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,lock_info,new_lock_info,cor_id);
-
+    rc = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,lock_info,new_lock_info,&try_lock,cor_id);
+    if (rc != RCOK) {
+        rc = rc == NODE_FAILED ? Abort : rc;
+        return rc;
+    }
     if(try_lock != lock_info){ //如果CAS失败，原子性被破坏	
         #if DEBUG_PRINTF
             printf("---atomic_retry_lock\n");
@@ -87,7 +90,7 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
     }         
     else{   //加锁成功
     #if DEBUG_PRINTF
-        printf("---thread id:%lu, lock success, nodeid-key : %u; %lu , txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), g_node_id, row->get_primary_key(), txn->get_txn_id(), lock_info, new_lock_info);
+        printf("---thread id:%lu, lock %s success, nodeid-key : %u; %lu , txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), type == DLOCK_EX ? "write" : "shared", g_node_id, row->get_primary_key(), txn->get_txn_id(), lock_info, new_lock_info);
     #endif
         rc = RCOK;
     } 
@@ -100,7 +103,11 @@ local_retry_lock:
     uint64_t try_lock = -1;
     uint64_t lock_type = 0;
     retry_time ++;
-    try_lock = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txn->get_txn_id(),cor_id);
+    rc = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txn->get_txn_id(),&try_lock, cor_id);
+    if (rc != RCOK) {
+        rc = rc == NODE_FAILED ? Abort : rc;
+        return rc;
+    }
     if(try_lock != 0 && !simulation->is_done()) {
         // rc = Abort;
         // return rc;

@@ -26,6 +26,20 @@ class YCSBQuery;
 class TPCCQuery;
 class PPSQuery;
 
+enum OpStatus {
+    RUN = 0, 
+    PREPARE,  // 准备阶段通过，下来发送提交消息
+    PREP_ABORT, // 准备阶段发生的错误
+    COMMIT_RESEND, // 标记为COMMIT_RESEND的消息，(将/正在)重发给其他节点
+    COM_ABORT, // 提交阶段发生的错误
+    COMMIT};
+
+typedef struct execute_node {
+  uint64_t stored_node;
+  uint64_t execute_node;
+  OpStatus status;
+}execute_node;
+
 class BaseQuery {
 public:
     virtual ~BaseQuery() {}

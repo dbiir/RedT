@@ -38,6 +38,7 @@
 #include "mem_alloc.h"
 #include "query.h"
 #include "msg_queue.h"
+#include "work_queue.h"
 #include "message.h"
 #include "src/rdma/sop.hh"
 #include "qps/op.hh"
@@ -112,7 +113,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 
 	if(IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
-		DEBUG("Running txn %ld\n",txn->txn_id);
+		DEBUG_T("Running txn %ld\n",txn->txn_id);
 		//query->print();
 		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
 		query->centers_touched.add_unique(g_center_id);
@@ -185,7 +186,7 @@ RC YCSBTxnManager::run_txn_post_wait() {
 
 bool YCSBTxnManager::is_done() { 
 #if PARAL_SUBTXN == true
-	return (next_record_id >= ((YCSBQuery*)query)->requests.size() && !waiting_for_response());
+	return (next_record_id >= ((YCSBQuery*)query)->requests.size());
 #else
 	return next_record_id >= ((YCSBQuery*)query)->requests.size();
 #endif
@@ -215,33 +216,8 @@ bool YCSBTxnManager::is_local_request(uint64_t idx) {
   return GET_NODE_ID(_wl->key_to_part(((YCSBQuery*)query)->requests[idx]->key)) == g_node_id;
 }
 
-#if BATCH_INDEX_AND_READ
-void YCSBTxnManager::ycsb_batch_read(yield_func_t &yield,BatchReadType rtype, uint64_t cor_id){
-  	YCSBQuery* ycsb_query = (YCSBQuery*) query;
-	vector<vector<uint64_t>> remote_index(g_node_cnt);
 
-	for(int i=0;i<ycsb_query->requests.size();i++){
-		ycsb_request * req = ycsb_query->requests[i];
-		uint64_t part_id = _wl->key_to_part( req->key );
-		uint64_t loc = GET_NODE_ID(part_id);
-		if(loc != g_node_id){  //remote
-			remote_index[loc].push_back(i);
-		}
-	}
-	for(int i=0;i<g_node_cnt;i++){
-		if(remote_index[i].size()>0){
-			batch_read(yield, rtype, i, remote_index, cor_id);
-		}
-	}
-	for(int i=0;i<g_node_cnt;i++){
-		if(remote_index[i].size()>0){
-			get_batch_read(yield, rtype,i, remote_index, cor_id);
-		}
-	}
- }
-#endif
-
-itemid_t* YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, uint64_t cor_id) {
+RC YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, itemid_t* item, uint64_t cor_id) {
 	uint64_t part_id = _wl->key_to_part( req->key );
   	uint64_t loc = GET_NODE_ID(part_id);
 	// printf("loc:%d and g_node_id:%d\n", loc, g_node_id);
@@ -258,24 +234,30 @@ itemid_t* YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_reque
 	uint64_t index_addr = (index_key) * sizeof(IndexInfo);
 	uint64_t index_size = sizeof(IndexInfo);
 
-    itemid_t* item = read_remote_index(yield, loc, index_addr,req->key, cor_id);
-	return item;
+    // itemid_t* item;
+	RC rc = read_remote_index(yield, loc, index_addr,req->key, item, cor_id);
+	return rc;
 }
 
 RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_request * req, row_t *& row_local, uint64_t cor_id) {
 	// get the index of row to be operated
 	
 	itemid_t * m_item;
-#if BATCH_INDEX_AND_READ
-	m_item = reqId_index.find(next_record_id)->second;
-#else
-    m_item = ycsb_read_remote_index(yield, req, cor_id);
-#endif
+
+    RC rc = ycsb_read_remote_index(yield, req, m_item, cor_id);
+	if (rc != RCOK) {
+		rc = rc == NODE_FAILED ? Abort : rc;
+		return rc;
+	}
 	uint64_t part_id = _wl->key_to_part( req->key );
-    uint64_t loc = GET_NODE_ID(part_id);
+    // uint64_t loc = GET_NODE_ID(part_id);
+	uint64_t loc = get_primary_node_id(part_id);
+	if (loc == -1) {
+		return Abort;
+	}
 	assert(loc != g_node_id);
     
-    RC rc = RCOK;
+    // RC rc = RCOK;
     uint64_t version = 0;
 
 	rc = get_remote_row(yield, req->acctype, loc, m_item, row_local, cor_id);
@@ -319,17 +301,12 @@ RC YCSBTxnManager::send_remote_subtxn() {
 			}
 		}
 	}
-	// printf("txn %lu, is_primary: %d %d %d %d\n", get_txn_id(),is_primary[0],is_primary[1],is_primary[2],is_primary[3]);
 	//get rsp_cnt
 	rsp_cnt = 0;
 	for(int i=0;i<query->centers_touched.size();i++){
 		if(is_primary[query->centers_touched[i]]) ++rsp_cnt;
 	}
 	--rsp_cnt; //exclude this center
-	// rsp_cnt = query->centers_touched.size() - 1;
-	// printf("p_rsp_cnt: %d\n", rsp_cnt);
-
-
 	//get extra_wait and req_need_wait
 	for(int i = 0; i < ycsb_query->requests.size(); i++) {
 		ycsb_request * req = ycsb_query->requests[i];
@@ -365,6 +342,7 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	return rc;
 }
 
+//! now useless
 RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 
@@ -446,24 +424,30 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	uint32_t center_id = GET_CENTER_ID(node_id);
 	uint32_t f1_center = GET_CENTER_ID(f1_id);
 	uint32_t f2_center = GET_CENTER_ID(f2_id);
-  	bool is_local = node_id == g_node_id;
+	bool is_local = node_id == g_node_id;
+	bool is_center = center_id == g_center_id;
+
+	// DEBUG_T("txn %lu, handle req %d ? is_center %d, is_local %d\n", get_txn_id(),next_record_id,is_center,is_local);
+
+	// Get and check whether local route table is different from the origin.
+
+	
 	RC rc = RCOK;
 	switch (state) {
 	case YCSB_0 :
 		if(is_local) {
 			rc = run_ycsb_0(yield,req,row,cor_id);
-		} else if (rdma_one_side() && center_id == g_center_id) {
-			// printf("LOCAL CENTER: %ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
+			if (rc == Abort) req->primary.status = OpStatus::PREP_ABORT;
+  			else req->primary.status = OpStatus::PREPARE;
+		} else if (rdma_one_side() && is_center) {
 			rc = send_remote_one_side_request(yield, req, row, cor_id);
+			if (rc == Abort) req->primary.status = OpStatus::PREP_ABORT;
+  			else req->primary.status = OpStatus::PREPARE;
 		} else {
-			// printf("REMOTE CENTER: %ld:%ld:%ld:%ld in run txn    %ld:%ld\n",cor_id,get_txn_id(), req->key, next_record_id, GET_NODE_ID(part_id), g_node_id);
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
-			if (waiting_for_response() ) {
-				rc = WAIT_REM;
-			} else {
-				rc = RCOK;
-			}
-			
+			// if (waiting_for_response()) rc = WAIT_REM;
+			// else rc = RCOK;
+			rc = RCOK;
 #else
 			rc = send_remote_request();
 #endif
@@ -472,11 +456,8 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	case YCSB_1 :
 		//read local row,for message queue by TCP/IP,write set has actually been written in this point,
 		//but for rdma, it was written in local, the remote data will actually be written when COMMIT
-		if(center_id == g_center_id){
-			rc = run_ycsb_1(req->acctype,row);  
-		}else{
-			rc = RCOK;
-		}
+		if(is_center) rc = run_ycsb_1(req->acctype,row);  
+		else rc = RCOK;
 		break;
 	case YCSB_FIN :
 		state = YCSB_FIN;
@@ -486,57 +467,56 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
   }
 
   if (rc == RCOK) next_ycsb_state();
-
   return rc;
 }
 
 RC YCSBTxnManager::run_ycsb_0(yield_func_t &yield,ycsb_request * req,row_t *& row_local,uint64_t cor_id) {
-  uint64_t starttime = get_sys_clock();
-  RC rc = RCOK;
-  int part_id = _wl->key_to_part( req->key );
-  access_t type = req->acctype;
-  itemid_t * m_item;
-  INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
-  m_item = index_read(_wl->the_index, req->key, part_id);
-  starttime = get_sys_clock();
-  row_t * row = ((row_t *)m_item->location);
-  if (INDEX_STRUCT == IDX_RDMA) {
-    mem_allocator.free(m_item, sizeof(itemid_t));
-  }
-  INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
-  rc = get_row(yield,row, type,row_local,cor_id);
-  return rc;
+	uint64_t starttime = get_sys_clock();
+	RC rc = RCOK;
+	int part_id = _wl->key_to_part( req->key );
+	access_t type = req->acctype;
+	itemid_t * m_item;
+	INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
+	m_item = index_read(_wl->the_index, req->key, part_id);
+	starttime = get_sys_clock();
+	row_t * row = ((row_t *)m_item->location);
+	if (INDEX_STRUCT == IDX_RDMA) {
+		mem_allocator.free(m_item, sizeof(itemid_t));
+	}
+	INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
+	rc = get_row(yield,row,type,row_local,cor_id);
+	return rc;
 }
 
 RC YCSBTxnManager::run_ycsb_1(access_t acctype, row_t * row_local) {
-  uint64_t starttime = get_sys_clock();
-  if (acctype == RD || acctype == SCAN) {
-	int fid = 0;
-	char * data = row_local->get_data();
-	uint64_t fval __attribute__ ((unused));
-	fval = *(uint64_t *)(&data[fid * 100]); //read fata and store to fval
-#if ISOLATION_LEVEL == READ_COMMITTED || ISOLATION_LEVEL == READ_UNCOMMITTED
-	// Release lock after read
-	release_last_row_lock();
-#endif
-
-  } 
-  else {
-	assert(acctype == WR);
+	uint64_t starttime = get_sys_clock();
+	if (acctype == RD || acctype == SCAN) {
 		int fid = 0;
-	  char * data = row_local->get_data();
-	  *(uint64_t *)(&data[fid * 100]) = 0; //write data, set data[0]=0
-#if YCSB_ABORT_MODE
-	if (data[0] == 'a') return RCOK;
-#endif
+		char * data = row_local->get_data();
+		uint64_t fval __attribute__ ((unused));
+		fval = *(uint64_t *)(&data[fid * 100]); //read fata and store to fval
+	#if ISOLATION_LEVEL == READ_COMMITTED || ISOLATION_LEVEL == READ_UNCOMMITTED
+		// Release lock after read
+		release_last_row_lock();
+	#endif
 
-#if ISOLATION_LEVEL == READ_UNCOMMITTED
-	// Release lock after write
-	release_last_row_lock();
-#endif
-  }
-  INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
-  return RCOK;
+	} 
+	else {
+		assert(acctype == WR);
+			int fid = 0;
+		char * data = row_local->get_data();
+		*(uint64_t *)(&data[fid * 100]) = 0; //write data, set data[0]=0
+	#if YCSB_ABORT_MODE
+		if (data[0] == 'a') return RCOK;
+	#endif
+
+	#if ISOLATION_LEVEL == READ_UNCOMMITTED
+		// Release lock after write
+		release_last_row_lock();
+	#endif
+	}
+	INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
+	return RCOK;
 }
 
 RC YCSBTxnManager::run_calvin_txn(yield_func_t &yield,uint64_t cor_id) {
@@ -624,7 +604,7 @@ RC YCSBTxnManager::run_ycsb(yield_func_t &yield,uint64_t cor_id) {
 	if (this->phase == CALVIN_LOC_RD && req->acctype == WR) continue;
 	if (this->phase == CALVIN_EXEC_WR && req->acctype == RD) continue;
 
-		uint64_t part_id = _wl->key_to_part( req->key );
+	uint64_t part_id = _wl->key_to_part( req->key );
 	bool loc = GET_NODE_ID(part_id) == g_node_id;
 
 	if (!loc) continue;
@@ -706,25 +686,6 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 		}
 	}
 #if RDMA_DBPAOR
-	// int nnum = 0;
-	// for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
-	// 	if(change_cnt[i]>0) ++nnum;
-	// }
-	// DBrequests dbreq(nnum);
-	// dbreq.init();
-	// //get remote tail
-	// int count = 0;
-	// for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
-	// 	if(change_cnt[i]>0){
-	// 		int num_of_entry = 1;
-    //         uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(get_thd_id(),count+1);            
-	// 		uint64_t remote_off= (uint64_t)(remote_mr_attr[i].buf + rdma_buffer_size-rdma_log_size+sizeof(uint64_t));
-	// 		dbreq.set_faa_meta(count,num_of_entry,local_buf,remote_off);
-	// 		++count;
-	// 	}
-	// }
-	// auto dbres = dbreq.post_reqs(rc_qp[i][thd_id]);
-
 	//batch faa
     uint64_t starttime = get_sys_clock();
 	uint64_t count = 0;
@@ -732,7 +693,13 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
 		if(change_cnt[i]>0){
 			//use RDMA_FAA for local and remote
-			faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id, count+1, true);
+			uint64_t result = -1;
+			rc = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, &result, cor_id, count+1, true);
+			// todo: I do not know whether I should abort here.
+			if (rc != RCOK) {
+				rc = rc == NODE_FAILED ? Abort : rc;
+				return rc;
+			}
 			++count;
 		}
 	}
@@ -746,11 +713,15 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			assert(false); //not support yet
 			#else
 			auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp();
-			RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+			// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 			uint64_t endtime = get_sys_clock();
 			INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 			DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 			INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+			if (res_p != rdmaio::IOCode::Ok) {
+				node_status.set_node_status(i, NS::Failure);
+				return NODE_FAILED;
+			}
 			#endif
     		uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(get_thd_id(),count+1);
 			start_idx[i] = *local_buf;
@@ -767,7 +738,12 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			}else{ //remote log
 				pthread_mutex_lock( LOG_HEAD_LATCH[i] );
 				while(start_idx[i] + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
-					log_head[i] = read_remote_log_head(yield, i, cor_id);
+					rc = read_remote_log_head(yield, i, &log_head[i], cor_id);
+					if (rc != RCOK) {
+						rc = rc == NODE_FAILED ? Abort : rc;
+						return rc;
+					}
+					// todo: I do not know whether I should abort here.
 				}
 				pthread_mutex_unlock( LOG_HEAD_LATCH[i] );
 				if(simulation->is_done()) break;
@@ -790,14 +766,12 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			}else{ //remote log
 				start_idx[i] = start_idx[i] % redo_log_buf.get_size();
 				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx[i]);
-				// //for debug purpose
-				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
-				// assert(le->state == EMPTY);
-				// assert(le->change_cnt == 0);
-				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id, count+1,true);
-				//for debug purpose
-				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
-				// assert(le->state == LOGGED);
+
+				rc = write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id, count+1,true);
+				if (rc != RCOK) {
+					rc = rc == NODE_FAILED ? Abort : rc;
+					return rc;
+				}
 				++count;
 			}
 			log_idx[i] = start_idx[i];
@@ -814,13 +788,17 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				assert(false); //not support yet
 				#else
 				auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp();
-				RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+				// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 				uint64_t endtime = get_sys_clock();
 				INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 				INC_STATS(get_thd_id(), rdma_read_cnt, 1);
 				INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 				INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 				DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
+				if (res_p != rdmaio::IOCode::Ok) {
+					node_status.set_node_status(i, NS::Failure);
+					return NODE_FAILED;
+				}
 				#endif
 			}
 		}
@@ -831,7 +809,9 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 		if(change_cnt[i]>0){
 			int num_of_entry = 1;
 			//use RDMA_FAA for local and remote
-			uint64_t start_idx = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id);
+			uint64_t start_idx = -1;
+			rc = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, &start_idx, cor_id);
+			// todo: I do not know whether I should abort here.
 
 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
 
@@ -863,14 +843,11 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				//consider possible overwritten: if no space, wait until cleaned 
 				//first prevent concurrent read and write among threads
 				pthread_mutex_lock( LOG_HEAD_LATCH[i] );
-				// while(start_idx + num_of_entry < log_head[i]){
-				// 	//wait for head to reset
-				// 	assert(false);
-			// 	log_head[i] = read_remote_log_head(yield, i, cor_id);					
-				// }
+
 				while(start_idx + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
 					//wait for AsyncRedoThread to clean buffer
-					log_head[i] = read_remote_log_head(yield, i, cor_id);
+					rc = read_remote_log_head(yield, i, &log_head[i], cor_id);
+					// todo: I do not know whether I should abort here.
 				}
 				pthread_mutex_unlock( LOG_HEAD_LATCH[i] );
 				if(simulation->is_done()) break;
@@ -878,17 +855,8 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				start_idx = start_idx % redo_log_buf.get_size();
 
 				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx);
-				
-				// //for debug purpose
-				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
-				// assert(le->state == EMPTY);
-				// assert(le->change_cnt == 0);
 
 				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id);
-				//for debug purpose
-				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
-				// assert(le->state == LOGGED);
-
 			}
 			log_idx[i] = start_idx;
 			mem_allocator.free(newEntry, sizeof(LogEntry));
@@ -898,3 +866,169 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	return rc;
 }
 #endif
+
+
+void YCSBTxnManager::update_query_status(uint64_t return_id, OpStatus status) {
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	for(int i=0;i<ycsb_query->requests.size();i++){ 
+		ycsb_request * req = ycsb_query->requests[i];
+		update_single_query_status(req->primary, return_id, status);
+		update_single_query_status(req->second1, return_id, status);
+		update_single_query_status(req->second2, return_id, status);
+	}
+}
+
+void YCSBTxnManager::update_query_status(bool timeout_check) {
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	if (timeout_check) {
+		// 消息超时以后，检查哪些需要重发
+		for(int i=0;i<ycsb_query->requests.size();i++){ 
+			ycsb_request * req = ycsb_query->requests[i];
+			if(req->acctype!=WR) {continue;}
+			if(req->primary.status == PREPARE) req->primary.status == COMMIT_RESEND;
+			if (req->second1.status == PREPARE) req->second1.status = COMMIT_RESEND;
+			if (req->second2.status == PREPARE) req->second2.status = COMMIT_RESEND;
+		}
+	} else {
+		// 执行器返回节点崩溃以后，检查需要重发的消息
+		for(int i=0;i<ycsb_query->requests.size();i++){ 
+			ycsb_request * req = ycsb_query->requests[i];
+			if(req->acctype!=WR) {continue;}
+			if(req->primary.status == COM_ABORT) req->primary.status == COMMIT_RESEND;
+			if (req->second1.status == COM_ABORT) req->second1.status = COMMIT_RESEND;
+			if (req->second2.status == COM_ABORT) req->second2.status = COMMIT_RESEND;
+		}
+	}
+}
+
+RC YCSBTxnManager::check_query_status(OpStatus status) {
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	RC can_enter_next_state = RCOK;
+	// 检查当前消息是否收集全了
+	for(int i=0;i<ycsb_query->requests.size();i++){ 
+		ycsb_request * req = ycsb_query->requests[i];
+		if(req->primary.status == PREP_ABORT) {
+			DEBUG_T("txn %ld need wait, due to req %d abort\n",get_txn_id(), i);
+			return Abort;
+		}
+		else if (req->primary.status < status) {
+			DEBUG_T("txn %ld need wait, due to req %d primary status %ld:%ld\n",get_txn_id(), i, req->primary.status, status);
+			return WAIT;
+		}
+		if(req->acctype==WR) {
+			if (req->second1.status == PREP_ABORT &&
+				req->second2.status == PREP_ABORT) {
+				DEBUG_T("txn %ld need wait, due to req %d secondary status %ld, %ld abort, %\n",get_txn_id(), i, req->second1.status, req->second2.status);
+				return Abort;
+			}
+			if (req->second1.status < status &&
+				req->second2.status < status) {
+				DEBUG_T("txn %ld need wait, due to req %d secondary status %ld,%ld:%ld\n",get_txn_id(), i, req->second1.status, req->second2.status, status);
+				return WAIT;
+			}
+		}
+	}
+
+	return can_enter_next_state;
+}
+
+RC YCSBTxnManager::resend_remote_subtxn() {
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	RC rc = RCOK;
+	vector<vector<uint64_t>> resend_center{g_center_cnt};
+	for(int i = 0; i < ycsb_query->requests.size(); i++) {
+		ycsb_request * req = ycsb_query->requests[i];
+		if(req->acctype!=WR) {continue;}
+		uint64_t loc = -1;
+		uint64_t part_id = _wl->key_to_part(req->key);
+		vector<uint64_t> node_id;
+		if(req->primary.status == COMMIT_RESEND){
+			loc = get_primary_node_id(part_id);
+			if (loc == -1) return WAIT;
+			node_id.push_back(loc);
+			req->primary.stored_node = loc;
+
+			req->primary.status == PREPARE;
+			DEBUG_T("resend-detail resend txn %ld req primary %ld to %ld\n",get_txn_id(),i,loc);
+		}
+		if(req->second1.status == COMMIT_RESEND){
+			loc = get_follower1_node_id(part_id);
+			if (loc == -1) return WAIT;
+			node_id.push_back(loc);
+			req->second1.stored_node = loc;
+			// 正在重发
+			req->second1.status == PREPARE;
+			DEBUG_T("resend-detail resend txn %ld req second1 %ld to %ld\n",get_txn_id(),i,loc);
+		}
+		if(req->second2.status == COMMIT_RESEND){
+			loc = get_follower2_node_id(part_id);
+			if (loc == -1) return WAIT;
+			node_id.push_back(loc);
+			req->second2.stored_node = loc;
+
+			req->second2.status == PREPARE;
+			DEBUG_T("resend-detail resend txn %ld req second2 %ld to %ld\n",get_txn_id(),i,loc);
+		}
+		// Check exist executor
+		for(int j=0;j<node_id.size();j++){
+			uint64_t center_id = GET_CENTER_ID(node_id[j]);
+			resend_center[center_id].push_back(i);
+			ycsb_query->centers_touched.add_unique(center_id);
+			ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id[j]));
+			//center_master is set as the first toughed primary, if not exist, use the first toughed backup.
+			auto ret = center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id[j]));
+			if(ret.second == false){
+				uint64_t actnode_id = center_master[center_id];
+				auto st = node_status.get_node_status(actnode_id);
+				if(st.status == Failure){
+					center_master[center_id] = node_id[j]; //change center_master
+					is_primary[center_id] = true;
+				}
+			}else{
+				is_primary[center_id] = (j == 0 ? true : false); 
+			}
+		}
+	}
+
+ 	for(auto iter = center_master.begin(); iter != center_master.end(); iter++){
+		uint64_t center_id = iter->first;
+		uint64_t executore_id = iter->second;
+		for(int i = 0; i < ycsb_query->requests.size(); i++) {
+			ycsb_request * req = ycsb_query->requests[i];
+			if(req->acctype!=WR) {continue;}
+			if (req->primary.status == COMMIT_RESEND && GET_CENTER_ID(req->primary.stored_node) == center_id)
+				req->primary.execute_node = executore_id;
+			if (req->second1.status == COMMIT_RESEND && GET_CENTER_ID(req->second1.stored_node) == center_id)
+				req->second1.execute_node = executore_id;
+			if (req->second2.status == COMMIT_RESEND && GET_CENTER_ID(req->second2.stored_node) == center_id)
+				req->second2.execute_node = executore_id;
+		}
+	}
+
+	for(int i = 0; i < g_center_cnt; i++) {
+		if(resend_center[i].size() > 0 && i != g_center_id) {//send message to all masters
+			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RECOVER_TXN),center_master[i]);
+			DEBUG_T("%ld Send Recover txn messages to %ld\n",get_txn_id(),center_master[i]);
+		}
+	}
+	#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
+	is_enqueue = true;
+	#endif
+	// txn_stats.wait_for_rsp_time = get_sys_clock();
+	return rc;
+}
+
+RC YCSBTxnManager::agent_check_commit() {
+	for(int i = 0; i < g_center_cnt; i++) {
+		if(remote_center[i].size() > 0 && i != g_center_id) {//send message to all masters
+			msg_queue.enqueue(get_thd_id(),Message::create_message(this,CHECK_TXN),center_master[i]);
+		}
+	}
+	#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
+	is_enqueue = true;
+	#endif
+}

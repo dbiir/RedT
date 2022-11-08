@@ -41,12 +41,13 @@ public:
     this->key = req->key;
     this->value = req->value;
   }
-//	char table_name[80];
 	access_t acctype;
 	uint64_t key;
 	char value;
-	// only for (qtype == SCAN)
-	//UInt32 scan_len;
+  // For 
+  execute_node primary;
+  execute_node second1;
+  execute_node second2;
 };
 
 class YCSBQueryGenerator : public QueryGenerator {

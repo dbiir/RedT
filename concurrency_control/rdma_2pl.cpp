@@ -10,7 +10,7 @@
 #include "log_rdma.h"
 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
-void RDMA_2pl::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnManager * txnMng,uint64_t cor_id) {
+RC RDMA_2pl::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnManager * txnMng,uint64_t cor_id) {
 	//row->copy(data);  //copy access->data to access->orig_row
     //no need for last step:data = orig_row in local situation
 #if CC_ALG == RDMA_NO_WAIT3
@@ -19,7 +19,15 @@ void RDMA_2pl::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, T
     uint64_t try_lock = -1;
     uint64_t off = (char*)row - rdma_global_buffer;
 retry_unlock:
-    try_lock = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),cor_id);
+    RC rc = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),&try_lock,cor_id);
+    // todo: how to continue the commit operation.
+    // In this case, this node must crashed. Thus, we cannot do anything
+    if (rc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        // txnMng->insert_failed_partition();
+        return RCOK;
+    }
+
     if(try_lock != 0 && !simulation->is_done()) {
         goto retry_unlock;
     }
@@ -38,6 +46,10 @@ retry_unlock:
     // printf("txn %d release local lock on item %d, lock_type: %d, try_time:%d \n", txnMng->get_txn_id(), row->get_primary_key(), row->lock_type, try_time);
 #else
     uint64_t lock_info = row->_tid_word;
+    if(!Row_rdma_2pl::has_exclusive_lock(lock_info)) {
+        printf("---thd:%lu, lock unlock write lock fail!!!!!! nodeid-key: %u; %lu, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, 0);
+        return RCOK;
+    }
     row->_tid_word = 0;
 #endif
 #if DEBUG_PRINTF
@@ -45,7 +57,7 @@ retry_unlock:
 #endif
 }
 
-void RDMA_2pl::remote_write_and_unlock(yield_func_t &yield,RC rc, TxnManager * txnMng , uint64_t num,uint64_t cor_id){
+RC RDMA_2pl::remote_write_and_unlock(yield_func_t &yield,RC rc, TxnManager * txnMng , uint64_t num,uint64_t cor_id){
 #if CC_ALG == RDMA_NO_WAIT3
     Access *access = txnMng->txn->accesses[num];
     uint64_t off = access->offset;
@@ -55,12 +67,28 @@ void RDMA_2pl::remote_write_and_unlock(yield_func_t &yield,RC rc, TxnManager * t
 retry_remote_unlock:
     uint64_t try_lock = -1;
 	uint64_t lock_type = 0;
-    try_lock = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),cor_id);
+    RC arc = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),&try_lock, cor_id);
+    // todo: how to continue the commit operation.
+    // In this case, executor find another node crashed.
+    if (arc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        txnMng->insert_failed_partition(access->partition_id);
+        return RCOK;
+    }
+    
     if(try_lock != 0) {
         // printf("cas retry\n");
         if (!simulation->is_done()) goto retry_remote_unlock;
     }
-    row_t * test_row = txnMng->read_remote_row(yield,loc,off,cor_id);
+    row_t * test_row;
+    arc = txnMng->read_remote_row(yield,loc,off,test_row,cor_id);
+    // todo: how to continue the commit operation.
+    if (arc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        txnMng->insert_failed_partition(access->partition_id);
+        return RCOK;
+    }
+
     uint64_t i = 0;
     uint64_t lock_num = 0;
     uint64_t lock_index = txnMng->get_txn_id() % LOCK_LENGTH;
@@ -75,7 +103,10 @@ retry_remote_unlock:
 		try_time ++;
     }
     test_row->_tid_word = 0;
-    assert(txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id) == true);
+    rc = txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id);
+    // todo: how to continue the commit operation.
+
+
 	mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 #else
     Access *access = txnMng->txn->accesses[num];
@@ -95,25 +126,39 @@ retry_remote_unlock:
     // memcpy(test_buf, (char*)data, operate_size);
 
 #if DEBUG_PRINTF
-    row_t * remote_row = txnMng->read_remote_row(yield,loc,off,cor_id);
+    row_t * remote_row;
+    rc = txnMng->read_remote_row(yield,loc,off,remote_row,cor_id);
+    if (rc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        txnMng->insert_failed_partition(access->partition_id);
+        return RCOK;
+    }
     uint64_t orig_lock_info = remote_row->_tid_word;
 	mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
-    // if(CC_ALG == RDMA_NO_WAIT) assert(orig_lock_info == 3);
-    // else if(CC_ALG == RDMA_NO_WAIT2) assert(orig_lock_info == 1);
+    if(!Row_rdma_2pl::has_exclusive_lock(orig_lock_info)) {
+        printf("---thd:%lu, remote unlock write lock fail!!!!!! node-id-key: %u; %ld, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_row->get_primary_key(), txnMng->get_txn_id(), orig_lock_info, 0);
+        return RCOK;
+    }
+        
 #endif
 
-    assert(txnMng->write_remote_row(yield,loc,operate_size,off,(char*)data,cor_id) == true);
-
+    rc = txnMng->write_remote_row(yield,loc,operate_size,off,(char*)data,cor_id);
+    // todo: how to continue the commit operation.
+    if (rc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        txnMng->insert_failed_partition(access->partition_id);
+        return NODE_FAILED;
+    }
 #if DEBUG_PRINTF 
 
-    printf("---thread id:%lu, local unlock shared lock, nodeid-key: %u; %lu, txnid: %lu, origin lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, remote_row->get_primary_key(), txnMng->get_txn_id(), orig_lock_info);
+    printf("---thread id:%lu, remote unlock write lock, nodeid-key: %u; %lu, txnid: %lu, origin lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, remote_row->get_primary_key(), txnMng->get_txn_id(), orig_lock_info);
 
     // printf("---thd: %lu, remote unlock write succ,lock location:%lu; %p, txn: %lu, old lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), orig_lock_info);
 #endif
 #endif
 }
 
-void RDMA_2pl::unlock(yield_func_t &yield,row_t * row , TxnManager * txnMng,uint64_t cor_id){
+RC RDMA_2pl::unlock(yield_func_t &yield,row_t * row , TxnManager * txnMng,uint64_t cor_id){
 #if CC_ALG == RDMA_NO_WAIT
 retry_unlock: 
     uint64_t lock_type;
@@ -125,8 +170,9 @@ retry_unlock:
     new_lock_num = lock_num-1;
     Row_rdma_2pl::info_encode(new_lock_info,lock_type,new_lock_num);
     
-    if(lock_type!=0 || lock_num <= 0) {
-        printf("---thd:%lu, lock unlock read lock fail!!!!!! lock location: %u; %p, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, &row->_tid_word, txnMng->get_txn_id(), lock_info, new_lock_info);
+    if(!Row_rdma_2pl::has_shared_lock(lock_info)) {
+        printf("---thd:%lu, lock unlock read lock fail!!!!!! nodeid-key: %u; %lu, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, new_lock_info);
+        return RCOK;
     }
     assert(lock_type == 0);  //already write locked
     assert(lock_num > 0); //already locked
@@ -136,7 +182,15 @@ retry_unlock:
     uint64_t thd_id = txnMng->get_thd_id();
     uint64_t off = (char*)row - rdma_global_buffer;
 
-    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,lock_info,new_lock_info,cor_id);
+    uint64_t try_lock = -1;
+    RC rc = txnMng->cas_remote_content(yield,loc,off,lock_info,new_lock_info,&try_lock,cor_id);
+    // todo: how to continue the commit operation.
+    if (rc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        // txnMng->insert_failed_partition();
+        return RCOK;
+    }
+
 
     if(try_lock != lock_info){
         //atomicity is destroyed
@@ -161,7 +215,14 @@ retry_unlock:
     uint64_t try_lock = -1;
     uint64_t thd_id = txnMng->get_thd_id();
     uint64_t off = (char*)row - rdma_global_buffer;
-    try_lock = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),cor_id);
+    RC rc = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),&try_lock,cor_id);
+    // todo: how to continue the commit operation.
+    if (rc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        // txnMng->insert_failed_partition();
+        return RCOK;
+    }
+
     if(try_lock != 0) {
         // printf("cas retry\n");
         if (!simulation->is_done()) goto retry_unlock;
@@ -193,14 +254,15 @@ retry_unlock:
 #endif
 }
 
-void RDMA_2pl::remote_unlock(yield_func_t &yield,TxnManager * txnMng , uint64_t num,uint64_t cor_id){
+RC RDMA_2pl::remote_unlock(yield_func_t &yield,TxnManager * txnMng , uint64_t num,uint64_t cor_id){
 #if CC_ALG == RDMA_NO_WAIT 
     Access *access = txnMng->txn->accesses[num];
 
     uint64_t off = access->offset;
     uint64_t loc = access->location;
 
-    row_t * remote_row = txnMng->read_remote_row(yield,loc,off,cor_id);
+    row_t * remote_row;
+    RC rc = txnMng->read_remote_row(yield,loc,off,remote_row,cor_id);
     uint64_t *lock_info = (uint64_t *)mem_allocator.alloc(sizeof(uint64_t));
     *lock_info = remote_row->_tid_word;
 	mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
@@ -213,12 +275,23 @@ remote_retry_unlock:
     Row_rdma_2pl::info_decode(*lock_info,lock_type,lock_num);
     new_lock_num = lock_num-1;
     Row_rdma_2pl::info_encode(new_lock_info,lock_type,new_lock_num);
-
+    if(!Row_rdma_2pl::has_shared_lock(*lock_info)) {
+        printf("---thd:%lu, remote unlock read lock fail!!!!!! nodeid-key: %u; %lu, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, remote_row->get_primary_key(), txnMng->get_txn_id(), lock_info, new_lock_info);
+        return RCOK;
+    }
     assert(lock_type == 0);  //already write locked
     assert(lock_num > 0); //already locked
 
     //remote CAS unlock
-    uint64_t try_lock = txnMng->cas_remote_content(yield,loc,off,*lock_info,new_lock_info,cor_id);
+    uint64_t try_lock = -1;
+    rc = txnMng->cas_remote_content(yield,loc,off,*lock_info,new_lock_info,&try_lock,cor_id);
+    // todo: how to continue the commit operation.
+    if (rc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        // txnMng->insert_failed_partition();
+        return RCOK;
+    }
+
     if(try_lock != *lock_info){ //atomicity is destroyed，CAS fail
         txnMng->num_atomic_retry++;
         total_num_atomic_retry++;
@@ -231,7 +304,7 @@ remote_retry_unlock:
         if (!simulation->is_done()) goto remote_retry_unlock;
     }
 #if DEBUG_PRINTF
-    printf("---thd：%lu, remote unlock lock succ,lock location: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), *lock_info, new_lock_info);
+    printf("---thd：%lu, remote unlock shared lock succ,lock location: %lu; %p, 事务号: %lu, 原lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_mr_attr[loc].buf + off, txnMng->get_txn_id(), *lock_info, new_lock_info);
 #endif
 	mem_allocator.free(lock_info, sizeof(uint64_t));
 #elif CC_ALG == RDMA_NO_WAIT3
@@ -243,12 +316,27 @@ remote_retry_unlock:
 retry_remote_unlock:
     uint64_t try_lock = -1;
 	uint64_t lock_type = 0;
-    try_lock = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),cor_id);
+    RC arc = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),&try_lock,cor_id);
+    // todo: report the failed primary replica to coordinator
+    // For read operation, we do not need to redo this operation.
+    if (arc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        // txnMng->insert_failed_partition();
+        return RCOK;
+    }
+
     if(try_lock != 0) {
         // printf("cas retry\n");
         if (!simulation->is_done()) goto retry_remote_unlock;
     }
-    row_t * test_row = txnMng->read_remote_row(yield,loc,off,cor_id);
+    row_t * test_row;
+    arc = txnMng->read_remote_row(yield,loc,off,test_row,cor_id);
+    if (arc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        // txnMng->insert_failed_partition();
+        return RCOK;
+    }
+
     uint64_t lock_index = txnMng->get_txn_id() % LOCK_LENGTH;
     uint64_t try_time = 0;
     while(try_time <= LOCK_LENGTH) {
@@ -265,15 +353,18 @@ retry_remote_unlock:
         test_row->lock_type = 0;
     }
     test_row->_tid_word = 0;
-    assert(txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id) == true);
+    arc = txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id);
+    // todo: report the failed primary replica to coordinator
+    if (arc == NODE_FAILED) {
+        node_status.set_node_status(loc, NS::Failure);
+        // txnMng->insert_failed_partition();
+        return RCOK;
+    }
 	mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 #endif
 }
 
-
-//write back and unlock
-void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id){
-    Transaction *txn = txnMng->txn;
+RC RDMA_2pl::commit_log(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id) {
 #if USE_REPLICA
     LogEntry * le = (LogEntry *)mem_allocator.alloc(sizeof(LogEntry));
     if(rc == Abort){
@@ -288,7 +379,7 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
     int count = 0;
 	for(int i=0;i<g_node_cnt;i++){
         if(txnMng->log_idx[i] != redo_log_buf.get_size()){
-            assert(le->c_ts != UINT64_MAX && le->c_ts != 0);
+            if (rc != Abort) assert(le->c_ts != UINT64_MAX && le->c_ts != 0);
 			uint64_t start_idx = txnMng->log_idx[i];
 			if(i==g_node_id){ //local 
                 char* start_addr = (char *)redo_log_buf.get_entry(start_idx);
@@ -316,22 +407,35 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
 				assert(false); //not support yet
 				#else
 				auto res_p = rc_qp[i][txnMng->get_thd_id()]->wait_one_comp();
-				RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
+				// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 				uint64_t endtime = get_sys_clock();
 				INC_STATS(txnMng->get_thd_id(), rdma_read_time, endtime-starttime);
 				INC_STATS(txnMng->get_thd_id(), rdma_read_cnt, 1);
 				INC_STATS(txnMng->get_thd_id(), worker_idle_time, endtime-starttime);
 				INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
 				DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
+                if (res_p != rdmaio::IOCode::Ok) {
+                    node_status.set_node_status(i, NS::Failure);
+                    return NODE_FAILED;
+                }
 				#endif
             }
             txnMng->log_idx[i] = redo_log_buf.get_size();
         }
     }
 #endif
-
 #endif
-// #else
+}
+
+//write back and unlock
+RC RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id){
+    Transaction *txn = txnMng->txn;
+
+    RC arc = RCOK;
+    arc = commit_log(yield, rc, txnMng, cor_id);
+    if (arc == NODE_FAILED) {
+        //todo: handle write failed.
+    }
     uint64_t starttime = get_sys_clock();
     //NO_WAIT has no problem of deadlock,so doesnot need to bubble sort the write_set in primary key order
 	int read_set[txn->row_cnt - txn->write_cnt];
@@ -350,12 +454,12 @@ void RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t co
         //local
         if(txn->accesses[read_set[i]]->location == g_node_id){
             Access * access = txn->accesses[ read_set[i] ];
-            unlock(yield,access->orig_row, txnMng,cor_id);
+            if (!txnMng->is_recover) unlock(yield,access->orig_row, txnMng,cor_id);
         }else{
         //remote
             remote_access[txn->accesses[read_set[i]]->location].push_back(read_set[i]);
             Access * access = txn->accesses[ read_set[i] ];
-            remote_unlock(yield,txnMng, read_set[i],cor_id);
+            if (!txnMng->is_recover)remote_unlock(yield,txnMng, read_set[i],cor_id);
         }
     }
     //for write set element,write back and release lock

@@ -36,6 +36,7 @@
 #include "qps/op.hh"
 #include "src/sshed.hh"
 #include "transport.h"
+#include "work_queue.h"
 #include "log_rdma.h"
 
 void TPCCTxnManager::init(uint64_t thd_id, Workload * h_wl) {
@@ -378,11 +379,9 @@ RC TPCCTxnManager::generate_center_master(uint64_t w_id, access_t type) {
 RC TPCCTxnManager::send_remote_subtxn() {
 	assert(IS_LOCAL(get_txn_id()));
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
-	// TPCCRemTxnType next_state = TPCC_FIN;
 	RC rc = RCOK;
 	unordered_set<uint64_t> node_id;
 
-	// 
 	uint64_t w_id = tpcc_query->w_id;
 	generate_center_master(w_id, WR);
 
@@ -458,7 +457,6 @@ RC TPCCTxnManager::send_remote_subtxn() {
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),center_master[i]);
 			// printf("txn %lu, send message to %d\n", get_txn_id(), center_master[i]);
 		}
-		
 	}
 	return rc;
 }
@@ -554,7 +552,7 @@ void TPCCTxnManager::copy_remote_items(TPCCQueryMessage * msg) {
 #endif
 }
 
-itemid_t* TPCCTxnManager::tpcc_read_remote_index(TPCCQuery * query) {
+RC TPCCTxnManager::tpcc_read_remote_index(yield_func_t &yield, TPCCQuery * query, itemid_t* item, uint64_t cor_id) {
     TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	uint64_t w_id = tpcc_query->w_id;
 	uint64_t d_id = tpcc_query->d_id;
@@ -614,17 +612,21 @@ itemid_t* TPCCTxnManager::tpcc_read_remote_index(TPCCQuery * query) {
     
 	assert(loc != g_node_id);
    // printf("【tpcc.cpp:451】read index key = %ld \n",key);
-    itemid_t *item = read_remote_index(loc,remote_offset,key);
+    // itemid_t *item;
+	RC rc = read_remote_index(yield, loc,remote_offset,key,item,cor_id);
 
-	return item;
+	return rc;
 }
 
 RC TPCCTxnManager::send_remote_one_side_request(yield_func_t &yield, TPCCQuery * query,row_t *& row_local, uint64_t cor_id){
     RC rc = RCOK;
 	// get the index of row to be operated
 	itemid_t * m_item;
-	m_item = tpcc_read_remote_index(query);
-
+	rc = tpcc_read_remote_index(yield, query, m_item, cor_id);
+	if (rc != RCOK) {
+		rc = rc == NODE_FAILED ? Abort : rc;
+		return rc;
+	}
     TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	uint64_t w_id = tpcc_query->w_id;
     uint64_t part_id_w = wh_to_part(w_id);
@@ -831,9 +833,10 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	return rc;
 }
 
-inline RC TPCCTxnManager::run_payment_0(yield_func_t &yield,uint64_t w_id, uint64_t d_id, uint64_t d_w_id,
-																				double h_amount, row_t *&r_wh_local,
-                                                                                uint64_t cor_id) {
+inline RC TPCCTxnManager::run_payment_0(yield_func_t &yield,uint64_t w_id, 
+										uint64_t d_id, uint64_t d_w_id,
+										double h_amount, row_t *&r_wh_local,
+										uint64_t cor_id) {
 
 	uint64_t starttime = get_sys_clock();
 	uint64_t key;
@@ -1600,7 +1603,9 @@ RC TPCCTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 		if(change_cnt[i]>0){
 			int num_of_entry = 1;
 			//use RDMA_FAA for local and remote
-			uint64_t start_idx = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id);
+			uint64_t start_idx = -1;
+			rc = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, &start_idx, cor_id);
+			// todo: I do not know whether I should abort here.
 
 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
 
@@ -1632,14 +1637,11 @@ RC TPCCTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				//consider possible overwritten: if no space, wait until cleaned 
 				//first prevent concurrent read and write among threads
 				pthread_mutex_lock( LOG_HEAD_LATCH[i] );
-				// while(start_idx + num_of_entry < log_head[i]){
-				// 	//wait for head to reset
-				// 	assert(false);
-				// 	log_head[i] = read_remote_log_head(yield, i, cor_id);					
-				// }
+
 				while(start_idx + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
 					//wait for AsyncRedoThread to clean buffer
-					log_head[i] = read_remote_log_head(yield, i, cor_id);
+					rc = read_remote_log_head(yield, i, &log_head[i], cor_id);
+					// todo: I do not know whether I should abort here.
 				}
 				pthread_mutex_unlock( LOG_HEAD_LATCH[i] );
 				if(simulation->is_done()) break;
@@ -1647,17 +1649,8 @@ RC TPCCTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				start_idx = start_idx % redo_log_buf.get_size();
 
 				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx);
-				
-				// //for debug purpose
-				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
-				// assert(le->state == EMPTY);
-				// assert(le->change_cnt == 0);
 
 				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id);
-				//for debug purpose
-				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
-				// assert(le->state == LOGGED);
-
 			}
 			log_idx[i] = start_idx;
 			mem_allocator.free(newEntry, sizeof(LogEntry));

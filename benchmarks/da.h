@@ -51,6 +51,7 @@ class DATxnManager : public TxnManager {
   RC run_calvin_txn(yield_func_t &yield,uint64_t cor_id);
 #if USE_REPLICA
 	RC redo_log(yield_func_t &yield, RC status, uint64_t cor_id);
+  RC redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_id);
 #endif
   void copy_remote_items(DAQueryMessage* msg);
 
@@ -65,5 +66,14 @@ class DATxnManager : public TxnManager {
   bool is_local_item(uint64_t idx);
   RC send_remote_request() {return RCOK;}
   RC run_delivery(DAQuery* query);
+  void insert_failed_partition(uint64_t key) {
+    failed_partition.add(key);
+  }
+  void update_query_status(uint64_t return_id, OpStatus status){}
+  void update_query_status(bool timeout_check) {}
+  RC check_query_status(OpStatus status){}
+
+  RC resend_remote_subtxn(){}
+  RC agent_check_commit(){}
 };
 #endif

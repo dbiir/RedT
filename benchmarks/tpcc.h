@@ -135,6 +135,16 @@ public:
   RC run_tpcc_phase5(yield_func_t &yield, uint64_t cor_id);
 	TPCCRemTxnType state;
   void copy_remote_items(TPCCQueryMessage * msg);
+  void insert_failed_partition(uint64_t key) {
+    failed_partition.add(key);
+  }
+  //todo:
+  void update_query_status(uint64_t return_id, OpStatus status){}
+  void update_query_status(bool timeout_check) {}
+  RC check_query_status(OpStatus status){}
+
+  RC resend_remote_subtxn(){}
+  RC agent_check_commit(){}
 private:
 	TPCCWorkload * _wl;
 	volatile RC _rc;
@@ -149,7 +159,7 @@ private:
   bool is_local_item(uint64_t idx);
   RC send_remote_request();
   RC send_remote_subtxn();
-  itemid_t* tpcc_read_remote_index(TPCCQuery * query);
+  RC tpcc_read_remote_index(yield_func_t &yield, TPCCQuery * query, itemid_t * item, uint64_t cor_id);
   RC send_remote_one_side_request(yield_func_t &yield, TPCCQuery * query,row_t *& row_local, uint64_t cor_id);
 
   RC run_payment_0(yield_func_t &yield,uint64_t w_id, uint64_t d_id, uint64_t d_w_id, double h_amount,
