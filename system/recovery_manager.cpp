@@ -46,6 +46,7 @@ RC HeartBeatThread::heartbeat_loop() {
                     msg_queue.enqueue(get_thd_id(), 
                         Message::create_message(route_table.table, node_status.table, HEART_BEAT),
                         dest_id);
+                    DEBUG_T("Node %ld send TCP heartbeat to %ld success\n", g_node_id, dest_id);
                 }
             } else {
                 uint64_t center_id = GET_CENTER_ID(g_node_id);
@@ -109,7 +110,7 @@ RouteAndStatus HeartBeatThread::read_remote_status(uint64_t target_server){
         //todo: handle error.
         node_status.set_node_status(target_server, NS::Failure);
     }
-
+    DEBUG_T("HEARTBEAT read primary node status\n");
 	endtime = get_sys_clock();
 
 	status_node* temp_status = (status_node *)mem_allocator.alloc(SIZE_OF_STATUS);

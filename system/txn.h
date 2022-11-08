@@ -165,6 +165,7 @@ public:
 	virtual RC      run_txn(yield_func_t &yield, uint64_t cor_id) = 0;
 #if USE_REPLICA
 	virtual RC 		redo_log(yield_func_t &yield, RC status, uint64_t cor_id) = 0;
+	virtual RC 		redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_id) = 0;
 #endif
 
 

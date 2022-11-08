@@ -125,9 +125,9 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT  4
+#define CENTER_CNT 3
 #define NODE_CNT 3
-#define THREAD_CNT 2
+#define THREAD_CNT 40
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -168,7 +168,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 6
+#define MAX_TXN_IN_FLIGHT 120
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -476,7 +476,7 @@ enum PPSTxnType {
 #define DEBUG_ASSERT        false
 #define DEBUG_DISTR false
 #define DEBUG_ALLOC false
-#define DEBUG_TXN true
+#define DEBUG_TXN false
 #define DEBUG_RACE false
 #define DEBUG_TIMELINE        false
 #define DEBUG_BREAKDOWN       false
@@ -594,10 +594,13 @@ enum PPSTxnType {
 #define SHMEM_ENV false
 #define ENVIRONMENT_EC2 false
 
-#define HEARTBEAT_TIME 100 * MILLION
+#define HEARTBEAT_TIME 1000 * MILLION
 #define SAME_CENTER_FAILED_TIME 5 * HEARTBEAT_TIME
 #define INTER_CENTER_FAILED_TIME 20 * HEARTBEAT_TIME
 #define EXECUTOR_FAILED_TIME 2 * INTER_CENTER_FAILED_TIME
+
+#define RECOVERY_MANAGER true
+#define RECOVERY_TXN_MECHANISM true
 
 #endif
   

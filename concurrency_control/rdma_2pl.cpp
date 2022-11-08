@@ -427,12 +427,19 @@ RC RDMA_2pl::commit_log(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t 
 #endif
 }
 
+RC RDMA_2pl::commit_recover_log(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id) {
+#if USE_REPLICA
+    return txnMng->redo_commit_log(yield, rc, cor_id);
+#endif
+}
+
 //write back and unlock
 RC RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id){
     Transaction *txn = txnMng->txn;
 
     RC arc = RCOK;
-    arc = commit_log(yield, rc, txnMng, cor_id);
+    if (!txnMng->is_recover) arc = commit_log(yield, rc, txnMng, cor_id);
+    else arc = commit_recover_log(yield, rc, txnMng, cor_id);
     if (arc == NODE_FAILED) {
         //todo: handle write failed.
     }

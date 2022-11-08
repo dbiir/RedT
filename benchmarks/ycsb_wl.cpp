@@ -167,10 +167,14 @@ void * YCSBWorkload::init_table_slice() {
 			//key ++
 	) {
 		int part_id = key_to_part(key); // % g_part_cnt;
+#if RECOVERY_MANAGER
+		if(0) {
+#else
 #if USE_REPLICA
 		if(GET_NODE_ID(part_id) != g_node_id && GET_FOLLOWER1_NODE(part_id) != g_node_id && GET_FOLLOWER2_NODE(part_id) != g_node_id) {
 #else
 		if(GET_NODE_ID(part_id) != g_node_id) {
+#endif
 #endif
 			++key;
 			continue;
@@ -211,9 +215,9 @@ void * YCSBWorkload::init_table_slice() {
 		uint64_t idx_key = primary_key;
 
 		rc = the_index->index_insert(idx_key, m_item, part_id);
-    if (INDEX_STRUCT == IDX_RDMA) {
-      mem_allocator.free(m_item, sizeof(itemid_t));
-    }
+		if (INDEX_STRUCT == IDX_RDMA) {
+			mem_allocator.free(m_item, sizeof(itemid_t));
+		}
 		assert(rc == RCOK);
 #if USE_REPLICA
         key ++;

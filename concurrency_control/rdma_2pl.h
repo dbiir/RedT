@@ -6,6 +6,7 @@ public:
 
     RC finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id);
     RC commit_log(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id);
+    RC commit_recover_log(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id);
 
 private:
     // void write_and_unlock(row_t * row, row_t * data, TxnManager * txnMng); 

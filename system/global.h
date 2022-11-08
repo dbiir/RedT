@@ -165,6 +165,8 @@ extern RowPool row_pool;
 extern QryPool qry_pool;
 extern TxnTable txn_table;
 extern QWorkQueue work_queue;
+extern QWorkQueue heartbeat_queue;
+extern QWorkQueue recover_queue;
 extern AbortQueue abort_queue;
 extern MessageQueue msg_queue;
 extern Client_txn client_man;
@@ -180,14 +182,13 @@ extern RouteTable route_table;
 extern NodeStatus node_status;
 // extern QTcpQueue tcp_queue;
 // extern TcpTimestamp tcp_ts;
-extern QWorkQueue heartbeat_queue;
-extern QWorkQueue recover_queue;
 
 extern map<string, string> g_params;
 
 extern char *rdma_global_buffer;
 // global TxnMeta shared memory 
 extern char *rdma_txntable_buffer;
+
 // global RouteTable shared memory
 extern char *rdma_routetable_buffer;
 // CALVIN share memory
@@ -268,6 +269,7 @@ extern UInt32 g_abort_thread_cnt;
 extern UInt32 g_logger_thread_cnt;
 extern UInt32 g_work_thread_cnt;
 extern UInt32 g_async_redo_thread_cnt;
+extern UInt32 g_recover_thread_cnt;
 extern UInt32 g_tcp_thread_cnt;
 extern UInt32 g_send_thread_cnt;
 extern UInt32 g_rem_thread_cnt;
@@ -282,7 +284,6 @@ extern int32_t g_inflight_max;
 extern uint64_t g_msg_size;
 extern uint64_t g_log_buf_max;
 extern uint64_t g_log_flush_timeout;
-extern UInt32 g_recover_thread_cnt;
 
 extern UInt64 memory_count;
 extern UInt64 tuple_count;
