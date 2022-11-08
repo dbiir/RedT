@@ -47,6 +47,7 @@
 #include "txn_table.h"
 #include "logger.h"
 #include "sim_manager.h"
+// #include "route_table.h"
 
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
@@ -114,6 +115,8 @@ class KeyXidCache;
 class Workload;
 class RouteTable;
 class NodeStatus;
+class status_node;
+class route_table_node;
 // class QTcpQueue;
 // class TcpTimestamp;
 
@@ -177,12 +180,16 @@ extern RouteTable route_table;
 extern NodeStatus node_status;
 // extern QTcpQueue tcp_queue;
 // extern TcpTimestamp tcp_ts;
+extern QWorkQueue heartbeat_queue;
+extern QWorkQueue recover_queue;
 
 extern map<string, string> g_params;
 
 extern char *rdma_global_buffer;
 // global TxnMeta shared memory 
 extern char *rdma_txntable_buffer;
+// global RouteTable shared memory
+extern char *rdma_routetable_buffer;
 // CALVIN share memory
 extern char *rdma_calvin_buffer;
 // redo log shared memory
@@ -284,6 +291,7 @@ extern pthread_mutex_t * RDMA_MEMORY_LATCH;
 extern uint64_t rdma_buffer_size;
 extern uint64_t client_rdma_buffer_size;
 extern uint64_t rdma_index_size;
+extern uint64_t rdma_routetable_size;
 // Replica redo log buffer size
 extern uint64_t rdma_log_size;
 // MAAT
@@ -395,9 +403,9 @@ extern uint32_t g_max_num_waits;
 extern UInt32 g_repl_type;
 extern UInt32 g_repl_cnt;
 
-enum RC { RCOK=0, Commit, Abort, WAIT, WAIT_REM, ERROR, FINISH, NONE};
+enum RC { RCOK=0, Commit, Abort, WAIT, WAIT_REM, ERROR, FINISH, NODE_FAILED, NONE};
 enum RemReqType {
-  INIT_DONE = 0,
+    INIT_DONE = 0,
     RLK,
     RULK,
     CL_QRY,
@@ -423,7 +431,14 @@ enum RemReqType {
     LOG_MSG_RSP,
     LOG_FLUSHED,
     CALVIN_ACK,
-  NO_MSG
+    HEART_BEAT,
+    RECOVERY,
+    WAIT_TXN,
+    RECOVER_TXN,
+    RACK_RECOVER_TXN,
+    CHECK_TXN,
+    RACK_CHECK,
+    NO_MSG
 };
 
 // Calvin
@@ -479,11 +494,11 @@ enum TsType {R_REQ = 0, W_REQ, P_REQ, XP_REQ};
 #define GET_FOLLOWER1_NODE(pid)	((pid + 2) % g_node_cnt) //leader and follower1 are in the same data center
 #define GET_FOLLOWER2_NODE(pid)	((pid + 1) % g_node_cnt) 
 
+#define GET_CENTER_ID(nid) (nid % g_center_cnt) //nid: the id of node
+
 // #define GET_FOLLOWER1_NODE(pid)	((pid + (g_node_cnt/g_center_cnt)) % g_node_cnt) //leader and follower1 are in the same data center
 // #define GET_FOLLOWER2_NODE(pid)	((pid + 1) % g_node_cnt) 
 
-
-#define GET_CENTER_ID(nid) (nid % g_center_cnt) //nid: the id of node
 
 #define GET_THREAD_ID(id)	(id % g_thread_cnt)
 #define GET_PART_ID(t,n)	(n)

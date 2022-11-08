@@ -13,7 +13,8 @@
 	 See the License for the specific language governing permissions and
 	 limitations under the License.
 */
-
+#include "recovery_manager.h"
+#include "recovery_manager_2.h"
 #include "abort_thread.h"
 #include "calvin_thread.h"
 #include "client_query.h"
@@ -47,6 +48,7 @@
 // #include "http.h"
 //#include "rdma_ctrl.hpp"
 #include "qps/rc_recv_manager.hh"
+#include "route_table.h"
 #include "qps/recv_iter.hh"
 //#include "src/allocator_master.hh"
 void network_test();
@@ -240,6 +242,19 @@ int main(int argc, char *argv[]) {
 	maat_man.init();
 	printf("Done\n");
 #endif
+	printf("Initializing heartbeat queue... ");
+	fflush(stdout);
+	heartbeat_queue.init();
+	printf("Done\n");
+	printf("Initializing recover queue... ");
+	fflush(stdout);
+	recover_queue.init();
+	printf("Done\n");
+	printf("Initializing RouteTable and NodeStatus... ");
+	fflush(stdout);
+	route_table.init();
+	node_status.init();
+	printf("Done\n");
 #if USE_REPLICA
     printf("Initializing Redo Log Buffer... ");
 	fflush(stdout);

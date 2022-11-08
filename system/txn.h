@@ -80,6 +80,8 @@ public:
 	RC rc;
 };
 
+enum TxnPhase {NULL_PHASE,EXECUTION_PHASE, FINISH_PHASE, DONE_PHASE};
+
 class TxnStats {
 public:
 	void init();
@@ -92,6 +94,7 @@ public:
 	uint64_t restart_starttime;
 	// for redt
 	uint64_t wait_for_rsp_time;
+	TxnPhase current_states; // EXECUTION_PHASE, PREPARE_PHASE, FINISH_PHASE
 
   	uint64_t init_complete_time;
 	uint64_t wait_starttime;
@@ -257,6 +260,7 @@ public:
 
 	bool loop_cas_remote(yield_func_t &yield,uint64_t target_server,uint64_t remote_offset,uint64_t old_value,uint64_t new_value, uint64_t cor_id);
 
+	Array<uint64_t> failed_partition;
 
 	bool isRecon() {
 		assert(CC_ALG == CALVIN || !recon);

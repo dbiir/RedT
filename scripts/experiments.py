@@ -527,17 +527,17 @@ def ycsb_network_delay():
 
 def ycsb_skew():
     wl = 'YCSB'
-    nnodes = [4]
-    algos=['RDMA_NO_WAIT3']
+    nnodes = [3]
+    algos=['RDMA_NO_WAIT']
     # base_table_size=1048576*10
     base_table_size=1048576  
     #base_table_size=2097152*8
 
     txn_write_perc = [1]
-    tup_write_perc = [0.5]
-    load = [10000]
+    tup_write_perc = [1]
+    load = [6]
 
-    tcnt = [4]  #THREAD_CNT
+    tcnt = [2]  #THREAD_CNT
 
     # skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
     # skew = [0.25,0.55,0.65,0.75]
@@ -1291,7 +1291,7 @@ configs = {
     "NETWORK_DELAY": '10000UL',
     "NETWORK_DELAY_TEST": 'false',
     "DONE_TIMER": "1 * 30 * BILLION // ~1 minutes",
-    "WARMUP_TIMER": "1 * 20 * BILLION // ~1 minutes",
+    "WARMUP_TIMER": "1 * 0 * BILLION // ~1 minutes",
     "SEQ_BATCH_TIMER": "5 * 1 * MILLION // ~5ms -- same as CALVIN paper",
     "BATCH_TIMER" : "0",
     "PROG_TIMER" : "10 * BILLION // in s",

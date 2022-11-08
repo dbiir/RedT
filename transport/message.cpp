@@ -27,6 +27,8 @@
 #include "maat.h"
 #include "da.h"
 #include "da_query.h"
+#include "route_table.h"
+
 std::vector<Message*> * Message::create_messages(char * buf) {
   std::vector<Message*> * all_msgs = new std::vector<Message*>;
   char * data = buf;
@@ -62,15 +64,15 @@ std::vector<Message*> * Message::create_messages(char * buf) {
 }
 
 Message * Message::create_message(char * buf) {
- RemReqType rtype = NO_MSG;
- uint64_t ptr = 0;
- COPY_VAL(rtype,buf,ptr);
- Message * msg = create_message(rtype);
+  RemReqType rtype = NO_MSG;
+  uint64_t ptr = 0;
+  COPY_VAL(rtype,buf,ptr);
+  Message * msg = create_message(rtype);
   //printf("buffer is:%s\n",buf);
   //printf("msg:%lu:%lu %lu %lu\n",((DAQueryMessage*)msg)->seq_id,((DAQueryMessage*)msg)->state,((DAQueryMessage*)msg)->next_state,((DAQueryMessage*)msg)->last_state);
   fflush(stdout);
- msg->copy_from_buf(buf);
- return msg;
+  msg->copy_from_buf(buf);
+  return msg;
 }
 
 Message * Message::create_message(TxnManager * txn, RemReqType rtype) {
@@ -98,6 +100,17 @@ Message * Message::create_message(LogRecord * record, RemReqType rtype) {
  return msg;
 }
 
+Message * Message::create_message(route_table_node * route, status_node * node, RemReqType rtype) {
+  Message * msg = create_message(rtype);
+  ((HeartBeatMessage*)msg)->copy_from_node_status(route, node);
+  return msg;
+}
+
+Message * Message::create_message(uint64_t pid, uint64_t rid, NodeStatus node, RemReqType rtype) {
+  Message * msg = create_message(rtype);
+  ((ReplicaRecoverMessage*)msg)->copy_from_replica(pid, rid);
+  return msg;
+}
 
 Message * Message::create_message(BaseQuery * query, RemReqType rtype) {
  assert(rtype == RQRY || rtype == CL_QRY || rtype == CL_QRY_O);
@@ -164,12 +177,17 @@ Message * Message::create_message(RemReqType rtype) {
     case CALVIN_ACK:
     case RACK_PREP:
     case RACK_FIN:
+    case RACK_RECOVER_TXN:
       msg = new AckMessage;
       break;
+    case RACK_CHECK:
+    case CHECK_TXN:
+      msg = new CheckMessage;
     case CL_QRY:
     case CL_QRY_O:
     case RTXN:
     case RTXN_CONT:
+    case RECOVER_TXN:
 #if WORKLOAD == YCSB
       msg = new YCSBClientQueryMessage;
 #elif WORKLOAD == TPCC
@@ -192,6 +210,15 @@ Message * Message::create_message(RemReqType rtype) {
       break;
     case CL_RSP:
       msg = new ClientResponseMessage;
+      break;
+    case HEART_BEAT:
+      msg = new HeartBeatMessage;
+      break;
+    case RECOVERY:
+      msg = new ReplicaRecoverMessage;
+      break;
+    case WAIT_TXN:
+      msg = new WaitTxnMessage;
       break;
     default:
       assert(false);
@@ -308,7 +335,8 @@ void Message::release_message(Message * msg) {
       break;
                     }
     case RQRY:
-    case RQRY_CONT: {
+    case RQRY_CONT:
+    case RECOVER_TXN: {
 #if WORKLOAD == YCSB
       YCSBQueryMessage * m_msg = (YCSBQueryMessage*)msg;
 #elif WORKLOAD == TPCC
@@ -354,7 +382,8 @@ void Message::release_message(Message * msg) {
                       }
     case CALVIN_ACK:
     case RACK_PREP:
-    case RACK_FIN: {
+    case RACK_FIN:
+    case RACK_RECOVER_TXN: {
       AckMessage * m_msg = (AckMessage*)msg;
       m_msg->release();
       delete m_msg;
@@ -401,6 +430,31 @@ void Message::release_message(Message * msg) {
       delete m_msg;
       break;
                  }
+    case HEART_BEAT: {
+      HeartBeatMessage * m_msg = (HeartBeatMessage*)msg;
+      m_msg->release();
+      delete m_msg;
+      break;
+    }
+    case RECOVERY: {
+      ReplicaRecoverMessage * m_msg = (ReplicaRecoverMessage*)msg;
+      m_msg->release();
+      delete m_msg;
+      break;
+    }
+    case WAIT_TXN: {
+      WaitTxnMessage * m_msg = (WaitTxnMessage*)msg;
+      m_msg->release();
+      delete m_msg;
+      break;
+    }
+    case RACK_CHECK:
+    case CHECK_TXN:{
+      CheckMessage * m_msg = (CheckMessage*)msg;
+      m_msg->release();
+      delete m_msg;
+      break;
+    }
     default: {
       assert(false);
     }
@@ -1151,6 +1205,8 @@ uint64_t AckMessage::get_size() {
   size += sizeof(size_t);
   size += sizeof(uint64_t) * part_keys.size();
 #endif
+  size += sizeof(size_t);
+  size += sizeof(uint64_t) * failed_partition.size();
   return size;
 }
 
@@ -1166,6 +1222,7 @@ void AckMessage::copy_from_txn(TxnManager * txn) {
   PPSQuery* pps_query = (PPSQuery*)(txn->query);
   part_keys.copy(pps_query->part_keys);
 #endif
+  part_keys.copy(txn->failed_partition);
 }
 
 void AckMessage::copy_to_txn(TxnManager * txn) {
@@ -1176,6 +1233,7 @@ void AckMessage::copy_to_txn(TxnManager * txn) {
   PPSQuery* pps_query = (PPSQuery*)(txn->query);
   pps_query->part_keys.append(part_keys);
 #endif
+  txn->failed_partition.append(failed_partition);
 }
 
 void AckMessage::copy_from_buf(char * buf) {
@@ -1197,6 +1255,14 @@ void AckMessage::copy_from_buf(char * buf) {
     part_keys.add(item);
   }
 #endif
+  size_t size;
+  COPY_VAL(size,buf,ptr);
+  failed_partition.init(size);
+  for(uint64_t i = 0 ; i < size;i++) {
+    uint64_t item;
+    COPY_VAL(item,buf,ptr);
+    failed_partition.add(item);
+  }
  assert(ptr == get_size());
 }
 
@@ -1209,7 +1275,6 @@ void AckMessage::copy_to_buf(char * buf) {
   COPY_BUF(buf,upper,ptr);
 #endif
 #if WORKLOAD == PPS && CC_ALG == CALVIN
-
   size_t size = part_keys.size();
   COPY_BUF(buf,size,ptr);
   for(uint64_t i = 0; i < part_keys.size(); i++) {
@@ -1217,7 +1282,13 @@ void AckMessage::copy_to_buf(char * buf) {
     COPY_BUF(buf,item,ptr);
   }
 #endif
- assert(ptr == get_size());
+  size_t size = failed_partition.size();
+  COPY_BUF(buf,size,ptr);
+  for(uint64_t i = 0; i < failed_partition.size(); i++) {
+    uint64_t item = failed_partition[i];
+    COPY_BUF(buf,item,ptr);
+  }
+  assert(ptr == get_size());
 }
 /************************/
 
@@ -1913,3 +1984,161 @@ uint64_t DAQueryMessage::get_size() {
   return size;
 }
 void DAQueryMessage::release() { QueryMessage::release(); }
+
+
+/************************/
+
+void HeartBeatMessage::release() {
+  //log_records.release();
+}
+
+uint64_t HeartBeatMessage::get_size() {
+  uint64_t size = Message::mget_size();
+  size += SIZE_OF_ROUTE;
+  size += SIZE_OF_STATUS;
+  //size += sizeof(LogRecord) * log_records.size();
+  return size;
+}
+
+void HeartBeatMessage::copy_from_txn(TxnManager* txn) { Message::mcopy_from_txn(txn); }
+
+void HeartBeatMessage::copy_to_txn(TxnManager* txn) { Message::mcopy_to_txn(txn); }
+
+void HeartBeatMessage::copy_from_node_status(route_table_node * route_table, status_node * node_status) { 
+  heartbeatmsg._route = route_table;
+  heartbeatmsg._status = node_status;
+  // _route = route_table;
+  // _node = node_status;
+}
+
+void HeartBeatMessage::copy_from_buf(char * buf) {
+  Message::mcopy_from_buf(buf);
+  uint64_t ptr = Message::mget_size();
+  heartbeatmsg._route = (route_table_node*) malloc(SIZE_OF_ROUTE);
+  heartbeatmsg._status = (status_node*)malloc(SIZE_OF_STATUS);
+  memcpy(heartbeatmsg._route,buf + ptr,SIZE_OF_ROUTE);
+  ptr += SIZE_OF_ROUTE;
+  // COPY_VAL((*heartbeatmsg._route),buf,ptr);
+  memcpy(heartbeatmsg._status,buf + ptr,SIZE_OF_STATUS);
+  ptr += SIZE_OF_STATUS;
+  // COPY_VAL((*heartbeatmsg._node),buf,ptr);
+  assert(ptr == get_size());
+}
+
+void HeartBeatMessage::copy_to_buf(char * buf) {
+  Message::mcopy_to_buf(buf);
+  uint64_t ptr = Message::mget_size();
+  memcpy(buf+ptr, heartbeatmsg._route, SIZE_OF_ROUTE);
+  ptr += SIZE_OF_ROUTE;
+  memcpy(buf+ptr, heartbeatmsg._status, SIZE_OF_STATUS);
+  ptr += SIZE_OF_STATUS;
+  // COPY_BUF(buf,(*heartbeatmsg._route),ptr);
+  // COPY_BUF(buf,(*heartbeatmsg._node),ptr);
+  assert(ptr == get_size());
+}
+
+/************************/
+
+void ReplicaRecoverMessage::release() {
+  //log_records.release();
+}
+
+uint64_t ReplicaRecoverMessage::get_size() {
+  uint64_t size = Message::mget_size();
+  size += sizeof(uint64_t);
+  size += sizeof(uint64_t);
+  //size += sizeof(LogRecord) * log_records.size();
+  return size;
+}
+
+void ReplicaRecoverMessage::copy_from_txn(TxnManager* txn) { Message::mcopy_from_txn(txn); }
+
+void ReplicaRecoverMessage::copy_to_txn(TxnManager* txn) { Message::mcopy_to_txn(txn); }
+
+void ReplicaRecoverMessage::copy_from_replica(uint64_t pid, uint64_t rid) { 
+  partition_id = pid;
+  replica_id = rid;
+  // _route = route_table;
+  // _node = node_status;
+}
+
+void ReplicaRecoverMessage::copy_from_buf(char * buf) {
+  Message::mcopy_from_buf(buf);
+  uint64_t ptr = Message::mget_size();
+  COPY_VAL(partition_id,buf,ptr);
+  COPY_VAL(replica_id,buf,ptr);
+  assert(ptr == get_size());
+}
+
+void ReplicaRecoverMessage::copy_to_buf(char * buf) {
+  Message::mcopy_to_buf(buf);
+  uint64_t ptr = Message::mget_size();
+  COPY_BUF(buf,partition_id,ptr);
+  COPY_BUF(buf,replica_id,ptr);
+  assert(ptr == get_size());
+}
+
+/************************/
+
+
+void WaitTxnMessage::release() {
+  //log_records.release();
+}
+
+uint64_t WaitTxnMessage::get_size() {
+  uint64_t size = Message::mget_size();
+  return size;
+}
+
+void WaitTxnMessage::copy_from_txn(TxnManager* txn) { 
+  // Message::mcopy_from_txn(txn); 
+  this->txn = txn;
+}
+
+void WaitTxnMessage::copy_to_txn(TxnManager* txn) { 
+  // Message::mcopy_to_txn(txn); 
+  txn = this->txn;
+}
+
+void WaitTxnMessage::copy_from_buf(char * buf) {
+}
+
+void WaitTxnMessage::copy_to_buf(char * buf) {
+}
+
+
+/************************/
+
+void CheckMessage::release() {
+  //log_records.release();
+}
+
+uint64_t CheckMessage::get_size() {
+  uint64_t size = Message::mget_size();
+  size += sizeof(uint64_t);
+  //size += sizeof(LogRecord) * log_records.size();
+  return size;
+}
+
+void CheckMessage::copy_from_txn(TxnManager* txn) { 
+  Message::mcopy_from_txn(txn); 
+  status = txn->txn_stats.current_states;
+}
+
+void CheckMessage::copy_to_txn(TxnManager* txn) { Message::mcopy_to_txn(txn); }
+
+void CheckMessage::copy_from_buf(char * buf) {
+  Message::mcopy_from_buf(buf);
+  uint64_t ptr = Message::mget_size();
+  COPY_VAL(status,buf,ptr);
+  assert(ptr == get_size());
+}
+
+void CheckMessage::copy_to_buf(char * buf) {
+  Message::mcopy_to_buf(buf);
+  uint64_t ptr = Message::mget_size();
+  COPY_BUF(buf,status,ptr);
+  assert(ptr == get_size());
+}
+
+/************************/

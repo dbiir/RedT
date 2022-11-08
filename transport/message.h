@@ -21,10 +21,13 @@
 #include "helper.h"
 #include "logger.h"
 #include "array.h"
+#include "route_table.h"
 
 class ycsb_request;
 class LogRecord;
+// class RouteAndStatus;
 struct Item_no;
+// class TxnManager;
 
 class Message {
 public:
@@ -35,6 +38,8 @@ public:
   static Message * create_message(uint64_t txn_id, RemReqType rtype);
   static Message * create_message(uint64_t txn_id,uint64_t batch_id, RemReqType rtype);
   static Message * create_message(LogRecord * record, RemReqType rtype);
+  static Message * create_message(route_table_node * route, status_node * node, RemReqType rtype);
+  static Message * create_message(uint64_t pid, uint64_t rid, NodeStatus node, RemReqType rtype);
   static Message * create_message(RemReqType rtype);
   static std::vector<Message*> * create_messages(char * buf);
   static void release_message(Message * msg);
@@ -182,7 +187,7 @@ public:
   uint64_t lower;
   uint64_t upper;
 #endif
-
+  Array<uint64_t> failed_partition;
   // For Calvin PPS: part keys from secondary lookup for sequencer response
   Array<uint64_t> part_keys;
 };
@@ -480,4 +485,62 @@ class DAQueryMessage : public QueryMessage {
 	uint64_t last_state;
 };
 
+class HeartBeatMessage : public Message {
+public:
+  void copy_from_buf(char * buf);
+  void copy_to_buf(char * buf);
+  void copy_from_txn(TxnManager * txn);
+  void copy_to_txn(TxnManager * txn);
+  uint64_t get_size();
+  void init() {}
+  void release();
+  void copy_from_node_status(route_table_node * route_table, status_node * node_status);
+
+  // LogRecord record;
+  RouteAndStatus heartbeatmsg;
+  // RouteTable* _route;
+  // NodeStatus* _status;
+};
+
+class ReplicaRecoverMessage : public Message {
+public:
+  void copy_from_buf(char * buf);
+  void copy_to_buf(char * buf);
+  void copy_from_txn(TxnManager * txn);
+  void copy_to_txn(TxnManager * txn);
+  uint64_t get_size();
+  void init() {}
+  void release();
+  void copy_from_replica(uint64_t pid, uint64_t rid);
+
+  uint64_t partition_id;
+  uint64_t replica_id;
+};
+
+// Will not be sent to another data nodes
+class WaitTxnMessage : public Message {
+public:
+  void copy_from_buf(char * buf);
+  void copy_to_buf(char * buf);
+  void copy_from_txn(TxnManager * txn);
+  void copy_to_txn(TxnManager * txn);
+  uint64_t get_size();
+  void init() {}
+  void release();
+
+  TxnManager* txn;
+};
+
+class CheckMessage : public Message {
+public:
+  void copy_from_buf(char * buf);
+  void copy_to_buf(char * buf);
+  void copy_from_txn(TxnManager * txn);
+  void copy_to_txn(TxnManager * txn);
+  uint64_t get_size();
+  void init() {}
+  void release();
+
+  uint64_t status;
+};
 #endif

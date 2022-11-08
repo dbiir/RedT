@@ -99,6 +99,8 @@ Logger logger;
 TimeTable time_table;
 RouteTable route_table;
 NodeStatus node_status;
+QWorkQueue heartbeat_queue;
+QWorkQueue recover_queue;
 // QTcpQueue tcp_queue;
 // TcpTimestamp tcp_ts;
 
@@ -231,6 +233,8 @@ pthread_mutex_t * RDMA_MEMORY_LATCH;
 // UInt64 rdma_buffer_size = 4*(1024*1024*1024L);
 UInt64 rdma_buffer_size = 8*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 300*(1024*1024L);
+
+UInt64 rdma_routetable_size = 1024*1024L;
 #if USE_REPLICA
 // UInt64 rdma_index_size = (10*1024*1024L*g_part_cnt);
 UInt64 rdma_index_size = (300*1024*1024L*g_part_cnt);
@@ -326,6 +330,8 @@ char *rdma_global_buffer;
 char *rdma_txntable_buffer;
 // CALVIN shared memory
 char *rdma_calvin_buffer;
+// RouteTable shared memory
+char *rdma_routetable_buffer;
 // redo log shared memory
 char *rdma_log_buffer;
 //rdmaio::Arc<rdmaio::rmem::RMem> rdma_global_buffer;

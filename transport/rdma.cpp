@@ -13,6 +13,8 @@
 #include "storage/row.h"
 #include "storage/table.h"
 #include "storage/log_rdma.h"
+#include "system/route_table.h"
+
 char *Rdma::rdma_buffer; //= new char[RDMA_BUFFER_SIZE];
 char ** Rdma::ifaddr = new char *[g_total_node_cnt+20];
 
@@ -180,6 +182,7 @@ void * Rdma::server_qp(void *){
 								.buf);
 	//by default, no rdma_txntable_buffer and rdma_calvin_buffer when using log
 	rdma_log_buffer = rdma_global_buffer + (rdma_buffer_size - rdma_log_size);	
+	rdma_routetable_buffer = rdma_global_buffer + (rdma_buffer_size - rdma_log_size - rdma_routetable_size);
 	rdma_txntable_buffer = rdma_global_buffer + (rdma_buffer_size - rdma_txntable_size);
 	rdma_calvin_buffer = rdma_global_buffer + (rdma_buffer_size - rdma_txntable_size - rdma_calvin_buffer_size);
 	rm_ctrl->start_daemon();
@@ -201,12 +204,29 @@ char* Rdma::get_row_client_memory(uint64_t thd_id,int num) { //num>=1
 	return temp;
 }
 
+
+char* Rdma::get_status_client_memory(uint64_t thd_id) { //num>=1
+	//when num>1, get extra row for doorbell batched RDMA requests
+	char* temp = (char *)(client_rdma_rm->raw_ptr);
+	temp += client_rdma_buffer_size;
+	temp = temp - sizeof(NodeStatus) - sizeof(RouteTable);
+	return temp;
+}
+
 #if USE_REPLICA
 char* Rdma::get_log_client_memory(uint64_t thd_id,int num) { //num>=1
 	char* temp = (char *)(client_rdma_rm->raw_ptr);
 	temp += sizeof(IndexInfo) * (max_batch_num * g_total_thread_cnt * (COROUTINE_CNT + 1));
 	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * (max_batch_num * g_total_thread_cnt * (COROUTINE_CNT + 1));
 	temp += sizeof(LogEntry) * ((num-1) * g_total_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
+	return temp;
+}
+
+char* Rdma::get_log_buffer_client_memory(uint64_t thd_id,int num) { //num>=1
+	char* temp = (char *)(client_rdma_rm->raw_ptr);
+	temp += sizeof(IndexInfo) * (max_batch_num * g_total_thread_cnt * (COROUTINE_CNT + 1));
+	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * (max_batch_num * g_total_thread_cnt * (COROUTINE_CNT + 1));
+	temp += sizeof(LogEntry) * (g_node_id * g_total_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
 	return temp;
 }
 #endif

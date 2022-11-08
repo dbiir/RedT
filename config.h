@@ -126,8 +126,8 @@
 // Simulation + Hardware
 /***********************************************/
 #define CENTER_CNT  4
-#define NODE_CNT 4
-#define THREAD_CNT 4
+#define NODE_CNT 3
+#define THREAD_CNT 2
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -168,7 +168,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 10000
+#define MAX_TXN_IN_FLIGHT 6
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -227,12 +227,10 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_NO_WAIT3
+#define CC_ALG RDMA_NO_WAIT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
-
-#define DEBUG_PRINTF  false
 
 #if RDMA_ONE_SIDE 
 #define BATCH_INDEX_AND_READ false //keep this "false", a fail test for SILO
@@ -351,10 +349,10 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 4194304
+#define SYNTH_TABLE_SIZE 3145728
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 1
-#define TUP_WRITE_PERC 0.5
+#define TUP_WRITE_PERC 1
 #define SCAN_PERC           0
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
@@ -471,12 +469,14 @@ enum PPSTxnType {
 #define IDX_VERB          false
 #define VERB_ALLOC          true
 
+#define DEBUG_PRINTF  false
 #define DEBUG_LOCK          false
 #define DEBUG_TIMESTAMP       false
 #define DEBUG_SYNTH         false
 #define DEBUG_ASSERT        false
 #define DEBUG_DISTR false
 #define DEBUG_ALLOC false
+#define DEBUG_TXN true
 #define DEBUG_RACE false
 #define DEBUG_TIMELINE        false
 #define DEBUG_BREAKDOWN       false
@@ -588,11 +588,16 @@ enum PPSTxnType {
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
 #define DONE_TIMER 1 * 30 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 0 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false
 #define ENVIRONMENT_EC2 false
+
+#define HEARTBEAT_TIME 100 * MILLION
+#define SAME_CENTER_FAILED_TIME 5 * HEARTBEAT_TIME
+#define INTER_CENTER_FAILED_TIME 20 * HEARTBEAT_TIME
+#define EXECUTOR_FAILED_TIME 2 * INTER_CENTER_FAILED_TIME
 
 #endif
   

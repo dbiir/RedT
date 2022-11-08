@@ -1,4 +1,4 @@
-set -x
+# set -x
 
 PHASE=5
 Latency="trans_total_run_time
