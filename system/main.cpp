@@ -406,16 +406,12 @@ int main(int argc, char *argv[]) {
 	async_redo_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], &attr, run_thread, (void *)&async_redo_thds[0]);
 #endif
+
 #if LOGGING
 	log_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&log_thds[0]);
 #endif
-#if RECOVERY_MANAGER
-	heartbeat_thds[0].init(id, g_node_id, m_wl);
-	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&heartbeat_thds[0]);
-	recovery_thds[0].init(id, g_node_id, m_wl);
-	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&recovery_thds[0]);
-#endif
+
 #if CC_ALG != CALVIN
 	abort_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&abort_thds[0]);
@@ -444,6 +440,12 @@ int main(int argc, char *argv[]) {
 #if USE_WORK_NUM_THREAD
 	worker_num_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], &attr, run_thread, (void *)&worker_num_thds[0]);
+#endif
+#if RECOVERY_MANAGER
+	heartbeat_thds[0].init(id, g_node_id, m_wl);
+	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&heartbeat_thds[0]);
+	recovery_thds[0].init(id, g_node_id, m_wl);
+	pthread_create(&p_thds[id++], NULL, run_thread, (void *)&recovery_thds[0]);
 #endif
 	for (uint64_t i = 0; i < all_thd_cnt; i++) pthread_join(p_thds[i], NULL);
 

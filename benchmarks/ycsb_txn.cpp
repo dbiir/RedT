@@ -325,15 +325,15 @@ RC YCSBTxnManager::send_remote_subtxn() {
 			ycsb_request * req = ycsb_query->requests[i];
 			if (GET_CENTER_ID(req->primary.stored_node) == center_id){
 				req->primary.execute_node = executore_id;
-				// DEBUG_T("txn %lu, node %ld needs to handle req %d primary replica\n", get_txn_id(),executore_id,i);
+				DEBUG_T("txn %lu, node %ld needs to handle req %d primary replica\n", get_txn_id(),executore_id,i);
 			}
 			if (GET_CENTER_ID(req->second1.stored_node) == center_id){
 				req->second1.execute_node = executore_id;
-				// DEBUG_T("txn %lu, node %ld needs to handle req %d second1 replica\n", get_txn_id(),executore_id,i);
+				DEBUG_T("txn %lu, node %ld needs to handle req %d second1 replica\n", get_txn_id(),executore_id,i);
 			}
 			if (GET_CENTER_ID(req->second2.stored_node) == center_id){
 				req->second2.execute_node = executore_id;
-				// DEBUG_T("txn %lu, node %ld needs to handle req %d second2 replica\n", get_txn_id(),executore_id,i);
+				DEBUG_T("txn %lu, node %ld needs to handle req %d second2 replica\n", get_txn_id(),executore_id,i);
 			}
 		}
 	}
@@ -758,14 +758,14 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			#if USE_COROUTINE
 			assert(false); //not support yet
 			#else
-			auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp();
+			auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 			// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 			uint64_t endtime = get_sys_clock();
 			INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 			DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 			INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 			if (res_p != rdmaio::IOCode::Ok) {
-				node_status.set_node_status(i, NS::Failure);
+				node_status.set_node_status(i, NS::Failure, get_thd_id());
 				return NODE_FAILED;
 			}
 			#endif
@@ -833,7 +833,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				#if USE_COROUTINE
 				assert(false); //not support yet
 				#else
-				auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp();
+				auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 				// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 				uint64_t endtime = get_sys_clock();
 				INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
@@ -842,7 +842,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 				DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 				if (res_p != rdmaio::IOCode::Ok) {
-					node_status.set_node_status(i, NS::Failure);
+					node_status.set_node_status(i, NS::Failure, get_thd_id());
 					return NODE_FAILED;
 				}
 				#endif
@@ -995,14 +995,14 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 			#if USE_COROUTINE
 			assert(false); //not support yet
 			#else
-			auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp();
+			auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 			// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 			uint64_t endtime = get_sys_clock();
 			INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 			DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 			INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 			if (res_p != rdmaio::IOCode::Ok) {
-				node_status.set_node_status(i, NS::Failure);
+				node_status.set_node_status(i, NS::Failure, get_thd_id());
 				return NODE_FAILED;
 			}
 			#endif
@@ -1072,7 +1072,7 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 				#if USE_COROUTINE
 				assert(false); //not support yet
 				#else
-				auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp();
+				auto res_p = rc_qp[i][get_thd_id()]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 				// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 				uint64_t endtime = get_sys_clock();
 				INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
@@ -1081,7 +1081,7 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 				INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 				DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 				if (res_p != rdmaio::IOCode::Ok) {
-					node_status.set_node_status(i, NS::Failure);
+					node_status.set_node_status(i, NS::Failure, get_thd_id());
 					return NODE_FAILED;
 				}
 				#endif
@@ -1205,7 +1205,7 @@ RC YCSBTxnManager::resend_remote_subtxn() {
 			if(ret.second == false){
 				uint64_t actnode_id = center_master[center_id];
 				auto st = node_status.get_node_status(actnode_id);
-				if(st.status == Failure){
+				if(st->status == Failure){
 					center_master[center_id] = node_id[j]; //change center_master
 					is_primary[center_id] = true;
 				}

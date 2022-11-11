@@ -1,6 +1,7 @@
 #include "global.h"
 #include "message.h"
 #include "thread.h"
+#include "recovery_manager.h"
 
 #ifndef _RECOVERY_MANAGER_2_H_
 #define _RECOVERY_MANAGER_2_H_
@@ -17,7 +18,7 @@
 //     RouteAndStatus read_remote_status(uint64_t target_server);
 // };
 
-class RecoveryThread : public Thread {
+class RecoveryThread : public HeartBeatThread {
 public:
     RC run();
     // uint64_t get_new_location(uint64_t partition, uint64_t old_location, uint64_t sid);
@@ -28,7 +29,7 @@ public:
     RC send_rdma_heart_beat(uint64_t dest_id);
     RC log_update_from_replica(uint64_t partition_id, uint64_t replica_id);
 private:
-    bool write_remote_heartbeat(uint64_t target_server);
+    // bool write_remote_heartbeat(uint64_t target_server);
     uint64_t caculate_new_secondary(uint64_t partition_id, uint64_t s_id);
 };
 #endif

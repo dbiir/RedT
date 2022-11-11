@@ -23,7 +23,7 @@ retry_unlock:
     // todo: how to continue the commit operation.
     // In this case, this node must crashed. Thus, we cannot do anything
     if (rc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         // txnMng->insert_failed_partition();
         return RCOK;
     }
@@ -71,7 +71,7 @@ retry_remote_unlock:
     // todo: how to continue the commit operation.
     // In this case, executor find another node crashed.
     if (arc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         txnMng->insert_failed_partition(access->partition_id);
         return RCOK;
     }
@@ -84,7 +84,7 @@ retry_remote_unlock:
     arc = txnMng->read_remote_row(yield,loc,off,test_row,cor_id);
     // todo: how to continue the commit operation.
     if (arc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         txnMng->insert_failed_partition(access->partition_id);
         return RCOK;
     }
@@ -129,7 +129,7 @@ retry_remote_unlock:
     row_t * remote_row;
     rc = txnMng->read_remote_row(yield,loc,off,remote_row,cor_id);
     if (rc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         txnMng->insert_failed_partition(access->partition_id);
         return RCOK;
     }
@@ -145,7 +145,7 @@ retry_remote_unlock:
     rc = txnMng->write_remote_row(yield,loc,operate_size,off,(char*)data,cor_id);
     // todo: how to continue the commit operation.
     if (rc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         txnMng->insert_failed_partition(access->partition_id);
         return NODE_FAILED;
     }
@@ -186,7 +186,7 @@ retry_unlock:
     RC rc = txnMng->cas_remote_content(yield,loc,off,lock_info,new_lock_info,&try_lock,cor_id);
     // todo: how to continue the commit operation.
     if (rc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         // txnMng->insert_failed_partition();
         return RCOK;
     }
@@ -218,7 +218,7 @@ retry_unlock:
     RC rc = txnMng->cas_remote_content(yield,loc,off,0,txnMng->get_txn_id(),&try_lock,cor_id);
     // todo: how to continue the commit operation.
     if (rc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         // txnMng->insert_failed_partition();
         return RCOK;
     }
@@ -287,7 +287,7 @@ remote_retry_unlock:
     rc = txnMng->cas_remote_content(yield,loc,off,*lock_info,new_lock_info,&try_lock,cor_id);
     // todo: how to continue the commit operation.
     if (rc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         // txnMng->insert_failed_partition();
         return RCOK;
     }
@@ -320,7 +320,7 @@ retry_remote_unlock:
     // todo: report the failed primary replica to coordinator
     // For read operation, we do not need to redo this operation.
     if (arc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         // txnMng->insert_failed_partition();
         return RCOK;
     }
@@ -332,7 +332,7 @@ retry_remote_unlock:
     row_t * test_row;
     arc = txnMng->read_remote_row(yield,loc,off,test_row,cor_id);
     if (arc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         // txnMng->insert_failed_partition();
         return RCOK;
     }
@@ -356,7 +356,7 @@ retry_remote_unlock:
     arc = txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id);
     // todo: report the failed primary replica to coordinator
     if (arc == NODE_FAILED) {
-        node_status.set_node_status(loc, NS::Failure);
+        node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         // txnMng->insert_failed_partition();
         return RCOK;
     }
@@ -406,7 +406,7 @@ RC RDMA_2pl::commit_log(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t 
 				#if USE_COROUTINE
 				assert(false); //not support yet
 				#else
-				auto res_p = rc_qp[i][txnMng->get_thd_id()]->wait_one_comp();
+				auto res_p = rc_qp[i][txnMng->get_thd_id()]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 				// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 				uint64_t endtime = get_sys_clock();
 				INC_STATS(txnMng->get_thd_id(), rdma_read_time, endtime-starttime);
@@ -415,7 +415,7 @@ RC RDMA_2pl::commit_log(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t 
 				INC_STATS(txnMng->get_thd_id(), worker_waitcomp_time, endtime-starttime);
 				DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
                 if (res_p != rdmaio::IOCode::Ok) {
-                    node_status.set_node_status(i, NS::Failure);
+                    node_status.set_node_status(i, NS::Failure, txnMng->get_thd_id());
                     return NODE_FAILED;
                 }
 				#endif

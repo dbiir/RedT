@@ -24,9 +24,9 @@ public:
     route_node_ts get_primary(uint64_t partition_id);
     route_node_ts get_secondary_1(uint64_t partition_id);
     route_node_ts get_secondary_2(uint64_t partition_id);
-    void set_primary(uint64_t partition_id, uint64_t node_id, uint64_t timestamp = 0);
-    void set_secondary_1(uint64_t partition_id, uint64_t node_id, uint64_t timestamp = 0);
-    void set_secondary_2(uint64_t partition_id, uint64_t node_id, uint64_t timestamp = 0);
+    void set_primary(uint64_t partition_id, uint64_t node_id, uint64_t timestamp = 0, uint64_t thd_id= 0);
+    void set_secondary_1(uint64_t partition_id, uint64_t node_id, uint64_t timestamp = 0, uint64_t thd_id = 0);
+    void set_secondary_2(uint64_t partition_id, uint64_t node_id, uint64_t timestamp = 0, uint64_t thd_id = 0);
 // private:
     route_table_node *table;
 };
@@ -39,8 +39,8 @@ public:
 class NodeStatus {
 public:
     void init();
-    status_node get_node_status(uint64_t node_id);
-    void set_node_status(uint64_t node_id, NS newSatus);
+    status_node* get_node_status(uint64_t node_id);
+    void set_node_status(uint64_t node_id, NS newSatus, uint64_t thd_id);
 // private:
     status_node *table;
 };
@@ -77,10 +77,11 @@ inline uint64_t get_center_primary(uint64_t center_id) {
     uint64_t node_cnt_per_dc = g_node_cnt / CENTER_CNT;
     for (int i = 0; i < node_cnt_per_dc; i++) {
         uint64_t node_id = i * CENTER_CNT + center_id;
-        status_node st = node_status.get_node_status(i);
-        if (st.status == NS::Failure) continue;
+        status_node* st = node_status.get_node_status(node_id);
+        if (st->status == NS::Failure) continue;
         return node_id;
     }
+    return -1;
 }
 inline bool is_center_primary(uint64_t nid) {
     assert(g_node_cnt % CENTER_CNT == 0);
@@ -88,37 +89,40 @@ inline bool is_center_primary(uint64_t nid) {
     uint64_t center_id = GET_CENTER_ID(nid);
     for (int i = 0; i < node_cnt_per_dc; i++) {
         uint64_t node_id = i * CENTER_CNT + center_id;
-        status_node st = node_status.get_node_status(i);
-        if (st.status == NS::Failure) continue;
+        status_node* st = node_status.get_node_status(node_id);
+        if (st->status == NS::Failure) {
+            // DEBUG_H("Node %ld failed in center %d\n", node_id, center_id);
+            continue;
+        }
         return node_id == nid;
     }
     assert(false);
 }
-inline bool is_global_primary(uint64_t nid) {
+inline uint64_t get_global_primary(uint64_t center_id) {
     for (int i = 0; i < g_node_cnt; i++) {
         uint64_t node_id = i;
-        status_node st = node_status.get_node_status(i);
-        if (st.status == NS::Failure) continue;
-        return i == nid;
+        status_node* st = node_status.get_node_status(node_id);
+        if (st->status == NS::Failure) continue;
+        return i;
     }
-    assert(false);
 }
+
 inline uint64_t get_primary_node_id(uint64_t part_id) {
     uint64_t node_id = route_table.get_primary(part_id).node_id;
-    status_node st = node_status.get_node_status(node_id);
-    if (st.status == NS::Failure) return -1;
+    status_node* st = node_status.get_node_status(node_id);
+    if (st->status == NS::Failure) return -1;
     return node_id;
 }
 inline uint64_t get_follower1_node_id(uint64_t part_id) {
     uint64_t node_id = route_table.get_secondary_1(part_id).node_id;
-    status_node st = node_status.get_node_status(node_id);
-    if (st.status == NS::Failure) return -1;
+    status_node* st = node_status.get_node_status(node_id);
+    if (st->status == NS::Failure) return -1;
     return node_id; 
 }
 inline uint64_t get_follower2_node_id(uint64_t part_id) {
     uint64_t node_id = route_table.get_secondary_2(part_id).node_id;
-    status_node st = node_status.get_node_status(node_id);
-    if (st.status == NS::Failure) return -1;
+    status_node* st = node_status.get_node_status(node_id);
+    if (st->status == NS::Failure) return -1;
     return node_id;
 }
 // #define IS_CENTER_PRIMARY(nid) ((nid / g_center_cnt) == 0)

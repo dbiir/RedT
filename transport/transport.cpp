@@ -715,10 +715,16 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * 
 			dest_node_id, (uint64_t)socket);
 
   	int rc = -1;
+	int start_time = get_sys_clock();
 	while (rc < 0 && (!simulation->is_setup_done() ||
 						(simulation->is_setup_done() && !simulation->is_done()))) {
 
 		rc= socket->sock.send(&buf,NN_MSG,NN_DONTWAIT);
+		int end_time = get_sys_clock();
+		if (end_time - start_time > MESSAGE_SEND_RETRY_TIME) {
+			DEBUG_H("%ld send msg to node %ld failed\n",send_thread_id,dest_node_id);
+			break;
+		}
 	}
 
   	DEBUG("%ld Batch of %d bytes sent to node %ld\n",send_thread_id,size,dest_node_id);

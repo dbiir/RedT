@@ -126,8 +126,8 @@
 // Simulation + Hardware
 /***********************************************/
 #define CENTER_CNT 3
-#define NODE_CNT 3
-#define THREAD_CNT 40
+#define NODE_CNT 6
+#define THREAD_CNT 4
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -168,7 +168,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 120
+#define MAX_TXN_IN_FLIGHT 16
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -349,7 +349,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 3145728
+#define SYNTH_TABLE_SIZE 629142
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 1
 #define TUP_WRITE_PERC 1
@@ -477,6 +477,7 @@ enum PPSTxnType {
 #define DEBUG_DISTR false
 #define DEBUG_ALLOC false
 #define DEBUG_TXN false
+#define DEBUG_RECOVER true
 #define DEBUG_RACE false
 #define DEBUG_TIMELINE        false
 #define DEBUG_BREAKDOWN       false
@@ -581,26 +582,28 @@ enum PPSTxnType {
 
 // Stats and timeout
 #define BILLION 1000000000UL // in ns => 1 second
-#define MILLION 1000000UL // in ns => 1 second
+#define MILLION 1000000UL // in ns => 1 ms
 #define USECONDE 1000UL //us
 #define STAT_ARR_SIZE 1024
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 30 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 60 * BILLION // ~1 minutes
 #define WARMUP_TIMER 1 * 0 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false
 #define ENVIRONMENT_EC2 false
 
+#define RDMA_CALLS_TIMEOUT 1000000
+#define MESSAGE_SEND_RETRY_TIME 10 * MILLION
 #define HEARTBEAT_TIME 1000 * MILLION
-#define SAME_CENTER_FAILED_TIME 5 * HEARTBEAT_TIME
+#define SAME_CENTER_FAILED_TIME 10 * HEARTBEAT_TIME
 #define INTER_CENTER_FAILED_TIME 20 * HEARTBEAT_TIME
 #define EXECUTOR_FAILED_TIME 2 * INTER_CENTER_FAILED_TIME
 
 #define RECOVERY_MANAGER true
-#define RECOVERY_TXN_MECHANISM true
+#define RECOVERY_TXN_MECHANISM false
 
 #endif
   

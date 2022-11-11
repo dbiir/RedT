@@ -810,7 +810,7 @@ void TxnManager::send_finish_messages() {
 #endif
 #endif
 	}
-	assert(num_msgs_commit==num_msgs_rw_prep);
+	assert(get_rc() == Abort || num_msgs_commit==num_msgs_rw_prep);
 	
 	#if RECOVERY_TXN_MECHANISM
 	update_send_time();
@@ -1633,7 +1633,7 @@ RC TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server,u
 	} while (res_p.first == 0);
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 #else
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 	endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1); //include index, row, log,...etc read.
@@ -1642,7 +1642,7 @@ RC TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server,u
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 	// RDMA_ASSERT();
 	if (res_p != rdmaio::IOCode::Ok) {
-		node_status.set_node_status(target_server, NS::Failure);
+		node_status.set_node_status(target_server, NS::Failure, get_thd_id());
 		return NODE_FAILED;
 	}
 	return RCOK;
@@ -1714,7 +1714,7 @@ RC TxnManager::write_remote_content(yield_func_t &yield, uint64_t target_server,
 		h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 		// yield(h_thd->_routines[0]);
 #else
-		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 		endtime = get_sys_clock();
 		INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 		INC_STATS(get_thd_id(), rdma_read_cnt, 1);
@@ -1723,7 +1723,7 @@ RC TxnManager::write_remote_content(yield_func_t &yield, uint64_t target_server,
 		DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 		// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 		if (res_p != rdmaio::IOCode::Ok) {
-			node_status.set_node_status(target_server, NS::Failure);
+			node_status.set_node_status(target_server, NS::Failure, get_thd_id());
 			return NODE_FAILED;
 		}
 #endif
@@ -1772,14 +1772,14 @@ RC TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,ui
 		h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 
 #else
-		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 		// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 		endtime = get_sys_clock();
 		INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 		DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 		INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 		if (res_p != rdmaio::IOCode::Ok) {
-			node_status.set_node_status(target_server, NS::Failure);
+			node_status.set_node_status(target_server, NS::Failure, get_thd_id());
 			return NODE_FAILED;
 		}
 #endif
@@ -1832,13 +1832,13 @@ RC TxnManager::cas_remote_content(yield_func_t &yield, uint64_t target_server,ui
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 
 #else
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
     endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	if (res_p != rdmaio::IOCode::Ok) {
-		node_status.set_node_status(target_server, NS::Failure);
+		node_status.set_node_status(target_server, NS::Failure, get_thd_id());
 		return NODE_FAILED;
 	}
 #endif

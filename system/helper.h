@@ -55,6 +55,12 @@ void REDLOG(const char *format, ...);
     fprintf(stdout,__VA_ARGS__); \
     fflush(stdout); \
   }
+
+#define DEBUG_H(...) \
+  if(DEBUG_RECOVER) { \
+    fprintf(stdout,__VA_ARGS__); \
+    fflush(stdout); \
+  }
   
 #define PRINT_LATENCY(...) \
   if(DEBUG_LATENCY && warmup_done) { \

@@ -51,7 +51,15 @@ void InputThread::setup() {
 				printf("Received INIT_DONE from node %ld\n",msg->return_node_id);
 				fflush(stdout);
 				simulation->process_setup_msg();
-			} else {
+			} else if (msg->rtype == HEART_BEAT) {
+				heartbeat_queue.enqueue(get_thd_id(),msg,false);
+				msgs->erase(msgs->begin());
+				continue;
+			} else if (msg->rtype == RECOVERY) {
+				recover_queue.enqueue(get_thd_id(), msg, false);
+				msgs->erase(msgs->begin());
+				continue;
+			}else {
 				assert(ISSERVER || ISREPLICA);
 				//printf("Received Msg %d from node %ld\n",msg->rtype,msg->return_node_id);
 #if CC_ALG == CALVIN
