@@ -50,10 +50,14 @@ retry_unlock:
         printf("---thd:%lu, lock unlock write lock fail!!!!!! nodeid-key: %u; %lu, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, 0);
         return RCOK;
     }
+    #if DEBUG_LOCK
+    uint64_t originlo = row->_txn_id;
+    row->_txn_id = 0;
+    #endif
     row->_tid_word = 0;
 #endif
 #if DEBUG_PRINTF
-    printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info);
+    printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu, old lock_info: %lu-%lu, lock owner %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, row->_tid_word, originlo);
 #endif
 }
 
@@ -416,6 +420,7 @@ RC RDMA_2pl::commit_log(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t 
 				DEL_STATS(txnMng->get_thd_id(), worker_process_time, endtime-starttime);
                 if (res_p != rdmaio::IOCode::Ok) {
                     node_status.set_node_status(i, NS::Failure, txnMng->get_thd_id());
+                    DEBUG_T("Thd %ld send RDMA one-sided failed.\n", txnMng->get_thd_id());
                     return NODE_FAILED;
                 }
 				#endif

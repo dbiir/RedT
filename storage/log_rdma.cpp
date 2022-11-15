@@ -17,12 +17,13 @@ void ChangeInfo::set_change_info(uint64_t ikey, uint64_t s, char* cont, bool is_
     if(s>0) memcpy(content,cont,s);
 }
 
-void LogEntry::set_entry(int ccnt,const vector<ChangeInfo>& cinfo, uint64_t sts){ //set value before logging
+void LogEntry::set_entry(uint64_t txnid, int ccnt,const vector<ChangeInfo>& cinfo, uint64_t sts){ //set value before logging
     assert(sts != UINT64_MAX && sts != 0);
 
     state = LOGGED;
     c_ts = 0;
     s_ts = sts; 
+    txn_id = txnid;
     change_cnt = ccnt;
     if (ccnt != 0) {
         assert(cinfo.size() == ccnt);

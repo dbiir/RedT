@@ -283,6 +283,14 @@ void WorkerThread::check_if_done(RC rc) {
 }
 
 void WorkerThread::release_txn_man() {
+  #if RECOVERY_TXN_MECHANISM
+  if (txn_man->is_enqueue && txn_man->wait_queue_entry != nullptr) {
+    work_queue.waittxn_remove(get_thd_id(),txn_man->wait_queue_entry);
+    txn_man->is_enqueue = false;
+    txn_man->wait_queue_entry = nullptr;
+    DEBUG_T("Txn %ld is removed from wait queue.\n",txn_man->get_txn_id());
+  }
+	#endif
   txn_table.release_transaction_manager(get_thd_id(), txn_man->get_txn_id(),
                                         txn_man->get_batch_id());
   txn_man = NULL;
@@ -666,25 +674,31 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
       ready_starttime = get_sys_clock();
       bool ready;
-      if((msg->rtype == RQRY || msg->rtype == RFIN) && msg->current_abort_cnt > txn_man->txn_stats.abort_cnt){
+      // if((msg->rtype == RQRY || msg->rtype == RFIN) && msg->current_abort_cnt > txn_man->txn_stats.abort_cnt){
         // assert(msg->current_abort_cnt > txn_man->txn_stats.abort_cnt);
-        ready = false;
-      }
-      else if(msg->rtype == RFIN && !txn_man->finish_logging) ready = false;
-      else ready = txn_man->unset_ready(); 
+        // printf("because abort cnt %ld:%ld\n",msg->current_abort_cnt,txn_man->txn_stats.abort_cnt);  
+        // ready = false;
+      // }
+      // else if(msg->rtype == RFIN && !txn_man->finish_logging) {
+      // if(msg->rtype == RFIN && !txn_man->finish_logging) {
+      //   // printf("because finish logging\n");  
+      //   ready = false;
+      // } else 
+      ready = txn_man->unset_ready(); 
       
       INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
       if(!ready) {
         // Return to work queue, end processing
+        // printf("because ready?\n");   
         work_queue.enqueue(get_thd_id(),msg,true);
         continue;
       }
 
       if(!txn_man->txn){
         assert(msg->rtype == RACK_PREP || msg->rtype == RACK_FIN);
-        //   printf("---\n");        
-          bool ready = txn_man->set_ready();
-          assert(ready);
+        printf("because no txn?\n");   
+        bool ready = txn_man->set_ready();
+        assert(ready);
         continue; // in majority, txn_man may has been destroyed when receive msgs
       } 
 
@@ -1018,8 +1032,14 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 #endif
     #if RECOVERY_TXN_MECHANISM
     txn_man->update_send_time();
-    if (!txn_man->is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(txn_man,WAIT_TXN));
-    txn_man->is_enqueue = true;
+    if (!txn_man->is_enqueue && txn_man->wait_queue_entry == nullptr) {
+      work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(txn_man,WAIT_TXN),txn_man->wait_queue_entry);
+      DEBUG_T("Txn %ld enqueue wait queue.\n",txn_man->get_txn_id());
+      txn_man->is_enqueue = true;
+    }else {
+      DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",txn_man->get_txn_id(), txn_man->wait_queue_entry->txn_id);
+    }
+    
     #endif
   }
   return rc;
@@ -1432,18 +1452,31 @@ RC WorkerThread::process_log_flushed(Message * msg) {
 
 RC WorkerThread::process_wait_txn(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG_T("WAIT TXN %ld\n",msg->get_txn_id());
+  txn_man->is_enqueue = false;
   if (IS_LOCAL(txn_man->get_txn_id()) || txn_man->new_coordinator == g_node_id) {
     // For coordinator, handle failed executor
     // Check current state
     if (txn_man->txn_stats.current_states == EXECUTION_PHASE) {
       txn_man->set_rc(Abort);
+      DEBUG_T("Resend finish abort txn %ld\n",msg->get_txn_id());
       txn_man->send_finish_messages();
       txn_man->abort(yield, cor_id);
       abort();
     } else if (txn_man->txn_stats.current_states == FINISH_PHASE) {
       txn_man->update_query_status(true);
-      DEBUG_T("1420 resend txn %ld\n",msg->get_txn_id());
-      txn_man->resend_remote_subtxn();
+      DEBUG_T("Resend commit txn %ld\n",msg->get_txn_id());
+      RC rc = txn_man->resend_remote_subtxn();
+      #if RECOVERY_TXN_MECHANISM
+      if (rc == WAIT) {
+        if (!txn_man->is_enqueue && txn_man->wait_queue_entry == nullptr) {
+          work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(txn_man,WAIT_TXN),txn_man->wait_queue_entry);
+          DEBUG_T("Txn %ld enqueue wait queue.\n",txn_man->get_txn_id());
+          txn_man->is_enqueue = true;
+        }else {
+          DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",txn_man->get_txn_id(), txn_man->wait_queue_entry->txn_id);
+        }
+      }
+      #endif
     }
   } else {
     // For executor, handle failed coordinator
@@ -1457,7 +1490,9 @@ RC WorkerThread::process_recover_txn(yield_func_t &yield, Message * msg, uint64_
   RC rc = RCOK;
   txn_man->reset_query();
   msg->copy_to_txn(txn_man);
-
+  txn_man->set_rc(RCOK);
+  // ClientQueryMessage *cmsg = (ClientQueryMessage*)msg;
+  // txn_man->set_rc(cmsg->rc);
   txn_man->is_recover = true;
   txn_man->send_RQRY_RSP = true;
   rc = txn_man->run_txn(yield, cor_id);
@@ -1476,13 +1511,23 @@ RC WorkerThread::process_recover_txn(yield_func_t &yield, Message * msg, uint64_
 RC WorkerThread::process_rack_recover_txn(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG_T("RACK RECOVER TXN %ld from %ld\n",msg->get_txn_id(), msg->get_return_id());
 
+  if(!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt || txn_man->get_commit_timestamp() == 0) 
+  // if( txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt)
+  // //  || txn_man->get_commit_timestamp() == 0) 
+  {
+    DEBUG_T("Txn %ld rack recover skip, because %p, part_touch %ld, abort %ld:%ld, ts %lu\n",msg->get_txn_id(), txn_man->query, txn_man->query->partitions_touched.size(), txn_man->abort_cnt, msg->current_abort_cnt, txn_man->get_commit_timestamp());
+    return RCOK;
+  }
   int responses_left = txn_man->received_response((AckMessage*)msg, OpStatus::COMMIT);
   if (responses_left > 0) return WAIT;
   if (txn_man->get_rc() == Abort) {
     //! current txn has several failed replica.
     txn_man->update_query_status(true);
     DEBUG_T("1459 resend txn %ld\n",msg->get_txn_id());
-    txn_man->resend_remote_subtxn();
+    RC rc = txn_man->resend_remote_subtxn();
+    // if (rc == WAIT) {
+
+    // }
     return WAIT;
   }
 

@@ -485,7 +485,10 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 	}
 #endif
 	#if RECOVERY_TXN_MECHANISM
-	if (!valid) return waittxn_dequeue(thd_id);
+	if (!valid) {
+		// DEBUG_T("Work queue check wait txn queue.\n");
+		return waittxn_dequeue(thd_id);
+	}
 	#endif
 	INC_STATS(thd_id,mtx[14],get_sys_clock() - mtx_wait_starttime);
 
@@ -501,7 +504,7 @@ Message * QWorkQueue::dequeue(uint64_t thd_id) {
 		msg->wq_time = queue_time;
 		// DEBUG("DEQUEUE (%ld,%ld) %ld; %ld; %d,
 		// 0x%lx\n",msg->txn_id,msg->batch_id,msg->return_node_id,queue_time,msg->rtype,(uint64_t)msg);
-		DEBUG("Work Dequeue (%ld,%ld)\n",entry->txn_id,entry->batch_id);
+		DEBUG("Work Dequeue type %ld (%ld,%ld)\n",msg->rtype, entry->txn_id,entry->batch_id);
 		DEBUG_M("QWorkQueue::dequeue work_queue_entry free\n");
 		mem_allocator.free(entry,sizeof(work_queue_entry));
 		INC_STATS(thd_id,work_queue_dequeue_time,get_sys_clock() - starttime);
@@ -581,30 +584,39 @@ Message * QWorkQueue::queuetop(uint64_t thd_id)
 }
 
 
-void WaitList::enqueue(uint64_t thd_id, Message * msg) {
+void WaitList::enqueue(uint64_t thd_id, Message * msg, wait_list_entry* &entry) {
+	// return ;
 	uint64_t starttime = get_sys_clock();
 	assert(msg);
-	wait_list_entry * entry = (wait_list_entry*)mem_allocator.align_alloc(sizeof(wait_list_entry));
+	entry = (wait_list_entry*)mem_allocator.align_alloc(sizeof(wait_list_entry));
 	entry->msg = msg;
 	entry->txn_id = msg->txn_id;
 
-	sem_wait(&_semaphore);
+	while (sem_trywait(&_semaphore) && !simulation->is_done()){}
 	LIST_PUT_TAIL(head,tail,entry);
-	wait_hash[msg->txn_id] = entry;
+	// wait_hash[msg->txn_id] = entry;
+	sem_post(&_semaphore);
+}
+
+void WaitList::enqueue(uint64_t thd_id, wait_list_entry* entry) {
+	// return ;
+	uint64_t starttime = get_sys_clock();
+	while (sem_trywait(&_semaphore) && !simulation->is_done()){}
+	LIST_PUT_TAIL(head,tail,entry);
+	// wait_hash[msg->txn_id] = entry;
 	sem_post(&_semaphore);
 }
 
 Message * WaitList::dequeue(uint64_t thd_id) {
+	// return nullptr;
 	uint64_t starttime = get_sys_clock();
 	assert(ISSERVER || ISREPLICA);
 	Message * msg = NULL;
 	wait_list_entry * entry = NULL;
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	bool valid = false;
-	sem_wait(&_semaphore);
+	while (sem_trywait(&_semaphore) && !simulation->is_done()){}
 	LIST_GET_HEAD(head,tail,entry);
-	// LIST_PUT_TAIL(head,tail,entry);
-	sem_post(&_semaphore);
 
 	//todo: check whether this txn timeout
 	if(entry != NULL) {
@@ -614,28 +626,27 @@ Message * WaitList::dequeue(uint64_t thd_id) {
 		TxnManager *txn = wmsg->txn;
 		if (!txn->is_time_out()) {
 			msg = NULL;
-			sem_wait(&_semaphore);
 			LIST_PUT_TAIL(head,tail,entry);
-			sem_post(&_semaphore);
-		} else {
-			sem_wait(&_semaphore);
-			wait_hash[msg->txn_id] = NULL;
-			sem_post(&_semaphore);
 		}
-		//printf("%ld WQdequeue %ld\n",thd_id,entry->txn_id);
-		// DEBUG("Work Dequeue (%ld,%ld)\n",entry->txn_id,entry->batch_id);
-		// DEBUG_M("QWorkQueue::dequeue work_queue_entry free\n");
-		// mem_allocator.free(entry,sizeof(work_queue_entry));
-		// INC_STATS(thd_id,work_queue_dequeue_time,get_sys_clock() - starttime);
 	}
+	sem_post(&_semaphore);
 	return msg;
 }
 
 void WaitList::remove(uint64_t thd_id, uint64_t txn_id) {
+	while (sem_trywait(&_semaphore) && !simulation->is_done()){}
 	wait_list_entry * entry = wait_hash[txn_id];
-	sem_wait(&_semaphore);
-	LIST_REMOVE_HT(head,tail,entry);
+	if (entry == nullptr) return;
+	LIST_REMOVE_HT(entry,head,tail);
 	wait_hash[txn_id] = NULL;
+	sem_post(&_semaphore);
+	mem_allocator.free(entry,sizeof(wait_list_entry));
+}
+
+void WaitList::remove(uint64_t thd_id, wait_list_entry* entry) {
+	if (entry == nullptr) return;
+	while (sem_trywait(&_semaphore) && !simulation->is_done()){}
+	LIST_REMOVE_HT(entry,head,tail);
 	sem_post(&_semaphore);
 	mem_allocator.free(entry,sizeof(wait_list_entry));
 }

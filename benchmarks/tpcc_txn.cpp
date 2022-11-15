@@ -460,8 +460,14 @@ RC TPCCTxnManager::send_remote_subtxn() {
 	}
 	#if RECOVERY_TXN_MECHANISM
 	update_send_time();
-	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
-	is_enqueue = true;
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN),wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n",get_txn_id());
+		is_enqueue = true;
+	} else {
+		DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",get_txn_id(), wait_queue_entry->txn_id);
+	}
+	
 	#endif
 	return rc;
 }
@@ -525,8 +531,14 @@ RC TPCCTxnManager::send_remote_request() {
 	state = next_state;
 	#if RECOVERY_TXN_MECHANISM
 	update_send_time();
-	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
-	is_enqueue = true;
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN),wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n",get_txn_id());
+		is_enqueue = true;
+	}else {
+		DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",get_txn_id(), wait_queue_entry->txn_id);
+	}
+	
 	#endif
 	return WAIT_REM;
 }
@@ -1619,7 +1631,7 @@ RC TPCCTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 
 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
 
-			newEntry->set_entry(change_cnt[i],change[i],get_start_timestamp());
+			newEntry->set_entry(get_txn_id(), change_cnt[i],change[i],get_start_timestamp());
 
 
 			if(i == g_node_id){ //local log
@@ -1718,7 +1730,7 @@ RC TPCCTxnManager::redo_commit_log(yield_func_t &yield,RC status, uint64_t cor_i
 
 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
 
-			newEntry->set_entry(0,change[i],get_start_timestamp());
+			newEntry->set_entry(get_txn_id(),0,change[i],get_start_timestamp());
 			if(status == Abort){
 				newEntry->state = LE_ABORTED;
 			}else{

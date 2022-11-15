@@ -31,7 +31,7 @@ RC RecoveryThread::run() {
             continue;
         }
         ReplicaRecoverMessage * rmsg = (ReplicaRecoverMessage*) msg;
-        DEBUG_H("Node receive recover msg from %ld, recover part %ld:%ld\n",  rmsg->return_node_id, rmsg->partition_id, rmsg->replica_id);
+        DEBUG_H("Route receive recover msg from %ld, recover part %ld:%ld\n",  rmsg->return_node_id, rmsg->partition_id, rmsg->replica_id);
         assert(rmsg->rtype == RECOVERY);
         if(rmsg->replica_id == 1 || rmsg->replica_id == 2) {
             secondary_recovery(rmsg->partition_id, rmsg->replica_id);
@@ -48,7 +48,7 @@ RC RecoveryThread::run() {
 RC RecoveryThread::secondary_recovery(uint64_t partition_id, uint64_t sid) {
     route_node_ts primary = route_table.get_primary(partition_id);
     uint64_t primary_id = primary.node_id;
-    DEBUG_H("Node recover part %ld secondary\n", partition_id);
+    DEBUG_H("Route recover part %ld secondary\n", partition_id);
     RC rc = log_update_from_replica(partition_id, primary_id);
     if(rc == RCOK) {
         if(sid == 1) {
@@ -72,7 +72,7 @@ RC RecoveryThread::secondary_recovery(uint64_t partition_id, uint64_t sid) {
 }
 
 RC RecoveryThread::primary_recovery(uint64_t partition_id) {
-    DEBUG_H("Node recover part %ld primary\n", partition_id);
+    DEBUG_H("Route recover part %ld primary\n", partition_id);
     route_node_ts primary = route_table.get_primary(partition_id);
     uint64_t primary_id = primary.node_id;
     uint64_t sid1 = route_table.get_secondary_1(partition_id).node_id;

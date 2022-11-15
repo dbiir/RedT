@@ -57,7 +57,7 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
     bool conflict = conflict_lock(lock_info, type, new_lock_info);
     if (conflict) {
         #if DEBUG_PRINTF
-        printf("---thread id:%lu, lock %s failed!!!!!!  nodeid-key : %u; %lu , txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), type == DLOCK_EX ? "write" : "shared", g_node_id, row->get_primary_key(), txn->get_txn_id(), lock_info, new_lock_info);  
+        printf("---thread id:%lu, lock %s failed!!!!!!  nodeid-key : %u; %lu , txnid: %lu, origin lock_info: %lu, new_lock_info: %lu, lock owner %lu\n", txn->get_thd_id(), type == DLOCK_EX ? "write" : "shared", g_node_id, row->get_primary_key(), txn->get_txn_id(), lock_info, new_lock_info, row->_txn_id);  
         #endif
         rc = Abort;
 	    return rc;
@@ -89,9 +89,13 @@ RC Row_rdma_2pl::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row
         }
     }         
     else{   //加锁成功
-    #if DEBUG_PRINTF
-        printf("---thread id:%lu, lock %s success, nodeid-key : %u; %lu , txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txn->get_thd_id(), type == DLOCK_EX ? "write" : "shared", g_node_id, row->get_primary_key(), txn->get_txn_id(), lock_info, new_lock_info);
+    #if DEBUG_LOCK
+        if (type == DLOCK_EX) row->_txn_id = txn->get_txn_id();
     #endif
+    #if DEBUG_PRINTF
+        printf("---thread id:%lu, lock %s success, nodeid-key : %u; %lu , txnid: %lu, origin lock_info: %lu, new_lock_info: %lu, lock owner %lu\n", txn->get_thd_id(), type == DLOCK_EX ? "write" : "shared", g_node_id, row->get_primary_key(), txn->get_txn_id(), lock_info, new_lock_info, row->_txn_id);
+    #endif
+
         rc = RCOK;
     } 
 #endif

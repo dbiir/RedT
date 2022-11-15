@@ -715,8 +715,14 @@ void TxnManager::send_prepare_messages() {
 #endif
 	#if RECOVERY_TXN_MECHANISM
 	update_send_time();
-	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
-	is_enqueue = true;
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN),wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n",get_txn_id());
+		is_enqueue = true;
+	}else {
+		DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",get_txn_id(), wait_queue_entry->txn_id);
+	}
+	
 	#endif
 #else
 	rsp_cnt = query->partitions_touched.size() - 1;
@@ -733,8 +739,13 @@ void TxnManager::send_prepare_messages() {
 #endif
 	#if RECOVERY_TXN_MECHANISM
 	update_send_time();
-	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
-	is_enqueue = true;
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN),wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n",get_txn_id());
+		is_enqueue = true;
+	}else {
+		DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",get_txn_id(), wait_queue_entry->txn_id);
+	}
 	#endif
 #endif
 	}
@@ -814,8 +825,14 @@ void TxnManager::send_finish_messages() {
 	
 	#if RECOVERY_TXN_MECHANISM
 	update_send_time();
-	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
-	is_enqueue = true;
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN),wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n",get_txn_id());
+		is_enqueue = true;
+	}else {
+		DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",get_txn_id(), wait_queue_entry->txn_id);
+	}
+	// 
 	#endif
 }
 
@@ -1268,10 +1285,10 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 		uint64_t new_lock_info;
 		uint64_t lock_info;
 		row_t * test_row = NULL;
+		row_t * lock_read;
 
 		if(type == RD){ //读集元素
 			//第一次rdma read，得到数据项的锁信息
-            row_t * lock_read;
 			rc = read_remote_row(yield,loc,m_item->offset,lock_read,cor_id);
 			if (rc != RCOK) {
 				rc = rc == NODE_FAILED ? Abort : rc;
@@ -1279,7 +1296,9 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 			}
 			new_lock_info = 0;
 			lock_info = lock_read->_tid_word;
+			#if !DEBUG_PRINTF
 			mem_allocator.free(lock_read, row_t::get_row_size(ROW_DEFAULT_SIZE));
+			#endif
 remote_atomic_retry_lock:
 			bool conflict = Row_rdma_2pl::conflict_lock(lock_info, DLOCK_SH, new_lock_info);
 
@@ -1295,11 +1314,17 @@ remote_atomic_retry_lock:
             rc = cas_remote_content(yield,loc,m_item->offset,lock_info,new_lock_info, &try_lock, cor_id);
 			if (rc != RCOK) {
 				rc = rc == NODE_FAILED ? Abort : rc;
+				#if DEBUG_PRINTF
+					printf("---thd %lu, remote lock read failed!!!!!!!! because node failed, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", get_thd_id(), loc, lock_read->get_primary_key(), get_txn_id(), try_lock);
+				#endif
 				return rc;
 			}
             if(try_lock != lock_info){
                 num_atomic_retry++;
                 total_num_atomic_retry++;
+				#if DEBUG_PRINTF
+					printf("---thd %lu, remote lock read failed!!!!!!!!, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", get_thd_id(), loc, lock_read->get_primary_key(), get_txn_id(), try_lock);
+				#endif
                 if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
                 lock_info = try_lock;
                 if (!simulation->is_done()) goto remote_atomic_retry_lock;
@@ -1312,6 +1337,9 @@ remote_atomic_retry_lock:
                   return Abort; //原子性被破坏，CAS失败	
                 }
             }
+			#if DEBUG_PRINTF
+				printf("---thd %lu, remote lock read succ, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", get_thd_id(), loc, lock_read->get_primary_key(), get_txn_id(), try_lock);
+			#endif
 			//read remote data
         	rc = read_remote_row(yield,loc,m_item->offset,test_row,cor_id);
 			if (rc != RCOK) {
@@ -1323,10 +1351,20 @@ remote_atomic_retry_lock:
 		else{ //写集元素直接CAS即可，不需要RDMA READ
 			lock_info = 0; //只有lock_info==0时才可以CAS，否则加写锁失败，Abort
 			new_lock_info = 3; //二进制11，即1个写锁
+			#if DEBUG_PRINTF
+			rc = read_remote_row(yield,loc,m_item->offset,lock_read,cor_id);
+			if (rc != RCOK) {
+				rc = rc == NODE_FAILED ? Abort : rc;
+				return rc;
+			}
+			#endif
 			//RDMA CAS加锁
 			uint64_t try_lock = -1;
 			rc = cas_remote_content(yield,loc,m_item->offset,lock_info,new_lock_info,&try_lock, cor_id);
 			if (rc != RCOK) {
+				#if DEBUG_PRINTF
+					printf("---thd %lu, local lock write failed!!!!!!!! because node failed, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", get_thd_id(), loc, lock_read->get_primary_key(), get_txn_id(), try_lock);
+				#endif
 				rc = rc == NODE_FAILED ? Abort : rc;
 				return rc;
 			}
@@ -1334,9 +1372,15 @@ remote_atomic_retry_lock:
 				DEBUG_M("TxnManager::get_row(abort) access free\n");
 				row_local = NULL;
 				txn->rc = Abort;
+				#if DEBUG_PRINTF
+					printf("---thd %lu, local lock write failed!!!!!!!!, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", get_thd_id(), loc, lock_read->get_primary_key(), get_txn_id(), try_lock);
+				#endif
 				mem_allocator.free(m_item, sizeof(itemid_t));
 				return Abort; //原子性被破坏，CAS失败			
 			}	
+			#if DEBUG_PRINTF
+				printf("---thd %lu, remote lock write succ, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", get_thd_id(), loc, lock_read->get_primary_key(), get_txn_id(), try_lock);
+			#endif
 			//read remote data
 			rc = read_remote_row(yield,loc,m_item->offset,test_row,cor_id);
 			if (rc != RCOK) {
@@ -1345,6 +1389,9 @@ remote_atomic_retry_lock:
 			}
 			// assert(test_row->get_primary_key() == req->key);   
 		}
+		#if DEBUG_PRINTF
+		mem_allocator.free(lock_read, row_t::get_row_size(ROW_DEFAULT_SIZE));
+		#endif
         //preserve the txn->access
 		++num_locks;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc,test_row->get_part_id());
@@ -1643,6 +1690,7 @@ RC TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server,u
 	// RDMA_ASSERT();
 	if (res_p != rdmaio::IOCode::Ok) {
 		node_status.set_node_status(target_server, NS::Failure, get_thd_id());
+		DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
 		return NODE_FAILED;
 	}
 	return RCOK;
@@ -1724,6 +1772,7 @@ RC TxnManager::write_remote_content(yield_func_t &yield, uint64_t target_server,
 		// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 		if (res_p != rdmaio::IOCode::Ok) {
 			node_status.set_node_status(target_server, NS::Failure, get_thd_id());
+			DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
 			return NODE_FAILED;
 		}
 #endif
@@ -1737,6 +1786,7 @@ RC TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,ui
     rdmaio::qp::Op<> op;
 	uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
     uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id,num);
+	*local_buf = -1;
     auto mr = client_rm_handler->get_reg_attr().value();
     
     uint64_t starttime;
@@ -1780,6 +1830,7 @@ RC TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,ui
 		INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 		if (res_p != rdmaio::IOCode::Ok) {
 			node_status.set_node_status(target_server, NS::Failure, get_thd_id());
+			DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
 			return NODE_FAILED;
 		}
 #endif
@@ -1839,6 +1890,7 @@ RC TxnManager::cas_remote_content(yield_func_t &yield, uint64_t target_server,ui
 	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	if (res_p != rdmaio::IOCode::Ok) {
 		node_status.set_node_status(target_server, NS::Failure, get_thd_id());
+		DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
 		return NODE_FAILED;
 	}
 #endif

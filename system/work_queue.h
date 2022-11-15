@@ -79,9 +79,11 @@ public:
     tail = NULL;
     sem_init(&_semaphore, 0, 1);
   }
-  void enqueue(uint64_t thd_id, Message * msg);
+  void enqueue(uint64_t thd_id, Message * msg, wait_list_entry* &entry);
+  void enqueue(uint64_t thd_id, wait_list_entry* entry);
   Message * dequeue(uint64_t thd_id);
   void remove(uint64_t thd_id, uint64_t txn_id);
+  void remove(uint64_t thd_id, wait_list_entry* entry);
 private:
   std::unordered_map<uint64_t, wait_list_entry*> wait_hash;
   wait_list_entry* head;
@@ -101,9 +103,10 @@ public:
   void sequencer_enqueue(uint64_t thd_id, Message * msg);
   Message * sequencer_dequeue(uint64_t thd_id);
 
-  void waittxn_enqueue(uint64_t thd_id, Message * msg) {wait_list->enqueue(thd_id, msg);}
+  void waittxn_enqueue(uint64_t thd_id, Message * msg, wait_list_entry* &entry) {wait_list->enqueue(thd_id, msg, entry);}
   //todo: 
   void waittxn_remove(uint64_t thd_id, uint64_t txn_id) {wait_list->remove(thd_id, txn_id);}
+  void waittxn_remove(uint64_t thd_id, wait_list_entry* entry) {wait_list->remove(thd_id, entry);}
   Message * waittxn_dequeue(uint64_t thd_id){wait_list->dequeue(thd_id);}
 
   uint64_t get_cnt() {return get_wq_cnt() + get_rem_wq_cnt() + get_new_wq_cnt();}

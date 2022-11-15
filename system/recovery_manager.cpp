@@ -118,6 +118,7 @@ RouteAndStatus HeartBeatThread::read_remote_status(uint64_t target_server){
     if (res_p != rdmaio::IOCode::Ok) {
         //todo: handle error.
         node_status.set_node_status(target_server, NS::Failure, get_thd_id());
+        DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
         DEBUG_H("Center primary node %ld failed, because read RDMA heartbeat failed, result %d\n", target_server, res_p.code);
     }
     DEBUG_H("HEARTBEAT read primary node status\n");
@@ -139,12 +140,12 @@ bool HeartBeatThread::write_remote_heartbeat(uint64_t target_server){
 
     char *local_buf = Rdma::get_status_client_memory(thd_id);
     
-    uint64_t time = get_sys_clock();
+    uint64_t time = get_wall_clock();
     uint64_t operate_size = sizeof(uint64_t);
-    ::memset(local_buf, 0, operate_size);
+    memset(local_buf, 0, operate_size);
     memcpy(local_buf, &time , operate_size);
     uint64_t remote_offset = rdma_buffer_size - rdma_log_size - rdma_routetable_size;
-    remote_offset += SIZE_OF_ROUTE + sizeof(status_node) * g_node_id; 
+    remote_offset += SIZE_OF_ROUTE + sizeof(status_node) * g_node_id + sizeof(NS); 
 
     auto res_s = rc_qp[target_server][thd_id]->send_normal(
 		{.op = IBV_WR_RDMA_WRITE,
@@ -160,6 +161,7 @@ bool HeartBeatThread::write_remote_heartbeat(uint64_t target_server){
 	if (res_p != rdmaio::IOCode::Ok) {
         //todo: handle error.
         node_status.set_node_status(target_server, NS::Failure, get_thd_id());
+        DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
         DEBUG_H("Center primary node %ld failed, because write RDMA heartbeat failed, result %d\n", target_server, res_p);
         return false;
     }
@@ -187,7 +189,7 @@ RC HeartBeatThread::check_for_same_center() {
             is_alive = false;
         }
         if (!is_alive) {
-            DEBUG_H("Node %ld find in same data center node %ld status Failure %d\n", g_node_id, dest_id, st->status);
+            // DEBUG_H("Node %ld find in same data center node %ld status Failure %d\n", g_node_id, dest_id, st->status);
             // recover the replica on failed node.
             generate_recovery_msg(dest_id);
         }
@@ -339,8 +341,8 @@ uint64_t HeartBeatThread::caculate_suitable_node(Replica rep, uint64_t failed_id
     for (int i = 0; i < node_cnt_per_dc; i++) {
         uint64_t node_id = i * CENTER_CNT + center_id;
         status_node* st = node_status.get_node_status(node_id);
-        DEBUG_H("Generate recover msg, node %ld state %ld\n", node_id, st->status);
         if (st->status == NS::Failure) continue;
+        DEBUG_H("Generate recover msg, node %ld state %ld\n", node_id, st->status);
         suitable_node = node_id;
         break;
     }

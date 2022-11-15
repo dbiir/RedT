@@ -217,6 +217,7 @@ RC InputThread::server_recv_loop() {
 				continue;
 			}
 #endif
+			DEBUG_T("Receive Msg %d, (%ld,%ld) from %ld\n", msg->rtype, msg->txn_id, msg->batch_id, msg->return_node_id);
 			work_queue.enqueue(get_thd_id(),msg,false);
 			msgs->erase(msgs->begin());
 		}

@@ -26,6 +26,7 @@
 #include "worker_thread.h"
 #include "routine.h"
 #include <unordered_map>
+#include "work_queue.h"
 //#include "wl.h"
 
 class Workload;
@@ -248,13 +249,20 @@ public:
 
 	// For check timeout
 	bool is_time_out() {
-		uint64_t now = get_sys_clock();
-		return now - last_send_msg > EXECUTOR_FAILED_TIME;
+		uint64_t now = get_wall_clock();
+		uint64_t last_ts = last_send_msg;
+		// DEBUG_T("txn %ld check time out, %lu:%lu\n",get_txn_id(),last_ts,now);
+		if (now > last_ts && (now - last_ts) > (EXECUTOR_FAILED_TIME)) {
+			DEBUG_T("txn %ld is time out, %lu:%lu\n",get_txn_id(),last_ts,now);
+			return true;
+		} else return false;
 	}
 	void update_send_time() {
-		last_send_msg = get_sys_clock();
+		last_send_msg = get_wall_clock();
+		DEBUG_T("txn %ld update last send time %lu\n",get_txn_id(),last_send_msg);
 	}
 	bool is_enqueue = false;
+	wait_list_entry* wait_queue_entry;
 	uint64_t new_coordinator = -1;
 	bool is_recover = false;
 	// For recover

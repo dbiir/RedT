@@ -261,6 +261,7 @@ public:
   void init();
   void release();
 
+  RC rc;
   uint64_t pid;
   uint64_t ts;
 #if CC_ALG == CALVIN

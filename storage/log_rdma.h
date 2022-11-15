@@ -29,13 +29,14 @@ public:
 	void init(); //initialize during system startup
     void set_flushed(); //set flushed after applying.
     void reset();
-    void set_entry(int ccnt,const vector<ChangeInfo>& cinfo, uint64_t sts);
+    void set_entry(uint64_t txnid, int ccnt,const vector<ChangeInfo>& cinfo, uint64_t sts);
     // entry_status get_status();
 
     entry_status state;
     uint64_t c_ts; //commit_timestamp
     uint64_t s_ts; //start_timestamp
     int change_cnt;
+    uint64_t txn_id;
     ChangeInfo change[CHANGE_PER_ENTRY];
 };
 

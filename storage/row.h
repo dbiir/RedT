@@ -127,6 +127,7 @@ public:
 	#if CC_ALG == RDMA_NO_WAIT 
 		volatile uint64_t _tid_word; 
 		volatile uint64_t wts; //commit timestamp of the latest transaction that writes this item
+		volatile uint64_t _txn_id; //For debug.
 		// volatile uint64_t lock_type;
 		// volatile uint64_t lock_owner[LOCK_LENGTH]; //解锁
 		Row_rdma_2pl * manager;

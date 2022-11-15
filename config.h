@@ -73,7 +73,7 @@
 #define USE_REPLICA true
 #define THOMAS_WRITE true  //if false, wait and sort
 #define INTER_DC_CONTROL true
-#define RDMA_DBPAOR true //concurrent logging
+#define RDMA_DBPAOR false //concurrent logging
 
 #if USE_REPLICA
 #define ASYNC_REDO_THREAD_CNT 1
@@ -127,7 +127,7 @@
 /***********************************************/
 #define CENTER_CNT 3
 #define NODE_CNT 6
-#define THREAD_CNT 4
+#define THREAD_CNT 2
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -168,7 +168,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 16
+#define MAX_TXN_IN_FLIGHT 12
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -469,15 +469,15 @@ enum PPSTxnType {
 #define IDX_VERB          false
 #define VERB_ALLOC          true
 
-#define DEBUG_PRINTF  false
-#define DEBUG_LOCK          false
+#define DEBUG_PRINTF true
+#define DEBUG_LOCK          true
 #define DEBUG_TIMESTAMP       false
 #define DEBUG_SYNTH         false
 #define DEBUG_ASSERT        false
 #define DEBUG_DISTR false
 #define DEBUG_ALLOC false
-#define DEBUG_TXN false
-#define DEBUG_RECOVER true
+#define DEBUG_TXN true
+#define DEBUG_RECOVER false
 #define DEBUG_RACE false
 #define DEBUG_TIMELINE        false
 #define DEBUG_BREAKDOWN       false
@@ -588,22 +588,22 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 60 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 120 * BILLION // ~1 minutes
 #define WARMUP_TIMER 1 * 0 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false
 #define ENVIRONMENT_EC2 false
 
-#define RDMA_CALLS_TIMEOUT 1000000
-#define MESSAGE_SEND_RETRY_TIME 10 * MILLION
+#define RDMA_CALLS_TIMEOUT 1 * 1000000
+#define MESSAGE_SEND_RETRY_TIME 1 * MILLION
 #define HEARTBEAT_TIME 1000 * MILLION
-#define SAME_CENTER_FAILED_TIME 10 * HEARTBEAT_TIME
+#define SAME_CENTER_FAILED_TIME 5 * HEARTBEAT_TIME
 #define INTER_CENTER_FAILED_TIME 20 * HEARTBEAT_TIME
-#define EXECUTOR_FAILED_TIME 2 * INTER_CENTER_FAILED_TIME
+#define EXECUTOR_FAILED_TIME 1 * INTER_CENTER_FAILED_TIME
 
 #define RECOVERY_MANAGER true
-#define RECOVERY_TXN_MECHANISM false
+#define RECOVERY_TXN_MECHANISM true
 
 #endif
   

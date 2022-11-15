@@ -260,7 +260,7 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
     
     // RC rc = RCOK;
     uint64_t version = 0;
-
+	DEBUG_T("Txn %ld one-sided op.", get_txn_id());
 	rc = get_remote_row(yield, req->acctype, loc, m_item, row_local, cor_id);
 	// mem_allocator.free(m_item, sizeof(itemid_t));
 	return rc;
@@ -356,8 +356,14 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	}
 	#if RECOVERY_TXN_MECHANISM
 	update_send_time();
-	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
-	is_enqueue = true;
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN),wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n",get_txn_id());
+		is_enqueue = true;
+	}else {
+		DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",get_txn_id(), wait_queue_entry->txn_id);
+	}
+	
 	#endif
 	// txn_stats.wait_for_rsp_time = get_sys_clock();
 	return rc;
@@ -394,8 +400,13 @@ RC YCSBTxnManager::send_remote_request() {
 	
 	#if RECOVERY_TXN_MECHANISM
 	update_send_time();
-	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
-	is_enqueue = true;
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN),wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n",get_txn_id());
+		is_enqueue = true;
+	}else {
+		DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",get_txn_id(), wait_queue_entry->txn_id);
+	}
 	#endif
 	return WAIT_REM;
 }
@@ -447,7 +458,7 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 
 	uint64_t part_id = _wl->key_to_part( req->key );
 	uint64_t node_id = get_primary_node_id(part_id);
-	if (node_id != req->primary.stored_node) return Abort;
+	// if (node_id != req->primary.stored_node) return Abort;
 	bool is_center = req->primary.execute_node == g_node_id;
 	bool is_local = req->primary.stored_node == g_node_id && req->primary.execute_node == g_node_id;
 
@@ -766,11 +777,20 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 			if (res_p != rdmaio::IOCode::Ok) {
 				node_status.set_node_status(i, NS::Failure, get_thd_id());
+				DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
 				return NODE_FAILED;
 			}
 			#endif
     		uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(get_thd_id(),count+1);
 			start_idx[i] = *local_buf;
+			if (i == g_node_id) {
+				DEBUG_T("txn %ld will write log in node %ld at index %d thd %ld now tail %ld\n",get_txn_id(), i, start_idx[i], get_thd_id(), *(redo_log_buf.get_tail()));
+			}else {
+				DEBUG_T("txn %ld will write log in node %ld at index %d thd %ld\n",get_txn_id(), i, start_idx[i], get_thd_id());
+			}
+			if (start_idx[i] == -1) {
+				return Abort;
+			}
 			++count;
 		}
 	}
@@ -801,10 +821,11 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
 		if(change_cnt[i]>0){
 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
-			newEntry->set_entry(change_cnt[i],change[i],get_start_timestamp());
+			newEntry->set_entry(get_txn_id(),change_cnt[i],change[i],get_start_timestamp());
 			if(i == g_node_id){ //local log
 				start_idx[i] = start_idx[i] % redo_log_buf.get_size();
 				char* start_addr = (char*)redo_log_buf.get_entry(start_idx[i]);
+				// !
 				assert(((LogEntry *)start_addr)->state == EMPTY);					
 				assert(((LogEntry *)start_addr)->change_cnt == 0);					
 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
@@ -843,6 +864,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 				if (res_p != rdmaio::IOCode::Ok) {
 					node_status.set_node_status(i, NS::Failure, get_thd_id());
+					DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
 					return NODE_FAILED;
 				}
 				#endif
@@ -858,10 +880,18 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			uint64_t start_idx = -1;
 			rc = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, &start_idx, cor_id);
 			// todo: I do not know whether I should abort here.
+			if (i == g_node_id) {
+				DEBUG_T("txn %ld will write log in node %ld at index %d thd %ld now tail %ld\n",get_txn_id(), i, start_idx, get_thd_id(), *(redo_log_buf.get_tail()));
+			} else {
+				DEBUG_T("txn %ld will write log in node %ld at index %d thd %ld\n",get_txn_id(), i, start_idx, get_thd_id());
+			}
+			if (start_idx == -1) {
+				return Abort;
+			}
 
 			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
 
-			newEntry->set_entry(change_cnt[i],change[i],get_start_timestamp());
+			newEntry->set_entry(get_txn_id(),change_cnt[i],change[i],get_start_timestamp());
 
 
 			if(i == g_node_id){ //local log
@@ -1003,6 +1033,7 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 			INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 			if (res_p != rdmaio::IOCode::Ok) {
 				node_status.set_node_status(i, NS::Failure, get_thd_id());
+				DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
 				return NODE_FAILED;
 			}
 			#endif
@@ -1082,6 +1113,7 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 				DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 				if (res_p != rdmaio::IOCode::Ok) {
 					node_status.set_node_status(i, NS::Failure, get_thd_id());
+					DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
 					return NODE_FAILED;
 				}
 				#endif
@@ -1161,6 +1193,7 @@ RC YCSBTxnManager::resend_remote_subtxn() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	RC rc = RCOK;
 	vector<vector<uint64_t>> resend_center{g_center_cnt};
+	if (IS_LOCAL(get_txn_id()) || new_coordinator == g_node_id) query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
 	for(int i = 0; i < ycsb_query->requests.size(); i++) {
 		ycsb_request * req = ycsb_query->requests[i];
 		if(req->acctype!=WR) {continue;}
@@ -1238,8 +1271,14 @@ RC YCSBTxnManager::resend_remote_subtxn() {
 	}
 	#if RECOVERY_TXN_MECHANISM
 	update_send_time();
-	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
-	is_enqueue = true;
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN),wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n",get_txn_id());
+		is_enqueue = true;
+	}else {
+		DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",get_txn_id(), wait_queue_entry->txn_id);
+	}
+	
 	#endif
 	// txn_stats.wait_for_rsp_time = get_sys_clock();
 	return rc;
@@ -1253,7 +1292,11 @@ RC YCSBTxnManager::agent_check_commit() {
 	}
 	#if RECOVERY_TXN_MECHANISM
 	update_send_time();
-	if (!is_enqueue) work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN));
-	is_enqueue = true;
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN),wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n",get_txn_id());
+		is_enqueue = true;
+	}
+	
 	#endif
 }
