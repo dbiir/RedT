@@ -443,8 +443,8 @@ RC RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_
     Transaction *txn = txnMng->txn;
 
     RC arc = RCOK;
-    if (!txnMng->is_recover) arc = commit_log(yield, rc, txnMng, cor_id);
-    else arc = commit_recover_log(yield, rc, txnMng, cor_id);
+    if (!txnMng->is_recover && txnMng->is_logged) arc = commit_log(yield, rc, txnMng, cor_id);
+    else if (rc == RCOK) arc = commit_recover_log(yield, rc, txnMng, cor_id);
     if (arc == NODE_FAILED) {
         //todo: handle write failed.
     }

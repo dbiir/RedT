@@ -124,8 +124,8 @@ void REDLOG(const char *format, ...);
 /************************************************/
 #define LIST_GET_HEAD(lhead, ltail, en) \
   {                                     \
-	en = lhead; \
-	if (lhead) lhead = lhead->next; \
+    en = lhead; \
+    if (lhead) lhead = lhead->next; \
     if (lhead)                          \
       lhead->prev = NULL;               \
     else                                \

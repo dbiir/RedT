@@ -407,7 +407,7 @@ void TxnManager::reset() {
 	locking_done = true;
 	ready_part = 0;
 	rsp_cnt = 0;
-	aborted = false;
+	// aborted = false;
 	return_id = UINT64_MAX;
 	twopl_wait_start = 0;
 	finish_logging = false;
@@ -417,6 +417,10 @@ void TxnManager::reset() {
 	for(int i=0;i<CENTER_CNT;i++){
 		is_primary[i] = false; 	
 	}
+	for(int i=0;i<NODE_CNT;i++){
+		log_idx[i] = -1; 	
+	}
+	is_logged = false;
 	#if WORKLOAD == YCSB
 	for(int i=0;i<REQ_PER_QUERY;i++){
 		for(int j=0;j<2;j++){
@@ -470,7 +474,11 @@ void TxnManager::reset() {
 
 void TxnManager::release() {
 	uint64_t prof_starttime = get_sys_clock();
-	qry_pool.put(get_thd_id(),query);
+	if (!aborted) {
+		qry_pool.put(get_thd_id(),query);
+	}
+	aborted = false;
+	// qry_pool.put(get_thd_id(),query);
 	INC_STATS(get_thd_id(),mtx[0],get_sys_clock()-prof_starttime);
 	query = NULL;
 	prof_starttime = get_sys_clock();
@@ -600,6 +608,7 @@ RC TxnManager::abort(yield_func_t &yield, uint64_t cor_id) {
 			);
 			*/
 	//commit_stats();
+	is_logged = false;
 	return Abort;
 }
 
@@ -1477,7 +1486,7 @@ remote_atomic_retry_lock:
 			}
 		}
 		
-		printf("txn %d add remote lock on item %d, lock_type: %d\n", txn->txn_id, test_row->get_primary_key(), lock_type);
+		DEBUG_T("txn %d add remote lock on item %d, lock_type: %d\n", txn->txn_id, test_row->get_primary_key(), lock_type);
         //preserve the txn->access
 		++num_locks;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc,test_row->get_part_id());
@@ -1594,7 +1603,7 @@ void TxnManager::release_locks(yield_func_t &yield, RC rc, uint64_t cor_id) {
 #endif
 }
 
-RC TxnManager::read_remote_index(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,uint64_t key, itemid_t * item, uint64_t cor_id){
+RC TxnManager::read_remote_index(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,uint64_t key, itemid_t * &item, uint64_t cor_id){
     uint64_t operate_size = sizeof(IndexInfo);
     uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
     char *local_buf = Rdma::get_index_client_memory(thd_id);
@@ -1604,6 +1613,7 @@ RC TxnManager::read_remote_index(yield_func_t &yield, uint64_t target_server,uin
     // itemid_t* 
 	item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
 	assert(((IndexInfo*)local_buf)->key == key);
+	// item->key = ((IndexInfo*)local_buf)->key;
 	item->location = ((IndexInfo*)local_buf)->address;
 	item->type = ((IndexInfo*)local_buf)->type;
 	item->valid = ((IndexInfo*)local_buf)->valid;
@@ -1613,7 +1623,7 @@ RC TxnManager::read_remote_index(yield_func_t &yield, uint64_t target_server,uin
     return rc;
 }
 
-RC TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,row_t * test_row, uint64_t cor_id){
+RC TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,row_t * &test_row, uint64_t cor_id){
     uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
     uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
     char *local_buf = Rdma::get_row_client_memory(thd_id);
@@ -1687,10 +1697,10 @@ RC TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server,u
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
-	// RDMA_ASSERT();
+	// assert(res_p == rdmaio::IOCode::Ok);
 	if (res_p != rdmaio::IOCode::Ok) {
 		node_status.set_node_status(target_server, NS::Failure, get_thd_id());
-		DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
+		DEBUG_T("Thd %ld send RDMA one-sided failed--read %ld.\n", get_thd_id(),target_server);
 		return NODE_FAILED;
 	}
 	return RCOK;
@@ -1772,7 +1782,7 @@ RC TxnManager::write_remote_content(yield_func_t &yield, uint64_t target_server,
 		// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 		if (res_p != rdmaio::IOCode::Ok) {
 			node_status.set_node_status(target_server, NS::Failure, get_thd_id());
-			DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
+			DEBUG_T("Thd %ld send RDMA one-sided failed--write %ld.\n", get_thd_id(), target_server);
 			return NODE_FAILED;
 		}
 #endif
@@ -1828,9 +1838,10 @@ RC TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,ui
 		INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 		DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 		INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+		// assert(res_p == rdmaio::IOCode::Ok);
 		if (res_p != rdmaio::IOCode::Ok) {
 			node_status.set_node_status(target_server, NS::Failure, get_thd_id());
-			DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
+			DEBUG_T("Thd %ld send RDMA one-sided failed--faa %ld.\n", get_thd_id(),target_server);
 			return NODE_FAILED;
 		}
 #endif
@@ -1888,9 +1899,10 @@ RC TxnManager::cas_remote_content(yield_func_t &yield, uint64_t target_server,ui
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 	INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
+	// assert(res_p == rdmaio::IOCode::Ok);
 	if (res_p != rdmaio::IOCode::Ok) {
 		node_status.set_node_status(target_server, NS::Failure, get_thd_id());
-		DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
+		DEBUG_T("Thd %ld send RDMA one-sided failed--cas %ld.\n", get_thd_id(),target_server);
 		return NODE_FAILED;
 	}
 #endif

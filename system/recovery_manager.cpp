@@ -118,7 +118,7 @@ RouteAndStatus HeartBeatThread::read_remote_status(uint64_t target_server){
     if (res_p != rdmaio::IOCode::Ok) {
         //todo: handle error.
         node_status.set_node_status(target_server, NS::Failure, get_thd_id());
-        DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
+        DEBUG_T("Thd %ld send RDMA one-sided failed--read RDMA heartbeat %ld.\n", get_thd_id(),target_server);
         DEBUG_H("Center primary node %ld failed, because read RDMA heartbeat failed, result %d\n", target_server, res_p.code);
     }
     DEBUG_H("HEARTBEAT read primary node status\n");
@@ -161,7 +161,7 @@ bool HeartBeatThread::write_remote_heartbeat(uint64_t target_server){
 	if (res_p != rdmaio::IOCode::Ok) {
         //todo: handle error.
         node_status.set_node_status(target_server, NS::Failure, get_thd_id());
-        DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
+        DEBUG_T("Thd %ld send RDMA one-sided failed--write RDMA heartbeat %ld.\n", get_thd_id(), target_server);
         DEBUG_H("Center primary node %ld failed, because write RDMA heartbeat failed, result %d\n", target_server, res_p);
         return false;
     }

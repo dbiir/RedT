@@ -118,7 +118,7 @@ void * Rdma::client_qp(void *arg){
 	//   uint64_t reg_nic_name = 0;
 	//   uint64_t reg_mem_name = 0;
 	struct passwd *pwd = getpwuid(getuid());
-	printf("login account：%s\n", pwd->pw_name);
+	printf("login account:%s\n", pwd->pw_name);
 
 	auto fetch_res = cm_.fetch_remote_mr(reg_mem_name);
 	RDMA_ASSERT(fetch_res == IOCode::Ok) << std::get<0>(fetch_res.desc);

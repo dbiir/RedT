@@ -591,8 +591,8 @@ void WaitList::enqueue(uint64_t thd_id, Message * msg, wait_list_entry* &entry) 
 	entry = (wait_list_entry*)mem_allocator.align_alloc(sizeof(wait_list_entry));
 	entry->msg = msg;
 	entry->txn_id = msg->txn_id;
-
-	while (sem_trywait(&_semaphore) && !simulation->is_done()){}
+	sem_wait(&_semaphore);
+	// while (sem_trywait(&_semaphore) && !simulation->is_done()){}
 	LIST_PUT_TAIL(head,tail,entry);
 	// wait_hash[msg->txn_id] = entry;
 	sem_post(&_semaphore);
@@ -601,8 +601,11 @@ void WaitList::enqueue(uint64_t thd_id, Message * msg, wait_list_entry* &entry) 
 void WaitList::enqueue(uint64_t thd_id, wait_list_entry* entry) {
 	// return ;
 	uint64_t starttime = get_sys_clock();
-	while (sem_trywait(&_semaphore) && !simulation->is_done()){}
+	sem_wait(&_semaphore);
+	// while (sem_trywait(&_semaphore) && !simulation->is_done()){}
 	LIST_PUT_TAIL(head,tail,entry);
+	if (head != nullptr) assert(head->prev == nullptr);
+	if (tail != nullptr ) assert(tail->next == nullptr);
 	// wait_hash[msg->txn_id] = entry;
 	sem_post(&_semaphore);
 }
@@ -615,9 +618,11 @@ Message * WaitList::dequeue(uint64_t thd_id) {
 	wait_list_entry * entry = NULL;
 	uint64_t mtx_wait_starttime = get_sys_clock();
 	bool valid = false;
-	while (sem_trywait(&_semaphore) && !simulation->is_done()){}
+	sem_wait(&_semaphore);
+	// while (sem_trywait(&_semaphore) && !simulation->is_done()){}
 	LIST_GET_HEAD(head,tail,entry);
-
+	if (head != nullptr) assert(head->prev == nullptr);
+	if (tail != nullptr) assert(tail->next == nullptr);
 	//todo: check whether this txn timeout
 	if(entry != NULL) {
 		msg = entry->msg;
@@ -627,6 +632,8 @@ Message * WaitList::dequeue(uint64_t thd_id) {
 		if (!txn->is_time_out()) {
 			msg = NULL;
 			LIST_PUT_TAIL(head,tail,entry);
+			if (head != nullptr) assert(head->prev == nullptr);
+			if (tail != nullptr) assert(tail->next == nullptr);
 		}
 	}
 	sem_post(&_semaphore);
@@ -634,7 +641,8 @@ Message * WaitList::dequeue(uint64_t thd_id) {
 }
 
 void WaitList::remove(uint64_t thd_id, uint64_t txn_id) {
-	while (sem_trywait(&_semaphore) && !simulation->is_done()){}
+	sem_wait(&_semaphore);
+	// while (sem_trywait(&_semaphore) && !simulation->is_done()){}
 	wait_list_entry * entry = wait_hash[txn_id];
 	if (entry == nullptr) return;
 	LIST_REMOVE_HT(entry,head,tail);
@@ -645,8 +653,11 @@ void WaitList::remove(uint64_t thd_id, uint64_t txn_id) {
 
 void WaitList::remove(uint64_t thd_id, wait_list_entry* entry) {
 	if (entry == nullptr) return;
-	while (sem_trywait(&_semaphore) && !simulation->is_done()){}
+	sem_wait(&_semaphore);
+	// while (sem_trywait(&_semaphore) && !simulation->is_done()){}
 	LIST_REMOVE_HT(entry,head,tail);
+	if (head != nullptr) assert(head->prev == nullptr);
+	if (tail != nullptr) assert(tail->next == nullptr);
 	sem_post(&_semaphore);
 	mem_allocator.free(entry,sizeof(wait_list_entry));
 }

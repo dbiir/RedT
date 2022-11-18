@@ -156,21 +156,23 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.wait_starttime = get_sys_clock();
 	if(IS_LOCAL(get_txn_id())) {  
 		txn_stats.wait_for_rsp_time = curr_time;
-		if(is_done() && rc == RCOK) {
+		RC result = check_query_status(PREPARE);
+		if(is_done() && rc == RCOK && result == RCOK) {
 			// printf("a txn is done\n");
 #if CC_ALG == WOUND_WAIT
       		txn_state = STARTCOMMIT;
 #endif
+			DEBUG_T("txn %ld commit immediate %d\n",get_txn_id(), result);
 			rc = start_commit(yield, cor_id);
 		}
-		else if(rc == Abort) { 
+		else if(rc == Abort || result == Abort) { 
 			rc = start_abort(yield, cor_id);
 		}
 	} else if(rc == Abort){
 		rc = abort(yield, cor_id);
 	}
 	
-  return rc;
+  	return rc;
 
 }
 
@@ -218,7 +220,7 @@ bool YCSBTxnManager::is_local_request(uint64_t idx) {
 }
 
 
-RC YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, itemid_t* item, uint64_t cor_id) {
+RC YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, itemid_t* &item, uint64_t cor_id) {
 	uint64_t part_id = _wl->key_to_part( req->key );
   	uint64_t loc = GET_NODE_ID(part_id);
 	// printf("loc:%d and g_node_id:%d\n", loc, g_node_id);
@@ -260,7 +262,7 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
     
     // RC rc = RCOK;
     uint64_t version = 0;
-	DEBUG_T("Txn %ld one-sided op.", get_txn_id());
+	// DEBUG_T("Txn %ld one-sided op.\n", get_txn_id());
 	rc = get_remote_row(yield, req->acctype, loc, m_item, row_local, cor_id);
 	// mem_allocator.free(m_item, sizeof(itemid_t));
 	return rc;
@@ -777,7 +779,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 			if (res_p != rdmaio::IOCode::Ok) {
 				node_status.set_node_status(i, NS::Failure, get_thd_id());
-				DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
+				DEBUG_T("Thd %ld send RDMA one-sided failed--log.\n", get_thd_id());
 				return NODE_FAILED;
 			}
 			#endif
@@ -864,7 +866,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 				DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 				if (res_p != rdmaio::IOCode::Ok) {
 					node_status.set_node_status(i, NS::Failure, get_thd_id());
-					DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
+					DEBUG_T("Thd %ld send RDMA one-sided failed--log.\n", get_thd_id());
 					return NODE_FAILED;
 				}
 				#endif
@@ -939,6 +941,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 		}
 	}
 #endif
+	is_logged = true;
 	return rc;
 }
 
@@ -955,6 +958,7 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 	for(int i=0;i<g_node_cnt;i++){
 		node_need_write_log[i] = 0;
 	}
+	vector<vector<ChangeInfo>> change(g_node_cnt);
 
 	//construct log 
 	for(int i=0;i<((YCSBQuery*)query)->requests.size();i++){
@@ -997,8 +1001,24 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 			uint32_t center_id = GET_CENTER_ID(node_id[i]);
 			if(center_id != g_center_id) continue; //log is only for row in the same center
 			++node_need_write_log[node_id[i]];
+
+			//fill in ChangeInfo here
+			ChangeInfo newChange;
+			row_t* temp_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+			//for simulation purpose, only write back metadata here
+			//in actual application, data in req should also be written back
+			temp_row->_tid_word = 0;
+			#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+			uint64_t op_size = sizeof(temp_row->_tid_word);
+			bool is_primary = (node_id[i] == get_primary_node_id(part_id));
+			newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 
+			#endif
+			mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+
+			change[node_id[i]].push_back(newChange);
 		}
 	}
+	#if RDMA_DBPAOR
 	//batch faa
     uint64_t starttime = get_sys_clock();
 	uint64_t count = 0;
@@ -1033,7 +1053,7 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 			INC_STATS(get_thd_id(), worker_waitcomp_time, endtime-starttime);
 			if (res_p != rdmaio::IOCode::Ok) {
 				node_status.set_node_status(i, NS::Failure, get_thd_id());
-				DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
+				DEBUG_T("Thd %ld send RDMA one-sided failed--faa %ld.\n", get_thd_id(),i);
 				return NODE_FAILED;
 			}
 			#endif
@@ -1113,13 +1133,82 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 				DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);
 				if (res_p != rdmaio::IOCode::Ok) {
 					node_status.set_node_status(i, NS::Failure, get_thd_id());
-					DEBUG_T("Thd %ld send RDMA one-sided failed.\n", get_thd_id());
+					DEBUG_T("Thd %ld send RDMA one-sided failed--%ld.\n", get_thd_id(),i);
 					return NODE_FAILED;
 				}
 				#endif
 			}
 		}
 	}
+	#else
+	//write log
+	for(int i=0;i<g_node_cnt&&rc==RCOK;i++){
+		if(node_need_write_log[i]>0){
+			int num_of_entry = 1;
+			//use RDMA_FAA for local and remote
+			uint64_t start_idx = -1;
+			rc = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, &start_idx, cor_id);
+			// todo: I do not know whether I should abort here.
+			if (i == g_node_id) {
+				DEBUG_T("txn %ld will write log in node %ld at index %d thd %ld now tail %ld\n",get_txn_id(), i, start_idx, get_thd_id(), *(redo_log_buf.get_tail()));
+			} else {
+				DEBUG_T("txn %ld will write log in node %ld at index %d thd %ld\n",get_txn_id(), i, start_idx, get_thd_id());
+			}
+			if (start_idx == -1) {
+				return Abort;
+			}
+
+			LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
+
+			newEntry->set_entry(get_txn_id(),node_need_write_log[i],change[i],get_start_timestamp());
+			newEntry->state = LE_COMMITTED;
+			newEntry->c_ts = get_commit_timestamp();
+
+			if(i == g_node_id){ //local log
+				//consider possible overwritten:if no space, wait until cleaned 
+				//for head: there is local read and write, and remote RDMA read, conflicts are ignored here, which might be problematic
+				// while(start_idx + num_of_entry < *(redo_log_buf.get_head())){
+				// 	//wait for head to reset
+				// 	assert(false);
+				// }
+				while((start_idx + num_of_entry - *(redo_log_buf.get_head()) >= redo_log_buf.get_size()) && !simulation->is_done()){
+					//wait for AsyncRedoThread to clean buffer
+				}
+				if(simulation->is_done()) break;
+				
+				start_idx = start_idx % redo_log_buf.get_size();
+
+				char* start_addr = (char*)redo_log_buf.get_entry(start_idx);
+
+				assert(((LogEntry *)start_addr)->state == EMPTY);					
+				assert(((LogEntry *)start_addr)->change_cnt == 0);					
+
+				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
+				assert(((LogEntry *)start_addr)->state == LOGGED);						
+			}else{ //remote log
+				//consider possible overwritten: if no space, wait until cleaned 
+				//first prevent concurrent read and write among threads
+				pthread_mutex_lock( LOG_HEAD_LATCH[i] );
+
+				while(start_idx + num_of_entry - log_head[i] >= redo_log_buf.get_size() && !simulation->is_done()){
+					//wait for AsyncRedoThread to clean buffer
+					rc = read_remote_log_head(yield, i, &log_head[i], cor_id);
+					// todo: I do not know whether I should abort here.
+				}
+				pthread_mutex_unlock( LOG_HEAD_LATCH[i] );
+				if(simulation->is_done()) break;
+				
+				start_idx = start_idx % redo_log_buf.get_size();
+
+				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx);
+
+				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id);
+			}
+			log_idx[i] = start_idx;
+			mem_allocator.free(newEntry, sizeof(LogEntry));
+		}
+	}
+	#endif
 	return rc;
 }
 #endif

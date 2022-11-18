@@ -64,8 +64,9 @@ void AbortQueue::process(uint64_t thd_id) {
             simulation->seconds_from_start(starttime));
       INC_STATS(thd_id,abort_queue_penalty_extra,starttime - entry->penalty_end);
       INC_STATS(thd_id,abort_queue_dequeue_cnt,1);
-      Message * msg = Message::create_message(RTXN);
-      msg->txn_id = entry->txn_id;
+      // Message * msg = Message::create_message(RTXN);
+      // msg->txn_id = entry->txn_id;
+      Message * msg = Message::create_message(CL_QRY);
       work_queue.enqueue(thd_id,msg,false);
       //entry = queue.top();
       DEBUG_M("AbortQueue::dequeue entry free\n");

@@ -125,9 +125,9 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 3
-#define NODE_CNT 6
-#define THREAD_CNT 2
+#define CENTER_CNT 4
+#define NODE_CNT 8
+#define THREAD_CNT 40
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -168,7 +168,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 12
+#define MAX_TXN_IN_FLIGHT 320
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -207,7 +207,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 10000UL
+#define NETWORK_DELAY 0UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -227,7 +227,7 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_NO_WAIT
+#define CC_ALG RDMA_NO_WAIT3
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -349,10 +349,10 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 629142
+#define SYNTH_TABLE_SIZE 8388608
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 1
-#define TUP_WRITE_PERC 1
+#define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
 #define PART_PER_TXN 2
@@ -363,7 +363,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 1
+#define CROSS_DC_TXN_PERC 0
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.
@@ -469,14 +469,14 @@ enum PPSTxnType {
 #define IDX_VERB          false
 #define VERB_ALLOC          true
 
-#define DEBUG_PRINTF true
-#define DEBUG_LOCK          true
+#define DEBUG_PRINTF false
+#define DEBUG_LOCK          false
 #define DEBUG_TIMESTAMP       false
 #define DEBUG_SYNTH         false
 #define DEBUG_ASSERT        false
 #define DEBUG_DISTR false
 #define DEBUG_ALLOC false
-#define DEBUG_TXN true
+#define DEBUG_TXN false
 #define DEBUG_RECOVER false
 #define DEBUG_RACE false
 #define DEBUG_TIMELINE        false
@@ -588,7 +588,7 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 120 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 30 * BILLION // ~1 minutes
 #define WARMUP_TIMER 1 * 0 * BILLION // ~1 minutes
 
 #define SEED 0
@@ -602,8 +602,8 @@ enum PPSTxnType {
 #define INTER_CENTER_FAILED_TIME 20 * HEARTBEAT_TIME
 #define EXECUTOR_FAILED_TIME 1 * INTER_CENTER_FAILED_TIME
 
-#define RECOVERY_MANAGER true
-#define RECOVERY_TXN_MECHANISM true
+#define RECOVERY_MANAGER false
+#define RECOVERY_TXN_MECHANISM false
 
 #endif
   

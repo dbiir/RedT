@@ -574,7 +574,7 @@ void TPCCTxnManager::copy_remote_items(TPCCQueryMessage * msg) {
 #endif
 }
 
-RC TPCCTxnManager::tpcc_read_remote_index(yield_func_t &yield, TPCCQuery * query, itemid_t* item, uint64_t cor_id) {
+RC TPCCTxnManager::tpcc_read_remote_index(yield_func_t &yield, TPCCQuery * query, itemid_t* &item, uint64_t cor_id) {
     TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	uint64_t w_id = tpcc_query->w_id;
 	uint64_t d_id = tpcc_query->d_id;

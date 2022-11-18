@@ -51,7 +51,7 @@ void LogEntry::set_flushed(){
 
 void LogEntry::reset(){ 
     // change[0].index_key = 888888;
-    assert(state == FLUSHED && c_ts == 0 && s_ts == 0 && change_cnt == 0);
+    // assert(state == FLUSHED && c_ts == 0 && s_ts == 0 && change_cnt == 0);
     state = EMPTY;
 }
 

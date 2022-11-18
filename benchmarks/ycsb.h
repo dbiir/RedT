@@ -88,7 +88,7 @@ private:
   RC mvcc_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC send_maat_remote_one_side_request(ycsb_request * req,row_t *& row_local);
   RC send_timestamp_remote_one_side_request(ycsb_request * req,row_t *& row_local);
-  RC ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req,  itemid_t* item, uint64_t cor_id);
+  RC ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req,  itemid_t* &item, uint64_t cor_id);
 
   RC run_ycsb_0(yield_func_t &yield,ycsb_request * req,row_t *& row_local,uint64_t cor_id);
   RC run_ycsb_1(access_t acctype, row_t * row_local);

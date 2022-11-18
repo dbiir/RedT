@@ -234,8 +234,8 @@ public:
 	RC read_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t operate_size, char* local_buf, uint64_t cor_id);
 	RC write_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, char* local_buf, uint64_t cor_id, bool outstanding = false);
 	//---- Next step RDMA primitives ----//
-	RC read_remote_index(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,uint64_t key, itemid_t * item, uint64_t cor_id);
-	RC read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, row_t * row, uint64_t cor_id);
+	RC read_remote_index(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,uint64_t key, itemid_t * &item, uint64_t cor_id);
+	RC read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, row_t * &row, uint64_t cor_id);
 	RC write_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
     RC write_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
     RC cas_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t old_value, uint64_t new_value, uint64_t *result, uint64_t cor_id);
@@ -265,6 +265,7 @@ public:
 	wait_list_entry* wait_queue_entry;
 	uint64_t new_coordinator = -1;
 	bool is_recover = false;
+	bool is_logged = false;
 	// For recover
 	Array<uint64_t> failed_partition;
 	virtual void insert_failed_partition(uint64_t key) = 0;

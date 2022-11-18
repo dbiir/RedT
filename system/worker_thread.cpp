@@ -390,11 +390,11 @@ void WorkerThread::abort() {
   #if WORKLOAD != DA //actually DA do not need real abort. Just count it and do not send real abort msg.
   uint64_t penalty =
       abort_queue.enqueue(get_thd_id(), txn_man->get_txn_id(), txn_man->get_abort_cnt());
-
   txn_man->txn_stats.total_abort_time += penalty;
+  release_txn_man();
   #endif
-  DEBUG_T("Txn %ld status is %ld\n", txn_man->get_txn_id(),
-      txn_man->txn_stats.current_states);
+  // DEBUG_T("Txn %ld status is %ld\n", txn_man->get_txn_id(),
+  //     txn_man->txn_stats.current_states);
 }
 
 TxnManager * WorkerThread::get_transaction_manager(Message * msg) {
@@ -695,7 +695,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
       }
 
       if(!txn_man->txn){
-        assert(msg->rtype == RACK_PREP || msg->rtype == RACK_FIN);
+        // assert(msg->rtype == RACK_PREP || msg->rtype == RACK_FIN);
         printf("because no txn?\n");   
         bool ready = txn_man->set_ready();
         assert(ready);
@@ -1378,7 +1378,8 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   }
 
 #if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3)
-  if(txn_man->get_rsp_cnt() == 0 && !txn_man->need_extra_wait()){
+  RC result = txn_man->check_query_status(PREPARE);
+  if(txn_man->get_rsp_cnt() == 0 && !txn_man->need_extra_wait() && result == RCOK){
     // assert(false);
 		assert(IS_LOCAL(txn_man->get_txn_id()));
     if(txn_man->get_rc() != Abort) {
