@@ -278,7 +278,7 @@ touch ${LATFILE} ${LTFILE}
 addTableTitle
 addContent '<tr>'
 addContent "<td>AlgoName\\NodeCount</td>"
-echo "根据测试，确定第一个循环体类型"
+# echo "根据测试，确定第一个循环体类型"
 ArgsType
 #根据测试，确定第一个循环体类型
 for arg in ${args[@]}
@@ -309,7 +309,7 @@ do
     CPUFILE=cpu-${cc}
     rm -rf ${CPUFILE}
     touch ${CPUFILE}
-    echo "根据测试，确定第2个循环体类型"
+    # echo "根据测试，确定第2个循环体类型"
     #根据测试，确定第2个循环体类型
     ArgsType
     #根据测试，确定第2个循环体类型
@@ -322,14 +322,14 @@ do
         echo -n ${arg}" " >> ${DIS_FILE}
         echo -n ${arg}" " >> ${CPUFILE}
         AS=''
-        echo "根据测试，确定TMPN"
+        # echo "根据测试，确定TMPN"
         #根据测试，确定TMPN
         TmpFileNum
         #根据测试，确定TMPN
         let TMPN--
         for i in $(seq 0 $TMPN)
         do
-            echo "根据测试，确定文件名"
+            # echo "根据测试，确定文件名"
             #根据测试，确定文件名
             FileName
             #根据测试，确定文件名            

@@ -722,7 +722,7 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * 
 		rc= socket->sock.send(&buf,NN_MSG,NN_DONTWAIT);
 		int end_time = get_sys_clock();
 		if (end_time - start_time > MESSAGE_SEND_RETRY_TIME) {
-			DEBUG_H("%ld send msg to node %ld failed\n",send_thread_id,dest_node_id);
+			printf("%ld send msg to node %ld failed\n",send_thread_id,dest_node_id);
 			break;
 		}
 	}
