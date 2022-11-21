@@ -27,7 +27,7 @@ for HOSTNAME in ${HOSTS}; do
     count=`expr $count + 1`
 done
 
-sleep 90
+sleep 60
 OLD_IFS="$IFS"
 IFS=" "
 HOSTLIST=($HOSTS)

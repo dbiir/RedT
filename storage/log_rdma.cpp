@@ -18,7 +18,7 @@ void ChangeInfo::set_change_info(uint64_t ikey, uint64_t s, char* cont, bool is_
 }
 
 void LogEntry::set_entry(uint64_t txnid, int ccnt,const vector<ChangeInfo>& cinfo, uint64_t sts){ //set value before logging
-    assert(sts != UINT64_MAX && sts != 0);
+    // assert(sts != UINT64_MAX && sts != 0);
 
     state = LOGGED;
     c_ts = 0;

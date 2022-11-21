@@ -515,7 +515,7 @@ def ycsb_network_delay():
     load = [320]
     tcnt = [40]  #THREAD_CNT
     skew = [0.2]
-    cross_dc_perc = [0]
+    cross_dc_perc = [1]
     network_delay = ['0UL'] 
     # network_delay = ['50000000UL','10000000UL'] 
     # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
@@ -1290,7 +1290,7 @@ configs = {
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '10000UL',
     "NETWORK_DELAY_TEST": 'false',
-    "DONE_TIMER": "1 * 30 * BILLION // ~1 minutes",
+    "DONE_TIMER": "1 * 20 * BILLION // ~1 minutes",
     "WARMUP_TIMER": "1 * 0 * BILLION // ~1 minutes",
     "SEQ_BATCH_TIMER": "5 * 1 * MILLION // ~5ms -- same as CALVIN paper",
     "BATCH_TIMER" : "0",

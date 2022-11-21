@@ -1184,7 +1184,7 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 				assert(((LogEntry *)start_addr)->change_cnt == 0);					
 
 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
-				assert(((LogEntry *)start_addr)->state == LOGGED);						
+				assert(((LogEntry *)start_addr)->state == LE_COMMITTED);						
 			}else{ //remote log
 				//consider possible overwritten: if no space, wait until cleaned 
 				//first prevent concurrent read and write among threads
