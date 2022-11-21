@@ -333,6 +333,7 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 		YCSBQuery::copy_request_to_msg(ycsb_query,msg,i);
 	}
 #else
+	// printf("remote_next_node_id: %d\n", remote_next_node_id);
 	for(uint64_t& i: remote_node[remote_next_node_id]){
 		YCSBQuery::copy_request_to_msg(ycsb_query,msg,i);
 	}

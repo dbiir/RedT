@@ -1,4 +1,4 @@
-set -x
+# set -x
 
 PHASE=5
 Latency="trans_total_run_time
@@ -183,6 +183,9 @@ ArgsType() {
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_network_delay' ]]
     then
         args=("${NETWORKDELAY[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_network_delay' ]]
+    then
+        args=("${NETWORKDELAY[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_scaling' || "${TEST_TYPE}" == 'ycsb_scaling_tcp' || "${TEST_TYPE}" == 'ycsb_scaling_two_sided' || "${TEST_TYPE}" == 'ycsb_scaling_one_sided' || "${TEST_TYPE}" == 'ycsb_scaling_coroutine' || "${TEST_TYPE}" == 'ycsb_scaling_dbpa' || "${TEST_TYPE}" == 'ycsb_scaling_all' ]]
     then
         args=("${NUMBEROFNODE[@]}")
@@ -242,6 +245,9 @@ FileName() {
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_network_delay' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_network_delay' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_scaling' || "${TEST_TYPE}" == 'ycsb_scaling_tcp' || "${TEST_TYPE}" == 'ycsb_scaling_two_sided' || "${TEST_TYPE}" == 'ycsb_scaling_one_sided' || "${TEST_TYPE}" == 'ycsb_scaling_coroutine' || "${TEST_TYPE}" == 'ycsb_scaling_dbpa' || "${TEST_TYPE}" == 'ycsb_scaling_all' ]]

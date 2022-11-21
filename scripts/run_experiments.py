@@ -276,6 +276,8 @@ for exp in exps:
         cmd='sh result.sh -a ycsb_tapir_cross_dc -n {} -c {} -dc {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in dcp]), strnow)
     elif exp == 'ycsb_tapir_network_delay':
         cmd='sh result.sh -a ycsb_tapir_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
+    elif exp == 'ycsb_early_network_delay':
+        cmd='sh result.sh -a ycsb_early_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
     elif exp == 'ycsb_tapir_writes':
         cmd='sh result.sh -a ycsb_tapir_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join([str(x) for x in al]), ','.join([str(x) for x in wr]), strnow)
     elif 'ycsb_scaling' in exp:

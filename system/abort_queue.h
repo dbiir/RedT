@@ -20,10 +20,12 @@
 
 #include "global.h"
 #include "helper.h"
+#include "message.h"
 
 struct abort_entry {
   uint64_t penalty_end;
   uint64_t txn_id;
+  Message *msg;
   abort_entry() {}
   abort_entry(uint64_t penalty_end, uint64_t txn_id) {
     this->penalty_end = penalty_end;
@@ -42,7 +44,7 @@ struct CompareAbortEntry {
 class AbortQueue {
 public:
   void init();
-  uint64_t enqueue(uint64_t thd_id, uint64_t txn_id, uint64_t abort_cnt);
+  uint64_t enqueue(uint64_t thd_id, uint64_t txn_id, TxnManager* txn, uint64_t abort_cnt);
   void process(uint64_t thd_id);
 private:
   std::priority_queue<abort_entry*,std::vector<abort_entry*>,CompareAbortEntry> queue;

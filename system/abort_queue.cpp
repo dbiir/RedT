@@ -18,10 +18,11 @@
 #include "abort_queue.h"
 #include "message.h"
 #include "work_queue.h"
+#include "txn.h"
 
 void AbortQueue::init() { pthread_mutex_init(&mtx, NULL); }
 
-uint64_t AbortQueue::enqueue(uint64_t thd_id, uint64_t txn_id, uint64_t abort_cnt) {
+uint64_t AbortQueue::enqueue(uint64_t thd_id, uint64_t txn_id, TxnManager* txn, uint64_t abort_cnt) {
   uint64_t starttime = get_sys_clock();
   uint64_t penalty = g_abort_penalty;
 #if BACKOFF
@@ -33,6 +34,9 @@ uint64_t AbortQueue::enqueue(uint64_t thd_id, uint64_t txn_id, uint64_t abort_cn
   abort_entry * entry = (abort_entry*)mem_allocator.alloc(sizeof(abort_entry));
   entry->penalty_end = penalty;
   entry->txn_id = txn_id;
+  entry->msg = Message::create_message(CL_QRY);
+  entry->msg->copy_from_txn(txn);
+  entry->msg->return_node_id = txn->client_id;
   uint64_t mtx_time_start = get_sys_clock();
   pthread_mutex_lock(&mtx);
   INC_STATS(thd_id,mtx[0],get_sys_clock() - mtx_time_start);
@@ -64,9 +68,10 @@ void AbortQueue::process(uint64_t thd_id) {
             simulation->seconds_from_start(starttime));
       INC_STATS(thd_id,abort_queue_penalty_extra,starttime - entry->penalty_end);
       INC_STATS(thd_id,abort_queue_dequeue_cnt,1);
-      Message * msg = Message::create_message(RTXN);
-      msg->txn_id = entry->txn_id;
-      work_queue.enqueue(thd_id,msg,false);
+      // Message * msg = Message::create_message(RTXN);
+      // msg->txn_id = entry->txn_id;
+      // Message * msg = Message::create_message(CL_QRY);
+      work_queue.enqueue(thd_id,entry->msg,false);
       //entry = queue.top();
       DEBUG_M("AbortQueue::dequeue entry free\n");
       mem_allocator.free(entry,sizeof(abort_entry));

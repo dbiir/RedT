@@ -369,7 +369,7 @@ void TxnManager::reset() {
 	log_rsp_cnt = 0;
 	log_fin_rsp_cnt = 0;
 	txn_state = 0;
-	aborted = false;
+	// aborted = false;
 	return_id = UINT64_MAX;
 	twopl_wait_start = 0;
 
@@ -418,7 +418,11 @@ void TxnManager::reset() {
 
 void TxnManager::release() {
 	uint64_t prof_starttime = get_sys_clock();
-	qry_pool.put(get_thd_id(),query);
+	if (!aborted) {
+		qry_pool.put(get_thd_id(),query);
+	}
+	aborted = false;
+	// qry_pool.put(get_thd_id(),query);
 	INC_STATS(get_thd_id(),mtx[0],get_sys_clock()-prof_starttime);
 	query = NULL;
 	prof_starttime = get_sys_clock();
@@ -781,7 +785,7 @@ void TxnManager::send_finish_messages() {
 	// printf("xxx txn %lu send rfin, rc = %d\n", get_txn_id(), get_rc());
 	fin_rsp_cnt = query->partitions_touched.size() - 1;
 	assert(IS_LOCAL(get_txn_id()));
-	DEBUG("%ld Send FINISH messages to %d\n",get_txn_id(),fin_rsp_cnt);
+	DEBUG_T("%ld Send FINISH messages to %d\n",get_txn_id(),fin_rsp_cnt);
 	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
 		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) {
 			continue;
