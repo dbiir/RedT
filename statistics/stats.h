@@ -150,6 +150,7 @@ public:
   uint64_t trans_store_access_count=0;
   uint64_t trans_get_row_count=0;
   double trans_total_run_time=0;
+  double trans_commit_total_run_time=0;
   double trans_init_time=0;
   double trans_process_time=0;
   double trans_2pc_time=0;

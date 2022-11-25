@@ -61,6 +61,7 @@ public:
 	void release();
 	void release_items();
 	void print();
+	void reset_query_status();
 	static std::set<uint64_t> participants(Message * msg, Workload * wl);
 	uint64_t participants(bool *& pps,Workload * wl);
 	uint64_t get_participants(Workload * wl);

@@ -246,6 +246,11 @@ for exp in exps:
         part.append(e[4])
     part = sorted(list(set(part)))
 
+    dc = []
+    for e in experiments:
+        dc.append(e[5])
+    dc = sorted(list(set(dc)))
+
     tpcc_ld = []
     for e in experiments:
         tpcc_ld.append(e[-1])
@@ -294,6 +299,8 @@ for exp in exps:
         cmd='sh result.sh -a tpcc_thread -n {} -c {} -t {} -T {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in tcnt]))
     elif 'ycsb_partitions' in exp:
         cmd='sh result.sh -a ycsb_partitions -n {} -c {} -t {} -P {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in part]))
+    elif 'ycsb_dcs' in exp:
+        cmd='sh result.sh -a ycsb_dcs -n {} -c {} -t {} -D {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in dc]))
     elif 'ycsb_coroutine' in exp:
         cmd='sh result.sh -a ycsb_coroutine -n {} -c {} -t {} -CO {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in cocnt]))
     print cmd

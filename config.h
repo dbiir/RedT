@@ -228,7 +228,7 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_NO_WAIT
+#define CC_ALG RDMA_NO_WAIT3
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -356,7 +356,8 @@
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 2
+#define PART_PER_TXN 4
+#define DC_PER_TXN 2 // Must ensure PART_PER_TXN > DC_PER_TXN
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
@@ -589,7 +590,7 @@ enum PPSTxnType {
 #define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
 #define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 30 * BILLION // ~1 minutes
+#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
 #define WARMUP_TIMER 1 * 0 * BILLION // ~1 minutes
 
 #define SEED 0
@@ -603,8 +604,8 @@ enum PPSTxnType {
 #define INTER_CENTER_FAILED_TIME 20 * HEARTBEAT_TIME
 #define EXECUTOR_FAILED_TIME 1 * INTER_CENTER_FAILED_TIME
 
-#define RECOVERY_MANAGER false
-#define RECOVERY_TXN_MECHANISM false
+#define RECOVERY_MANAGER true
+#define RECOVERY_TXN_MECHANISM true
 
 #endif
   

@@ -399,6 +399,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	rsp_cnt = 0;
 	intra_rsp_cnt = 0;
 	abort_cnt = 0;
+	failed_partition.init(g_part_cnt);
 }
 
 // reset after abort
@@ -470,8 +471,10 @@ void TxnManager::reset() {
 #endif
 	assert(txn);
 	assert(query);
+	query->reset_query_status();
 	txn->reset(get_thd_id());
 	center_master.clear();
+	failed_partition.clear();
 	// Stats
 	txn_stats.reset();
 }

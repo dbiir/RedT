@@ -49,6 +49,7 @@ public:
     uint64_t waiting_time;
     void clear();
     void release();
+    virtual void reset_query_status() = 0;
     virtual bool isReconQuery() {return false;}
 
     // Prevent unnecessary remote messages

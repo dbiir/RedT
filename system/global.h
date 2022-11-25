@@ -322,6 +322,7 @@ extern uint64_t count_max;
 extern UInt32 g_cc_alg;
 extern ts_t g_query_intvl;
 extern UInt32 g_part_per_txn;
+extern UInt32 g_dc_per_txn;
 extern double g_perc_multi_part;
 extern double g_txn_read_perc;
 extern double g_txn_write_perc;

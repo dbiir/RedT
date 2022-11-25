@@ -26,6 +26,7 @@ public:
   	void release();
   	void print();
   	bool readonly();
+	void reset_query_status(){}
 
 	static std::set<uint64_t> participants(Message * msg, Workload * wl);
 	DATxnType txn_type;

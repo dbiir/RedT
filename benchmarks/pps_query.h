@@ -53,6 +53,7 @@ public:
     uint64_t participants(bool *& pps,Workload * wl);
     uint64_t get_participants(Workload * wl);
     bool readonly();
+    void reset_query_status(){}
     virtual bool isReconQuery() {
     bool result = (txn_type == PPS_GETPARTBYSUPPLIER) || (txn_type == PPS_GETPARTBYPRODUCT) ||
                 (txn_type == PPS_ORDERPRODUCT);

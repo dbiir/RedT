@@ -208,6 +208,7 @@ void WorkerThread::co_commit(uint64_t cor_id) {
   INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_commit_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
+  INC_STATS(get_thd_id(), trans_commit_total_run_time, timespan_short);
 
   INC_STATS(get_thd_id(), trans_2pc_count, 1);
   INC_STATS(get_thd_id(), trans_finish_count, 1);
@@ -343,6 +344,7 @@ void WorkerThread::commit() {
   INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_commit_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
+  INC_STATS(get_thd_id(), trans_commit_total_run_time, timespan_short);
 
   INC_STATS(get_thd_id(), trans_2pc_count, 1);
   INC_STATS(get_thd_id(), trans_finish_count, 1);

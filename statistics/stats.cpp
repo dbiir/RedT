@@ -157,6 +157,7 @@ void Stats_thd::clear() {
   trans_store_access_count=0;
 
   trans_total_run_time=0;
+  trans_commit_total_run_time=0;
   trans_init_time=0;
   trans_process_time=0;
   trans_2pc_time=0;
@@ -653,6 +654,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   // trans
   fprintf(outf,
   ",trans_total_run_time=%f"
+  ",trans_commit_total_run_time=%f"
   ",trans_init_time=%f"
   ",trans_process_time=%f"
   ",trans_get_access_time=%f"
@@ -696,7 +698,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",trans_get_client_wait=%f"
   ",trans_return_client_wait=%f"
   ",trans_process_client=%f",
-          trans_total_run_time / BILLION, trans_init_time / BILLION, trans_process_time / BILLION,
+          trans_total_run_time / BILLION, trans_commit_total_run_time / BILLION ,trans_init_time / BILLION, trans_process_time / BILLION,
           trans_get_access_time / BILLION, trans_store_access_time / BILLION, trans_get_row_time /BILLION, trans_benchmark_compute_time /BILLION,
           trans_2pc_time / BILLION,
           trans_prepare_time / BILLION,
@@ -718,6 +720,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
 
   fprintf(outf,
   ",avg_trans_total_run_time=%f"
+  ",avg_trans_commit_total_run_time=%f"
   ",avg_num_msgs_rw_prep=%f"
   ",avg_num_msgs_commit=%f"
   ",max_num_msgs_rw_prep=%lu"
@@ -736,7 +739,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",avg_trans_finish_time=%f"
   ",avg_trans_commit_time=%f"
   ",avg_trans_abort_time=%f",
-          trans_total_run_time / (trans_total_count * BILLION), (double)total_num_msgs_rw_prep / (double)total_local_txn_commit, (double)total_num_msgs_commit / (double)total_local_txn_commit, max_num_msgs_rw_prep, max_num_msgs_commit, trans_init_time / (trans_init_count * BILLION), trans_process_time / (trans_process_count * BILLION),
+          trans_total_run_time / (trans_total_count * BILLION), trans_commit_total_run_time / (trans_commit_count * BILLION), (double)total_num_msgs_rw_prep / (double)total_local_txn_commit, (double)total_num_msgs_commit / (double)total_local_txn_commit, max_num_msgs_rw_prep, max_num_msgs_commit, trans_init_time / (trans_init_count * BILLION), trans_process_time / (trans_process_count * BILLION),
           trans_get_access_time / (trans_get_access_count * BILLION), trans_store_access_time / (trans_store_access_count * BILLION), trans_get_row_time / (trans_get_row_count * BILLION),
           trans_2pc_time / (trans_2pc_count * BILLION),
           trans_prepare_time / (trans_prepare_count * BILLION),
@@ -1452,6 +1455,7 @@ void Stats_thd::combine(Stats_thd * stats) {
   trans_store_access_count+=stats->trans_store_access_count;
 
   trans_total_run_time+=stats->trans_total_run_time;
+  trans_commit_total_run_time+=stats->trans_commit_total_run_time;
   trans_init_time+=stats->trans_init_time;
   trans_process_time+=stats->trans_process_time;
   trans_2pc_time+=stats->trans_2pc_time;

@@ -91,6 +91,15 @@ void YCSBQuery::reset() {
 	requests.clear();
 }
 
+void YCSBQuery::reset_query_status() {
+	for (int i = 0; i < requests.size(); i++) {
+		ycsb_request* req = requests[i];
+		req->primary.status = OpStatus::RUN;
+		req->second1.status = OpStatus::RUN;
+		req->second2.status = OpStatus::RUN;
+	}
+}
+
 void YCSBQuery::release() {
 	BaseQuery::release();
 	DEBUG_M("YCSBQuery::release() free\n");
