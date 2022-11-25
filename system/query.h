@@ -46,6 +46,7 @@ public:
     virtual bool readonly() = 0;
     virtual void print() = 0;
     virtual void init();
+    virtual void reset_query_status() = 0;
     uint64_t waiting_time;
     void clear();
     void release();

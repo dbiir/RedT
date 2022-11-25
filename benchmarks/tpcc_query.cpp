@@ -320,6 +320,18 @@ void TPCCQuery::reset() {
   items.clear();
 }
 
+void TPCCQuery::reset_query_status() {
+  c_w_primary.status = OpStatus::RUN;
+  c_w_second1.status = OpStatus::RUN;
+  c_w_second2.status = OpStatus::RUN;
+  for (int i = 0; i < items.size(); i++) {
+    Item_no * item = items[i];
+    item->ol_supply_w_primary.status=OpStatus::RUN;
+		item->ol_supply_w_second1.status=OpStatus::RUN;
+		item->ol_supply_w_second2.status=OpStatus::RUN;
+  }
+}
+
 void TPCCQuery::release() {
   BaseQuery::release();
   DEBUG_M("TPCCQuery::release() free\n");

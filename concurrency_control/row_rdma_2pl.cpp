@@ -127,6 +127,9 @@ local_retry_lock:
     } else if(lock_type == 1 || type == DLOCK_EX) {
         // printf("row_rdma_2pl:119\n");
         _row->_tid_word = 0;
+        #if DEBUG_PRINTF
+            printf("txn %d add local lock on item %d, lock_type: %d failed !!!!! because conflict\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
+        #endif
         rc = Abort;
         return rc;
     } else {
@@ -147,12 +150,18 @@ local_retry_lock:
         }
         if(try_time > LOCK_LENGTH) {
             // printf("row_rdma_2pl:138\n");
+            #if DEBUG_PRINTF
+                printf("txn %d add local lock on item %d, lock_type: %d failed !!!!! because too many locks\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
+            #endif
             _row->_tid_word = 0;
             rc = Abort;
             return rc;
         }      
     }
     _row->_tid_word = 0;
+    #if DEBUG_PRINTF
+        printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
+    #endif
     // printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
 #endif
 	return rc;

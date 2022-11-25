@@ -57,7 +57,7 @@ retry_unlock:
     row->_tid_word = 0;
 #endif
 #if DEBUG_PRINTF
-    printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu, old lock_info: %lu-%lu, lock owner %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, row->_tid_word, originlo);
+    printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id());
 #endif
 }
 
@@ -84,7 +84,7 @@ retry_remote_unlock:
         // printf("cas retry\n");
         if (!simulation->is_done()) goto retry_remote_unlock;
     }
-    row_t * test_row;
+    row_t * test_row = nullptr;
     arc = txnMng->read_remote_row(yield,loc,off,test_row,cor_id);
     // todo: how to continue the commit operation.
     if (arc == NODE_FAILED) {
@@ -92,7 +92,8 @@ retry_remote_unlock:
         txnMng->insert_failed_partition(access->partition_id);
         return RCOK;
     }
-
+    char *local_buf = Rdma::get_row_client_memory(thd_id);
+    assert(test_row->get_primary_key() == access->key);
     uint64_t i = 0;
     uint64_t lock_num = 0;
     uint64_t lock_index = txnMng->get_txn_id() % LOCK_LENGTH;
@@ -253,7 +254,7 @@ retry_unlock:
     // printf("txn %d release local lock on item %d, lock_type: %d, try_time: %d\n", txnMng->get_txn_id(), row->get_primary_key(), row->lock_type, try_time);
     row->_tid_word = 0;
 #if DEBUG_PRINTF
-    printf("---thread id:%lu, local unlock shared lock, nodeid-key: %u; %lu, txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, new_lock_info);
+    printf("---thread id:%lu, local unlock shared lock, nodeid-key: %u; %lu, txnid: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id());
 #endif
 #endif
 }
@@ -333,13 +334,14 @@ retry_remote_unlock:
         // printf("cas retry\n");
         if (!simulation->is_done()) goto retry_remote_unlock;
     }
-    row_t * test_row;
+    row_t * test_row = nullptr;
     arc = txnMng->read_remote_row(yield,loc,off,test_row,cor_id);
     if (arc == NODE_FAILED) {
         node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         // txnMng->insert_failed_partition();
         return RCOK;
     }
+    assert(test_row->get_primary_key() == access->key);
 
     uint64_t lock_index = txnMng->get_txn_id() % LOCK_LENGTH;
     uint64_t try_time = 0;
@@ -448,6 +450,7 @@ RC RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_
     if (arc == NODE_FAILED) {
         //todo: handle write failed.
     }
+    DEBUG_T("txn %ld enters the finish phase.\n", txnMng->get_txn_id());
     uint64_t starttime = get_sys_clock();
     //NO_WAIT has no problem of deadlock,so doesnot need to bubble sort the write_set in primary key order
 	int read_set[txn->row_cnt - txn->write_cnt];
@@ -499,17 +502,17 @@ RC RDMA_2pl::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_
 
     for (uint64_t i = 0; i < txn->row_cnt; i++) {
         if(txn->accesses[i]->location != g_node_id){
-        //remote
-        mem_allocator.free(txn->accesses[i]->data,0);
-        mem_allocator.free(txn->accesses[i]->orig_row,0);
-        // mem_allocator.free(txn->accesses[i]->test_row,0);
-        txn->accesses[i]->data = NULL;
-        txn->accesses[i]->orig_row = NULL;
-        txn->accesses[i]->orig_data = NULL;
-        txn->accesses[i]->version = 0;
+            //remote
+            mem_allocator.free(txn->accesses[i]->data,0);
+            mem_allocator.free(txn->accesses[i]->orig_row,0);
+            // mem_allocator.free(txn->accesses[i]->test_row,0);
+            txn->accesses[i]->data = NULL;
+            txn->accesses[i]->orig_row = NULL;
+            txn->accesses[i]->orig_data = NULL;
+            txn->accesses[i]->version = 0;
 
-        //txn->accesses[i]->test_row = NULL;
-        txn->accesses[i]->offset = 0;
+            //txn->accesses[i]->test_row = NULL;
+            txn->accesses[i]->offset = 0;
         }
     }
 	memset(txnMng->write_set, 0, 100);

@@ -58,6 +58,7 @@ public:
 	void init(uint64_t thd_id, Workload * h_wl);
 	void init();
 	void reset();
+	void reset_query_status();
 	void release();
 	void release_items();
 	void print();

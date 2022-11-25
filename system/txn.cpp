@@ -363,6 +363,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	txn_ready = true;
 	twopl_wait_start = 0;
 	txn_stats.init();
+	failed_partition.init(g_part_cnt);
 	finish_logging = false;
 	
 	num_msgs_commit = 0;
@@ -466,8 +467,10 @@ void TxnManager::reset() {
 #endif
 	assert(txn);
 	assert(query);
+	query->reset_query_status();
 	txn->reset(get_thd_id());
 	center_master.clear();
+	failed_partition.clear();
 	// Stats
 	txn_stats.reset();
 }
@@ -1631,6 +1634,7 @@ RC TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,uint6
 	RC rc = read_remote_content(yield, target_server, remote_offset, operate_size, local_buf, cor_id);
 	if (rc != RCOK) return rc;
 	test_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+	memset(test_row, 0, operate_size);
     memcpy(test_row, local_buf, operate_size);
     return rc;
 }
@@ -1934,7 +1938,7 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
 	rc = test_row->remote_copy_row(test_row, this, access);
     assert(test_row->get_primary_key() == access->data->get_primary_key());
     if (rc == Abort || rc == WAIT) {
-        DEBUG_M("TxnManager::get_row(abort) access free\n");
+        DEBUG_T("TxnManager::get_row(abort) access free\n");
         access_pool.put(get_thd_id(),access);
         return rc;
     }
@@ -1950,7 +1954,7 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
 
     row_local = access->data;
     ++txn->row_cnt;
-
+	DEBUG_T("txn %ld put remote row %ld offset %ld type %d in access\n", get_txn_id(), key, access->offset, access->type);
     mem_allocator.free(m_item,0);
 
     if (type == WR) ++txn->write_cnt;//this->last_type = WR

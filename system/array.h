@@ -52,7 +52,7 @@ public:
   }
 
   void append(Array a) {
-    if (count + a.size() > capacity) return;
+    // if (count + a.size() > capacity) return;
     assert(count + a.size() <= capacity);
     for(uint64_t i = 0; i < a.size(); i++) {
       add(a[i]);

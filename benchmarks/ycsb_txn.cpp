@@ -51,21 +51,21 @@
 void YCSBTxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	TxnManager::init(thd_id, h_wl);
 	_wl = (YCSBWorkload *) h_wl;
-  reset();
+  	reset();
 }
 
 void YCSBTxnManager::reset() {
-  state = YCSB_0;
-  next_record_id = 0;
-  remote_next_center_id = 0;
-  for(int i = 0; i < g_center_cnt; i++) {
-	remote_center[i].clear();
-  }
-  TxnManager::reset();
+	state = YCSB_0;
+	next_record_id = 0;
+	remote_next_center_id = 0;
+	for(int i = 0; i < g_center_cnt; i++) {
+		remote_center[i].clear();
+	}
+	TxnManager::reset();
 }
 
 RC YCSBTxnManager::acquire_locks() {
-  uint64_t starttime = get_sys_clock();
+  	uint64_t starttime = get_sys_clock();
 	assert(CC_ALG == CALVIN);
   YCSBQuery* ycsb_query = (YCSBQuery*) query;
   locking_done = false;
@@ -343,7 +343,10 @@ RC YCSBTxnManager::send_remote_subtxn() {
 
 	rsp_cnt = 0;
 	for(int i=0;i<query->centers_touched.size();i++){
-		if(is_primary[query->centers_touched[i]]) ++rsp_cnt;
+		if(is_primary[query->centers_touched[i]]) {
+			++rsp_cnt;
+			DEBUG_T("txn %lu, needs send inter-txn primary to %lu nodes\n", get_txn_id(),query->centers_touched[i]);
+		}
 	}
 	--rsp_cnt; //exclude this center
 	DEBUG_T("txn %lu, needs send inter-txn to %lu nodes\n", get_txn_id(),rsp_cnt);
@@ -465,16 +468,16 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	bool is_local = req->primary.stored_node == g_node_id && req->primary.execute_node == g_node_id;
 
 	// Get and check whether local route table is different from the origin.
-
-	
 	RC rc = RCOK;
 	switch (state) {
 	case YCSB_0 :
 		if(is_local) {
+			DEBUG_T("txn %ld execute local req %ld on node %ld, req store node %ld, execution node %ld\n",get_txn_id(),next_record_id,g_node_id, req->primary.stored_node, req->primary.execute_node);
 			rc = run_ycsb_0(yield,req,row,cor_id);
 			if (rc == Abort) req->primary.status = OpStatus::PREP_ABORT;
   			else req->primary.status = OpStatus::PREPARE;
 		} else if (rdma_one_side() && is_center) {
+			DEBUG_T("txn %ld execute same center req %ld on node %ld, req store node %ld, execution node %ld\n",get_txn_id(),next_record_id,g_node_id, req->primary.stored_node, req->primary.execute_node);
 			rc = send_remote_one_side_request(yield, req, row, cor_id);
 			if (rc == Abort) req->primary.status = OpStatus::PREP_ABORT;
   			else req->primary.status = OpStatus::PREPARE;
@@ -1253,6 +1256,7 @@ RC YCSBTxnManager::check_query_status(OpStatus status) {
 	// 检查当前消息是否收集全了
 	for(int i=0;i<ycsb_query->requests.size();i++){ 
 		ycsb_request * req = ycsb_query->requests[i];
+		// DEBUG_T("txn %ld check req %d, its primary status %ld\n",get_txn_id(), i, req->primary.status);
 		if(req->primary.status == PREP_ABORT) {
 			DEBUG_T("txn %ld need wait, due to req %d abort\n",get_txn_id(), i);
 			return Abort;

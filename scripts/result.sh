@@ -67,6 +67,11 @@ do
             shift
             shift
             ;;
+        -D)
+            DCS=$2
+            shift
+            shift
+            ;;
         -s)
             SKEW=($(echo $2 | tr ',' ' '))
             shift
@@ -201,6 +206,9 @@ ArgsType() {
     elif [[ "${TEST_TYPE}" == 'ycsb_partitions' ]]
     then
         args=("${PART[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_dcs' ]]
+    then
+        args=("${DCS[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_sk_partitions' ]]
     then
         args=("${PART[@]}")
@@ -247,6 +255,9 @@ FileName() {
     elif [[ "${TEST_TYPE}" == 'ycsb_partitions' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _PPT-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_dcs' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _DPT-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_sk_partitions' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _PPT-${arg}_ | grep ^${i}_ | grep _SKEW-${SKEW})

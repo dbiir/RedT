@@ -1,7 +1,7 @@
 digraph graphname {
-  total [label="trans total time \n 0.193418\n 100 %",
+  total [label="trans total time \n 0.077033\n 100 %",
 		shape=box]
-	process [label="trans process time \n 0.000001\n 0.096482%",
+	process [label="trans process time \n 0.000000\n 79733.711524%",
 			shape=box]
     process_network [label="trans process network time \n trans_process_network \n trans_process_network_percent %", shape=box]
     txn_process [label="run benchmark read and write \n txn_process_time \n txn_process_time_percent %",
@@ -28,7 +28,7 @@ digraph graphname {
               shape=box]
     block [label="trans block time \n trans_block_time \n trans_block_time_percent %",
         shape=box]
-	twopc [label="trans 2pc time \n 0.096936\n trans_2pc_time_percent %",
+	twopc [label="trans 2pc time \n 0.038611\n trans_2pc_time_percent %",
 		shape=box]
 		prepare [label="trans prepare time \n trans_prepare_time \n trans_prepare_time_percent %",
 				shape=box]
