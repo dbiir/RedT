@@ -129,6 +129,8 @@ public:
 #if USE_REPLICA
 	RC redo_log(yield_func_t &yield, RC status, uint64_t cor_id);
   RC redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_id);
+  RC redo_local_log(yield_func_t &yield,RC status, uint64_t cor_id);
+  RC redo_commit_local_log(yield_func_t &yield,RC status, uint64_t cor_id);
 #endif
 	RC run_txn_post_wait();
 	RC run_calvin_txn(yield_func_t &yield, uint64_t cor_id);
@@ -155,11 +157,13 @@ private:
   vector<vector<uint64_t>> remote_center{g_center_cnt};
   void next_tpcc_state();
   RC generate_center_master(uint64_t w_id, access_t type);
+  RC generate_intra_center_master(uint64_t w_id, access_t type);
   RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
   bool is_done();
   bool is_local_item(uint64_t idx);
   RC send_remote_request();
   RC send_remote_subtxn();
+  RC send_intra_subtxn();
   RC tpcc_read_remote_index(yield_func_t &yield, TPCCQuery * query, itemid_t * &item, uint64_t cor_id);
   RC send_remote_one_side_request(yield_func_t &yield, TPCCQuery * query,row_t *& row_local, uint64_t cor_id);
 

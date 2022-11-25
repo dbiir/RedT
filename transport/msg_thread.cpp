@@ -62,7 +62,7 @@ void MessageThread::send_batch(uint64_t dest_node_id) {
 	  ((uint32_t*)sbuf->buffer)[2] = sbuf->cnt;
     INC_STATS(_thd_id,mbuf_send_intv_time,get_sys_clock() - sbuf->starttime);
 
-    DEBUG_T("Send batch of %ld msgs to %ld\n",sbuf->cnt,dest_node_id);
+    DEBUG("Send batch of %ld msgs to %ld\n",sbuf->cnt,dest_node_id);
     fflush(stdout);
     sbuf->set_send_time(get_sys_clock());
 #ifdef USE_RDMA
@@ -425,7 +425,7 @@ void MessageThread::run() {
   uint64_t copy_starttime = get_sys_clock();
   msg->copy_to_buf(&(sbuf->buffer[sbuf->ptr]));
   INC_STATS(_thd_id,msg_copy_output_time,get_sys_clock() - copy_starttime);
-  DEBUG_T("%ld Buffered Msg %d, (%ld,%ld) to %ld\n", _thd_id, msg->rtype, msg->txn_id, msg->batch_id,
+  DEBUG("%ld Buffered Msg %d, (%ld,%ld) to %ld\n", _thd_id, msg->rtype, msg->txn_id, msg->batch_id,
         dest_node_id);
   sbuf->cnt += 1;
   sbuf->ptr += msg->get_size();

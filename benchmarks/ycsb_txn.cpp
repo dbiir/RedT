@@ -119,8 +119,19 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 		query->centers_touched.add_unique(g_center_id);
 #if PARAL_SUBTXN
 		rc = send_remote_subtxn();
+		#if USE_TCP_INTRA_CENTER
+		rc = send_intra_subtxn();
+		#endif
 #endif
-	}
+	} else if (is_executor() && state == YCSB_0 && next_record_id == 0){
+		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
+#if PARAL_SUBTXN && USE_TCP_INTRA_CENTER
+		rc = send_intra_subtxn();
+#endif
+	} 
+	#if USE_TCP_INTRA_CENTER
+	txn->twopc_state = EXEC;
+	#endif
 	
 	uint64_t starttime = get_sys_clock();
 
@@ -371,6 +382,50 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	return rc;
 }
 
+
+RC YCSBTxnManager::send_intra_subtxn() {
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	RC rc = RCOK;
+	if (is_send_intra_msg) return rc;
+	
+	// Array<uint64_t> node_id;
+	ycsb_query->in_center_nodes.init(g_node_cnt);
+	for(int i = 0; i < ycsb_query->requests.size(); i++) {
+		ycsb_request * req = ycsb_query->requests[i];
+		bool is_center = req->primary.execute_node == g_node_id;
+		if (is_center)
+		uint64_t part_id = _wl->key_to_part(req->key);
+#if USE_REPLICA
+		if(req->acctype == WR){
+			if (req->primary.execute_node == g_node_id) ycsb_query->in_center_nodes.add_unique(req->primary.stored_node);
+			if (req->second1.execute_node == g_node_id) ycsb_query->in_center_nodes.add_unique(req->second1.stored_node);
+			if (req->second2.execute_node == g_node_id) ycsb_query->in_center_nodes.add_unique(req->second2.stored_node);
+		}else if(req->acctype == RD){
+			if (req->primary.execute_node == g_node_id) ycsb_query->in_center_nodes.add_unique(req->primary.stored_node);
+		}else assert(false);
+#else
+		node_id.push_back(GET_NODE_ID(part_id));		
+#endif
+		for(int j=0;j<ycsb_query->in_center_nodes.size();j++){
+			ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,ycsb_query->in_center_nodes[j]));
+			//center_master is set as the first toughed primary, if not exist, use the first toughed backup.
+		}
+	}
+	// printf("txn %lu, is_primary: %d %d %d %d\n", get_txn_id(),is_primary[0],is_primary[1],is_primary[2],is_primary[3]);
+	//get intra_rsp_cnt
+	intra_rsp_cnt = ycsb_query->in_center_nodes.size() - 1;
+	
+	for(int i = 0; i < ycsb_query->in_center_nodes.size(); i++) {
+		uint64_t dest_node_id = ycsb_query->in_center_nodes[i];
+		if (dest_node_id == g_node_id) continue;
+		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),dest_node_id);
+		DEBUG_T("txn %lu, send intra-txn to %lu\n", get_txn_id(),dest_node_id);
+	}
+	is_send_intra_msg = true;
+	// txn_stats.wait_for_rsp_time = get_sys_clock();
+	return rc;
+}
+
 //! now useless
 RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
@@ -475,9 +530,17 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			if (rc == Abort) req->primary.status = OpStatus::PREP_ABORT;
   			else req->primary.status = OpStatus::PREPARE;
 		} else if (rdma_one_side() && is_center) {
+			#if USE_TCP_INTRA_CENTER
+			if(waiting_for_intra_response()) {
+				rc = WAIT_REM;
+			} else {
+				rc = RCOK;
+			}
+			#else
 			rc = send_remote_one_side_request(yield, req, row, cor_id);
 			if (rc == Abort) req->primary.status = OpStatus::PREP_ABORT;
   			else req->primary.status = OpStatus::PREPARE;
+			#endif
 		} else {
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
 			rc = RCOK;
@@ -489,8 +552,13 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	case YCSB_1 :
 		//read local row,for message queue by TCP/IP,write set has actually been written in this point,
 		//but for rdma, it was written in local, the remote data will actually be written when COMMIT
-		if(is_center) rc = run_ycsb_1(req->acctype,row);  
-		else rc = RCOK;
+		#if USE_TCP_INTRA_CENTER
+		if(is_local) {
+		#else
+		if(is_center) {
+		#endif
+			rc = run_ycsb_1(req->acctype,row); 
+		} else rc = RCOK;
 		break;
 	case YCSB_FIN :
 		state = YCSB_FIN;
@@ -1209,6 +1277,180 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 		}
 	}
 	#endif
+	return rc;
+}
+
+RC YCSBTxnManager::redo_local_log(yield_func_t &yield,RC status, uint64_t cor_id) {
+	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3){
+		assert(status != Abort);
+		status = RCOK;		
+	}
+	
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	RC rc = RCOK;
+
+	// Only for current node
+	int change_cnt = 0;
+
+	vector<ChangeInfo> change;
+	
+
+	//construct log 
+	for(int i=0;i<((YCSBQuery*)query)->requests.size();i++){
+		ycsb_request * req = ycsb_query->requests[i];
+		//log is only for write operation
+		if(req->acctype!=WR) continue; 
+		// key_to_part should be used here! but its only for YCSB workload, so manually set part_id
+		// this part should be considered and changed for other workload!
+		// uint64_t part_id = _wl->key_to_part( req->key );
+		uint64_t part_id = req->key % g_part_cnt;
+		vector<uint64_t> node_id;
+		if(status == RCOK){ //validate success, log all replicas
+			if (get_follower1_node_id(part_id) == g_node_id ||
+				get_follower2_node_id(part_id) == g_node_id ||
+				get_primary_node_id(part_id) == g_node_id) {
+				change_cnt++;
+				row_t* temp_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+				temp_row->_tid_word = 0;
+				#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+				uint64_t op_size = sizeof(temp_row->_tid_word);
+				bool is_primary = (g_node_id == GET_NODE_ID(part_id));
+				ChangeInfo newChange;
+				newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 
+				#endif
+				mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+
+				change.push_back(newChange);
+			}
+		}
+		else if(status == Abort){ //validate fail, only log the primary replicas that have been locked
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+			// int sum = 0;
+			// for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
+			// if(sum>=num_locks) break;
+			// node_id.push_back(GET_NODE_ID(part_id));				
+#endif
+		} else{
+			assert(false);
+		}
+	}
+	//write log
+
+	if(change_cnt>0){
+		int num_of_entry = 1;
+		//use RDMA_FAA for local and remote
+		uint64_t start_idx = -1;
+		rc = faa_remote_content(yield, g_node_id, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, &start_idx, cor_id);
+		// uint64_t start_idx = faa_remote_content(yield, g_node_id, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id);
+
+		LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
+
+		newEntry->set_entry(get_txn_id(),change_cnt,change,get_start_timestamp());
+
+
+		//consider possible overwritten:if no space, wait until cleaned 
+		//for head: there is local read and write, and remote RDMA read, conflicts are ignored here, which might be problematic
+		while((start_idx + num_of_entry - *(redo_log_buf.get_head()) >= redo_log_buf.get_size()) && !simulation->is_done()){
+			//wait for AsyncRedoThread to clean buffer
+		}
+		
+		start_idx = start_idx % redo_log_buf.get_size();
+		char* start_addr = (char*)redo_log_buf.get_entry(start_idx);
+		assert(((LogEntry *)start_addr)->state == EMPTY);
+		assert(((LogEntry *)start_addr)->change_cnt == 0);
+		memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
+		assert(((LogEntry *)start_addr)->state == LOGGED);
+		log_idx[g_node_id] = start_idx;
+		mem_allocator.free(newEntry, sizeof(LogEntry));
+	}
+	is_logged = true;
+	return rc;
+}
+
+RC YCSBTxnManager::redo_commit_local_log(yield_func_t &yield,RC status, uint64_t cor_id) {
+	if (status == Abort) return Abort;
+	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3){
+		assert(status != Abort);
+		status = RCOK;		
+	}
+	
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	RC rc = RCOK;
+
+	// Only for current node
+	int change_cnt = 0;
+
+	vector<ChangeInfo> change;
+	
+	//construct log 
+	for(int i=0;i<((YCSBQuery*)query)->requests.size();i++){
+		ycsb_request * req = ycsb_query->requests[i];
+		//log is only for write operation
+		if(req->acctype!=WR) continue; 
+		// key_to_part should be used here! but its only for YCSB workload, so manually set part_id
+		// this part should be considered and changed for other workload!
+		// uint64_t part_id = _wl->key_to_part( req->key );
+		uint64_t part_id = req->key % g_part_cnt;
+		vector<uint64_t> node_id;
+		if(status == RCOK){ //validate success, log all replicas
+			if (get_follower1_node_id(part_id) == g_node_id ||
+				get_follower2_node_id(part_id) == g_node_id ||
+				get_primary_node_id(part_id) == g_node_id) {
+				change_cnt++;
+				row_t* temp_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
+				temp_row->_tid_word = 0;
+				#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+				uint64_t op_size = sizeof(temp_row->_tid_word);
+				bool is_primary = (g_node_id == GET_NODE_ID(part_id));
+				ChangeInfo newChange;
+				newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 
+				#endif
+				mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+
+				change.push_back(newChange);
+			}
+		}
+		else if(status == Abort){ //validate fail, only log the primary replicas that have been locked
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+			// int sum = 0;
+			// for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
+			// if(sum>=num_locks) break;
+			// node_id.push_back(GET_NODE_ID(part_id));				
+#endif
+		} else{
+			assert(false);
+		}
+	}
+	//write log
+
+	if(change_cnt>0){
+		int num_of_entry = 1;
+		//use RDMA_FAA for local and remote
+		uint64_t start_idx = -1;
+		rc = faa_remote_content(yield, g_node_id, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, &start_idx, cor_id);
+		// uint64_t start_idx = faa_remote_content(yield, g_node_id, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, cor_id);
+
+		LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
+
+		newEntry->set_entry(get_txn_id(),change_cnt,change,get_start_timestamp());
+		newEntry->state = LE_COMMITTED;
+		newEntry->c_ts = get_commit_timestamp();
+		//consider possible overwritten:if no space, wait until cleaned 
+		//for head: there is local read and write, and remote RDMA read, conflicts are ignored here, which might be problematic
+		while((start_idx + num_of_entry - *(redo_log_buf.get_head()) >= redo_log_buf.get_size()) && !simulation->is_done()){
+			//wait for AsyncRedoThread to clean buffer
+		}
+		
+		start_idx = start_idx % redo_log_buf.get_size();
+		char* start_addr = (char*)redo_log_buf.get_entry(start_idx);
+		assert(((LogEntry *)start_addr)->state == EMPTY);
+		assert(((LogEntry *)start_addr)->change_cnt == 0);
+		memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
+		assert(((LogEntry *)start_addr)->state == LE_COMMITTED);
+		log_idx[g_node_id] = start_idx;
+		mem_allocator.free(newEntry, sizeof(LogEntry));
+	}
+	is_logged = true;
 	return rc;
 }
 #endif

@@ -57,7 +57,7 @@ retry_unlock:
     row->_tid_word = 0;
 #endif
 #if DEBUG_PRINTF
-    printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu, old lock_info: %lu-%lu, lock owner %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, row->_tid_word, originlo);
+    // printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu, old lock_info: %lu-%lu, lock owner %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, row->_tid_word, originlo);
 #endif
 }
 
@@ -253,7 +253,7 @@ retry_unlock:
     // printf("txn %d release local lock on item %d, lock_type: %d, try_time: %d\n", txnMng->get_txn_id(), row->get_primary_key(), row->lock_type, try_time);
     row->_tid_word = 0;
 #if DEBUG_PRINTF
-    printf("---thread id:%lu, local unlock shared lock, nodeid-key: %u; %lu, txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, new_lock_info);
+    // printf("---thread id:%lu, local unlock shared lock, nodeid-key: %u; %lu, txnid: %lu, origin lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, new_lock_info);
 #endif
 #endif
 }
@@ -436,6 +436,87 @@ RC RDMA_2pl::commit_recover_log(yield_func_t &yield,RC rc, TxnManager * txnMng,u
 #if USE_REPLICA
     return txnMng->redo_commit_log(yield, rc, cor_id);
 #endif
+}
+
+RC RDMA_2pl::local_finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id) {
+Transaction *txn = txnMng->txn;
+    if (!txnMng->is_logged) txnMng->redo_commit_local_log(yield, rc, cor_id);
+    else {
+    #if USE_REPLICA
+        LogEntry * le = (LogEntry *)mem_allocator.alloc(sizeof(LogEntry));
+        if(rc == Abort){
+            le->state = LE_ABORTED;
+        }else{
+            le->state = LE_COMMITTED;
+        }
+        le->c_ts = txnMng->get_commit_timestamp();
+        // printf("c_ts:%lu\n",le->c_ts);
+        uint64_t operate_size = sizeof(le->state) + sizeof(le->c_ts);
+
+        int count = 0;
+
+        if(txnMng->log_idx[g_node_id] != redo_log_buf.get_size()){
+            if (rc !=Abort) assert(le->c_ts != UINT64_MAX && le->c_ts != 0);
+            uint64_t start_idx = txnMng->log_idx[g_node_id];
+            char* start_addr = (char *)redo_log_buf.get_entry(start_idx);
+            memcpy(start_addr, (char *)le, operate_size);
+        }
+        mem_allocator.free(le, sizeof(LogEntry));
+    #endif
+    }
+
+    uint64_t starttime = get_sys_clock();
+    //NO_WAIT has no problem of deadlock,so doesnot need to bubble sort the write_set in primary key order
+    int read_set[txn->row_cnt - txn->write_cnt];
+    int cur_rd_idx = 0;
+    int cur_wr_idx = 0;
+    for (uint64_t rid = 0; rid < txn->row_cnt; rid ++) {
+        assert(GET_CENTER_ID(txn->accesses[rid]->location) == g_center_id);
+        if (txn->accesses[rid]->type == WR)
+            txnMng->write_set[cur_wr_idx ++] = rid;
+        else
+            read_set[cur_rd_idx ++] = rid;
+    }
+    for (uint64_t i = 0; i < txn->row_cnt-txn->write_cnt; i++) {
+        //local
+        if(txn->accesses[read_set[i]]->location == g_node_id){
+            Access * access = txn->accesses[ read_set[i] ];
+            unlock(yield,access->orig_row, txnMng,cor_id);
+        }
+    }
+    //for write set element,write back and release lock
+    for (uint64_t i = 0; i < txn->write_cnt; i++) {
+        //local
+        if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
+            Access * access = txn->accesses[ txnMng->write_set[i] ];
+            write_and_unlock(yield,access->orig_row, access->data, txnMng,cor_id); 
+        }
+    }
+
+    uint64_t timespan = get_sys_clock() - starttime;
+    txnMng->txn_stats.cc_time += timespan;
+    txnMng->txn_stats.cc_time_short += timespan;
+    INC_STATS(txnMng->get_thd_id(),twopl_release_time,timespan);
+    INC_STATS(txnMng->get_thd_id(),twopl_release_cnt,1);
+// #endif
+    
+
+    for (uint64_t i = 0; i < txn->row_cnt; i++) {
+        if(txn->accesses[i]->location != g_node_id){
+            //remote
+            mem_allocator.free(txn->accesses[i]->data,0);
+            mem_allocator.free(txn->accesses[i]->orig_row,0);
+            // mem_allocator.free(txn->accesses[i]->test_row,0);
+            txn->accesses[i]->data = NULL;
+            txn->accesses[i]->orig_row = NULL;
+            txn->accesses[i]->orig_data = NULL;
+            txn->accesses[i]->version = 0;
+
+            //txn->accesses[i]->test_row = NULL;
+            txn->accesses[i]->offset = 0;
+        }
+    }
+	memset(txnMng->write_set, 0, 100);
 }
 
 //write back and unlock

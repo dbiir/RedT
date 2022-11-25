@@ -58,6 +58,7 @@
   #define RDMA_TWO_SIDE false
   #define USE_COROUTINE false
   #define USE_DBPAOR false
+  #define USE_TCP_INTRA_CENTER true
 // #endif
 /************RDMA TYPE**************/
 #define CHANGE_TCP_ONLY 0
@@ -227,7 +228,7 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_NO_WAIT3
+#define CC_ALG RDMA_NO_WAIT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -363,7 +364,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 0
+#define CROSS_DC_TXN_PERC 1
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.
@@ -602,8 +603,8 @@ enum PPSTxnType {
 #define INTER_CENTER_FAILED_TIME 20 * HEARTBEAT_TIME
 #define EXECUTOR_FAILED_TIME 1 * INTER_CENTER_FAILED_TIME
 
-#define RECOVERY_MANAGER true
-#define RECOVERY_TXN_MECHANISM true
+#define RECOVERY_MANAGER false
+#define RECOVERY_TXN_MECHANISM false
 
 #endif
   

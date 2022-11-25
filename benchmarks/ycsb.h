@@ -66,6 +66,8 @@ public:
 #if USE_REPLICA
 	RC redo_log(yield_func_t &yield, RC status, uint64_t cor_id);
   RC redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_id);
+  RC redo_local_log(yield_func_t &yield,RC status, uint64_t cor_id);
+  RC redo_commit_local_log(yield_func_t &yield,RC status, uint64_t cor_id);
 #endif
   // RC run_co_txn(yield_func_t &yield, uint64_t cor_id);
   RC run_txn_post_wait();
@@ -97,6 +99,7 @@ private:
   bool is_local_request(uint64_t idx);
   RC send_remote_request();
   RC send_remote_subtxn();
+  RC send_intra_subtxn();
   RC agent_check_commit();
 
   row_t * row;

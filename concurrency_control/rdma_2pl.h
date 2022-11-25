@@ -5,6 +5,7 @@ class RDMA_2pl{
 public:
 
     RC finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id);
+    RC local_finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id);
     RC commit_log(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id);
     RC commit_recover_log(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id);
 

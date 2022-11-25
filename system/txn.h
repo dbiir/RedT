@@ -167,6 +167,8 @@ public:
 #if USE_REPLICA
 	virtual RC 		redo_log(yield_func_t &yield, RC status, uint64_t cor_id) = 0;
 	virtual RC 		redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_id) = 0;
+	virtual RC 		redo_local_log(yield_func_t &yield, RC status, uint64_t cor_id) = 0;
+	virtual RC 		redo_commit_local_log(yield_func_t &yield, RC status, uint64_t cor_id) = 0;
 #endif
 
 
@@ -337,6 +339,15 @@ public:
 #if CC_ALG == WOUND_WAIT
 	TxnStatus		txn_state;
 #endif
+	bool is_send_intra_msg = false;
+	bool is_send_intra_finish = false;
+	bool is_executor() {
+		bool a = get_txn_id() % g_node_cnt == return_id;
+		uint64_t center_id = GET_CENTER_ID(get_txn_id() % g_node_cnt);
+		bool b = center_id != g_center_id;
+		return a && b;
+	}
+
 	bool aborted;
 	uint64_t return_id;
 	RC        		validate(yield_func_t &yield, uint64_t cor_id);
@@ -391,12 +402,15 @@ public:
 	uint64_t get_abort_cnt() {return abort_cnt;}
 	uint64_t abort_cnt;
 	int received_response(RC rc);
+	int received_intra_response(RC rc);
 	int received_response(AckMessage* msg, OpStatus state);
 	bool waiting_for_response();
+	bool waiting_for_intra_response();
 	RC get_rc() {return txn->rc;}
 	void set_rc(RC rc) {txn->rc = rc;}
 	//void send_rfin_messages(RC rc) {assert(false);}
 	void send_finish_messages();
+	void send_finish_messages_intra();
 	void send_prepare_messages();
 
 	TxnStats txn_stats;
@@ -421,6 +435,7 @@ public:
 	Message* last_msg;
 	uint64_t log_idx[NODE_CNT]; //redo_log_buf.get_size() if no log 
 
+	int intra_rsp_cnt;
 protected:
 	int rsp_cnt;
 	void            insert_row(row_t * row, table_t * table);

@@ -397,6 +397,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	#endif
 	commit_timestamp = 0;
 	rsp_cnt = 0;
+	intra_rsp_cnt = 0;
 	abort_cnt = 0;
 }
 
@@ -407,11 +408,14 @@ void TxnManager::reset() {
 	locking_done = true;
 	ready_part = 0;
 	rsp_cnt = 0;
+	intra_rsp_cnt = 0;
+	is_send_intra_msg = false;
+	is_send_intra_finish = false;
 	// aborted = false;
 	return_id = UINT64_MAX;
 	twopl_wait_start = 0;
 	finish_logging = false;
-
+	
 	num_msgs_commit = 0;
 	num_msgs_rw_prep = 0;
 	for(int i=0;i<CENTER_CNT;i++){
@@ -634,6 +638,9 @@ RC TxnManager::start_abort(yield_func_t &yield, uint64_t cor_id) {
 	if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT3) {
 #endif
 		send_finish_messages();
+		#if USE_TCP_INTRA_CENTER
+		send_finish_messages_intra();
+		#endif
 		abort(yield, cor_id);
 		return Abort;
 	}
@@ -664,44 +671,23 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
   	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
-	if(true) {
-		if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3) {
-			// send prepare messages
-			send_prepare_messages();
-			rc = WAIT_REM;
-		} else {
-			uint64_t finish_start_time = get_sys_clock();
-			txn_stats.finish_start_time = finish_start_time;
-			// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-			// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-      		// INC_STATS(get_thd_id(), trans_prepare_count, 1);
-			send_finish_messages();
-			rsp_cnt = 0;
-			rc = commit(yield, cor_id);
-		}
-	} 
-	else { 
-		rc = validate(yield, cor_id);
-		// rc = RCOK;
+
+	if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3) {
+		// send prepare messages
+		send_prepare_messages();
+		rc = WAIT_REM;
+	} else {
 		uint64_t finish_start_time = get_sys_clock();
 		txn_stats.finish_start_time = finish_start_time;
-
 		// uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
 		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
-		if(rc == RCOK){   //for NO_WAIT , rc == RCOK
-			rc = commit(yield, cor_id);
-		}		
-		else {
-			txn->rc = Abort;
-			DEBUG("%ld start_abort\n",get_txn_id());
-			if(query->partitions_touched.size() > 1 && CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT3) {
-				send_finish_messages();
-				abort(yield, cor_id);
-				rc = Abort;
-			}
-			rc = abort(yield, cor_id);
-		}
+		// INC_STATS(get_thd_id(), trans_prepare_count, 1);
+		send_finish_messages();
+		#if USE_TCP_INTRA_CENTER
+		send_finish_messages_intra();
+		#endif
+		rsp_cnt = 0;
+		rc = commit(yield, cor_id);
 	}
 	return rc;
 }
@@ -761,11 +747,38 @@ void TxnManager::send_prepare_messages() {
 	
 }
 
+
+void TxnManager::send_finish_messages_intra() {
+	if (is_send_intra_finish) return;
+	txn->twopc_state = FIN;
+	intra_rsp_cnt = query->in_center_nodes.size() - 1;
+	
+	// assert(IS_LOCAL(get_txn_id()));
+	DEBUG_T("%ld Send FINISH messages to %ld nodes\n",get_txn_id(),intra_rsp_cnt);
+	for(uint64_t i = 0; i < query->in_center_nodes.size(); i++) {
+		if(query->in_center_nodes[i] == g_node_id || GET_CENTER_ID(query->in_center_nodes[i]) != g_center_id) {
+			continue;
+		}
+#if USE_RDMA == CHANGE_MSG_QUEUE
+        tport_man.rdma_thd_send_msg(get_thd_id(), GET_NODE_ID(query->partitions_touched[i]), Message::create_message(this, RFIN));
+#else
+		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN),
+								GET_NODE_ID(query->in_center_nodes[i]));
+		DEBUG_T("txn %lu, send intra-finish to %lu\n", get_txn_id(),query->in_center_nodes[i]);
+#endif
+	}
+	is_send_intra_finish = true;
+	assert(num_msgs_commit==num_msgs_rw_prep);
+}
+
 void TxnManager::send_finish_messages() {
 	txn_stats.current_states = FINISH_PHASE;
 #if CENTER_MASTER == true
 	//get rsp_cnt
 	rsp_cnt = 0;
+	#if USE_TCP_INTRA_CENTER
+	txn->twopc_state = FIN;
+	#endif
 	for(int i=0;i<query->centers_touched.size();i++){
 		if(is_primary[query->centers_touched[i]]) ++rsp_cnt;
 	}
@@ -870,6 +883,20 @@ int TxnManager::received_response(AckMessage* msg, OpStatus state) {
 	if (result == RCOK) return 0;
 	return 1;
 }
+
+int TxnManager::received_intra_response(RC rc) {
+	assert(txn->rc == RCOK || txn->rc == Abort);
+	if (txn->rc == RCOK) txn->rc = rc;
+#if CC_ALG == CALVIN
+	++intra_rsp_cnt;
+#else
+	if (intra_rsp_cnt > 0) --intra_rsp_cnt;
+	else return -1;
+#endif
+	return intra_rsp_cnt;
+}
+
+bool TxnManager::waiting_for_intra_response() { return intra_rsp_cnt > 0; }
 
 bool TxnManager::waiting_for_response() { return rsp_cnt > 0; }
 
@@ -1097,7 +1124,11 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 	}
 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+    #if USE_TCP_INTRA_CENTER
+	r2pl_man.local_finish(yield,rc,this,cor_id);
+	#else
     r2pl_man.finish(yield,rc,this,cor_id);
+	#endif
 #endif
 #if CC_ALG == CALVIN 
 	// cleanup locked rows

@@ -38,7 +38,10 @@ public:
     void calvin_wrapup(yield_func_t &yield, uint64_t cor_id);
     RC process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rfwd(yield_func_t &yield, Message * msg, uint64_t cor_id);
+    RC process_rack_rfin_coordinator(Message * msg);
+    RC process_rack_rfin_executor(Message * msg);
     RC process_rack_rfin(Message * msg);
+    RC process_rack_prep_common(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rack_prep(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_id);
