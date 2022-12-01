@@ -345,7 +345,7 @@ def ycsb_cross_dc():
 def ycsb_tapir_network_delay():
     wl = 'YCSB'
     nnodes = [8]
-    algos=['NO_WAIT']
+    algos=['MDCC']
     tapir=['true']
     early=['false']
     base_table_size=1048576
@@ -353,8 +353,8 @@ def ycsb_tapir_network_delay():
     tup_write_perc = [0.5]
     load = [320]
     tcnt = [40]  #THREAD_CNT
-    skew = [0.2]
-    cross_dc_perc = [1.0]
+    skew = [0.0]
+    cross_dc_perc = [0.5]
     # network_delay = ['50000000UL','100000000UL','150000000UL','200000000UL','250000000UL','300000000UL','350000000UL','400000000UL','450000000UL','500000000UL'] 
     # network_delay = ['50000000UL','100000000UL','150000000UL','200000000UL','300000000UL','450000000UL'] 
     # network_delay = ['250000000UL','300000000UL','350000000UL','400000000UL','450000000UL','500000000UL'] 
@@ -369,7 +369,7 @@ def ycsb_tapir_network_delay():
 def ycsb_network_delay():
     wl = 'YCSB'
     nnodes = [8]
-    algos=['NO_WAIT']
+    algos=['MDCC']
     tapir=['false']
     early=['false']
     base_table_size=1048576*4
@@ -412,24 +412,24 @@ def ycsb_early_network_delay():
 
 def ycsb_tapir_skew():
     wl = 'YCSB'
-    nnodes = [4]
+    nnodes = [8]
 
-    algos=['NO_WAIT']
+    algos=['MDCC']
     tapir=['true']
     early=['false']
     # base_table_size=1048576*10
-    base_table_size=1048576*4    
+    base_table_size=1048576    
     #base_table_size=2097152*8
 
-    txn_write_perc = [0.5]
+    txn_write_perc = [1]
     tup_write_perc = [0.5]
-    load = [10000]
+    load = [320]
 
-    tcnt = [10]  #THREAD_CNT
+    tcnt = [40]  #THREAD_CNT
 
-    skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
+    # skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
     # skew = [0.25,0.55,0.65,0.75]
-    # skew = [0.2]
+    skew = [0.8]
     # skew = [0.0,0.1,0.2,0.3,0.4,0.5]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,ir in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,tapir)]
@@ -1209,7 +1209,7 @@ configs = {
     "PART_CNT": "NODE_CNT",
     "PART_PER_TXN": 2,
     "MAX_TXN_IN_FLIGHT": 10000,
-    "NETWORK_DELAY": '100000000UL',
+    "NETWORK_DELAY": '0UL',
     "COROUTINE_CNT": 4,
     "ONLY_ONE_HOME": 'false',
     "NETWORK_DELAY_TEST": 'false',

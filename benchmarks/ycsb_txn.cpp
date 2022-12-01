@@ -180,8 +180,15 @@ RC YCSBTxnManager::send_remote_subtxn() {
 		ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id));
 		if(req->acctype == WR) ycsb_query->partitions_modified.add_unique(part_id);
 		remote_node[node_id].push_back(i);
+#if CC_ALG == MDCC
+		uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
+		uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
+		remote_node[f1].push_back(i);	
+		remote_node[f2].push_back(i);	
+#endif
 	}
-	rsp_cnt = query->partitions_touched.size() - 1;
+	// rsp_cnt = query->partitions_touched.size() - 1;
+	rsp_cnt = 0;
 
 #if USE_TAPIR && TAPIR_REPLICA
 	#if TAPIR_DEBUG
@@ -192,6 +199,7 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	#if TAPIR_DEBUG
 				printf("send %d rqry message to node:%d \n",get_txn_id(), query->partitions_touched[i]);
 	#endif
+			++rsp_cnt;
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),query->partitions_touched[i]);
 		}
 	}
@@ -202,6 +210,7 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	#if TAPIR_DEBUG
 			printf("send %d rqry message to node:%d \n",get_txn_id(), i);
 	#endif
+			++rsp_cnt;
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
 		}
 	}
@@ -254,6 +263,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 		return WAIT;
 	}
 #endif
+	if(CC_ALG == MDCC) assert(rc == RCOK);
 
 	if(!IS_LOCAL(get_txn_id())){
 		if(rc == Abort) rc = abort(yield, cor_id);
@@ -359,14 +369,17 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	ycsb_request * req = ycsb_query->requests[next_record_id];
 	uint64_t part_id = _wl->key_to_part( req->key );
+#if CC_ALG == MDCC
+  	bool loc = (GET_NODE_ID(part_id) == g_node_id || GET_FOLLOWER1_NODE(part_id) == g_node_id || GET_FOLLOWER2_NODE(part_id) == g_node_id);	
+#else
   	bool loc = GET_NODE_ID(part_id) == g_node_id;
-	
+#endif
 	RC rc = RCOK;
 	switch (state) {
 	case YCSB_0 :
 		if(loc) {
-			if(ycsb_query->requests[next_record_id]->acctype == WR && IS_LOCAL(get_txn_id())) 	
-				ycsb_query->partitions_modified.add_unique(part_id);
+			// if(ycsb_query->requests[next_record_id]->acctype == WR && IS_LOCAL(get_txn_id())) 	
+				// ycsb_query->partitions_modified.add_unique(part_id);
 			rc = run_ycsb_0(yield,req,row,cor_id);
 		} else {
 #if PARAL_SUBTXN == true

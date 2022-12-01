@@ -361,14 +361,17 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
         if(!txn_man || !(txn_man->txn) || !txn_man->query || 
         // txn_man->query->partitions_touched.size() == 0 || 
         txn_man->abort_cnt != msg->current_abort_cnt) {//txn already committed
+          if(CC_ALG == MDCC) assert(false);
           DEBUG_T("txn %ld type %d already commit, query?%d, partitions_touched?%d, abort cnt %d, msg abort cnt %d\n", msg->get_txn_id(),msg->get_rtype(), !txn_man->query, txn_man->query->partitions_touched.size() == 0 , txn_man->abort_cnt, msg->current_abort_cnt);
           continue;
         }
         else if (txn_man->txn_state == 2 && msg->rtype == RACK_PREP) {
+          if(CC_ALG == MDCC) assert(false);
           DEBUG_T("txn %ld type %d state %ld\n", msg->get_txn_id(),msg->get_rtype(), txn_man->txn_state);
           continue;
         }
         else if (txn_man->txn_state == 3 && msg->rtype == RACK_FIN) {
+          if(CC_ALG == MDCC) assert(false);
           DEBUG_T("txn %ld type %d state %ld\n", msg->get_txn_id(),msg->get_rtype(), txn_man->txn_state);
           continue;
         }
@@ -485,20 +488,21 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
     txn_man->reset();
     txn_man->reset_query();
     // printf("%d:%d send abort finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));  
-    msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN),
-                      GET_NODE_ID(msg->get_txn_id()));
+    if(CC_ALG != MDCC)
+      msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN), GET_NODE_ID(msg->get_txn_id()));
     return Abort;
   }
 
 //now commit 
   txn_man->commit(yield, cor_id);
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
-  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT)
+  if (CC_ALG != MDCC && (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT)){
 #if TAPIR_DEBUG
     printf("%d:%d send commit finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
 #endif
     msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN),
                       GET_NODE_ID(msg->get_txn_id()));
+  }
   // release_txn_man();
 	// printf("xxx txn %lu send rack_fin, rc = %d\n", txn_man->get_txn_id(), txn_man->get_rc());
 
@@ -533,7 +537,7 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
   // INC_STATS(get_thd_id(), trans_prepare_log_message_count, 1);
   // }
   assert(responses_left >=0);
-#if MAJORITY
+#if MAJORITY && CC_ALG != MDCC
   if(responses_left == 1){//able to return with 2 confirm(local+one remote)
 #else
   if(responses_left == 0){
@@ -559,13 +563,22 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
 #if EARLY_PREPARE
       if(txn_man->get_rc()==Abort) return Abort;
       // if(txn_man->aborted) return Abort;
-#else
-      assert(txn_man->get_rc()==RCOK);
 #endif
       txn_man->send_finish_messages();
       assert(txn_man->get_local_log());
+#if CC_ALG == MDCC
+    rc = txn_man->get_rc();
+    if(rc == Abort){
+      txn_man->abort(yield, cor_id);
+      abort();
+    }else{
+      txn_man->commit(yield, cor_id);
+      commit();
+    }
+#else
       txn_man->log_replica(RFIN_LOG, g_node_id); 
       rc = WAIT_REM;
+#endif
       return rc;
     }else{
       DEBUG_T("%d:%d send rack prep to %d\n", g_node_id, txn_man->get_txn_id(), txn_man->get_return_node());
@@ -642,6 +655,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   int responses_left = 0;
 
   if (!txn_man || !(txn_man->txn) || !txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) {
+    if(CC_ALG == MDCC) assert(false);
     DEBUG_T("RPREP_ACK skip %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
     return RCOK;
   }
@@ -652,7 +666,17 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   printf("%d receive prep rack messages from %d\n", txn_man->get_txn_id(), msg->return_node_id);
 #endif
 #if USE_TAPIR
+
+#if CC_ALG == MDCC
+  if(txn_man->validate_status == EMPTY)
+    responses_left = txn_man->received_tapir_response(((AckMessage*)msg)->rc, msg->return_node_id);
+  else if(txn_man->validate_status == SECOND_FAIL || txn_man->validate_status == SECOND_SUCCESS)
+    responses_left = txn_man->received_response(((AckMessage*)msg)->rc);    
+  else assert(false);
+#else
   responses_left = txn_man->received_tapir_response(((AckMessage*)msg)->rc, msg->return_node_id);
+#endif
+
   // if(responses_left < 0) {
   //   return RCOK;
   // }
@@ -736,6 +760,12 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #endif
 
   if (responses_left > 0) return WAIT;
+#if CC_ALG == MDCC
+  if(txn_man->validate_status == SECOND_FAIL || txn_man->validate_status == SECOND_SUCCESS)  
+    if(txn_man->get_log_rsp_cnt() > 0)
+      return WAIT;
+#endif 
+
 #if !USE_TAPIR
 #if MAJORITY
   if (txn_man->get_log_rsp_cnt() > 1) return WAIT;
@@ -744,9 +774,16 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #endif
 #endif
   // Done waiting
+#if CC_ALG == MDCC
+    if(txn_man->validate_status == EMPTY){
+      rc = txn_man->validate(yield, cor_id);
+      if(txn_man->get_rc() == RCOK) txn_man->set_rc(rc);
+    }
+#else
   if(txn_man->get_rc() == RCOK) {
     rc = txn_man->validate(yield, cor_id);
   }
+#endif
   if(IS_LOCAL(txn_man->get_txn_id())) {
 		INC_STATS(get_thd_id(), trans_logging_count, 1);
     // assert(txn_man->start_logging_time!=0);
@@ -763,6 +800,49 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     txn_man->txn->rc = Abort;
     rc = Abort;
   }
+
+#if CC_ALG == MDCC
+  if(txn_man->validate_status == FIRST_FAIL || txn_man->validate_status == FIRST_SUCCESS){
+  //this is the receive of the FIRST round of RACK_PREPARE
+    if(rc == Abort){ // extra two round-trips
+      printf("&&&txn %ld, need extra 2rt\n", txn_man->get_txn_id());
+      txn_man->send_prepare_messages();
+      
+      ValidateState vs = txn_man->validate_status;    
+      assert(vs == FIRST_FAIL || vs == FIRST_SUCCESS);
+
+      if(vs != FIRST_SUCCESS){
+        rc = txn_man->validate(yield, cor_id);    
+      }else{
+        txn_man->validate_status = SECOND_SUCCESS;
+        rc = RCOK;
+      }
+      txn_man->set_rc(rc);
+      txn_man->log_replica(RLOG, g_node_id);
+      rc = WAIT_REM;
+    }else{ //now commit
+      printf("&&&txn %ld, commit in 2rt\n", txn_man->get_txn_id());
+      txn_man->send_finish_messages(); //no need to receive response, considered as asynchronous
+      txn_man->commit(yield, cor_id);
+      commit();
+    }
+  }else if(txn_man->validate_status == SECOND_FAIL || txn_man->validate_status == SECOND_SUCCESS){
+  //this is the receive of the SECOND round of RACK_PREPARE
+    if(rc == Abort) printf("&&&txn %ld, abort in 4rt\n", txn_man->get_txn_id());
+    else printf("&&&txn %ld, commit in 4rt\n", txn_man->get_txn_id());
+
+    txn_man->send_finish_messages(); //no need to receive response, considered as asynchronous
+    if(rc == Abort){
+      txn_man->abort(yield, cor_id);
+      abort();
+    }else{
+      txn_man->commit(yield, cor_id);
+      commit();
+    }
+  }else assert(false);
+  return rc;
+#endif
+
 #if USE_TAPIR
   // printf("prepare %d\n", txn_man->txn_state);
   if(txn_man->txn_state == 1) {
@@ -819,6 +899,7 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
   RC rc = RCOK;
   int responses_left = 0;
   if (!txn_man || !(txn_man->txn) || !txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) {
+    if(CC_ALG == MDCC) assert(false); 
     DEBUG_T("RPREP_ACK skip %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
     return RCOK;
   }
@@ -885,11 +966,18 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
 #endif
 
 #if PARAL_SUBTXN == true
-  if (!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) return RCOK;
+  if (!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) {
+    if(CC_ALG == MDCC) assert(false);
+    return RCOK;
+  }
 
   int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
   assert(responses_left >=0);
-  
+
+#if CC_ALG == MDCC
+  assert(((QueryResponseMessage*)msg)->rc == RCOK);
+#endif
+
   if(!txn_man->aborted && ((QueryResponseMessage*)msg)->rc == Abort) {
     txn_man->start_abort(yield, cor_id);
   }
@@ -996,6 +1084,28 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
 #if TAPIR_DEBUG
     printf("%d:%d send prepare ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
 #endif
+
+  #if CC_ALG == MDCC
+    // if not validated before, or validated as abort, update the result here;
+    // otherwise, set rc = RCOK directly
+    ValidateState vs = txn_man->validate_status;
+    assert(vs == EMPTY || vs == FIRST_FAIL || vs == FIRST_SUCCESS);
+
+    if(vs != FIRST_SUCCESS){
+      rc = txn_man->validate(yield, cor_id);    
+    }else{
+      txn_man->validate_status = SECOND_SUCCESS;
+    }
+    txn_man->set_rc(rc);
+    if(vs == EMPTY){ // this is the FIRST round of prepare
+      msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+    }else{ // this is the SECOND round of prepare
+      txn_man->log_replica(RLOG, msg->return_node_id);
+      rc = WAIT_REM;
+    }
+    return rc;
+  #endif
+
     pthread_mutex_lock(&log_lock);
     log_count ++;
     log_content = log_count;
@@ -1107,7 +1217,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
 #if CC_ALG == MVCC
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
 #endif
-#if CC_ALG == OCC
+#if CC_ALG == OCC || CC_ALG == MDCC
   #if WORKLOAD==DA
     if(da_start_stamp_tab.count(txn_man->get_txn_id())==0)
     {

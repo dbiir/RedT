@@ -285,7 +285,7 @@ void Transaction::release_accesses(uint64_t thd_id) {
 void Transaction::release_inserts(uint64_t thd_id) {
 	for(uint64_t i = 0; i < insert_rows.size(); i++) {
 	row_t * row = insert_rows[i];
-#if CC_ALG != MAAT && CC_ALG != OCC
+#if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != MDCC
 		DEBUG_M("TxnManager::cleanup row->manager free\n");
 		mem_allocator.free(row->manager, 0);
 #endif
@@ -355,6 +355,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	num_msgs_prep = 0;
 	num_msgs_commit = 0;
 	finish_read_write = false;
+	validate_status = EMPTY;
 	set_local_log(false);
 }
 
@@ -377,6 +378,7 @@ void TxnManager::reset() {
 	num_msgs_prep = 0;
 	num_msgs_commit = 0;
 	finish_read_write = false;
+	validate_status = EMPTY;
 	set_local_log(false);
 
 #if USE_TAPIR
@@ -601,7 +603,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	}
 #else
 	// printf("%d query_partitions_modified size: %d\n", get_txn_id(), query->partitions_modified.size());
-	if(query->partitions_modified.size() != 0)
+	if(query->partitions_touched.size() != 0)
 		return WAIT_REM;	
 #endif
 	assert(query->readonly());
@@ -673,8 +675,124 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 }
 #endif
 void TxnManager::send_prepare_messages() {
-#if USE_REPLICA
-#if USE_TAPIR
+#if CC_ALG == MDCC
+	// this means that it is the FIRST round of prepare in MDCC; 
+	// otherwise, it is the SECOND round of prepare to resolve conflicts.
+	if(get_rc() != Abort){ 
+#else
+	if(USE_REPLICA){
+#endif
+	#if USE_TAPIR
+		uint64_t tar_nodes[g_node_cnt];
+		uint64_t tar_nodes_cnt = 0;
+		rsp_cnt = 0;
+		fin_rsp_cnt = 0;
+		log_rsp_cnt = 0;
+		log_fin_rsp_cnt = 0;
+		for(int i = 0; i < g_node_cnt; i++) {
+			ir_log_rsp_cnt[i] = 0;
+		}
+		for(int i = 0; i < query->partitions_touched.size(); i++){
+			uint64_t part_id = query->partitions_touched[i];
+			ir_log_rsp_cnt[i] = 3;
+			uint64_t l_node = GET_NODE_ID(part_id);
+			uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
+			uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
+			bool exist = false;
+			if(l_node == g_node_id || f1 == g_node_id || f2 == g_node_id) {
+				ir_log_rsp_cnt[i]--;
+			}
+			if(l_node != g_node_id){
+				bool exist = false;
+				for(int j=0;j<tar_nodes_cnt;j++){
+					if(tar_nodes[j] == l_node) {exist = true;break;}
+				}
+				rsp_cnt += 1;
+				//every part in different node
+				// if(g_part_cnt == g_node_cnt) assert(!exist);
+				if(!exist){
+					tar_nodes[tar_nodes_cnt++] = l_node;
+				}
+			}
+			if(f1 != g_node_id){
+				bool exist = false;
+				for(int j=0;j<tar_nodes_cnt;j++){
+					if(tar_nodes[j] == f1) {exist = true;break;}
+				}
+				//every part in different node
+				// if(g_part_cnt == g_node_cnt) assert(!exist);
+				if(!exist){
+					tar_nodes[tar_nodes_cnt++] = f1;
+				}
+			}
+			if(f2 != g_node_id){
+				bool exist = false;
+				for(int j=0;j<tar_nodes_cnt;j++){
+					if(tar_nodes[j] == f2) {exist = true;break;}
+				}
+				//every part in different node
+				// if(g_part_cnt == g_node_cnt) assert(!exist);
+				if(!exist){
+					tar_nodes[tar_nodes_cnt++] = f2;
+				}
+			}
+		}
+		DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),tar_nodes_cnt);
+		for(int i=0;i<tar_nodes_cnt;i++){
+	#if TAPIR_DEBUG
+			printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
+	#endif
+			msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
+		}
+	#else
+		uint64_t tar_nodes[g_node_cnt];
+		rsp_cnt = 0;
+		fin_rsp_cnt = 0;
+		log_rsp_cnt = 0;
+		log_fin_rsp_cnt = 0;
+		// printf("%d:%d start prepare modified: %d\n", g_node_id, get_txn_id(),query->partitions_modified.size());
+		for(int i=0;i<query->partitions_modified.size();i++){
+			uint64_t part_id = query->partitions_modified[i];
+			uint64_t l_node = GET_NODE_ID(part_id);
+			if(l_node != g_node_id){
+				bool exist = false;
+				for(int j=0;j<rsp_cnt;j++){
+					if(tar_nodes[j] == l_node) {exist = true;break;}
+				}
+				//every part in different node
+				if(g_part_cnt == g_node_cnt) assert(!exist);
+				if(!exist){
+					tar_nodes[rsp_cnt++] = l_node;
+				}
+			}
+		}
+		// printf("%d:%d start prepare rsp_cnt: %d\n", g_node_id, get_txn_id(),rsp_cnt);
+		for(int i=0;i<rsp_cnt;i++){
+			// printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
+			msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
+		}
+	#endif
+	}
+	else{
+		rsp_cnt = query->partitions_touched.size() - 1;
+		DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
+		for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
+		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) continue;
+			msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),
+												GET_NODE_ID(query->partitions_touched[i]));
+		}
+	}
+}
+
+void TxnManager::send_finish_messages() {
+	// if(IS_LOCAL(get_txn_id())) {
+	// 	INC_STATS(get_thd_id(), trans_logging_count, 1);
+	// 	INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
+	// 	start_fin_time = get_sys_clock();
+	// }
+#if CC_ALG == MDCC 
+	// similar to send_prepare_message()	
+	// no need to wait for message response
 	uint64_t tar_nodes[g_node_cnt];
 	uint64_t tar_nodes_cnt = 0;
 	rsp_cnt = 0;
@@ -686,20 +804,20 @@ void TxnManager::send_prepare_messages() {
 	}
 	for(int i = 0; i < query->partitions_touched.size(); i++){
 		uint64_t part_id = query->partitions_touched[i];
-		ir_log_rsp_cnt[i] = 3;
+		// ir_log_rsp_cnt[i] = 3;
 		uint64_t l_node = GET_NODE_ID(part_id);
 		uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
 		uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
 		bool exist = false;
-		if(l_node == g_node_id || f1 == g_node_id || f2 == g_node_id) {
-			ir_log_rsp_cnt[i]--;
-		}
+		// if(l_node == g_node_id || f1 == g_node_id || f2 == g_node_id) {
+		// 	ir_log_rsp_cnt[i]--;
+		// }
 		if(l_node != g_node_id){
 			bool exist = false;
 			for(int j=0;j<tar_nodes_cnt;j++){
 				if(tar_nodes[j] == l_node) {exist = true;break;}
 			}
-			rsp_cnt += 1;
+			// rsp_cnt += 1;
 			//every part in different node
 			// if(g_part_cnt == g_node_cnt) assert(!exist);
 			if(!exist){
@@ -729,58 +847,12 @@ void TxnManager::send_prepare_messages() {
 			}
 		}
 	}
-	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),tar_nodes_cnt);
-	for(int i=0;i<tar_nodes_cnt;i++){
-#if TAPIR_DEBUG
-		printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
-#endif
-		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
-	}
-#else
-	uint64_t tar_nodes[g_node_cnt];
-	rsp_cnt = 0;
-	fin_rsp_cnt = 0;
-	log_rsp_cnt = 0;
-	log_fin_rsp_cnt = 0;
-	// printf("%d:%d start prepare modified: %d\n", g_node_id, get_txn_id(),query->partitions_modified.size());
-	for(int i=0;i<query->partitions_modified.size();i++){
-		uint64_t part_id = query->partitions_modified[i];
-		uint64_t l_node = GET_NODE_ID(part_id);
-		if(l_node != g_node_id){
-			bool exist = false;
-			for(int j=0;j<rsp_cnt;j++){
-				if(tar_nodes[j] == l_node) {exist = true;break;}
-			}
-			//every part in different node
-			if(g_part_cnt == g_node_cnt) assert(!exist);
-			if(!exist){
-				tar_nodes[rsp_cnt++] = l_node;
-			}
-		}
-	}
-	// printf("%d:%d start prepare rsp_cnt: %d\n", g_node_id, get_txn_id(),rsp_cnt);
-	for(int i=0;i<rsp_cnt;i++){
-		// printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
-		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
-	}
-#endif
-#else
-	rsp_cnt = query->partitions_touched.size() - 1;
-	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
-	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
-	if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) continue;
-		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),
-											GET_NODE_ID(query->partitions_touched[i]));
-	}
-#endif
-}
 
-void TxnManager::send_finish_messages() {
-	// if(IS_LOCAL(get_txn_id())) {
-	// 	INC_STATS(get_thd_id(), trans_logging_count, 1);
-	// 	INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
-	// 	start_fin_time = get_sys_clock();
-	// }
+	for(int i=0;i<tar_nodes_cnt;i++){
+		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN),tar_nodes[i]);
+	}
+	return;
+#else
 #if !USE_TAPIR
 	// printf("xxx txn %lu send rfin, rc = %d\n", get_txn_id(), get_rc());
 	fin_rsp_cnt = query->partitions_touched.size() - 1;
@@ -923,6 +995,7 @@ void TxnManager::send_finish_messages() {
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN), tar_nodes[i]);
 	}
 #endif
+#endif
 }
 
 int TxnManager::received_response(RC rc) {
@@ -959,7 +1032,7 @@ int TxnManager::received_tapir_response(RC rc, uint64_t return_node_id) {
 		}
 	}
 	for(int i = 0; i < query->partitions_touched.size(); i++) {
-#if MAJORITY
+#if MAJORITY && CC_ALG != MDCC
 		if(ir_log_rsp_cnt[i] > 1) {
 			return 1;
 		}
@@ -970,6 +1043,7 @@ int TxnManager::received_tapir_response(RC rc, uint64_t return_node_id) {
 		}
 #endif
 	}
+	rsp_cnt = 0;
 	return 0;
 }
 int TxnManager::received_tapir_fin_response(RC rc, uint64_t return_node_id) {
@@ -1227,7 +1301,7 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 
 void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 
-#if CC_ALG == OCC && MODE == NORMAL_MODE
+#if (CC_ALG == OCC || CC_ALG == MDCC) && MODE == NORMAL_MODE
 	occ_man.finish(rc,this);
 #endif
 	ts_t starttime = get_sys_clock();
@@ -1497,12 +1571,12 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 #if MODE != NORMAL_MODE
 	return RCOK;
 #endif
-	if (CC_ALG != OCC && CC_ALG != MAAT) {
+	if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != MDCC) {
 		return RCOK;
 	}
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
-	if (CC_ALG == OCC && rc == RCOK) rc = occ_man.validate(this);
+	if ((CC_ALG == OCC || CC_ALG == MDCC) && rc == RCOK) rc = occ_man.validate(this);
 	if(CC_ALG == MAAT  && rc == RCOK) {
 		rc = maat_man.validate(this);
 		// Note: home node must be last to validate
@@ -1510,7 +1584,17 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 			rc = maat_man.find_bound(this);
 		}
 	}
-	
+
+#if CC_ALG == MDCC
+	if(validate_status == EMPTY){
+		if(rc == Abort) validate_status = FIRST_FAIL;
+		else validate_status = FIRST_SUCCESS;
+	}else if(validate_status == FIRST_FAIL){
+		if(rc == Abort) validate_status = SECOND_FAIL;
+		else validate_status = SECOND_SUCCESS;
+	}else assert(false); 
+#endif
+
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);
     INC_STATS(get_thd_id(),trans_validate_count, 1);

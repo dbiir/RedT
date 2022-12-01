@@ -38,6 +38,10 @@ RC Row_occ::access(TxnManager *txn, TsType type) {
 #endif
 	INC_STATS(txn->get_thd_id(), trans_access_lock_wait_time, get_sys_clock() - starttime);
 	if (type == R_REQ) {
+#if CC_ALG == MDCC
+			txn->cur_row->copy(_row);
+			rc = RCOK;
+#else
 		if (txn->get_start_timestamp() < wts) {
       		INC_STATS(txn->get_thd_id(),occ_ts_abort_cnt,1);
 			rc = Abort;
@@ -45,6 +49,7 @@ RC Row_occ::access(TxnManager *txn, TsType type) {
 			txn->cur_row->copy(_row);
 			rc = RCOK;
 		}
+#endif 
 	} else
 		assert(false);
 #ifdef MUTX

@@ -39,6 +39,7 @@ class YCSBQuery;
 class TPCCQuery;
 //class r_query;
 
+enum ValidateState {EMPTY,FIRST_FAIL,FIRST_SUCCESS,SECOND_FAIL,SECOND_SUCCESS};
 enum TxnState {START,INIT,EXEC,PREP,FIN,DONE};
 enum BatchReadType {R_INDEX=0,R_ROW};
 
@@ -307,6 +308,7 @@ public:
 	bool is_ready() {return txn_ready == true;}
 	volatile int txn_ready;
 	volatile bool finish_read_write;
+	ValidateState validate_status; //has validated successfully before
 
 	// Calvin
 	uint32_t lock_ready_cnt;

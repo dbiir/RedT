@@ -426,7 +426,7 @@ uint64_t QueryMessage::get_size() {
 #if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC  || CC_ALG == WOUND_WAIT
   size += sizeof(ts);
 #endif
-#if CC_ALG == OCC
+#if CC_ALG == OCC || CC_ALG == MDCC
   size += sizeof(start_ts);
 #endif
   return size;
@@ -438,7 +438,7 @@ void QueryMessage::copy_from_txn(TxnManager * txn) {
   ts = txn->get_timestamp();
   assert(ts != 0);
 #endif
-#if CC_ALG == OCC
+#if CC_ALG == OCC || CC_ALG == MDCC
   start_ts = txn->get_start_timestamp();
 #endif
 }
@@ -449,7 +449,7 @@ void QueryMessage::copy_to_txn(TxnManager * txn) {
   assert(ts != 0);
   txn->set_timestamp(ts);
 #endif
-#if CC_ALG == OCC
+#if CC_ALG == OCC || CC_ALG == MDCC
   txn->set_start_timestamp(start_ts);
 #endif
 }
@@ -462,7 +462,7 @@ void QueryMessage::copy_from_buf(char * buf) {
  COPY_VAL(ts,buf,ptr);
   assert(ts != 0);
 #endif
-#if CC_ALG == OCC 
+#if CC_ALG == OCC || CC_ALG == MDCC
  COPY_VAL(start_ts,buf,ptr);
 #endif
 }
@@ -475,7 +475,7 @@ void QueryMessage::copy_to_buf(char * buf) {
   COPY_BUF(buf,ts,ptr);
   assert(ts != 0);
 #endif
-#if CC_ALG == OCC 
+#if CC_ALG == OCC || CC_ALG == MDCC
   COPY_BUF(buf,start_ts,ptr);
 #endif
 }

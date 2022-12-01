@@ -116,7 +116,7 @@ public:
 	 	Row_ts * manager;
 	#elif CC_ALG == MVCC
 		Row_mvcc * manager;
-	#elif CC_ALG == OCC 
+	#elif CC_ALG == OCC || CC_ALG == MDCC
 		Row_occ * manager;
 	#elif CC_ALG == MAAT
 		Row_maat * manager;

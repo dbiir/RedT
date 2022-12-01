@@ -77,7 +77,7 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_ts *) mem_allocator.align_alloc(sizeof(Row_ts));
 #elif CC_ALG == MVCC
 	manager = (Row_mvcc *) mem_allocator.align_alloc(sizeof(Row_mvcc));
-#elif CC_ALG == OCC
+#elif CC_ALG == OCC || CC_ALG == MDCC
 	manager = (Row_occ *) mem_allocator.align_alloc(sizeof(Row_occ));
 #elif CC_ALG == MAAT
 	manager = (Row_maat *) mem_allocator.align_alloc(sizeof(Row_maat));
@@ -337,7 +337,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	}
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
-#elif CC_ALG == OCC
+#elif CC_ALG == OCC || CC_ALG == MDCC
 	// OCC always make a local copy regardless of read or write
   uint64_t init_time = get_sys_clock();
 	DEBUG_M("row_t::get_row OCC alloc \n");
@@ -467,7 +467,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		assert(rc == RCOK);
 	}
 	return 0;
-#elif CC_ALG == OCC
+#elif CC_ALG == OCC || CC_ALG == MDCC
 	assert (row != NULL);
 	if (type == WR) manager->write(row, txn->get_end_timestamp());
 	row->free_row();

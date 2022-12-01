@@ -61,7 +61,7 @@ void OptCC::finish(RC rc, TxnManager * txn) {
 
 RC OptCC::per_row_validate(TxnManager *txn) {
 	RC rc = RCOK;
-#if CC_ALG == OCC
+#if CC_ALG == OCC || CC_ALG == MDCC
 	// sort all rows accessed in primary key order.
 	for (uint64_t i = txn->get_access_cnt() - 1; i > 0; i--) {
 		for (uint64_t j = 0; j < i; j ++) {
@@ -268,18 +268,16 @@ void OptCC::central_finish(RC rc, TxnManager * txn) {
 			prev = act;
 			act = act->next;
 		}
-    	if(act == NULL) {
-      		assert(rc == Abort);
-		  	//pthread_mutex_unlock( &latch );
-			sem_post(&_semaphore);
-			return;
-    	}
-		assert(act->txn == txn);
-		if (prev != NULL)
-			prev->next = act->next;
-		else
-			active = act->next;
-		active_len --;
+
+		if(act != NULL){ 
+			assert(act->txn == txn);
+			if (prev != NULL)
+				prev->next = act->next;
+			else
+				active = act->next;
+			active_len --;
+		}		
+		
 		if (rc == RCOK) {
 			// remove the assert for performance
       		/*

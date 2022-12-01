@@ -24,8 +24,8 @@ istc_machines=[
 "istc2",
 "istc5",
 ]
-username = "ibtest"
-vcloud_uname = 'home/ibtest'
+username = "ljy"
+vcloud_uname = 'home/ljy'
 
 #identity = "/usr0/data1/dvanaken/.ssh/id_rsa_vcloud"
 vcloud_machines = [

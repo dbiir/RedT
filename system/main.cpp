@@ -275,7 +275,7 @@ int main(int argc, char *argv[]) {
 	//if (WORKLOAD != TEST) {
 	//	query_queue.init(m_wl);
 	//}
-#if CC_ALG == OCC
+#if CC_ALG == OCC || CC_ALG == MDCC
 	printf("Initializing occ lock manager... ");
 	occ_man.init();
 	printf("Done\n");

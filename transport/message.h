@@ -390,7 +390,7 @@ public:
 #if CC_ALG == MVCC
   uint64_t thd_id;
 #endif
-#if CC_ALG == OCC
+#if CC_ALG == OCC || CC_ALG == MDCC
   uint64_t start_ts;
 #endif
 #if MODE==QRY_ONLY_MODE
