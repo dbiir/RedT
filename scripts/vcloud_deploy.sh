@@ -11,7 +11,7 @@ for HOSTNAME in ${HOSTS}; do
     # scp cpu_monitor.sh ${USERNAME}@${HOSTNAME}:${PATHE}
     ssh -n -o BatchMode=yes -o StrictHostKeyChecking=no -l ${USERNAME} ${USERNAME}@${HOSTNAME} "rm -rf /tmp/${USERNAME}_* ${USERNAME} ${count}" &
 done
-sh ntptime.sh
+# sh ntptime.sh
 for HOSTNAME in ${HOSTS}; do
     #SCRIPT="env SCHEMA_PATH=\"$2\" timeout -k 10m 10m gdb -batch -ex \"run\" -ex \"bt\" --args ./rundb -nid${count} >> results.out 2>&1 | grep -v ^\"No stack.\"$"
     if [ $count -ge $NODE_CNT ]; then

@@ -90,7 +90,7 @@ private:
     auto res_qp =
         Impl::create_qp(nic, IBV_QPT_RC, my_config, this->cq, this->recv_cq);
     if (res_qp != IOCode::Ok) {
-      RDMA_LOG(4) << "Error on creating QP: " << std::get<1>(res.desc);
+      RDMA_LOG(4) << "Error on creating QP: " << std::get<1>(res_qp.desc);
       return;
     }
     this->qp = std::get<0>(res_qp.desc);

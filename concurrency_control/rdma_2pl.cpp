@@ -439,10 +439,9 @@ RC RDMA_2pl::commit_recover_log(yield_func_t &yield,RC rc, TxnManager * txnMng,u
 }
 
 RC RDMA_2pl::local_finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_id) {
-Transaction *txn = txnMng->txn;
-    if (!txnMng->is_logged) txnMng->redo_commit_local_log(yield, rc, cor_id);
-    else {
-    #if USE_REPLICA
+    Transaction *txn = txnMng->txn;
+    if (txnMng->is_logged) {
+        #if USE_REPLICA
         LogEntry * le = (LogEntry *)mem_allocator.alloc(sizeof(LogEntry));
         if(rc == Abort){
             le->state = LE_ABORTED;
@@ -460,10 +459,12 @@ Transaction *txn = txnMng->txn;
             uint64_t start_idx = txnMng->log_idx[g_node_id];
             char* start_addr = (char *)redo_log_buf.get_entry(start_idx);
             memcpy(start_addr, (char *)le, operate_size);
+            // printf("txn %ld commit log in node %ld at index %d thd %ld now tail %ld\n",txnMng->get_txn_id(), g_node_id, start_idx, txnMng->get_thd_id(), *(redo_log_buf.get_tail()));
         }
         mem_allocator.free(le, sizeof(LogEntry));
-    #endif
+        #endif
     }
+    else if (rc == RCOK) txnMng->redo_commit_local_log(yield, rc, cor_id);
 
     uint64_t starttime = get_sys_clock();
     //NO_WAIT has no problem of deadlock,so doesnot need to bubble sort the write_set in primary key order

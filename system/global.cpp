@@ -238,7 +238,7 @@ UInt64 max_tuple_size = 0;
 pthread_mutex_t * RDMA_MEMORY_LATCH;
 
 // UInt64 rdma_buffer_size = 4*(1024*1024*1024L);
-UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
+UInt64 rdma_buffer_size = 20*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 300*(1024*1024L);
 
 UInt64 rdma_routetable_size = 1024*1024L;

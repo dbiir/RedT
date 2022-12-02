@@ -715,16 +715,16 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * 
 			dest_node_id, (uint64_t)socket);
 
   	int rc = -1;
-	int start_time = get_sys_clock();
+	// int start_time = get_sys_clock();
 	while (rc < 0 && (!simulation->is_setup_done() ||
 						(simulation->is_setup_done() && !simulation->is_done()))) {
 
 		rc= socket->sock.send(&buf,NN_MSG,NN_DONTWAIT);
-		int end_time = get_sys_clock();
-		if (end_time - start_time > MESSAGE_SEND_RETRY_TIME) {
-			printf("%ld send msg to node %ld failed\n",send_thread_id,dest_node_id);
-			break;
-		}
+		// int end_time = get_sys_clock();
+		// if (end_time - start_time > MESSAGE_SEND_RETRY_TIME) {
+		// 	printf("%ld send msg to node %ld failed\n",send_thread_id,dest_node_id);
+		// 	break;
+		// }
 	}
 
   	DEBUG("%ld Batch of %d bytes sent to node %ld\n",send_thread_id,size,dest_node_id);
@@ -910,14 +910,13 @@ std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
 	return msgs;
 	}
 
-  INC_STATS(thd_id,msg_recv_time, get_sys_clock() - starttime);
+  	INC_STATS(thd_id,msg_recv_time, get_sys_clock() - starttime);
 	INC_STATS(thd_id,msg_recv_cnt,1);
 
 	starttime = get_sys_clock();
 
-  msgs = Message::create_messages((char*)buf);
-  DEBUG_T("Batch of %d bytes recv from node %ld; Time: %f\n", bytes, msgs->front()->return_node_id,
-		simulation->seconds_from_start(get_sys_clock()));
+  	msgs = Message::create_messages((char*)buf);
+	// DEBUG_T("Batch of %d bytes recv from node %ld; Time: %f\n", bytes, msgs->front()->return_node_id, simulation->seconds_from_start(get_sys_clock()));
 
 	nn::freemsg(buf);
 

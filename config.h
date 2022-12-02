@@ -71,6 +71,7 @@
 
 #define CENTER_MASTER true  //hg-network without replica stage 2
 #define PARAL_SUBTXN true  //hg-network without replica stage 3
+#define PARAL_INTRA_SUBTXN false  //hg-network without replica stage 3
 #define USE_REPLICA true
 #define THOMAS_WRITE true  //if false, wait and sort
 #define INTER_DC_CONTROL true
@@ -126,9 +127,9 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 4
-#define NODE_CNT 8
-#define THREAD_CNT 40
+#define CENTER_CNT 3
+#define NODE_CNT 12
+#define THREAD_CNT 20
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -208,7 +209,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 0UL
+#define NETWORK_DELAY 10000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -350,14 +351,14 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 8388608
+#define SYNTH_TABLE_SIZE 12582912
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 1
-#define TUP_WRITE_PERC 0.5
+#define TUP_WRITE_PERC 0.2
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 4
-#define DC_PER_TXN 2 // Must ensure PART_PER_TXN > DC_PER_TXN
+#define PART_PER_TXN 6
+#define DC_PER_TXN 2
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
@@ -605,7 +606,7 @@ enum PPSTxnType {
 #define EXECUTOR_FAILED_TIME 1 * INTER_CENTER_FAILED_TIME
 
 #define RECOVERY_MANAGER true
-#define RECOVERY_TXN_MECHANISM true
+#define RECOVERY_TXN_MECHANISM false
 
 #endif
   

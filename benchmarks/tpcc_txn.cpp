@@ -91,7 +91,7 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 
 	if(IS_LOCAL(txn->txn_id) && (state == TPCC_PAYMENT0 || state == TPCC_NEWORDER0)) {
-		DEBUG("Running txn %ld\n",txn->txn_id);
+		DEBUG_T("Running txn %ld\n",txn->txn_id);
 #if DISTR_DEBUG
 		query->print();
 #endif
@@ -109,7 +109,9 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 		rc = send_intra_subtxn();
 		#endif	
 	}
-
+	#if USE_TCP_INTRA_CENTER
+	txn->twopc_state = EXEC;
+	#endif
 
 	while(rc == RCOK && !is_done()) {
 		rc = run_txn_state(yield, cor_id);
@@ -389,21 +391,21 @@ RC TPCCTxnManager::generate_intra_center_master(uint64_t w_id, access_t type) {
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 #if USE_REPLICA
 	if (type == WR) {
-		if (GET_NODE_ID(wh_to_part(w_id)) == g_center_id)
-			node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
-		if (GET_FOLLOWER1_NODE(wh_to_part(w_id)) == g_center_id)
-			node_id.push_back(GET_FOLLOWER1_NODE(wh_to_part(w_id)));
-		if (GET_FOLLOWER2_NODE(wh_to_part(w_id)) == g_center_id)
-			node_id.push_back(GET_FOLLOWER2_NODE(wh_to_part(w_id)));
+		if (GET_CENTER_ID(GET_NODE_ID(wh_to_part(w_id))) == g_center_id)
+			tpcc_query->in_center_nodes.add_unique(GET_NODE_ID(wh_to_part(w_id)));
+		if (GET_CENTER_ID(GET_FOLLOWER1_NODE(wh_to_part(w_id))) == g_center_id)
+			tpcc_query->in_center_nodes.add_unique(GET_FOLLOWER1_NODE(wh_to_part(w_id)));
+		if (GET_CENTER_ID(GET_FOLLOWER2_NODE(wh_to_part(w_id))) == g_center_id)
+			tpcc_query->in_center_nodes.add_unique(GET_FOLLOWER2_NODE(wh_to_part(w_id)));
 	} else {
-		if (GET_NODE_ID(wh_to_part(w_id)) == g_center_id)
-			node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
+		if (GET_CENTER_ID(GET_NODE_ID(wh_to_part(w_id))) == g_center_id)
+			tpcc_query->in_center_nodes.add_unique(GET_NODE_ID(wh_to_part(w_id)));
 	}
 #else
 	node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
 #endif
-	for(int j=0;j<node_id.size();j++){
-		tpcc_query->partitions_touched.add_unique(GET_PART_ID(0,node_id[j]));
+	for(int j=0;j<tpcc_query->in_center_nodes.size();j++){
+		tpcc_query->partitions_touched.add_unique(GET_PART_ID(0,tpcc_query->in_center_nodes[j]));
 	}
 }
 
@@ -482,11 +484,12 @@ RC TPCCTxnManager::send_remote_subtxn() {
 			}
 		}
 	}
-
+	assert(num_msgs_rw_prep==0);
 	for(int i = 0; i < g_center_cnt; i++) {
 		if(remote_center[i].size() > 0 && i != g_center_id) {//send message to all masters
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),center_master[i]);
-			// printf("txn %lu, send message to %d\n", get_txn_id(), center_master[i]);
+			DEBUG_T("txn %lu, send message to %d\n", get_txn_id(), center_master[i]);
+			num_msgs_rw_prep++;
 		}
 	}
 	#if RECOVERY_TXN_MECHANISM
@@ -505,13 +508,13 @@ RC TPCCTxnManager::send_remote_subtxn() {
 
 
 RC TPCCTxnManager::send_intra_subtxn() {
-	assert(IS_LOCAL(get_txn_id()));
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 	// TPCCRemTxnType next_state = TPCC_FIN;
 	RC rc = RCOK;
 	if (is_send_intra_msg) return rc;
 	unordered_set<uint64_t> node_id;
 
+	tpcc_query->in_center_nodes.init(g_node_cnt);
 	uint64_t w_id = tpcc_query->w_id;
 	generate_intra_center_master(w_id, WR);
 
@@ -530,10 +533,12 @@ RC TPCCTxnManager::send_intra_subtxn() {
 			generate_intra_center_master(ol_supply_w_id, WR);
 		}
 	}
-	intra_rsp_cnt = tpcc_query->partitions_touched.size() - 1;
+	intra_rsp_cnt = tpcc_query->in_center_nodes.size() - 1;
+	// intra_rsp_cnt = tpcc_query->partitions_touched.size() - 1;
 
-	for(int i = 0; i < tpcc_query->partitions_touched.size(); i++) {
-		uint64_t dest_part_id = tpcc_query->partitions_touched[i];
+	for(int i = 0; i < tpcc_query->in_center_nodes.size(); i++) {
+		uint64_t dest_part_id = tpcc_query->in_center_nodes[i];
+		if (dest_part_id == g_node_id) continue;
 		msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),dest_part_id);
 	}
 	is_send_intra_msg = true;
@@ -819,27 +824,32 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		case TPCC_PAYMENT4 :
 			if(c_w_loc)
 				rc = run_payment_4(yield, w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row,cor_id);
-#if PARAL_SUBTXN == true
+			#if PARAL_SUBTXN == true
 			else if(rdma_one_side() && c_w_cen == g_center_id && g_node_id == center_master[c_w_cen]){//rdma_silo
-#else
+			#else
 			else if(rdma_one_side() && w_cen == g_center_id){//rdma_silo
-#endif
-				#if USE_TCP_INTRA_CENTER
-				// if (is_executor())rc = send_remote_request();
-				#else
-				rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
-				#endif
-			}else {
-#if PARAL_SUBTXN == true && CENTER_MASTER == true
+			#endif
+			#if USE_TCP_INTRA_CENTER
 				rc = RCOK;
-#else
+				// if(waiting_for_intra_response()) {
+				// 	rc = WAIT_REM;
+				// } else {
+				// 	rc = RCOK;
+				// }
+			#else
+				rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
+			#endif
+			}else {
+			#if PARAL_SUBTXN == true && CENTER_MASTER == true
+				rc = RCOK;
+			#else
 				rc = send_remote_request();
-#endif
+			#endif
 			}
 			break;
 		case TPCC_PAYMENT5 :
 			#if USE_TCP_INTRA_CENTER
-			if(c_w_loc){
+			if(c_w_loc) {
 			#else
 			if(c_w_cen == g_center_id){
 			#endif
@@ -896,22 +906,26 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			if(ol_supply_w_loc) {
 				rc = new_order_8(yield,w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,row,cor_id);
 			}
-#if PARAL_SUBTXN == true
+			#if PARAL_SUBTXN == true
 			else if(rdma_one_side() && ol_supply_w_cen == g_center_id && g_node_id == center_master[ol_supply_w_cen]){//rdma_silo
-#else
+			#else
 			else if(rdma_one_side() && w_cen == g_center_id){//rdma_silo
-#endif
-				#if USE_TCP_INTRA_CENTER
-				// if (is_executor())rc = send_remote_request();
-				#else
-				rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
-				#endif
-			} else {
-#if PARAL_SUBTXN == true && CENTER_MASTER == true
+			#endif
+			#if USE_TCP_INTRA_CENTER
+			// if(waiting_for_intra_response()) {
+			// 	rc = WAIT_REM;
+			// } else {
 				rc = RCOK;
-#else
+			// }
+			#else
+				rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
+			#endif
+			} else {
+				#if PARAL_SUBTXN == true && CENTER_MASTER == true
+				rc = RCOK;
+				#else
 				rc = send_remote_request();
-#endif
+				#endif
 			}
 			break;
 		case TPCC_NEWORDER9 :
@@ -1838,7 +1852,7 @@ RC TPCCTxnManager::redo_commit_log(yield_func_t &yield,RC status, uint64_t cor_i
 				assert(((LogEntry *)start_addr)->change_cnt == 0);					
 
 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
-				assert(((LogEntry *)start_addr)->state == LOGGED);						
+				// assert(((LogEntry *)start_addr)->state == LE_COMMITTED);						
 			}else{ //remote log
 				//consider possible overwritten: if no space, wait until cleaned 
 				//first prevent concurrent read and write among threads
@@ -1910,6 +1924,7 @@ RC TPCCTxnManager::redo_local_log(yield_func_t &yield,RC status, uint64_t cor_id
 		//use RDMA_FAA for local and remote
 		uint64_t start_idx = -1;
 		rc = faa_remote_content(yield, i, rdma_buffer_size-rdma_log_size+sizeof(uint64_t), num_of_entry, &start_idx, cor_id);
+		// printf("txn %ld will write log in node %ld at index %d thd %ld now tail %ld\n",get_txn_id(), i, start_idx, get_thd_id(), *(redo_log_buf.get_tail()));
 		LogEntry* newEntry = (LogEntry*)mem_allocator.alloc(sizeof(LogEntry));
 		newEntry->set_entry(get_txn_id(), change_cnt[i],change[i],get_start_timestamp());
 
@@ -1931,13 +1946,14 @@ RC TPCCTxnManager::redo_local_log(yield_func_t &yield,RC status, uint64_t cor_id
 
 		log_idx[i] = start_idx;
 		mem_allocator.free(newEntry, sizeof(LogEntry));
+		// is_logged = true;
 	}
-
+	is_logged = true;
 	return rc;
 }
 
 RC TPCCTxnManager::redo_commit_local_log(yield_func_t &yield,RC status, uint64_t cor_id) {
-	// return RCOK;
+	return RCOK;
 	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3){
 		assert(status != Abort);
 		status = RCOK;		
@@ -1965,7 +1981,7 @@ RC TPCCTxnManager::redo_commit_local_log(yield_func_t &yield,RC status, uint64_t
 		// update district
 		construct_log(tpcc_query->w_id, change, change_cnt, status);
 
-		for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
+		for(uint64_t i = 0; i < tpcc_query->items.size(); i++) {
 			uint64_t ol_number = i;
 			uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
 			// update stock
@@ -1999,12 +2015,12 @@ RC TPCCTxnManager::redo_commit_local_log(yield_func_t &yield,RC status, uint64_t
 		assert(((LogEntry *)start_addr)->change_cnt == 0);					
 
 		memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
-		assert(((LogEntry *)start_addr)->state == LE_COMMITTED);						
+		// assert(((LogEntry *)start_addr)->state == LE_COMMITTED);						
 
 		log_idx[i] = start_idx;
 		mem_allocator.free(newEntry, sizeof(LogEntry));
 	}
-
+	is_logged = true;
 	return rc;
 }
 

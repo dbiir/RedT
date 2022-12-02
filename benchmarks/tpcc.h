@@ -142,9 +142,37 @@ public:
     failed_partition.add(key);
   }
   //todo:
-  void update_query_status(uint64_t return_id, OpStatus status){}
-  void update_query_status(bool timeout_check) {}
-  RC check_query_status(OpStatus status){}
+
+  void update_query_status(uint64_t return_id, OpStatus status){
+    if (rsp_cnt > 0)--rsp_cnt;
+    uint64_t center_from = GET_CENTER_ID(return_id);
+    if (wh_extra_wait[0] == center_from ||
+        wh_extra_wait[1] == center_from) {
+      wh_need_wait = false;
+    }
+    if (cus_extra_wait[0] == center_from ||
+        cus_extra_wait[1] == center_from) {
+      cus_need_wait = false;
+    }
+    for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+      if(extra_wait[i][0] == center_from || extra_wait[i][1] == center_from){
+        req_need_wait[i] = false;
+      }
+    }  
+  }
+  void update_query_status(bool timeout_check) {
+    
+  }
+  RC check_query_status(OpStatus status){
+    if (wh_need_wait || cus_need_wait || rsp_cnt > 0) {
+      DEBUG_T("txn %ld need wait because wh %ld cus %ld rsp_nct %ld\n",get_txn_id(), wh_need_wait, cus_need_wait, rsp_cnt);
+      return WAIT;
+    }
+    for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+      if(req_need_wait[i]) return WAIT;
+    }
+    return RCOK;
+  }
 
   RC resend_remote_subtxn(){}
   RC agent_check_commit(){}

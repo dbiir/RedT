@@ -167,7 +167,7 @@ void * YCSBWorkload::init_table_slice() {
 			//key ++
 	) {
 		int part_id = key_to_part(key); // % g_part_cnt;
-#if RECOVERY_MANAGER
+#if 0 && RECOVERY_MANAGER
 		if(0) {
 #else
 #if USE_REPLICA

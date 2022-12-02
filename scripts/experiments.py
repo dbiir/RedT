@@ -150,28 +150,26 @@ def ycsb_one_sided_cnt():
 
 def ycsb_scaling():
     wl = 'YCSB'
-    # nnodes = [1,2,4,8,16,32,64]
-    nnodes = [24]
+    # nnodes = [12]
+    nnodes = [3,6,9,12]
     # nnodes = [4,8,12,16,20,24,28,32,36,40]
     algos = ['RDMA_NO_WAIT3']
     # base_table_size=262144*10
-    # base_table_size=1048576 #2^20
-    base_table_size=131072 #2^17
+    base_table_size=1048576 #2^20
+    # base_table_size=131072 #2^17
     # base_table_size=1024
     # base_table_size=2097152*8
     txn_write_perc = [1]
     tup_write_perc = [0.5]
-    # load = [80]
-    tcnt = [10]
+    # load = [320]
+    tcnt = [20]
     ctcnt = [4]
     scnt = [1]
     rcnt = [1]
     skew = [0.2]
     # skew = [0.0,0.5,0.9]    
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT","SEND_THREAD_CNT","REM_THREAD_CNT","CLIENT_SEND_THREAD_CNT","CLIENT_REM_THREAD_CNT"]
-    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,n*thr,sk,thr,cthr,sthr,rthr,sthr,rthr] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,nnodes,algos)]
-    # exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,cthr,sthr,rthr,sthr,rthr] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
-    #exp = exp + [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT","SEND_THREAD_CNT","REM_THREAD_CNT","CLIENT_SEND_THREAD_CNT","CLIENT_REM_THREAD_CNT","CENTER_CNT"]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,n*thr,sk,thr,cthr,sthr,rthr,sthr,rthr,3] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,nnodes,algos)]
     return fmt,exp
 
 def ycsb_scaling_l():
@@ -808,13 +806,13 @@ def ycsb_partitions():
     nnodes = [12]
     algos=['RDMA_NO_WAIT3']
     # load = [10000,12000]
-    load = [320]
-    # nparts = [6]
-    ndcs = [2,3,4,5,6]
+    load = [240]
+    nparts = [2,3,4,5,6]
+    ndcs = [2]
     base_table_size= 1048576
     txn_write_perc = [1]
     tup_write_perc = [0.2]
-    tcnt = [40]
+    tcnt = [20]
     skew = [0.2]
     rpq =  10
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
@@ -824,19 +822,21 @@ def ycsb_partitions():
 def ycsb_dcs():
     wl = 'YCSB'
     # nnodes = [15]
+    # nnodes = [12]
     nnodes = [12]
     algos=['RDMA_NO_WAIT3']
     # load = [10000,12000]
     load = [320]
     # nparts = [6]
     nparts = [8]
-    ndcs = [2,3,4,5,6]
+    ndcs = [2]
+    # ndcs = [2,3,4,5,6]
     base_table_size= 1048576
     txn_write_perc = [1]
     tup_write_perc = [0.2]
     tcnt = [40]
     skew = [0.2]
-    rpq =  10
+    rpq =  12
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","DC_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
     exp = [[wl,n,algo,rpq,p,dc,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,0] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,dc in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,ndcs)]
     return fmt,exp
@@ -872,39 +872,40 @@ def tpcc_scaling():
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
     return fmt,exp
-
 def tpcc_scaling_n():
     wl = 'TPCC'
-    nnodes = [4]
-    # nnodes = [3,6,9,12,15]
+    # nnodes = [9]
+    # nnodes = [3,6,9]
+    nnodes = [3,6,9,12]
     nalgos=['RDMA_NO_WAIT3']
     npercpay=[0.0]
     # npercpay=[1.0]
-    wh=8
+    wh=16
     # wh=64
     load = [10000]
-    tcnt = [10]
-    ctcnt = [1]
+    tcnt = [20]
+    ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
+    exp = [[wl,n,cc,pp,wh*n,1,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
 
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
     return fmt,exp
+
 def tpcc_scaling_p():
     wl = 'TPCC'
-    nnodes = [15]
-    # nnodes = [3,6,9,12,15]
+    # nnodes = [9]
+    nnodes = [3,6,9,12]
     nalgos=['RDMA_NO_WAIT3']
     npercpay=[1.0]
     # npercpay=[1.0]
-    wh=8
+    wh=16
     # wh=64
     load = [20000]
-    tcnt = [8]
-    ctcnt = [1]
+    tcnt = [20]
+    ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,tif,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
+    exp = [[wl,n,cc,pp,wh*n,1,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
     return fmt,exp

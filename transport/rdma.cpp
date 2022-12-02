@@ -45,6 +45,7 @@ void Rdma::read_ifconfig(const char * ifaddr_file) {
 		cnt++;
 	}
   	assert(cnt == g_total_node_cnt);
+	fflush(stdout);
 }
 
 string Rdma::get_path() {
@@ -105,6 +106,7 @@ void * Rdma::client_qp(void *arg){
 	uint64_t thread_num = arg_tmp->thread_num;
 
 	printf("\n node_id = %d \n",node_id);
+	fflush(stdout);
 
 	ConnectManager cm_(std::string(rdma_server_add[node_id]));
 
@@ -119,6 +121,7 @@ void * Rdma::client_qp(void *arg){
 	//   uint64_t reg_mem_name = 0;
 	struct passwd *pwd = getpwuid(getuid());
 	printf("login account:%s\n", pwd->pw_name);
+	fflush(stdout);
 
 	auto fetch_res = cm_.fetch_remote_mr(reg_mem_name);
 	RDMA_ASSERT(fetch_res == IOCode::Ok) << std::get<0>(fetch_res.desc);
@@ -165,6 +168,7 @@ void * Rdma::client_qp(void *arg){
 void * Rdma::server_qp(void *){
 	printf("\n====server====\n");
 	printf("rdma_server_port[g_node_id] = %d\n",rdma_server_port[g_node_id]);
+	fflush(stdout);
 	rm_ctrl = Arc<RCtrl>(new rdmaio::RCtrl(rdma_server_port[g_node_id]));
 
 	uint64_t reg_nic_name = g_node_id;
@@ -280,6 +284,7 @@ ALLOC_FAILED:
 void Rdma::init(){
 	_sock_cnt = get_socket_count();
 	printf("rdma Init %d: %ld\n",g_node_id,_sock_cnt);
+	fflush(stdout);
 	string path = get_path();
 	read_ifconfig(path.c_str());
 
@@ -303,6 +308,7 @@ void Rdma::init(){
 #endif
 	pthread_t server_thread;
 	printf("g_total_node_cnt = %d",g_total_node_cnt);
+	fflush(stdout);
 
 	for(int i = 0; i < NODE_CNT ; i++){
 		rdma_server_port[i] = get_port(i);
@@ -310,6 +316,7 @@ void Rdma::init(){
 
 	server_qp(NULL);
 	printf("start wait\n");
+	fflush(stdout);
 	sleep(10);
 
 	for(node_id = 0; node_id < g_total_node_cnt; node_id++) {
