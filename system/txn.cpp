@@ -623,7 +623,7 @@ RC TxnManager::start_abort(yield_func_t &yield, uint64_t cor_id) {
 	INC_STATS(get_thd_id(), trans_process_time, process_time_span);
     INC_STATS(get_thd_id(), trans_process_count, 1);
 	txn->rc = Abort;
-	DEBUG("%ld start_abort\n",get_txn_id());
+	DEBUG_T("%ld start_abort\n",get_txn_id());
 
 	uint64_t finish_start_time = get_sys_clock();
 	txn_stats.finish_start_time = finish_start_time;

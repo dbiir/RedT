@@ -162,24 +162,24 @@ RC OptCC::central_validate(TxnManager * txn) {
 	starttime = get_sys_clock();
 	starttime = get_sys_clock();
 
-  uint64_t checked = 0;
-  uint64_t active_checked = 0;
-  uint64_t hist_checked = 0;
-  stop = 0;
+	uint64_t checked = 0;
+	uint64_t active_checked = 0;
+	uint64_t hist_checked = 0;
+	stop = 0;
 	if (finish_tn > start_tn) {
-    while (his && his->tn > finish_tn) his = his->next;
+		while (his && his->tn > finish_tn) his = his->next;
 		while (his && his->tn > start_tn) {
-      		++hist_checked;
-      		++checked;
+			++hist_checked;
+			++checked;
 			valid = test_valid(his, rset);
-#if WORKLOAD == TPCC
-			if (valid)
-				valid = test_valid(his, wset);
-#endif
+	#if WORKLOAD == TPCC
+				if (valid)
+					valid = test_valid(his, wset);
+	#endif
 			if (!valid) {
-        		INC_STATS(txn->get_thd_id(),occ_hist_validate_fail_time,get_sys_clock() - starttime);
+				INC_STATS(txn->get_thd_id(),occ_hist_validate_fail_time,get_sys_clock() - starttime);
 				goto final;
-      		}
+			}
 			his = his->next;
 		}
 	}

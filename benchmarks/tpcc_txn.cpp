@@ -91,7 +91,7 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 
 	if(IS_LOCAL(txn->txn_id) && (state == TPCC_PAYMENT0 || state == TPCC_NEWORDER0)) {
-		DEBUG("Running txn %ld\n",txn->txn_id);
+		DEBUG_T("Running txn %ld\n",txn->txn_id);
 #if DISTR_DEBUG
 		query->print();
 #endif
@@ -451,11 +451,12 @@ RC TPCCTxnManager::send_remote_subtxn() {
 			}
 		}
 	}
-
+	assert(num_msgs_rw_prep==0);
 	for(int i = 0; i < g_center_cnt; i++) {
 		if(remote_center[i].size() > 0 && i != g_center_id) {//send message to all masters
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),center_master[i]);
-			// printf("txn %lu, send message to %d\n", get_txn_id(), center_master[i]);
+			DEBUG_T("txn %lu, send message to %d\n", get_txn_id(), center_master[i]);
+			num_msgs_rw_prep++;
 		}
 	}
 	#if RECOVERY_TXN_MECHANISM
@@ -1678,6 +1679,7 @@ RC TPCCTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			mem_allocator.free(newEntry, sizeof(LogEntry));
 		}
 	}
+	is_logged = true;
 	return rc;
 }
 
@@ -1758,7 +1760,7 @@ RC TPCCTxnManager::redo_commit_log(yield_func_t &yield,RC status, uint64_t cor_i
 				assert(((LogEntry *)start_addr)->change_cnt == 0);					
 
 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
-				assert(((LogEntry *)start_addr)->state == LOGGED);						
+				// assert(((LogEntry *)start_addr)->state == LE_COMMITTED);						
 			}else{ //remote log
 				//consider possible overwritten: if no space, wait until cleaned 
 				//first prevent concurrent read and write among threads

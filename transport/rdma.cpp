@@ -147,7 +147,7 @@ void * Rdma::client_qp(void *arg){
 
 		// printf("qp_name = %s, rdma_server_port[node_id] = %d \n",qp_name[node_id][thread_id].c_str(),rdma_server_port[node_id]);
 		auto qp_res = cm_.cc_rc(qp_name[node_id][thread_id], rc_qp[node_id][thread_id], reg_nic_name, QPConfig());
-		RDMA_ASSERT(qp_res == IOCode::Ok) << std::get<0>(qp_res.desc);
+		RDMA_ASSERT(qp_res == IOCode::Ok) << name << std::get<0>(qp_res.desc);
 		auto key = std::get<1>(qp_res.desc);
 		// RDMA_LOG(4) << "client fetch QP authentical key: " << key;
 
@@ -203,8 +203,11 @@ char* Rdma::get_index_client_memory(uint64_t thd_id,int num) { //num>=1
 char* Rdma::get_row_client_memory(uint64_t thd_id,int num) { //num>=1
 	//when num>1, get extra row for doorbell batched RDMA requests
 	char* temp = (char *)(client_rdma_rm->raw_ptr);
-	temp +=  sizeof(IndexInfo) * (max_batch_num * g_total_thread_cnt * (COROUTINE_CNT + 1));
-	temp += row_t::get_row_size(ROW_DEFAULT_SIZE) * ((num-1) * g_total_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
+	uint64_t start_offset = 0;
+	start_offset += sizeof(IndexInfo) * (max_batch_num * g_total_thread_cnt * (COROUTINE_CNT + 1));
+	start_offset += row_t::get_row_size(ROW_DEFAULT_SIZE) * ((num-1) * g_total_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
+	assert(start_offset + row_t::get_row_size(ROW_DEFAULT_SIZE) < (client_rdma_buffer_size - SIZE_OF_ROUTE - SIZE_OF_STATUS));
+	temp += start_offset;
 	return temp;
 }
 

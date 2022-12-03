@@ -348,31 +348,47 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 		} else {
 			partition_id = mrand->next() % g_part_cnt;
 			#if INTER_DC_CONTROL
-			if(g_strict_ppt && g_part_per_txn <= g_part_cnt &&
-			   g_dc_per_txn <= g_center_cnt) {
-				assert(g_part_per_txn > g_dc_per_txn);
-				dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
-				while ((dcs_accessed.size() < g_dc_per_txn   && 
-						dcs_accessed.count(dc_id) > 0)       || 
-						(dcs_accessed.size() == g_dc_per_txn && 
-						dcs_accessed.count(dc_id) == 0)      ||
-						(partitions_accessed.size() < g_part_per_txn         &&
-								partitions_accessed.count(partition_id) > 0) ||
-					    (partitions_accessed.size() == g_part_per_txn        &&
-								partitions_accessed.count(partition_id) == 0)
-						) {
-					partition_id = mrand->next() % g_part_cnt;
+			if(g_strict_ppt && cross_dc_txn) {
+				if (g_part_per_txn <= g_part_cnt || g_dc_per_txn <= g_center_cnt) {
+					assert(g_part_per_txn >= g_dc_per_txn);
 					dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
-				}
-			} else {
-				assert(g_part_per_txn > g_dc_per_txn);
-				dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
-				while ((dcs_accessed.size() < g_dc_per_txn   && 
-						dcs_accessed.count(dc_id) > 0)       || 
-						(dcs_accessed.size() == g_dc_per_txn && 
-						dcs_accessed.count(dc_id) == 0)) {
-					partition_id = mrand->next() % g_part_cnt;
+					while ((dcs_accessed.size() < g_dc_per_txn   && 
+							dcs_accessed.count(dc_id) > 0)       || 
+							(dcs_accessed.size() == g_dc_per_txn && 
+							dcs_accessed.count(dc_id) == 0)      ||
+							(partitions_accessed.size() < g_part_per_txn         &&
+									partitions_accessed.count(partition_id) > 0) ||
+							(partitions_accessed.size() == g_part_per_txn        &&
+									partitions_accessed.count(partition_id) == 0)
+							) {
+						partition_id = mrand->next() % g_part_cnt;
+						dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					}
+			   	}
+			} else if (g_strict_ppt && !cross_dc_txn) {
+				if (g_part_per_txn <= g_part_cnt) {
+					assert(g_part_per_txn >= g_dc_per_txn);
 					dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					while (dc_id != GET_CENTER_ID(home_partition_id) ||
+							(partitions_accessed.size() < g_part_per_txn         &&
+									partitions_accessed.count(partition_id) > 0) ||
+							(partitions_accessed.size() == g_part_per_txn        &&
+									partitions_accessed.count(partition_id) == 0)
+							) {
+						partition_id = mrand->next() % g_part_cnt;
+						dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					}
+			   	}
+			} else if (!g_strict_ppt && cross_dc_txn) {
+				if (g_dc_per_txn <= g_center_cnt) {
+					dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					while ((dcs_accessed.size() < g_dc_per_txn   && 
+							dcs_accessed.count(dc_id) > 0)       || 
+							(dcs_accessed.size() == g_dc_per_txn && 
+							dcs_accessed.count(dc_id) == 0)) {
+						partition_id = mrand->next() % g_part_cnt;
+						dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					}
 				}
 			}
 			#else 
@@ -389,12 +405,11 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 		#endif
 
 #endif
-#if INTER_DC_CONTROL
-		if(cross_dc_txn && !has_cross_dc_part && GET_CENTER_ID(GET_NODE_ID(partition_id)) != GET_CENTER_ID(GET_NODE_ID(home_partition_id))){
-			has_cross_dc_part = true;
-		}
-#endif
-
+// #if INTER_DC_CONTROL
+// 		if(cross_dc_txn && !has_cross_dc_part && GET_CENTER_ID(GET_NODE_ID(partition_id)) != GET_CENTER_ID(GET_NODE_ID(home_partition_id))){
+// 			has_cross_dc_part = true;
+// 		}
+// #endif
 		ycsb_request * req = (ycsb_request*) mem_allocator.alloc(sizeof(ycsb_request));
 		if (r_twr < g_txn_read_perc || r < g_tup_read_perc)
 			req->acctype = RD;

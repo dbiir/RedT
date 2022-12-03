@@ -257,7 +257,7 @@ FileName() {
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _PPT-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_dcs' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _DPT-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _DC_PER_TXN-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_sk_partitions' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _PPT-${arg}_ | grep ^${i}_ | grep _SKEW-${SKEW})

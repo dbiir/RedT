@@ -67,13 +67,13 @@ uint64_t Thread::get_node_id() { return _node_id; }
 
 void Thread::tsetup() {
 	printf("Setup %ld:%ld\n",_node_id, _thd_id);
-    fflush(stdout);
+  fflush(stdout);
 	pthread_barrier_wait( &warmup_bar );
-    // sleep(10);
-    setup();
+  sleep(10);
+  setup();
 
 	printf("Running %ld:%ld\n",_node_id, _thd_id);
-    fflush(stdout);
+  fflush(stdout);
 	pthread_barrier_wait( &warmup_bar );
 
 #if TIME_ENABLE

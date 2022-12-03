@@ -681,11 +681,11 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
         // ready = false;
       // }
       // else if(msg->rtype == RFIN && !txn_man->finish_logging) {
-      // if(msg->rtype == RFIN && !txn_man->finish_logging) {
-      //   // printf("because finish logging\n");  
-      //   ready = false;
-      // } else 
-      ready = txn_man->unset_ready(); 
+      if(msg->rtype == RFIN && !txn_man->finish_logging) {
+        // printf("because finish logging\n");  
+        ready = false;
+      } else 
+        ready = txn_man->unset_ready(); 
       
       INC_STATS(get_thd_id(),worker_activate_txn_time,get_sys_clock() - ready_starttime);
       if(!ready) {
@@ -1276,7 +1276,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     txn_man->txn_stats.starttime = get_sys_clock();
     txn_man->txn_stats.restart_starttime = txn_man->txn_stats.starttime;
     msg->copy_to_txn(txn_man);
-    DEBUG("START %ld %f %lu\n", txn_man->get_txn_id(),
+    DEBUG_T("START %ld %f %lu\n", txn_man->get_txn_id(),
           simulation->seconds_from_start(get_sys_clock()), txn_man->txn_stats.starttime);
     #if WORKLOAD==DA
       if(da_start_trans_tab.count(txn_man->get_txn_id())==0)

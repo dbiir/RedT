@@ -300,7 +300,10 @@ RC YCSBTxnManager::send_remote_subtxn() {
 			req->primary.stored_node = loc;
 		}else assert(false);
 #else
-		node_id.push_back(GET_NODE_ID(part_id));		
+		loc = get_primary_node_id(part_id);
+		if (loc == -1) return Abort;
+		node_id.push_back(loc);
+		req->primary.stored_node = loc;	
 #endif
 		for(int j=0;j<node_id.size();j++){
 			uint64_t center_id = GET_CENTER_ID(node_id[j]);

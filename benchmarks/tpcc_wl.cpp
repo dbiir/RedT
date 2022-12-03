@@ -129,29 +129,29 @@ RC TPCCWorkload::init_table() {
 //		- order line
 /**********************************/
 
-	pthread_t * p_thds = new pthread_t[g_init_parallelism - 1];
-    thr_args * tt = new thr_args[g_init_parallelism];
-	for (UInt32 i = 0; i < g_init_parallelism ; i++) {
-	tt[i].wl = this;
-	tt[i].id = i;
-  }
+		pthread_t * p_thds = new pthread_t[g_init_parallelism - 1];
+		thr_args * tt = new thr_args[g_init_parallelism];
+		for (UInt32 i = 0; i < g_init_parallelism ; i++) {
+		tt[i].wl = this;
+		tt[i].id = i;
+	}
   // Stock table
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
-	pthread_create(&p_thds[i], NULL, threadInitStock, &tt[i]);
+		pthread_create(&p_thds[i], NULL, threadInitStock, &tt[i]);
 	}
-  threadInitStock(&tt[g_init_parallelism-1]);
+	threadInitStock(&tt[g_init_parallelism-1]);
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
 		int rc = pthread_join(p_thds[i], NULL);
 		if (rc) {
 			printf("ERROR; return code from pthread_join() is %d\n", rc);
 			exit(-1);
 		}
-  }
-  printf("STOCK Done\n");
-  fflush(stdout);
+	}
+	printf("STOCK Done\n");
+	fflush(stdout);
   // Item Table
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
-	pthread_create(&p_thds[i], NULL, threadInitItem, &tt[i]);
+		pthread_create(&p_thds[i], NULL, threadInitItem, &tt[i]);
 	}
     threadInitItem(&tt[g_init_parallelism-1]);
 	for (UInt32 i = 0; i < g_init_parallelism - 1; i++) {
@@ -235,15 +235,15 @@ RC TPCCWorkload::init_table() {
 }
 
 RC TPCCWorkload::get_txn_man(TxnManager *& txn_manager) {
-  DEBUG_M("TPCCWorkload::get_txn_man TPCCTxnManager alloc\n");
-  txn_manager = (TPCCTxnManager *)mem_allocator.align_alloc(sizeof(TPCCTxnManager));
+	DEBUG_M("TPCCWorkload::get_txn_man TPCCTxnManager alloc\n");
+	txn_manager = (TPCCTxnManager *)mem_allocator.align_alloc(sizeof(TPCCTxnManager));
 	new(txn_manager) TPCCTxnManager();
 	//txn_manager->init( this);
 	return RCOK;
 }
 
 void TPCCWorkload::init_tab_item(int id) {
-  if (WL_VERB) printf("[init] loading item table\n");
+  	if (WL_VERB) printf("[init] loading item table\n");
 	for (UInt32 i = id+1; i <= g_max_items; i+=g_init_parallelism) {
 		row_t * row;
 		uint64_t row_id;
@@ -256,18 +256,18 @@ void TPCCWorkload::init_tab_item(int id) {
 		row->set_value(I_NAME, name);
 		row->set_value(I_PRICE, URand(1, 100));
 		char data[50];
-	//MakeAlphaString(26, 50, data);
-	if (RAND(10) == 0) strcpy(data, "original");
+		//MakeAlphaString(26, 50, data);
+		if (RAND(10) == 0) strcpy(data, "original");
 		row->set_value(I_DATA, data);
-      // if(i <= 1000)printf("【tpcc_wl.cpp:243】item_key = %ld\n",i);
+      	// if(i <= 1000)printf("【tpcc_wl.cpp:243】item_key = %ld\n",i);
 		index_insert(i_item, i, row, 0);
 	}
 }
 
 void TPCCWorkload::init_tab_wh() {
-  if (WL_VERB) printf("[init] workload table.\n");
+  	if (WL_VERB) printf("[init] workload table.\n");
 	for (UInt32 wid = 1; wid <= g_num_wh; wid ++) {
-		#if !RECOVERY_MANAGER
+		#if 1 || !RECOVERY_MANAGER
 		if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
 		#endif
 		row_t * row;
@@ -583,15 +583,15 @@ uint64_t TPCCWorkload::get_permutation() {
 }
 
 void * TPCCWorkload::threadInitItem(void * This) {
-  TPCCWorkload * wl = ((thr_args*) This)->wl;
-  int id = ((thr_args*) This)->id;
+	TPCCWorkload * wl = ((thr_args*) This)->wl;
+	int id = ((thr_args*) This)->id;
 	wl->init_tab_item(id);
 	printf("ITEM Done\n");
 	return NULL;
 }
 
 void * TPCCWorkload::threadInitWh(void * This) {
-  TPCCWorkload * wl = (TPCCWorkload*) This;
+  	TPCCWorkload * wl = (TPCCWorkload*) This;
 	wl->init_tab_wh();
 	printf("WAREHOUSE Done\n");
 	return NULL;
@@ -600,7 +600,7 @@ void * TPCCWorkload::threadInitWh(void * This) {
 void * TPCCWorkload::threadInitDist(void * This) {
   TPCCWorkload * wl = (TPCCWorkload*) This;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-		#if !RECOVERY_MANAGER
+		#if 1 || !RECOVERY_MANAGER
 		if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid)) != g_node_id) continue;
 		#endif
 		wl->init_tab_dist(wid);
@@ -613,7 +613,7 @@ void * TPCCWorkload::threadInitStock(void * This) {
   TPCCWorkload * wl = ((thr_args*) This)->wl;
   int id = ((thr_args*) This)->id;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-		#if !RECOVERY_MANAGER
+		#if 1 || !RECOVERY_MANAGER
 		if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid))) continue;
 		#endif
 		wl->init_tab_stock(id,wid);
@@ -626,7 +626,7 @@ void * TPCCWorkload::threadInitCust(void * This) {
   TPCCWorkload * wl = ((thr_args*) This)->wl;
   int id = ((thr_args*) This)->id;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-		#if !RECOVERY_MANAGER
+		#if 1 || !RECOVERY_MANAGER
 		if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid))) continue;
 		#endif
 		for (uint64_t did = 1; did <= g_dist_per_wh; did++) {
@@ -640,21 +640,21 @@ void * TPCCWorkload::threadInitCust(void * This) {
 void * TPCCWorkload::threadInitHist(void * This) { //这个都没有往共享内存里存
   TPCCWorkload * wl = (TPCCWorkload*) This;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-		#if !RECOVERY_MANAGER
+		#if 1 || !RECOVERY_MANAGER
 		if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid))) continue;
 		#endif
 		for (uint64_t did = 1; did <= g_dist_per_wh; did++)
 	        for (uint64_t cid = 1; cid <= g_cust_per_dist; cid++) wl->init_tab_hist(cid, did, wid);
-  }
+  	}
 	printf("HISTORY Done\n");
 	return NULL;
 }
 
 void * TPCCWorkload::threadInitOrder(void * This) {
-  TPCCWorkload * wl = ((thr_args*) This)->wl;
-  int id = ((thr_args*) This)->id;
+	TPCCWorkload * wl = ((thr_args*) This)->wl;
+	int id = ((thr_args*) This)->id;
 	for (uint64_t wid = 1; wid <= g_num_wh; wid ++) {
-		#if !RECOVERY_MANAGER
+		#if 1 || !RECOVERY_MANAGER
 		if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid))) continue;
 		#endif
 		for (uint64_t did = 1; did <= g_dist_per_wh; did++) wl->init_tab_order(id, did, wid);
