@@ -155,7 +155,7 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 4560
+#define TPORT_PORT 6222
 #define TPORT_TWOSIDE_PORT 15000
 #define RDMA_TPORT 9214
 #define SET_AFFINITY true
@@ -191,6 +191,7 @@
 #define MAJORITY true
 #define INTER_DC_CONTROL true
 #define EARLY_PREPARE false
+#define MDCC_DEBUG false
 
 #define TAPIR_DEBUG false
 #define TAPIR_REPLICA false
@@ -337,7 +338,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 1
+#define CROSS_DC_TXN_PERC 0.5
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.

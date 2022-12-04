@@ -50,7 +50,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn) {
 
 RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txncnt) {
     // return RCOK;
-    assert (CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN);
+    assert (CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == MDCC);
     RC rc;
     uint64_t starttime = get_sys_clock();
     uint64_t lock_get_start_time = starttime;
@@ -65,7 +65,61 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
     if(owner_cnt > 0) {
         INC_STATS(txn->get_thd_id(),twopl_already_owned_cnt,1);
     }
+
 	bool conflict = conflict_lock(lock_type, type);
+
+#if CC_ALG == MDCC
+    if(txn->lock_status != LOCK_EMPTY){
+        //this is the SECOND try of lock
+
+        // !formally! _wl->key_to_part() should be used here
+        uint64_t part_id = _row->get_primary_key() % g_part_cnt;
+        bool is_primary = (GET_NODE_ID(part_id)==g_node_id ? true:false);
+        
+        LockEntry * en;
+        bool lock_already_hold = false;
+        for(uint64_t i = 0; i < owners_size; i++) {
+            en = owners[i];
+            while (en != NULL) {
+                if(en->txn == txn){
+                    lock_already_hold = true;
+                    break;
+                }
+                en = en->next;
+            }
+            if(lock_already_hold) break;
+        }
+
+        if(is_primary){ //process RPREPARE
+            if(lock_already_hold){ //simply keep the lock
+                rc = RCOK;
+            }else{ //try lock again
+                if(conflict) rc = Abort;
+                else goto lock;
+            }
+        }else{ //process RLOG
+            if(lock_already_hold){
+                rc = RCOK;
+            }else{
+                if(conflict){ // preempt current lock: clear current lock
+                    for(uint64_t i = 0; i < owners_size; i++) {
+                        while (owners[i] != NULL) {
+                            en = owners[i];                        
+                            owners[i] = en->next;
+                            return_entry(en);
+                        }
+                    }
+                    owner_cnt = 0;
+                    lock_type = LOCK_NONE;
+                } 
+                // and lock again               
+                goto lock;
+            }
+        }
+        goto final;
+    }
+#endif
+
 #if TWOPL_LITE
 	  conflict = owner_cnt > 0;
 #endif
@@ -89,7 +143,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
     if (conflict) {
         //printf("conflict! rid%ld txnid%ld ",_row->get_primary_key(),txn->get_txn_id());
         // Cannot be added to the owner list.
-        if (CC_ALG == NO_WAIT) {
+        if (CC_ALG == NO_WAIT || CC_ALG == MDCC) {
             rc = Abort;
             DEBUG("abort %ld,%ld %ld %lx\n", txn->get_txn_id(), txn->get_batch_id(),
             _row->get_primary_key(), (uint64_t)_row);
@@ -411,18 +465,20 @@ RC Row_lock::lock_release(TxnManager * txn) {
             uint64_t endtime = get_sys_clock();
             INC_STATS(txn->get_thd_id(),twopl_owned_time,endtime - own_starttime);
             if(lock_type == DLOCK_SH) {
-            INC_STATS(txn->get_thd_id(),twopl_sh_owned_time,endtime - own_starttime);
-            INC_STATS(txn->get_thd_id(),twopl_sh_owned_cnt,1);
-        } else {
-            INC_STATS(txn->get_thd_id(),twopl_ex_owned_time,endtime - own_starttime);
-            INC_STATS(txn->get_thd_id(),twopl_ex_owned_cnt,1);
+                INC_STATS(txn->get_thd_id(),twopl_sh_owned_time,endtime - own_starttime);
+                INC_STATS(txn->get_thd_id(),twopl_sh_owned_cnt,1);
+            } else {
+                INC_STATS(txn->get_thd_id(),twopl_ex_owned_time,endtime - own_starttime);
+                INC_STATS(txn->get_thd_id(),twopl_ex_owned_cnt,1);
+            }
+            lock_type = LOCK_NONE;
         }
-        lock_type = LOCK_NONE;
-      }
     } 
     else { // NOT find the entry in the owner list
 #if CC_ALG == WOUND_WAIT
         DEBUG("txn_id = %ld release lock but not in owners\n",txn->txn->txn_id);
+#elif CC_ALG == MDCC
+        //do nothing
 #else
         assert(false);
         en = waiters_head;
@@ -447,6 +503,9 @@ RC Row_lock::lock_release(TxnManager * txn) {
 #endif
     LockEntry * entry;
     // If any waiter can join the owners, just do it!
+#if CC_ALG == MDCC
+    assert(waiters_head == NULL);
+#endif
     while (waiters_head && !conflict_lock(lock_type, waiters_head->type)) {
         LIST_GET_HEAD(waiters_head, waiters_tail, entry);
 #if DEBUG_TIMELINE

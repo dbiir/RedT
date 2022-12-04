@@ -356,6 +356,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	num_msgs_commit = 0;
 	finish_read_write = false;
 	validate_status = EMPTY;
+	lock_status = LOCK_EMPTY;
 	set_local_log(false);
 }
 
@@ -379,6 +380,7 @@ void TxnManager::reset() {
 	num_msgs_commit = 0;
 	finish_read_write = false;
 	validate_status = EMPTY;
+	lock_status = LOCK_EMPTY;
 	set_local_log(false);
 
 #if USE_TAPIR
@@ -602,6 +604,20 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		return WAIT_REM;
 	}
 #else
+#if CC_ALG == MDCC
+	//try get lock for the local row
+    for(int i=0;i<get_access_cnt();i++){
+		Access* acc = txn->accesses[i];
+		row_t* orig_row = acc->orig_row;
+		access_t type = acc->type;
+		RC row_rc = orig_row->get_row(yield, type, this, acc, cor_id);
+		if(rc == RCOK) rc = row_rc;    
+    }
+    set_rc(rc);
+	assert(lock_status == LOCK_EMPTY);
+	if(rc == Abort) lock_status = LOCK_FIRST_FAIL;
+	else lock_status = LOCK_FIRST_SUCCESS;
+#endif
 	// printf("%d query_partitions_modified size: %d\n", get_txn_id(), query->partitions_modified.size());
 	if(query->partitions_touched.size() != 0)
 		return WAIT_REM;	
@@ -742,6 +758,9 @@ void TxnManager::send_prepare_messages() {
 	#if TAPIR_DEBUG
 			printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
 	#endif
+#if MDCC_DEBUG
+    printf("txn %lu Send first PREP to %lu.\n", get_txn_id(),tar_nodes[i]);
+#endif
 			msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
 		}
 	#else
@@ -778,6 +797,9 @@ void TxnManager::send_prepare_messages() {
 		DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
 		for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
 		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) continue;
+#if MDCC_DEBUG
+    printf("txn %lu Send second PREP to %lu.\n", get_txn_id(),GET_NODE_ID(query->partitions_touched[i]));
+#endif
 			msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),
 												GET_NODE_ID(query->partitions_touched[i]));
 		}
@@ -849,6 +871,9 @@ void TxnManager::send_finish_messages() {
 	}
 
 	for(int i=0;i<tar_nodes_cnt;i++){
+#if MDCC_DEBUG
+    printf("txn %lu Send RFIN to %lu.\n", get_txn_id(),tar_nodes[i]);
+#endif
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN),tar_nodes[i]);
 	}
 	return;
@@ -1004,7 +1029,8 @@ int TxnManager::received_response(RC rc) {
 #if CC_ALG == CALVIN
 	++rsp_cnt;
 #else
-  if (rsp_cnt > 0) --rsp_cnt;
+//   if (rsp_cnt > 0) 
+  --rsp_cnt;
 #endif
 	return rsp_cnt;
 }
@@ -1261,8 +1287,7 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 	row_t * orig_r = txn->accesses[rid]->orig_row;
 
   if (ROLL_BACK && type == XP &&
-      (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE ||
-      CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT)) {
+      (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == MDCC || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT)) {
     orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data); 
   } else {
 #if ISOLATION_LEVEL == READ_COMMITTED
@@ -1276,7 +1301,7 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 #endif
 
 #if ROLL_BACK && \
-		(CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT)
+		(CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT)
 	if (type == WR && is_local) {
 		//printf("free 10 %ld\n",get_txn_id());
 		txn->accesses[rid]->orig_data->free_row();
@@ -1301,7 +1326,7 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 
 void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 
-#if (CC_ALG == OCC || CC_ALG == MDCC) && MODE == NORMAL_MODE
+#if (CC_ALG == OCC) && MODE == NORMAL_MODE
 	occ_man.finish(rc,this);
 #endif
 	ts_t starttime = get_sys_clock();
@@ -1358,8 +1383,9 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	get_access_end_time = get_sys_clock();
 	INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
 	INC_STATS(get_thd_id(), trans_get_access_count, 1);
-
+#if CC_ALG != MDCC
 	rc = row->get_row(yield,type, this, access,cor_id);
+#endif
 	INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
 	INC_STATS(get_thd_id(), trans_get_row_count, 1);
 
@@ -1382,8 +1408,10 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	}
 	access->type = type;
 	access->orig_row = row; //access->data == access->orig_row
+	//!formally! _wl->key_to_part() should be used here
+	access->is_primary = (GET_NODE_ID(row->get_primary_key() % g_part_cnt) == g_node_id ? true : false) ;
 
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT)
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT)
 	if (type == WR) {
 	//printf("alloc 10 %ld\n",get_txn_id());
 	uint64_t part_id = row->get_part_id();
@@ -1430,7 +1458,11 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
     INC_STATS(get_thd_id(), trans_store_access_time, timespan + starttime - middle_time);
   	INC_STATS(get_thd_id(), trans_store_access_count, 1);
 	INC_STATS(get_thd_id(), txn_manager_time, timespan);
+#if CC_ALG == MDCC
+	row_rtn  = row;
+#else
 	row_rtn  = access->data;
+#endif
 
 	if (CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN) assert(rc == RCOK);
 	assert(rc == RCOK);
@@ -1452,7 +1484,7 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 
 	access->type = type;
 	access->orig_row = row;
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE)
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC )
 	if (type == WR) {
 		uint64_t part_id = row->get_part_id();
 		//printf("alloc 10 %ld\n",get_txn_id());
@@ -1571,12 +1603,12 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 #if MODE != NORMAL_MODE
 	return RCOK;
 #endif
-	if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != MDCC) {
+	if (CC_ALG != OCC && CC_ALG != MAAT) {
 		return RCOK;
 	}
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
-	if ((CC_ALG == OCC || CC_ALG == MDCC) && rc == RCOK) rc = occ_man.validate(this);
+	if ((CC_ALG == OCC) && rc == RCOK) rc = occ_man.validate(this);
 	if(CC_ALG == MAAT  && rc == RCOK) {
 		rc = maat_man.validate(this);
 		// Note: home node must be last to validate
@@ -1584,16 +1616,6 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 			rc = maat_man.find_bound(this);
 		}
 	}
-
-#if CC_ALG == MDCC
-	if(validate_status == EMPTY){
-		if(rc == Abort) validate_status = FIRST_FAIL;
-		else validate_status = FIRST_SUCCESS;
-	}else if(validate_status == FIRST_FAIL){
-		if(rc == Abort) validate_status = SECOND_FAIL;
-		else validate_status = SECOND_SUCCESS;
-	}else assert(false); 
-#endif
 
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);

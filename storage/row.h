@@ -110,13 +110,13 @@ public:
 	uint64_t return_row(RC rc, access_t type, TxnManager *txn, row_t *row);
 	void return_row(RC rc, access_t type, TxnManager * txn, row_t * row, uint64_t _min_commit_ts);
 
-	#if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT
+	#if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT || CC_ALG == MDCC
 		Row_lock * manager;
 	#elif CC_ALG == TIMESTAMP
 	 	Row_ts * manager;
 	#elif CC_ALG == MVCC
 		Row_mvcc * manager;
-	#elif CC_ALG == OCC || CC_ALG == MDCC
+	#elif CC_ALG == OCC 
 		Row_occ * manager;
 	#elif CC_ALG == MAAT
 		Row_maat * manager;

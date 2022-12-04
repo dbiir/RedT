@@ -117,7 +117,7 @@ uint64_t cget_size(QueryMessage * msg) {
 #if CC_ALG == WAIT_DIE || CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == CICADA || CC_ALG == WOUND_WAIT
   size += sizeof(msg->ts);
 #endif
-#if CC_ALG == OCC || CC_ALG == MDCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
+#if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
     CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
     CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
   size += sizeof(msg->start_ts);
@@ -158,7 +158,7 @@ void fake_copy_to_buf(Message * msg, char* buf) {
     COPY_BUF(buf,cmsg->ts,ptr);
       assert(ts != 0);
     #endif
-    #if CC_ALG == OCC || CC_ALG == MDCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
+    #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
         CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
         CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
     COPY_BUF(buf,cmsg->start_ts,ptr);
@@ -222,7 +222,7 @@ Message* fake_create_message(char * buf) {
     COPY_VAL(cmsg->ts,buf,ptr);
       assert(cmsg->ts != 0);
     #endif
-    #if CC_ALG == OCC || CC_ALG == MDCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
+    #if CC_ALG == OCC || CC_ALG == FOCC || CC_ALG == BOCC || CC_ALG == SSI || CC_ALG == WSI || \
         CC_ALG == DLI_BASE || CC_ALG == DLI_OCC || CC_ALG == DLI_MVCC_OCC || \
         CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC
     COPY_VAL(cmsg->start_ts,buf,ptr);

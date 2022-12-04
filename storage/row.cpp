@@ -71,13 +71,13 @@ void row_t::init_manager(row_t * row) {
 	return;
 #endif
 	DEBUG_M("row_t::init_manager alloc \n");
-#if CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT
+#if CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT || CC_ALG == MDCC
 	manager = (Row_lock *) mem_allocator.align_alloc(sizeof(Row_lock));
 #elif CC_ALG == TIMESTAMP
 	manager = (Row_ts *) mem_allocator.align_alloc(sizeof(Row_ts));
 #elif CC_ALG == MVCC
 	manager = (Row_mvcc *) mem_allocator.align_alloc(sizeof(Row_mvcc));
-#elif CC_ALG == OCC || CC_ALG == MDCC
+#elif CC_ALG == OCC
 	manager = (Row_occ *) mem_allocator.align_alloc(sizeof(Row_occ));
 #elif CC_ALG == MAAT
 	manager = (Row_maat *) mem_allocator.align_alloc(sizeof(Row_maat));
@@ -270,8 +270,8 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 #endif
 
 
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT
-  	uint64_t init_time = get_sys_clock();
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT || CC_ALG == MDCC
+	uint64_t init_time = get_sys_clock();
 	//uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN) ? DLOCK_SH : DLOCK_EX; // ! this wrong !!
     INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
@@ -337,7 +337,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	}
   INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
-#elif CC_ALG == OCC || CC_ALG == MDCC
+#elif CC_ALG == OCC
 	// OCC always make a local copy regardless of read or write
   uint64_t init_time = get_sys_clock();
 	DEBUG_M("row_t::get_row OCC alloc \n");
@@ -438,7 +438,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	return 0;
 #endif
 
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT || CC_ALG == MDCC
 	assert (row == NULL || row == this || type == XP);
 	if (CC_ALG != CALVIN && ROLL_BACK &&
 			type == XP) {  // recover from previous writes. should not happen w/ Calvin
@@ -467,7 +467,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		assert(rc == RCOK);
 	}
 	return 0;
-#elif CC_ALG == OCC || CC_ALG == MDCC
+#elif CC_ALG == OCC
 	assert (row != NULL);
 	if (type == WR) manager->write(row, txn->get_end_timestamp());
 	row->free_row();

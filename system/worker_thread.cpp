@@ -352,7 +352,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
     }
     //uint64_t starttime = get_sys_clock();
     DEBUG_T("worker run txn %ld type %d \n", msg->get_txn_id(),msg->get_rtype());
-    if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O && msg->rtype != RLOG && msg->rtype != RFIN_LOG) || CC_ALG == CALVIN) {
+    if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O && msg->rtype != RLOG && msg->rtype != RFIN_LOG) || CC_ALG == CALVIN || (CC_ALG == MDCC && msg->rtype == RLOG)) {
       txn_man = get_transaction_manager(msg);
       if(msg->rtype == RACK_LOG || msg->rtype == RACK_FIN_LOG || msg->rtype == RACK_FIN || msg->rtype == RACK_PREP
       //  || msg->rtype == RPREPARE
@@ -511,7 +511,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
 
 RC WorkerThread::process_rlog(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   RC rc = RCOK;
-  DEBUG_T("RLOG %ld from %ld\n",msg->get_txn_id(),msg->return_node_id);
+  DEBUG_T("RLOG %ld from %ld\n",msg->get_txn_id(),msg->return_node_id);  
   // txn_man->abort_cnt = msg->current_abort_cnt;
   // txn_man->set_rc(rc);
 #if USE_REPLICA
@@ -520,6 +520,33 @@ RC WorkerThread::process_rlog(yield_func_t &yield, Message * msg, uint64_t cor_i
 	// log_content = log_count;
 	// pthread_mutex_unlock(&log_lock);
 #endif
+#if CC_ALG == MDCC
+    rc = ((PrepareMessage*)msg)->rc;
+    LockState ls = txn_man->lock_status;    
+    // assert(ls == LOCK_FIRST_FAIL || ls == LOCK_FIRST_SUCCESS);
+    if(ls == LOCK_SECOND_FAIL){
+      //txn already aborted, do nothing
+    }else if(rc == Abort){
+      txn_man->abort(yield, cor_id);
+      txn_man->lock_status = LOCK_SECOND_FAIL;
+    }else{ //rc==RCOK && (ls == LOCK_FIRST_FAIL || ls == LOCK_FIRST_SUCCESS || ls == LOCK_SECOND_SUCCESS)
+      for(int i=0;i<txn_man->get_access_cnt();i++){
+        Access* acc = txn_man->txn->accesses[i];
+      	//!formally! _wl->key_to_part() should be used here
+        uint64_t part_id = acc->orig_row->get_primary_key() % g_part_cnt;
+        bool is_target = (GET_NODE_ID(part_id) == msg->return_node_id ? true : false);
+        if(is_target && !acc->is_primary){
+          row_t* orig_row = acc->orig_row;
+          access_t type = acc->type;
+          RC row_rc = orig_row->get_row(yield, type, txn_man, acc, cor_id);
+          assert(row_rc == RCOK);
+        }
+      }
+      // txn_man->set_rc(((PrepareMessage*)msg)->rc);
+      txn_man->lock_status = LOCK_SECOND_SUCCESS;      
+    }
+#endif
+
   DEBUG_T("%d:%d send rack log to %d\n", g_node_id, msg->get_txn_id(), msg->return_node_id);
   Message * return_msg = Message::create_message(NULL,RACK_LOG,msg->get_txn_id());
   return_msg->current_abort_cnt = msg->current_abort_cnt;
@@ -586,6 +613,9 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
 	    // printf("xxx txn %lu send rack_prep, rc = %d\n", txn_man->get_txn_id(), txn_man->get_rc());
       txn_man->finish_read_write = true;
 #endif
+#if MDCC_DEBUG
+    printf("txn %lu Send second(log) RACK_PREP to %lu.\n", txn_man->get_txn_id(),txn_man->get_return_node());
+#endif
       msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man,RACK_PREP),txn_man->get_return_node());
     }    
   }
@@ -650,6 +680,10 @@ RC WorkerThread::process_rack_fin_log(yield_func_t &yield, Message * msg, uint64
 }
 
 RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+#if MDCC_DEBUG
+    printf("txn %lu RPREP_ACK from %lu. ls = %d\n", txn_man->get_txn_id(), msg->get_return_id(), txn_man->lock_status);
+#endif
+  
   DEBUG_T("RPREP_ACK %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
   RC rc = RCOK;
   int responses_left = 0;
@@ -668,9 +702,10 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #if USE_TAPIR
 
 #if CC_ALG == MDCC
-  if(txn_man->validate_status == EMPTY)
+  LockState ls = txn_man->lock_status;
+  if(ls == LOCK_FIRST_FAIL || ls == LOCK_FIRST_SUCCESS)
     responses_left = txn_man->received_tapir_response(((AckMessage*)msg)->rc, msg->return_node_id);
-  else if(txn_man->validate_status == SECOND_FAIL || txn_man->validate_status == SECOND_SUCCESS)
+  else if(ls == LOCK_SECOND_FAIL || ls == LOCK_SECOND_SUCCESS)
     responses_left = txn_man->received_response(((AckMessage*)msg)->rc);    
   else assert(false);
 #else
@@ -761,7 +796,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 
   if (responses_left > 0) return WAIT;
 #if CC_ALG == MDCC
-  if(txn_man->validate_status == SECOND_FAIL || txn_man->validate_status == SECOND_SUCCESS)  
+  if(ls == LOCK_SECOND_FAIL || ls == LOCK_SECOND_SUCCESS)  
     if(txn_man->get_log_rsp_cnt() > 0)
       return WAIT;
 #endif 
@@ -774,16 +809,9 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #endif
 #endif
   // Done waiting
-#if CC_ALG == MDCC
-    if(txn_man->validate_status == EMPTY){
-      rc = txn_man->validate(yield, cor_id);
-      if(txn_man->get_rc() == RCOK) txn_man->set_rc(rc);
-    }
-#else
   if(txn_man->get_rc() == RCOK) {
     rc = txn_man->validate(yield, cor_id);
   }
-#endif
   if(IS_LOCAL(txn_man->get_txn_id())) {
 		INC_STATS(get_thd_id(), trans_logging_count, 1);
     // assert(txn_man->start_logging_time!=0);
@@ -802,40 +830,46 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   }
 
 #if CC_ALG == MDCC
-  if(txn_man->validate_status == FIRST_FAIL || txn_man->validate_status == FIRST_SUCCESS){
-  //this is the receive of the FIRST round of RACK_PREPARE
+  if(ls == LOCK_FIRST_FAIL || ls == LOCK_FIRST_SUCCESS){
+    //this is the receive of the FIRST round of RACK_PREPARE
     if(rc == Abort){ // extra two round-trips
-      printf("&&&txn %ld, need extra 2rt\n", txn_man->get_txn_id());
-      txn_man->send_prepare_messages();
-      
-      ValidateState vs = txn_man->validate_status;    
-      assert(vs == FIRST_FAIL || vs == FIRST_SUCCESS);
+      // printf("&&&txn %lu, need extra 2rt\n", txn_man->get_txn_id());
 
-      if(vs != FIRST_SUCCESS){
-        rc = txn_man->validate(yield, cor_id);    
-      }else{
-        txn_man->validate_status = SECOND_SUCCESS;
-        rc = RCOK;
+      txn_man->send_prepare_messages();
+
+      for(int i=0;i<txn_man->get_access_cnt();i++){
+        if(txn_man->txn->accesses[i]->is_primary){
+          Access* acc = txn_man->txn->accesses[i];
+          row_t* orig_row = acc->orig_row;
+          access_t type = acc->type;
+          RC row_rc = orig_row->get_row(yield, type, txn_man, acc, cor_id);
+          if(rc == RCOK) rc = row_rc;    
+          if(rc == Abort){
+            txn_man->abort(yield, cor_id);
+            break;
+          } 
+        }
       }
       txn_man->set_rc(rc);
+      if(rc == Abort) txn_man->lock_status = LOCK_SECOND_FAIL;
+      else txn_man->lock_status = LOCK_SECOND_SUCCESS;      
       txn_man->log_replica(RLOG, g_node_id);
       rc = WAIT_REM;
     }else{ //now commit
-      printf("&&&txn %ld, commit in 2rt\n", txn_man->get_txn_id());
+      // printf("&&&txn %lu, commit in 2rt\n", txn_man->get_txn_id());
       txn_man->send_finish_messages(); //no need to receive response, considered as asynchronous
       txn_man->commit(yield, cor_id);
       commit();
     }
-  }else if(txn_man->validate_status == SECOND_FAIL || txn_man->validate_status == SECOND_SUCCESS){
-  //this is the receive of the SECOND round of RACK_PREPARE
-    if(rc == Abort) printf("&&&txn %ld, abort in 4rt\n", txn_man->get_txn_id());
-    else printf("&&&txn %ld, commit in 4rt\n", txn_man->get_txn_id());
-
+  }else if(ls == LOCK_SECOND_FAIL || ls == LOCK_SECOND_SUCCESS){
+    //this is the receive of the SECOND round of RACK_PREPARE
     txn_man->send_finish_messages(); //no need to receive response, considered as asynchronous
     if(rc == Abort){
+      // printf("&&&txn %lu, abort in 4rt\n", txn_man->get_txn_id());
       txn_man->abort(yield, cor_id);
       abort();
     }else{
+      // printf("&&&txn %lu, commit in 4rt\n", txn_man->get_txn_id());
       txn_man->commit(yield, cor_id);
       commit();
     }
@@ -1085,26 +1119,56 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
     printf("%d:%d send prepare ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
 #endif
 
-  #if CC_ALG == MDCC
-    // if not validated before, or validated as abort, update the result here;
-    // otherwise, set rc = RCOK directly
-    ValidateState vs = txn_man->validate_status;
-    assert(vs == EMPTY || vs == FIRST_FAIL || vs == FIRST_SUCCESS);
-
-    if(vs != FIRST_SUCCESS){
-      rc = txn_man->validate(yield, cor_id);    
-    }else{
-      txn_man->validate_status = SECOND_SUCCESS;
-    }
-    txn_man->set_rc(rc);
-    if(vs == EMPTY){ // this is the FIRST round of prepare
+#if CC_ALG == MDCC
+    LockState ls = txn_man->lock_status;
+    if(ls == LOCK_EMPTY){
+      //this is the FIRST try of lock
+      for(int i=0;i<txn_man->get_access_cnt();i++){
+        Access* acc = txn_man->txn->accesses[i];
+        row_t* orig_row = acc->orig_row;
+        access_t type = acc->type;
+        RC row_rc = orig_row->get_row(yield, type, txn_man, acc, cor_id);
+        if(rc == RCOK) rc = row_rc;
+      }
+      txn_man->set_rc(rc);
+      if(rc == Abort) txn_man->lock_status = LOCK_FIRST_FAIL;
+      else txn_man->lock_status = LOCK_FIRST_SUCCESS;
+#if MDCC_DEBUG
+    printf("txn %lu Send first RACK_PREP to %lu.\n", txn_man->get_txn_id(),msg->return_node_id);
+#endif
       msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
-    }else{ // this is the SECOND round of prepare
+    }else{
+      //this is the SECOND try of lock
+      if(ls == LOCK_SECOND_FAIL){
+        //txn already aborted, do nothing
+        rc = Abort;
+      }else{
+        for(int i=0;i<txn_man->get_access_cnt();i++){
+          if(txn_man->txn->accesses[i]->is_primary){
+            Access* acc = txn_man->txn->accesses[i];
+            row_t* orig_row = acc->orig_row;
+            access_t type = acc->type;
+            RC row_rc = orig_row->get_row(yield, type, txn_man, acc, cor_id);
+            if(rc == RCOK) rc = row_rc;    
+            if(rc == Abort){
+              txn_man->abort(yield, cor_id);
+              break;
+            } 
+          }
+        }
+      }
+      txn_man->set_rc(rc);
+      if(rc == Abort) txn_man->lock_status = LOCK_SECOND_FAIL;
+      else txn_man->lock_status = LOCK_SECOND_SUCCESS;      
       txn_man->log_replica(RLOG, msg->return_node_id);
       rc = WAIT_REM;
+// #if MDCC_DEBUG
+//     printf("txn %lu Send second RACK_PREP to %lu.\n", txn_man->get_txn_id(),msg->return_node_id);
+// #endif
+//       msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
     }
     return rc;
-  #endif
+#endif
 
     pthread_mutex_lock(&log_lock);
     log_count ++;
@@ -1217,7 +1281,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
 #if CC_ALG == MVCC
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
 #endif
-#if CC_ALG == OCC || CC_ALG == MDCC
+#if CC_ALG == OCC
   #if WORKLOAD==DA
     if(da_start_stamp_tab.count(txn_man->get_txn_id())==0)
     {
@@ -1270,6 +1334,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     fflush(stdout);
   #endif
   // Execute transaction
+  assert(txn_man->lock_status == LOCK_EMPTY);
   if (is_cl_o) {
     rc = txn_man->send_remote_request();
   } else {

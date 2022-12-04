@@ -419,6 +419,7 @@ RC YCSBTxnManager::run_ycsb_0(yield_func_t &yield,ycsb_request * req,row_t *& ro
   m_item = index_read(_wl->the_index, req->key, part_id);
   starttime = get_sys_clock();
   row_t * row = ((row_t *)m_item->location);
+  assert(req->key == row->get_primary_key());
   INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
   rc = get_row(yield,row, type,row_local,cor_id);
   return rc;

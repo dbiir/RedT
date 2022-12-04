@@ -61,7 +61,7 @@ void OptCC::finish(RC rc, TxnManager * txn) {
 
 RC OptCC::per_row_validate(TxnManager *txn) {
 	RC rc = RCOK;
-#if CC_ALG == OCC || CC_ALG == MDCC
+#if CC_ALG == OCC
 	// sort all rows accessed in primary key order.
 	for (uint64_t i = txn->get_access_cnt() - 1; i > 0; i--) {
 		for (uint64_t j = 0; j < i; j ++) {
