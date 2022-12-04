@@ -858,7 +858,8 @@ obj/abort_queue.o: system/abort_queue.cpp system/mem_alloc.h system/global.h \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  system/abort_queue.h transport/message.h system/helper.h system/logger.h \
  system/array.h system/global.h system/helper.h system/mem_alloc.h \
- system/work_queue.h
+ system/work_queue.h system/txn.h system/array.h transport/message.h \
+ system/worker_thread.h system/thread.h system/routine.h
 obj/abort_thread.o: system/abort_thread.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
@@ -880,7 +881,8 @@ obj/abort_thread.o: system/abort_thread.cpp system/global.h config.h \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  system/thread.h system/routine.h system/abort_thread.h \
- system/abort_queue.h
+ system/abort_queue.h transport/message.h system/helper.h system/logger.h \
+ system/array.h system/global.h system/helper.h system/mem_alloc.h
 obj/calvin_thread.o: system/calvin_thread.cpp system/global.h config.h \
  statistics/stats.h statistics/../system/global.h \
  statistics/stats_array.h system/pool.h system/helper.h \
@@ -957,9 +959,9 @@ obj/global.o: system/global.cpp system/global.h config.h statistics/stats.h \
  client/client_query.h system/helper.h system/query.h \
  concurrency_control/occ.h storage/row.h system/routine.h system/global.h \
  transport/transport.h transport/nn.hpp system/work_queue.h \
- system/abort_queue.h client/client_txn.h concurrency_control/maat.h \
- system/msg_queue.h system/lock_free_queue.h system/sequencer.h \
- system/wl.h
+ system/abort_queue.h transport/message.h system/logger.h system/array.h \
+ client/client_txn.h concurrency_control/maat.h system/msg_queue.h \
+ system/lock_free_queue.h system/sequencer.h system/wl.h
 obj/hash.o: system/hash.cpp system/hash.h
 obj/helper.o: system/helper.cpp system/global.h config.h statistics/stats.h \
  statistics/../system/global.h statistics/stats_array.h system/pool.h \
@@ -1451,13 +1453,14 @@ obj/worker_thread.o: system/worker_thread.cpp system/worker_thread.h \
  rlibv2/././bootstrap/./../utils/marshal.hh \
  rlibv2/././bootstrap/./multi_msg.hh rlibv2/././bootstrap/./proto.hh \
  system/thread.h system/routine.h system/abort_queue.h \
+ transport/message.h system/helper.h system/logger.h system/array.h \
+ system/global.h system/helper.h system/mem_alloc.h \
  concurrency_control/maat.h storage/row.h system/routine.h \
- system/manager.h transport/message.h system/helper.h system/logger.h \
- system/array.h system/global.h system/helper.h system/mem_alloc.h \
- system/msg_queue.h system/lock_free_queue.h transport/msg_thread.h \
- transport/nn.hpp system/query.h system/array.h benchmarks/tpcc_query.h \
- system/query.h system/txn.h transport/message.h system/wl.h \
- system/work_queue.h benchmarks/ycsb_query.h transport/transport.h
+ system/manager.h system/msg_queue.h system/lock_free_queue.h \
+ transport/msg_thread.h transport/nn.hpp system/query.h system/array.h \
+ benchmarks/tpcc_query.h system/query.h system/txn.h transport/message.h \
+ system/wl.h system/work_queue.h benchmarks/ycsb_query.h \
+ transport/transport.h
 obj/stats.o: statistics/stats.cpp statistics/stats.h \
  statistics/../system/global.h config.h statistics/stats.h \
  statistics/../system/pool.h statistics/../system/global.h \

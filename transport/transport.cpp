@@ -379,7 +379,7 @@ std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
 	starttime = get_sys_clock();
 
   msgs = Message::create_messages((char*)buf);
-  DEBUG("Batch of %d bytes recv from node %ld; Time: %f\n", bytes, msgs->front()->return_node_id,
+  DEBUG_T("Batch of %d bytes recv from node %ld; Time: %f\n", bytes, msgs->front()->return_node_id,
 		simulation->seconds_from_start(get_sys_clock()));
 
 	nn::freemsg(buf);

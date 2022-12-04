@@ -165,6 +165,7 @@ extern UInt32 g_node_cnt;
 extern UInt32 g_center_id;
 extern UInt32 g_center_cnt;
 extern UInt32 g_part_cnt;
+extern UInt32 g_dc_per_txn;
 extern UInt32 g_virtual_part_cnt;
 extern UInt32 g_core_cnt;
 extern UInt32 g_total_node_cnt;

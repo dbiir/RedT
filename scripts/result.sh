@@ -62,6 +62,11 @@ do
             shift
             shift
             ;;
+        -D)
+            DCS=$2
+            shift
+            shift
+            ;;
         -p)
             PHASE=$2
             shift
@@ -171,10 +176,16 @@ ArgsType() {
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_skew' ]]
     then
         args=("${SKEW[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_skew' ]]
+    then
+        args=("${SKEW[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_cross_dc' ]]
     then
         args=("${CROSSDCPERC[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_cross_dc' ]]
+    then
+        args=("${CROSSDCPERC[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_cross_dc' ]]
     then
         args=("${CROSSDCPERC[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_network_delay' ]]
@@ -219,6 +230,9 @@ ArgsType() {
     elif [[ "${TEST_TYPE}" == 'ycsb_partitions' ]]
     then
         args=("${PART[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_dcs' ]]
+    then
+        args=("${DCS[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_sk_partitions' ]]
     then
         args=("${PART[@]}")
@@ -235,10 +249,16 @@ FileName() {
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_skew' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _SKEW-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_skew' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _SKEW-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_cross_dc' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_cross_dc' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_cross_dc' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_network_delay' ]]
@@ -283,6 +303,9 @@ FileName() {
     elif [[ "${TEST_TYPE}" == 'ycsb_partitions' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _PPT-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_dcs' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _DC_PER_TXN-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_sk_partitions' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _PPT-${arg}_ | grep ^${i}_ | grep _SKEW-${SKEW})

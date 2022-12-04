@@ -373,6 +373,13 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
           continue;
         }
       }
+      if(!txn_man->txn){
+        // assert(msg->rtype == RACK_PREP || msg->rtype == RACK_FIN);
+        printf("because no txn?\n");   
+        // bool ready = txn_man->set_ready();
+        // assert(ready);
+        continue; // in majority, txn_man may has been destroyed when receive msgs
+      } 
 
       if ((CC_ALG != CALVIN) && IS_LOCAL(txn_man->get_txn_id())) {
         if (msg->rtype != RTXN_CONT &&

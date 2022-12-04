@@ -601,7 +601,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	}
 #else
 	// printf("%d query_partitions_modified size: %d\n", get_txn_id(), query->partitions_modified.size());
-	if(query->partitions_modified.size() != 0)
+	if(query->partitions_touched.size() != 0)
 		return WAIT_REM;	
 #endif
 	assert(query->readonly());

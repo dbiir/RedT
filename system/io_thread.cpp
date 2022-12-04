@@ -187,7 +187,7 @@ RC InputThread::server_recv_loop() {
 				continue;
 			}
 #endif
-			DEBUG("recv txn %ld type %d\n",msg->get_txn_id(),msg->get_rtype());
+			DEBUG_T("recv txn %ld type %d\n",msg->get_txn_id(),msg->get_rtype());
 			work_queue.enqueue(get_thd_id(),msg,false);
 			msgs->erase(msgs->begin());
 		}

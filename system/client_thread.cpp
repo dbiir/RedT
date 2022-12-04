@@ -97,7 +97,7 @@ RC ClientThread::run() {
 #endif
 		assert(m_query);
 
-		DEBUG("Client: thread %lu sending query to node: %u, %d, %f\n",
+		DEBUG_T("Client: thread %lu sending query to node: %u, %d, %f\n",
 				_thd_id, next_node_id,inf_cnt,simulation->seconds_from_start(get_sys_clock()));
 #if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
 		Message * msg = Message::create_message((BaseQuery*)m_query,CL_QRY_O);
