@@ -29,11 +29,15 @@ skip = False
 exps=[]
 arg_cluster = False
 merge_mode = False
-use_delay = "false"
+set_dc = False
+dc_count = 0
 perfTime = 60
 fromtimelist=[]
 totimelist=[]
 cpu_usage_index=0
+set_latency = 0
+latency = 0
+latency_range = 0
 
 if len(sys.argv) < 2:
      sys.exit("Usage: %s [-exec/-e/-noexec/-ne] [-c cluster] experiments\n \
@@ -61,8 +65,19 @@ for arg in sys.argv[1:]:
         arg_cluster = True
     elif arg == '-m':
         merge_mode = True
-    elif arg == '-d':
-        use_delay = "true"
+    elif arg == '--dc':
+        set_dc = True
+    elif set_dc:
+        dc_count = arg
+        set_dc = False
+    elif arg == '-l':
+        set_latency = 1
+    elif set_latency == 1:  # set delay
+        latency = arg
+        set_latency = 2
+    elif set_latency == 2:  # set delay range
+        latency_range = arg
+        set_latency = 0
     elif arg_cluster:
         cluster = arg
         arg_cluster = False
@@ -75,7 +90,7 @@ for exp in exps:
     for e in experiments:
         cfgs = get_cfgs(fmt,e)
         if remote:
-            cfgs["TPORT_TYPE"], cfgs["TPORT_TYPE_IPC"], cfgs["TPORT_PORT"] = "tcp", "false", 4560
+            cfgs["TPORT_TYPE"], cfgs["TPORT_TYPE_IPC"], cfgs["TPORT_PORT"] = "tcp", "false", 6222
         output_f = get_outfile_name(cfgs, fmt)
         output_dir = output_f + "/"
         output_f += strnow
@@ -120,7 +135,6 @@ for exp in exps:
                     cfg_fname = "vcloud_ifconfig.txt"
                 else:
                     assert(False)
-
                 # machines = machines_[:(cfgs["NODE_CNT"]+1)]
                 machines = machines_[:(cfgs["NODE_CNT"]+cfgs["CLIENT_NODE_CNT"])]
                 with open("ifconfig.txt", 'w') as f_ifcfg:
@@ -128,14 +142,20 @@ for exp in exps:
                         f_ifcfg.write(m + "\n")
 
                 if cfgs["WORKLOAD"] == "TPCC":
-                    files = ["rundb", "runcl", "ifconfig.txt", "./benchmarks/TPCC_short_schema.txt", "./benchmarks/TPCC_full_schema.txt"]
+                    files = ["rundb", "runcl", "ifconfig.txt"]
                 elif cfgs["WORKLOAD"] == "YCSB":
-                    files = ["rundb", "runcl", "ifconfig.txt", "benchmarks/YCSB_schema.txt"]
+                    files = ["rundb", "runcl", "ifconfig.txt"]
+                
+                # if cfgs["WORKLOAD"] == "TPCC":
+                #     files = ["rundb", "runcl", "ifconfig.txt", "./benchmarks/TPCC_short_schema.txt", "./benchmarks/TPCC_full_schema.txt"]
+                # elif cfgs["WORKLOAD"] == "YCSB":
+                #     files = ["rundb", "runcl", "ifconfig.txt", "benchmarks/YCSB_schema.txt"]
+
                 for m, f in itertools.product(machines, files):
                     if cluster == 'istc':
                         cmd = 'scp {}/{} {}.csail.mit.edu:/{}/'.format(PATH, f, m, uname)
                     elif cluster == 'vcloud':
-                        os.system('./scripts/kill.sh {}'.format(m))
+                        os.system('sh scripts/kill.sh {}'.format(m))
                         cmd = 'scp {}/{} {}:/{}'.format(PATH, f, m, uname)
                     print cmd
                     os.system(cmd)
@@ -147,9 +167,9 @@ for exp in exps:
                 print("Deploying: {}".format(output_f))
                 os.chdir('./scripts')
                 if cluster == 'istc':
-                    cmd = './deploy.sh \'{}\' /{}/ {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"])
+                    cmd = 'sh deploy.sh \'{}\' /{}/ {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"])
                 elif cluster == 'vcloud':
-                    cmd = './vcloud_deploy.sh \'{}\' /{}/ {} {} {} {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"], perfTime, uname2, use_delay)
+                    cmd = 'sh vcloud_deploy.sh \'{}\' /{}/ {} {} {} {} {} {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"], perfTime, uname2, dc_count, latency, latency_range)
                 print cmd
                 fromtimelist.append(str(int(time.time())) + "000")
                 os.system(cmd)
@@ -168,7 +188,7 @@ for exp in exps:
                 # cpu_usage_path=PATH + "/results/" + strnow + '/cpu_usage_' + str(cpu_usage_index)
                 # cpu_usage_avg_path = PATH + "/results/" + strnow + '/cpu_usage_avg'
                 # os.mkdir(cpu_usage_path)
-                # cpu_usage_index+=1
+                cpu_usage_index+=1
                 for m, n in zip(machines, range(len(machines))):
                     if cluster == 'istc':
                         cmd = 'scp {}.csail.mit.edu:/{}/results.out {}{}_{}.out'.format(m,uname,result_dir,n,output_f)
@@ -208,7 +228,9 @@ for exp in exps:
 
     tcnt = []
     for e in experiments:
-        tcnt.append(e[-6])
+        tcnt.append(e[-2])
+    # for e in experiments:
+    #     tcnt.append(e[-6])
     tcnt = sorted(list(set(tcnt)))
 
     cocnt = []
@@ -232,7 +254,7 @@ for exp in exps:
 
     wr = []
     for e in experiments:
-        wr.append(e[-7])
+        wr.append(e[-5])
     wr = sorted(list(set(wr)))
 
     cn = []

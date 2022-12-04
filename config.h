@@ -83,9 +83,9 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 3
-#define NODE_CNT 12
-#define THREAD_CNT 40
+#define CENTER_CNT 4
+#define NODE_CNT 8
+#define THREAD_CNT 10
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -126,7 +126,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 480
+#define MAX_TXN_IN_FLIGHT 320
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -155,7 +155,7 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 4560
+#define TPORT_PORT 6222
 #define TPORT_TWOSIDE_PORT 15000
 #define RDMA_TPORT 9214
 #define SET_AFFINITY true
@@ -195,6 +195,7 @@
 #define TAPIR_DEBUG false
 #define TAPIR_REPLICA false
 
+#define CO_LOG true
 
 /***********************************************/
 // USE RDMA
@@ -323,7 +324,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 12582912
+#define SYNTH_TABLE_SIZE 8388608
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 1
 #define TUP_WRITE_PERC 0.5
@@ -338,7 +339,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 0.0
+#define CROSS_DC_TXN_PERC 1.0
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.

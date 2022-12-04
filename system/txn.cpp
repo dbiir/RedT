@@ -553,6 +553,9 @@ RC TxnManager::start_abort(yield_func_t &yield, uint64_t cor_id) {
 	txn_state = 2;
 	abort(yield, cor_id);
 	return Abort;
+// #elif CO_LOG
+//     send_colog_messages();
+// 	return WAIT_REM;
 #else
 	if(query->partitions_touched.size() > 1) {
 		send_finish_messages();
@@ -624,6 +627,11 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 				INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
 				start_fin_time = get_sys_clock();
 			}
+#if CO_LOG
+			send_colog_messages();
+			rc = WAIT_REM;
+			return rc;
+#endif
 			send_finish_messages();
 			txn_state = 2;
 		#if !USE_TAPIR
@@ -661,6 +669,11 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		else {
 			txn->rc = Abort;
 			DEBUG("%ld start_abort\n",get_txn_id());
+// #if CO_LOG
+// 			send_colog_messages();
+// 			rc = WAIT_REM;
+// 			return rc;
+// #endif
 			if(query->partitions_touched.size() > 1) {
 				send_finish_messages();
 				abort(yield, cor_id);
@@ -773,6 +786,17 @@ void TxnManager::send_prepare_messages() {
 											GET_NODE_ID(query->partitions_touched[i]));
 	}
 #endif
+}
+
+void TxnManager::send_colog_messages() {
+	rsp_cnt = 2;
+	uint64_t next_node = g_node_id;
+	for(uint64_t i = 1; i <= 2; i++) {
+		next_node = (g_node_id + i) % g_node_cnt;
+		// printf("%d:%d send finish to %d\n", g_node_id, get_txn_id(), next_node);
+		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RCO_LOG),
+											next_node);
+	}
 }
 
 void TxnManager::send_finish_messages() {

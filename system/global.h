@@ -336,6 +336,8 @@ enum RemReqType {
     LOG_MSG_RSP,
     LOG_FLUSHED,
     CALVIN_ACK,
+    RCO_LOG,
+    RACK_CO_LOG,
   NO_MSG
 };
 

@@ -45,6 +45,8 @@ public:
     RC process_rlog(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rack_fin_log(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rfin_log(yield_func_t &yield, Message * msg, uint64_t cor_id);
+    RC process_rack_co_log(yield_func_t &yield, Message * msg, uint64_t cor_id);
+    RC process_rco_log(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rqry_cont(yield_func_t &yield, Message * msg, uint64_t cor_id);

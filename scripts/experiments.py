@@ -519,11 +519,11 @@ def ycsb_skew():
     tup_write_perc = [0.5]
     load = [320] #node_cnt*tcnt
 
-    tcnt = [40]  #THREAD_CNT
+    tcnt = [10]  #THREAD_CNT
 
     # skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
-    skew = [0.65,0.7,0.8,0.85]
-    # skew = [0.7]
+    # skew = [0.65,0.7,0.8,0.85]
+    skew = [0.2]
     # skew = [0.0,0.1,0.2,0.3,0.4,0.5]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,tapir,early)]
@@ -544,11 +544,11 @@ def ycsb_early_skew():
     tup_write_perc = [0.5]
     load = [320] #node_cnt*tcnt
 
-    tcnt = [40]  #THREAD_CNT
+    tcnt = [10]  #THREAD_CNT
 
-    skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
+    # skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
     # skew = [0.25,0.55,0.65,0.75]
-    # skew = [0.7]
+    skew = [0.2]
     # skew = [0.0,0.1,0.2,0.3,0.4,0.5]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,tapir,early)]

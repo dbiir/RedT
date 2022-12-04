@@ -99,6 +99,12 @@ void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) 
 			case RFIN_LOG:
         rc = process_rfin_log(yield, msg, cor_id);
 				break;
+      case RCO_LOG:
+        rc = process_rco_log(yield, msg, cor_id);
+        break;
+      case RACK_CO_LOG:
+        rc = process_rack_co_log(yield, msg, cor_id);
+        break;
 			case RACK_FIN_LOG:
         rc = process_rack_fin_log(yield, msg, cor_id);
 				break;
@@ -569,6 +575,11 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
 #else
       assert(txn_man->get_rc()==RCOK);
 #endif
+#if CO_LOG
+      txn_man->send_colog_messages();
+      rc = WAIT_REM;
+      return rc;
+#endif
       txn_man->send_finish_messages();
       assert(txn_man->get_local_log());
       txn_man->log_replica(RFIN_LOG, g_node_id); 
@@ -803,6 +814,11 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     // }
 #endif
   } else {
+#if CO_LOG
+    txn_man->send_colog_messages();
+    rc = WAIT_REM;
+    return rc;
+#endif
     txn_man->send_finish_messages();
 #if USE_REPLICA
     if(txn_man->get_local_log()){
@@ -816,10 +832,38 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     // if(txn_man->query->partitions_touched.size() != 0)
       txn_man->commit(yield, cor_id);
 #endif
+// #endif
   }
   return rc;
 }
 
+RC WorkerThread::process_rack_co_log(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+  // printf("RCO_LOG_ACK %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
+  RC rc = RCOK;
+  int responses_left = 0;
+
+  responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+
+  assert(responses_left >= 0);
+
+  
+  if (responses_left > 0) return WAIT;
+  // Done waiting
+    txn_man->send_finish_messages();
+#if USE_REPLICA
+    if(txn_man->get_local_log()){
+      txn_man->log_replica(RFIN_LOG, g_node_id); 
+      rc = WAIT_REM;
+      return rc;
+    }else{
+      txn_man->commit(yield, cor_id);
+    }
+#else
+    // if(txn_man->query->partitions_touched.size() != 0)
+      txn_man->commit(yield, cor_id);
+#endif
+  return rc;
+}
 RC WorkerThread::process_rack_rfin(Message * msg) {
   DEBUG_T("RFIN_ACK %ld from %d\n",msg->get_txn_id(), msg->return_node_id);
 
@@ -1033,6 +1077,13 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
     }
     return rc;
 #endif
+}
+
+RC WorkerThread::process_rco_log(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+    // printf("rco log %ld, return_id %ld \n",msg->get_txn_id(), msg->return_node_id);
+    RC rc = RCOK;
+    msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man, RACK_CO_LOG), msg->return_node_id);
+    return rc;
 }
 
 uint64_t WorkerThread::get_next_txn_id() {

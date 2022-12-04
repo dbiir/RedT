@@ -298,6 +298,7 @@ public:
 	void set_rc(RC rc) {txn->rc = rc;}
 	//void send_rfin_messages(RC rc) {assert(false);}
 	void send_finish_messages();
+	void send_colog_messages();
 	void send_prepare_messages();
 
 	TxnStats txn_stats;
