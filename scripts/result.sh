@@ -68,7 +68,7 @@ do
             shift
             ;;
         -D)
-            DCS=$2
+            DCS=($(echo $2 | tr ',' ' '))
             shift
             shift
             ;;

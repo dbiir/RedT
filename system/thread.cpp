@@ -69,7 +69,7 @@ void Thread::tsetup() {
 	printf("Setup %ld:%ld\n",_node_id, _thd_id);
   fflush(stdout);
 	pthread_barrier_wait( &warmup_bar );
-  sleep(10);
+  if (!ISCLIENT) sleep(5);
   setup();
 
 	printf("Running %ld:%ld\n",_node_id, _thd_id);

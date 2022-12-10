@@ -863,8 +863,12 @@ int TxnManager::received_response(RC rc) {
 
 int TxnManager::received_response(AckMessage* msg, OpStatus state) {
 	uint64_t return_id = msg->return_node_id;
+	OpStatus change_state = state;
+	if (((AckMessage*)msg)->rc == Abort &&
+		txn->rc == RCOK) txn->rc = Abort;
 	if (txn->rc == RCOK) txn->rc = msg->rc;
-	update_query_status(return_id,state);
+	if (((AckMessage*)msg)->rc == Abort && state == PREPARE) change_state = PREP_ABORT;
+	update_query_status(return_id,change_state);
 	RC result = check_query_status(state);
 	if (result == Abort) {
 		set_rc(Abort);
@@ -1289,7 +1293,7 @@ uint64_t TxnManager::get_part_num(uint64_t num,uint64_t part){
 }
 
 
-RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, itemid_t *m_item, row_t *& row_local, uint64_t cor_id) {
+RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t key, uint64_t loc, itemid_t *m_item, row_t *& row_local, uint64_t cor_id) {
 	RC rc = RCOK;
 
 	#if CC_ALG == RDMA_NO_WAIT
@@ -1301,7 +1305,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, 
 
 		if(type == RD){ //读集元素
 			//第一次rdma read，得到数据项的锁信息
-			rc = read_remote_row(yield,loc,m_item->offset,lock_read,cor_id);
+			rc = read_remote_row(yield,loc,m_item->offset,lock_read,cor_id, key);
 			if (rc != RCOK) {
 				rc = rc == NODE_FAILED ? Abort : rc;
 				return rc;
@@ -1335,7 +1339,7 @@ remote_atomic_retry_lock:
                 num_atomic_retry++;
                 total_num_atomic_retry++;
 				#if DEBUG_PRINTF
-					printf("---thd %lu, remote lock read failed!!!!!!!!, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", get_thd_id(), loc, lock_read->get_primary_key(), get_txn_id(), try_lock);
+					printf("---thd %lu, remote lock read failed!!!!!!!!, lock location: %u; %lu, txn: %lu, old lock_info: %lu, lock owner %ld\n", get_thd_id(), loc, lock_read->get_primary_key(), get_txn_id(), try_lock);
 				#endif
                 if(num_atomic_retry > max_num_atomic_retry) max_num_atomic_retry = num_atomic_retry;
                 lock_info = try_lock;
@@ -1353,7 +1357,7 @@ remote_atomic_retry_lock:
 				printf("---thd %lu, remote lock read succ, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", get_thd_id(), loc, lock_read->get_primary_key(), get_txn_id(), try_lock);
 			#endif
 			//read remote data
-        	rc = read_remote_row(yield,loc,m_item->offset,test_row,cor_id);
+        	rc = read_remote_row(yield,loc,m_item->offset,test_row,cor_id,key);
 			if (rc != RCOK) {
 				rc = rc == NODE_FAILED ? Abort : rc;
 				return rc;
@@ -1364,7 +1368,7 @@ remote_atomic_retry_lock:
 			lock_info = 0; //只有lock_info==0时才可以CAS，否则加写锁失败，Abort
 			new_lock_info = 3; //二进制11，即1个写锁
 			#if DEBUG_PRINTF
-			rc = read_remote_row(yield,loc,m_item->offset,lock_read,cor_id);
+			rc = read_remote_row(yield,loc,m_item->offset,lock_read,cor_id,key);
 			if (rc != RCOK) {
 				rc = rc == NODE_FAILED ? Abort : rc;
 				return rc;
@@ -1394,7 +1398,7 @@ remote_atomic_retry_lock:
 				printf("---thd %lu, remote lock write succ, lock location: %u; %lu, txn: %lu, old lock_info: %lu\n", get_thd_id(), loc, lock_read->get_primary_key(), get_txn_id(), try_lock);
 			#endif
 			//read remote data
-			rc = read_remote_row(yield,loc,m_item->offset,test_row,cor_id);
+			rc = read_remote_row(yield,loc,m_item->offset,test_row,cor_id,key);
 			if (rc != RCOK) {
 				rc = rc == NODE_FAILED ? Abort : rc;
 				return rc;
@@ -1417,6 +1421,7 @@ remote_atomic_retry_lock:
 		// uint64_t new_lock_info;
 		// uint64_t lock_info;
 		row_t * test_row = NULL;
+		uint64_t retry_time = 0;
 	retry_lock:
 		uint64_t try_lock = -1;
 		uint64_t lock_type = 0;
@@ -1433,10 +1438,18 @@ remote_atomic_retry_lock:
 				return rc;
 			}
 			if(try_lock != 0 && !simulation->is_done()) {
-				printf("retry cas lock \n");
+				// printf("retry cas lock \n");
+				retry_time++;
+				if (retry_time > 5) {
+					DEBUG_T("txn %d add remote mutx lock on item %d failed !!!!!\n", txn->txn_id, key);
+					return Abort;
+				}
 				goto retry_lock;
 			}
-			rc = read_remote_row(yield, loc, m_item->offset, test_row, cor_id);
+			rc = read_remote_row(yield, loc, m_item->offset, test_row, cor_id, key);
+			#if WORKLOAD == YCSB
+			assert(test_row->get_primary_key() == key);
+			#endif
 			if (rc != RCOK) {
 				rc = rc == NODE_FAILED ? Abort : rc;
 				return rc;
@@ -1454,6 +1467,8 @@ remote_atomic_retry_lock:
 				}
 			} else if(lock_type == 1 || type == WR) {
 				test_row->_tid_word = 0;
+				DEBUG_T("txn %d add remote lock on item %d failed !!!!! because lock type %s, lock type %s, lock owner %ld\n", txn->txn_id, test_row->get_primary_key(),lock_type == 1 ? "EX":"SH", type == WR ? "EX":"SH", test_row->lock_owner[0]);
+
 				rc = write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id);
 				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 				mem_allocator.free(m_item, sizeof(itemid_t));
@@ -1481,6 +1496,7 @@ remote_atomic_retry_lock:
 				if(try_time > LOCK_LENGTH) {
 					test_row->_tid_word = 0;
 					rc = write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id);
+					DEBUG_T("txn %d add remote lock on item %d failed !!!!! because lock owner is too long\n", txn->txn_id, test_row->get_primary_key());
 					mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 					mem_allocator.free(m_item, sizeof(itemid_t));
 					rc = Abort;
@@ -1614,19 +1630,24 @@ RC TxnManager::read_remote_index(yield_func_t &yield, uint64_t target_server,uin
 	RC rc = read_remote_content(yield, target_server, remote_offset, operate_size, local_buf, cor_id);
 	if (rc != RCOK) return rc;
     // itemid_t* 
+	last_index = (IndexInfo *)mem_allocator.alloc(sizeof(IndexInfo));
+	memcpy((char*)last_index, local_buf, operate_size);
 	item = (itemid_t *)mem_allocator.alloc(sizeof(itemid_t));
+	memset(item, 0, sizeof(itemid_t));
 	assert(((IndexInfo*)local_buf)->key == key);
-	// item->key = ((IndexInfo*)local_buf)->key;
+	item->key = ((IndexInfo*)local_buf)->key;
+	assert(item->key == key);
 	item->location = ((IndexInfo*)local_buf)->address;
 	item->type = ((IndexInfo*)local_buf)->type;
 	item->valid = ((IndexInfo*)local_buf)->valid;
 	item->offset = ((IndexInfo*)local_buf)->offset;
   	item->table_offset = ((IndexInfo*)local_buf)->table_offset;
+	
 
     return rc;
 }
 
-RC TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,row_t * &test_row, uint64_t cor_id){
+RC TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,row_t * &test_row, uint64_t cor_id, uint64_t key){
     uint64_t operate_size = row_t::get_row_size(ROW_DEFAULT_SIZE);
     uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
     char *local_buf = Rdma::get_row_client_memory(thd_id);
@@ -1636,6 +1657,7 @@ RC TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,uint6
 	test_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 	memset(test_row, 0, operate_size);
     memcpy(test_row, local_buf, operate_size);
+	if (key != UINT64_MAX) assert(test_row->get_primary_key() == key);
     return rc;
 }
 
@@ -1694,7 +1716,8 @@ RC TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server,u
 	} while (res_p.first == 0);
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 #else
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
+	// auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
 	endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1); //include index, row, log,...etc read.
@@ -1776,7 +1799,8 @@ RC TxnManager::write_remote_content(yield_func_t &yield, uint64_t target_server,
 		h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 		// yield(h_thd->_routines[0]);
 #else
-		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
+		// auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
+		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
 		endtime = get_sys_clock();
 		INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 		INC_STATS(get_thd_id(), rdma_read_cnt, 1);
@@ -1836,7 +1860,8 @@ RC TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,ui
 		h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 
 #else
-		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
+		// auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
+		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
 		// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 		endtime = get_sys_clock();
 		INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
@@ -1898,7 +1923,8 @@ RC TxnManager::cas_remote_content(yield_func_t &yield, uint64_t target_server,ui
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 
 #else
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
+	// auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
     endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);

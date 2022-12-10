@@ -222,7 +222,20 @@ bool YCSBTxnManager::is_local_request(uint64_t idx) {
 
 RC YCSBTxnManager::ycsb_read_remote_index(yield_func_t &yield, ycsb_request * req, itemid_t* &item, uint64_t cor_id) {
 	uint64_t part_id = _wl->key_to_part( req->key );
-  	uint64_t loc = GET_NODE_ID(part_id);
+
+	#if REPLICA_CC
+	uint64_t loc = -1;
+	uint64_t loc1 = get_primary_node_id(part_id);
+	uint64_t loc2 = get_follower1_node_id(part_id);
+	uint64_t loc3 = get_follower2_node_id(part_id);
+	if (GET_CENTER_ID(loc1) == g_center_id) loc = loc1;
+	if (GET_CENTER_ID(loc2) == g_center_id) loc = loc2;
+	if (GET_CENTER_ID(loc3) == g_center_id) loc = loc3;
+	assert(GET_CENTER_ID(loc) == g_center_id);
+	#else 
+	uint64_t loc = get_primary_node_id(part_id);
+	#endif
+  	// uint64_t loc = GET_NODE_ID(part_id);
 	// printf("loc:%d and g_node_id:%d\n", loc, g_node_id);
 	assert(loc != g_node_id);
 	uint64_t thd_id = get_thd_id();
@@ -254,7 +267,19 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
 	}
 	uint64_t part_id = _wl->key_to_part( req->key );
     // uint64_t loc = GET_NODE_ID(part_id);
+	
+	#if REPLICA_CC
+	uint64_t loc = -1;
+	uint64_t loc1 = get_primary_node_id(part_id);
+	uint64_t loc2 = get_follower1_node_id(part_id);
+	uint64_t loc3 = get_follower2_node_id(part_id);
+	if (GET_CENTER_ID(loc1) == g_center_id) loc = loc1;
+	if (GET_CENTER_ID(loc2) == g_center_id) loc = loc2;
+	if (GET_CENTER_ID(loc3) == g_center_id) loc = loc3;
+	assert(GET_CENTER_ID(loc) == g_center_id);
+	#else 
 	uint64_t loc = get_primary_node_id(part_id);
+	#endif
 	if (loc == -1) {
 		return Abort;
 	}
@@ -263,7 +288,7 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
     // RC rc = RCOK;
     uint64_t version = 0;
 	// DEBUG_T("Txn %ld one-sided op.\n", get_txn_id());
-	rc = get_remote_row(yield, req->acctype, loc, m_item, row_local, cor_id);
+	rc = get_remote_row(yield, req->acctype, req->key, loc, m_item, row_local, cor_id);
 	// mem_allocator.free(m_item, sizeof(itemid_t));
 	return rc;
 }
@@ -278,7 +303,7 @@ RC YCSBTxnManager::send_remote_subtxn() {
 		vector<uint64_t> node_id;
 		uint64_t loc = -1;
 #if USE_REPLICA
-		if(req->acctype == WR){
+		if(REPLICA_CC || req->acctype == WR){
 			loc = get_primary_node_id(part_id);
 			if (loc == -1) return Abort;
 			node_id.push_back(loc);
@@ -467,8 +492,22 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	uint64_t part_id = _wl->key_to_part( req->key );
 	uint64_t node_id = get_primary_node_id(part_id);
 	// if (node_id != req->primary.stored_node) return Abort;
-	bool is_center = req->primary.execute_node == g_node_id;
-	bool is_local = req->primary.stored_node == g_node_id && req->primary.execute_node == g_node_id;
+	#if REPLICA_CC
+	bool is_center = (req->primary.execute_node == g_node_id) ||
+					 (req->second1.execute_node == g_node_id) ||
+					 (req->second2.execute_node == g_node_id);
+	bool is_local = (req->primary.stored_node == g_node_id && 
+					 req->primary.execute_node == g_node_id) || 
+					 (req->second1.stored_node == g_node_id && 
+					 req->second1.execute_node == g_node_id) || 
+					 (req->second2.stored_node == g_node_id && 
+					 req->second2.execute_node == g_node_id);
+	#else
+	bool is_center = (req->primary.execute_node == g_node_id) ;
+	bool is_local = (req->primary.stored_node == g_node_id && 
+					 req->primary.execute_node == g_node_id);
+
+	#endif
 
 	// Get and check whether local route table is different from the origin.
 	RC rc = RCOK;
@@ -477,13 +516,13 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 		if(is_local) {
 			DEBUG_T("txn %ld execute local req %ld on node %ld, req store node %ld, execution node %ld\n",get_txn_id(),next_record_id,g_node_id, req->primary.stored_node, req->primary.execute_node);
 			rc = run_ycsb_0(yield,req,row,cor_id);
-			if (rc == Abort) req->primary.status = OpStatus::PREP_ABORT;
-  			else req->primary.status = OpStatus::PREPARE;
+			// if (rc == Abort) req->primary.status = OpStatus::PREP_ABORT;
+  			// else req->primary.status = OpStatus::PREPARE;
 		} else if (rdma_one_side() && is_center) {
 			DEBUG_T("txn %ld execute same center req %ld on node %ld, req store node %ld, execution node %ld\n",get_txn_id(),next_record_id,g_node_id, req->primary.stored_node, req->primary.execute_node);
 			rc = send_remote_one_side_request(yield, req, row, cor_id);
-			if (rc == Abort) req->primary.status = OpStatus::PREP_ABORT;
-  			else req->primary.status = OpStatus::PREPARE;
+			// if (rc == Abort) req->primary.status = OpStatus::PREP_ABORT;
+  			// else req->primary.status = OpStatus::PREPARE;
 		} else {
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
 			rc = RCOK;
@@ -918,8 +957,8 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 
 				char* start_addr = (char*)redo_log_buf.get_entry(start_idx);
 
-				assert(((LogEntry *)start_addr)->state == EMPTY);					
-				assert(((LogEntry *)start_addr)->change_cnt == 0);					
+				// assert(((LogEntry *)start_addr)->state == EMPTY);					
+				// assert(((LogEntry *)start_addr)->change_cnt == 0);					
 
 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
 				assert(((LogEntry *)start_addr)->state == LOGGED);						
@@ -1016,7 +1055,11 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 			temp_row->_tid_word = 0;
 			#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 			uint64_t op_size = sizeof(temp_row->_tid_word);
+			#if REPLICA_CC
+			bool is_primary = true;
+			#else
 			bool is_primary = (node_id[i] == get_primary_node_id(part_id));
+			#endif
 			newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 
 			#endif
 			mem_allocator.free(temp_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
@@ -1186,8 +1229,8 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 
 				char* start_addr = (char*)redo_log_buf.get_entry(start_idx);
 
-				assert(((LogEntry *)start_addr)->state == EMPTY);					
-				assert(((LogEntry *)start_addr)->change_cnt == 0);					
+				// assert(((LogEntry *)start_addr)->state == EMPTY);					
+				// assert(((LogEntry *)start_addr)->change_cnt == 0);					
 
 				memcpy(start_addr, (char *)newEntry, sizeof(LogEntry));
 				assert(((LogEntry *)start_addr)->state == LE_COMMITTED);						
@@ -1261,7 +1304,7 @@ RC YCSBTxnManager::check_query_status(OpStatus status) {
 		ycsb_request * req = ycsb_query->requests[i];
 		// DEBUG_T("txn %ld check req %d, its primary status %ld\n",get_txn_id(), i, req->primary.status);
 		if(req->primary.status == PREP_ABORT) {
-			DEBUG_T("txn %ld need wait, due to req %d abort\n",get_txn_id(), i);
+			DEBUG_T("txn %ld need abort, due to req %d abort\n",get_txn_id(), i);
 			return Abort;
 		}
 		else if (req->primary.status < status) {
@@ -1269,13 +1312,23 @@ RC YCSBTxnManager::check_query_status(OpStatus status) {
 			return WAIT;
 		}
 		if(req->acctype==WR) {
+			#if REPLICA_CC
+			if (req->second1.status == PREP_ABORT ||
+				req->second2.status == PREP_ABORT) {
+			#else
 			if (req->second1.status == PREP_ABORT &&
 				req->second2.status == PREP_ABORT) {
-				DEBUG_T("txn %ld need wait, due to req %d secondary status %ld, %ld abort, %\n",get_txn_id(), i, req->second1.status, req->second2.status);
+			#endif
+				DEBUG_T("txn %ld need abort, due to req %d secondary status %ld, %ld abort\n",get_txn_id(), i, req->second1.status, req->second2.status);
 				return Abort;
 			}
+			#if REPLICA_CC
+			if (req->second1.status < status ||
+				req->second2.status < status) {
+			#else
 			if (req->second1.status < status &&
 				req->second2.status < status) {
+			#endif
 				DEBUG_T("txn %ld need wait, due to req %d secondary status %ld,%ld:%ld\n",get_txn_id(), i, req->second1.status, req->second2.status, status);
 				return WAIT;
 			}

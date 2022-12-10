@@ -74,6 +74,8 @@
 #define THOMAS_WRITE true  //if false, wait and sort
 #define INTER_DC_CONTROL true
 #define RDMA_DBPAOR false //concurrent logging
+#define AGENT_COORDINATOR false
+#define REPLICA_CC false
 
 #if USE_REPLICA
 #define ASYNC_REDO_THREAD_CNT 1
@@ -125,9 +127,9 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 4
-#define NODE_CNT 8
-#define THREAD_CNT 40
+#define CENTER_CNT 3
+#define NODE_CNT 12
+#define THREAD_CNT 20
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -168,7 +170,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 320
+#define MAX_TXN_IN_FLIGHT 240
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -197,7 +199,7 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 4222
+#define TPORT_PORT 6222
 #define TPORT_TWOSIDE_PORT 13000
 #define SET_AFFINITY true
 
@@ -207,7 +209,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 0UL
+#define NETWORK_DELAY 10000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -227,7 +229,7 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_NO_WAIT3
+#define CC_ALG RDMA_NO_WAIT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -349,14 +351,14 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 8388608
+#define SYNTH_TABLE_SIZE 6291456
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 1
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 4
-#define DC_PER_TXN 2 // Must ensure PART_PER_TXN > DC_PER_TXN
+#define PART_PER_TXN 2
+#define DC_PER_TXN 2
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
 #define FIELD_PER_TUPLE       10
@@ -364,7 +366,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 1
+#define CROSS_DC_TXN_PERC 1.0
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.
@@ -470,9 +472,9 @@ enum PPSTxnType {
 #define IDX_VERB          false
 #define VERB_ALLOC          true
 
-#define DEBUG_PRINTF false
+#define DEBUG_PRINTF        false
 #define DEBUG_LOCK          false
-#define DEBUG_TIMESTAMP       false
+#define DEBUG_TIMESTAMP     false
 #define DEBUG_SYNTH         false
 #define DEBUG_ASSERT        false
 #define DEBUG_DISTR false
@@ -603,8 +605,8 @@ enum PPSTxnType {
 #define INTER_CENTER_FAILED_TIME 20 * HEARTBEAT_TIME
 #define EXECUTOR_FAILED_TIME 1 * INTER_CENTER_FAILED_TIME
 
-#define RECOVERY_MANAGER true
-#define RECOVERY_TXN_MECHANISM true
+#define RECOVERY_MANAGER false
+#define RECOVERY_TXN_MECHANISM false
 
 #endif
   

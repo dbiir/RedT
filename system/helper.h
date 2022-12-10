@@ -273,9 +273,10 @@ public:
     };
 	Data_type type;
 	void * location; // points to the table | page | row
-    uint64_t offset;
-    uint64_t table_offset;
+  uint64_t offset;
+  uint64_t table_offset;
 	itemid_t * next;
+  uint64_t key;
 	bool valid;
 	void init();
 	bool operator==(const itemid_t &other) const;

@@ -254,6 +254,11 @@ RC row_t::get_lock(access_t type, TxnManager * txn) {
 RC row_t::remote_copy_row(row_t* remote_row, TxnManager * txn, Access *access) {
   RC rc = RCOK;
   uint64_t init_time = get_sys_clock();
+//   if (remote_row->tuple_size > ROW_DEFAULT_SIZE) {
+// 	printf("out of size %ld\n",remote_row->tuple_size);
+// 	assert(remote_row->tuple_size <= ROW_DEFAULT_SIZE);
+//   }
+  
   txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(remote_row->tuple_size));
   INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
   

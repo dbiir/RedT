@@ -29,10 +29,15 @@ skip = False
 exps=[]
 arg_cluster = False
 merge_mode = False
+set_dc = False
+dc_count = 0
 perfTime = 60
 fromtimelist=[]
 totimelist=[]
 cpu_usage_index=0
+set_latency = 0
+latency = 0
+latency_range = 0
 
 if len(sys.argv) < 2:
      sys.exit("Usage: %s [-exec/-e/-noexec/-ne] [-c cluster] experiments\n \
@@ -60,6 +65,19 @@ for arg in sys.argv[1:]:
         arg_cluster = True
     elif arg == '-m':
         merge_mode = True
+    elif arg == '--dc':
+        set_dc = True
+    elif set_dc:
+        dc_count = arg
+        set_dc = False
+    elif arg == '-l':
+        set_latency = 1
+    elif set_latency == 1:  # set delay
+        latency = arg
+        set_latency = 2
+    elif set_latency == 2:  # set delay range
+        latency_range = arg
+        set_latency = 0
     elif arg_cluster:
         cluster = arg
         arg_cluster = False
@@ -72,7 +90,7 @@ for exp in exps:
     for e in experiments:
         cfgs = get_cfgs(fmt,e)
         if remote:
-            cfgs["TPORT_TYPE"], cfgs["TPORT_TYPE_IPC"], cfgs["TPORT_PORT"] = "tcp", "false", 4222
+            cfgs["TPORT_TYPE"], cfgs["TPORT_TYPE_IPC"], cfgs["TPORT_PORT"] = "tcp", "false", 6222
         output_f = get_outfile_name(cfgs, fmt)
         output_dir = output_f + "/"
         output_f += strnow
@@ -151,7 +169,7 @@ for exp in exps:
                 if cluster == 'istc':
                     cmd = 'sh deploy.sh \'{}\' /{}/ {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"])
                 elif cluster == 'vcloud':
-                    cmd = 'sh vcloud_deploy.sh \'{}\' /{}/ {} {} {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"], perfTime, uname2)
+                    cmd = 'sh vcloud_deploy.sh \'{}\' /{}/ {} {} {} {} {} {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"], perfTime, uname2, dc_count, latency, latency_range)
                 print cmd
                 fromtimelist.append(str(int(time.time())) + "000")
                 os.system(cmd)
@@ -236,7 +254,7 @@ for exp in exps:
 
     wr = []
     for e in experiments:
-        wr.append(e[-5])
+        wr.append(e[4])
     wr = sorted(list(set(wr)))
 
     cn = []
@@ -276,6 +294,8 @@ for exp in exps:
     elif exp == 'ycsb_cross_dc':
         cmd='sh result.sh -a ycsb_cross_dc -n {} -c {} -dc {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in dcp]), strnow)
     elif exp == 'ycsb_network_delay':
+        cmd='sh result.sh -a ycsb_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
+    elif exp == 'ycsb_network_delay2':
         cmd='sh result.sh -a ycsb_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
     elif exp == 'ycsb_writes':
         cmd='sh result.sh -a ycsb_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join([str(x) for x in al]), ','.join([str(x) for x in wr]), strnow)

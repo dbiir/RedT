@@ -167,7 +167,7 @@ void * YCSBWorkload::init_table_slice() {
 			//key ++
 	) {
 		int part_id = key_to_part(key); // % g_part_cnt;
-#if 0 && RECOVERY_MANAGER
+#if RECOVERY_MANAGER
 		if(0) {
 #else
 #if USE_REPLICA
@@ -205,7 +205,6 @@ void * YCSBWorkload::init_table_slice() {
 			new_row->set_value(fid, value,sizeof(value));
 		}
 #endif
-
 		itemid_t * m_item =
 			(itemid_t *) mem_allocator.alloc( sizeof(itemid_t));
 		assert(m_item != NULL);

@@ -716,8 +716,9 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void * 
 
   	int rc = -1;
 	// int start_time = get_sys_clock();
-	while (rc < 0 && (!simulation->is_setup_done() ||
-						(simulation->is_setup_done() && !simulation->is_done()))) {
+	// while (rc < 0 && (!simulation->is_setup_done() ||
+						// (simulation->is_setup_done() && !simulation->is_done()))) {
+	while (rc < 0 && (!simulation->is_done())) {
 
 		rc= socket->sock.send(&buf,NN_MSG,NN_DONTWAIT);
 		// int end_time = get_sys_clock();
@@ -866,24 +867,24 @@ std::vector<Message*> * Transport::rdma_recv_msg(uint64_t thd_id) {
 std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
 	int bytes = 0;
 	void * buf;
-  uint64_t starttime = get_sys_clock();
-  std::vector<Message*> * msgs = NULL;
-  //uint64_t ctr = starttime % recv_sockets.size();
-  uint64_t rand = (starttime % recv_sockets.size()) / g_this_rem_thread_cnt;
-  // uint64_t ctr = ((thd_id % g_this_rem_thread_cnt) % recv_sockets.size()) + rand *
-  // g_this_rem_thread_cnt;
-  uint64_t ctr = thd_id % g_this_rem_thread_cnt;
-  if (ctr >= recv_sockets.size()) return msgs;
-  if(g_this_rem_thread_cnt < g_total_node_cnt) {
-	ctr += rand * g_this_rem_thread_cnt;
-	while(ctr >= recv_sockets.size()) {
-	  ctr -= g_this_rem_thread_cnt;
+	uint64_t starttime = get_sys_clock();
+	std::vector<Message*> * msgs = NULL;
+	//uint64_t ctr = starttime % recv_sockets.size();
+	uint64_t rand = (starttime % recv_sockets.size()) / g_this_rem_thread_cnt;
+	// uint64_t ctr = ((thd_id % g_this_rem_thread_cnt) % recv_sockets.size()) + rand *
+	// g_this_rem_thread_cnt;
+	uint64_t ctr = thd_id % g_this_rem_thread_cnt;
+	if (ctr >= recv_sockets.size()) return msgs;
+	if(g_this_rem_thread_cnt < g_total_node_cnt) {
+		ctr += rand * g_this_rem_thread_cnt;
+		while(ctr >= recv_sockets.size()) {
+		ctr -= g_this_rem_thread_cnt;
+		}
 	}
-  }
-  assert(ctr < recv_sockets.size());
-  uint64_t start_ctr = ctr;
+	assert(ctr < recv_sockets.size());
+	uint64_t start_ctr = ctr;
 
-  while (bytes <= 0 && (!simulation->is_setup_done() ||
+  	while (bytes <= 0 && (!simulation->is_setup_done() ||
 						(simulation->is_setup_done() && !simulation->is_done()))) {
 	Socket * socket = recv_sockets[ctr];
 		bytes = socket->sock.recv(&buf, NN_MSG, NN_DONTWAIT);
@@ -910,13 +911,13 @@ std::vector<Message*> * Transport::recv_msg(uint64_t thd_id) {
 	return msgs;
 	}
 
-  INC_STATS(thd_id,msg_recv_time, get_sys_clock() - starttime);
+  	INC_STATS(thd_id,msg_recv_time, get_sys_clock() - starttime);
 	INC_STATS(thd_id,msg_recv_cnt,1);
 
 	starttime = get_sys_clock();
 
-  msgs = Message::create_messages((char*)buf);
-  DEBUG_T("Batch of %d bytes recv from node %ld; Time: %f\n", bytes, msgs->front()->return_node_id,
+  	msgs = Message::create_messages((char*)buf);
+  	DEBUG_T("Batch of %d bytes recv from node %ld; Time: %f\n", bytes, msgs->front()->return_node_id,
 		simulation->seconds_from_start(get_sys_clock()));
 
 	nn::freemsg(buf);

@@ -68,7 +68,9 @@ void MessageThread::send_batch(uint64_t dest_node_id) {
 #ifdef USE_RDMA
     tport_man.rdma_send_msg(_thd_id, dest_node_id, sbuf->buffer, sbuf->ptr);
 #else
-    if (ISCLIENT) {
+    if (ISCLIENT ||
+       dest_node_id >= NODE_CNT ||
+       !RECOVERY_MANAGER) {
       tport_man.send_msg(_thd_id,dest_node_id,sbuf->buffer,sbuf->ptr);
     } else {
       status_node* st = node_status.get_node_status(dest_node_id);

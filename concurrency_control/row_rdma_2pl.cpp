@@ -106,7 +106,7 @@ local_retry_lock:
 
     uint64_t try_lock = -1;
     uint64_t lock_type = 0;
-    retry_time ++;
+    
     rc = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txn->get_txn_id(),&try_lock, cor_id);
     if (rc != RCOK) {
         rc = rc == NODE_FAILED ? Abort : rc;
@@ -115,20 +115,26 @@ local_retry_lock:
     if(try_lock != 0 && !simulation->is_done()) {
         // rc = Abort;
         // return rc;
+        retry_time ++;
+        if (retry_time > 5) {
+            DEBUG_T("txn %d add local mutx lock on item %d failed !!!!!\n", txn->get_txn_id(), row->get_primary_key());
+            return Abort;
+        }
         goto local_retry_lock;
     }
-    lock_type = _row->lock_type;
+    lock_type = row->lock_type;
     if(lock_type == 0) {
         uint64_t lock_index = txn->get_txn_id() % LOCK_LENGTH;
-        _row->lock_owner[lock_index] = txn->get_txn_id();
-        _row->lock_type = type == DLOCK_EX? 1:2;
+        row->lock_owner[lock_index] = txn->get_txn_id();
+        row->lock_type = type == DLOCK_EX? 1:2;
         // _row->_tid_word = 0;
         rc = RCOK;
     } else if(lock_type == 1 || type == DLOCK_EX) {
         // printf("row_rdma_2pl:119\n");
-        _row->_tid_word = 0;
+        row->_tid_word = 0;
         #if DEBUG_PRINTF
-            printf("txn %d add local lock on item %d, lock_type: %d failed !!!!! because conflict\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
+        DEBUG_T("txn %d add remote lock on item %d failed !!!!! because lock type %s, lock type %s, lock owner %ld\n", txn->get_txn_id(), row->get_primary_key(),lock_type == 1 ? "EX":"SH", type == DLOCK_EX ? "EX":"SH", row->lock_owner[0]);
+            // printf("txn %d add local lock on item %d, lock_type: %d failed !!!!! because conflict\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
         #endif
         rc = Abort;
         return rc;
@@ -137,11 +143,11 @@ local_retry_lock:
         uint64_t try_time = 0;
         while(try_time <= LOCK_LENGTH) {
             // printf("row_rdma_2pl:125 try_time: %d\n", try_time);
-            // printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
-            if(_row->lock_owner[lock_index] == 0) {
-                _row->lock_owner[lock_index] = txn->get_txn_id();
-                _row->lock_type = _row->lock_type + 1;
-                // _row->_tid_word = 0;
+            // printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
+            if(row->lock_owner[lock_index] == 0) {
+                row->lock_owner[lock_index] = txn->get_txn_id();
+                row->lock_type = row->lock_type + 1;
+                // row->_tid_word = 0;
                 rc = RCOK;
                 break;
             }
@@ -151,18 +157,18 @@ local_retry_lock:
         if(try_time > LOCK_LENGTH) {
             // printf("row_rdma_2pl:138\n");
             #if DEBUG_PRINTF
-                printf("txn %d add local lock on item %d, lock_type: %d failed !!!!! because too many locks\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
+                printf("txn %d add local lock on item %d, lock_type: %d failed !!!!! because too many locks\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
             #endif
-            _row->_tid_word = 0;
+            row->_tid_word = 0;
             rc = Abort;
             return rc;
         }      
     }
-    _row->_tid_word = 0;
+    row->_tid_word = 0;
     #if DEBUG_PRINTF
-        printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
+        printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
     #endif
-    // printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), _row->get_primary_key(), _row->lock_type);
+    // printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
 #endif
 	return rc;
 }

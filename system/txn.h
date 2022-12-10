@@ -27,6 +27,7 @@
 #include "routine.h"
 #include <unordered_map>
 #include "work_queue.h"
+#include "index_rdma.h"
 //#include "wl.h"
 
 class Workload;
@@ -227,7 +228,7 @@ public:
 	}
 
     uint64_t get_part_num(uint64_t num,uint64_t part);
-	RC get_remote_row(yield_func_t &yield, access_t type, uint64_t loc, itemid_t *m_item, row_t *& row_local, uint64_t cor_id);
+	RC get_remote_row(yield_func_t &yield, access_t type, uint64_t key, uint64_t loc, itemid_t *m_item, row_t *& row_local, uint64_t cor_id);
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc,uint64_t part_id);
 
 	//---- Base RDMA primitives ----//
@@ -235,7 +236,7 @@ public:
 	RC write_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, char* local_buf, uint64_t cor_id, bool outstanding = false);
 	//---- Next step RDMA primitives ----//
 	RC read_remote_index(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,uint64_t key, itemid_t * &item, uint64_t cor_id);
-	RC read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, row_t * &row, uint64_t cor_id);
+	RC read_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, row_t * &row, uint64_t cor_id, uint64_t key = UINT64_MAX);
 	RC write_remote_index(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
     RC write_remote_row(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id);
     RC cas_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t old_value, uint64_t new_value, uint64_t *result, uint64_t cor_id);
@@ -420,6 +421,8 @@ public:
 	int last_txn_id;
 	Message* last_msg;
 	uint64_t log_idx[NODE_CNT]; //redo_log_buf.get_size() if no log 
+
+	IndexInfo* last_index;
 
 protected:
 	int rsp_cnt;

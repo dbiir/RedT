@@ -830,6 +830,11 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   if (txn_man->txn_stats.current_states >= FINISH_PHASE) {
     return RCOK;
   }
+  if(((AckMessage*)msg)->rc == Abort) {
+  //   txn_man->start_abort(yield, cor_id);
+  //   return Abort;
+    DEBUG_T("Txn %ld recieve a abort message from %ld.\n",msg->get_txn_id(), msg->get_return_id());
+  }
 
   int responses_left = txn_man->received_response((AckMessage*)msg, OpStatus::PREPARE);
   if (responses_left > 0) return WAIT;
@@ -1714,6 +1719,7 @@ RC AsyncRedoThread::run() {
             if(cur_entry->change[j].is_primary) continue;
             IndexInfo* idx_info = (IndexInfo *)(rdma_global_buffer + (cur_entry->change[j].index_key) * sizeof(IndexInfo));
             row_t * tar_row = idx_info->address;
+            if (tar_row == nullptr) continue;
             uint64_t tar_wts= *(uint64_t*)(tar_row + sizeof(tar_row->_tid_word));
             if(cur_entry->c_ts > tar_wts){ //update data and cts
               memcpy((char *)tar_row,cur_entry->change[j].content,cur_entry->change[j].size);

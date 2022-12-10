@@ -33,7 +33,7 @@ names = summary.keys()
 # print a, b, c
 
 a, b, c, d, e, f, g, h = 0, 0, 0, 0, 0, 0, 0, 0,
-m, n, p, q =  0, 0, 0, 0
+m, n, p, q, i =  0, 0, 0, 0, 0
 if 'tput' in summary:
     a = sum(summary['tput'])
 if 'total_txn_abort_cnt' in summary and 'total_txn_commit_cnt' in summary and summary['total_txn_commit_cnt'][0] + summary['total_txn_abort_cnt'][0] != 0:
@@ -59,6 +59,8 @@ if 'avg_num_msgs_rw_prep' in summary:
     p = sum(summary['avg_num_msgs_rw_prep']) 
 if 'avg_num_msgs_commit' in summary:
     q = sum(summary['avg_num_msgs_commit']) 
+if 'avg_trans_commit_total_run_time' in summary:
+    i = sum(summary['avg_trans_commit_total_run_time']) 
 
 # print a, b, e, f, g / h
-print a, b, e, m, n, p, q  
+print a, b, e, i, m, n, p, q  

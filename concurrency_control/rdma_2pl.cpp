@@ -47,7 +47,7 @@ retry_unlock:
 #else
     uint64_t lock_info = row->_tid_word;
     if(!Row_rdma_2pl::has_exclusive_lock(lock_info)) {
-        printf("---thd:%lu, lock unlock write lock fail!!!!!! nodeid-key: %u; %lu, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, 0);
+        DEBUG_T("---thd:%lu, lock unlock write lock fail!!!!!! nodeid-key: %u; %lu, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, 0);
         return RCOK;
     }
     #if DEBUG_LOCK
@@ -141,7 +141,7 @@ retry_remote_unlock:
     uint64_t orig_lock_info = remote_row->_tid_word;
 	mem_allocator.free(remote_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
     if(!Row_rdma_2pl::has_exclusive_lock(orig_lock_info)) {
-        printf("---thd:%lu, remote unlock write lock fail!!!!!! node-id-key: %u; %ld, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_row->get_primary_key(), txnMng->get_txn_id(), orig_lock_info, 0);
+        // printf("---thd:%lu, remote unlock write lock fail!!!!!! node-id-key: %u; %ld, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), loc, remote_row->get_primary_key(), txnMng->get_txn_id(), orig_lock_info, 0);
         return RCOK;
     }
         
@@ -176,7 +176,7 @@ retry_unlock:
     Row_rdma_2pl::info_encode(new_lock_info,lock_type,new_lock_num);
     
     if(!Row_rdma_2pl::has_shared_lock(lock_info)) {
-        printf("---thd:%lu, lock unlock read lock fail!!!!!! nodeid-key: %u; %lu, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, new_lock_info);
+        // printf("---thd:%lu, lock unlock read lock fail!!!!!! nodeid-key: %u; %lu, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), lock_info, new_lock_info);
         return RCOK;
     }
     assert(lock_type == 0);  //already write locked
@@ -281,7 +281,7 @@ remote_retry_unlock:
     new_lock_num = lock_num-1;
     Row_rdma_2pl::info_encode(new_lock_info,lock_type,new_lock_num);
     if(!Row_rdma_2pl::has_shared_lock(*lock_info)) {
-        printf("---thd:%lu, remote unlock read lock fail!!!!!! nodeid-key: %u; %lu, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, remote_row->get_primary_key(), txnMng->get_txn_id(), lock_info, new_lock_info);
+        // printf("---thd:%lu, remote unlock read lock fail!!!!!! nodeid-key: %u; %lu, txn_id: %lu, old_lock_info: %lu, new_lock_info: %lu\n", txnMng->get_thd_id(), g_node_id, remote_row->get_primary_key(), txnMng->get_txn_id(), lock_info, new_lock_info);
         return RCOK;
     }
     assert(lock_type == 0);  //already write locked
