@@ -429,9 +429,10 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
       //   ready = false;
       // }
       // else 
-      #if !USE_TAPIR
+      #if !USE_TAPIR && !EARLY_PREPARE
       if(msg->rtype == RFIN && !txn_man->finish_read_write) ready = false;
-      else ready = txn_man->unset_ready(); 
+      else 
+      ready = txn_man->unset_ready(); 
       #else
       ready = txn_man->unset_ready(); 
       #endif

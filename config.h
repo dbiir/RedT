@@ -85,7 +85,7 @@
 /***********************************************/
 #define CENTER_CNT 4
 #define NODE_CNT 8
-#define THREAD_CNT 10
+#define THREAD_CNT 40
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -166,7 +166,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 100000000UL
+#define NETWORK_DELAY 0UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -190,7 +190,7 @@
 #define USE_TAPIR false
 #define MAJORITY true
 #define INTER_DC_CONTROL true
-#define EARLY_PREPARE true
+#define EARLY_PREPARE false
 
 #define TAPIR_DEBUG false
 #define TAPIR_REPLICA false
@@ -330,7 +330,7 @@
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 4
+#define PART_PER_TXN 2
 #define DC_PER_TXN 2
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10

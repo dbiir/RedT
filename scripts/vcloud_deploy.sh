@@ -18,7 +18,7 @@ done
 
 if [[ $DC_COUNT -ne 0 ]]
 then
-    sh reset_group_delay.sh
+    sh clean_group_delay.sh
     sh set_group_delay.sh 0 $DC_COUNT
 fi
 

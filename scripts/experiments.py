@@ -412,6 +412,30 @@ def ycsb_tapir_network_delay():
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr,cro_dc_perc,net_del] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc,net_del,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc,network_delay,tapir,early)]
     return fmt,exp
 
+def ycsb_tapir_network_delay2():
+    wl = 'YCSB'
+    nnodes = [8]
+    algos=['NO_WAIT']
+    tapir=['true']
+    early=['false']
+    base_table_size=1048576
+    txn_write_perc = [1]
+    tup_write_perc = [0.5]
+    load = [320]
+    tcnt = [40]  #THREAD_CNT
+    skew = [0.2]
+    cross_dc_perc = [0]
+    # network_delay = ['50000000UL','100000000UL','150000000UL','200000000UL','250000000UL','300000000UL','350000000UL','400000000UL','450000000UL','500000000UL'] 
+    # network_delay = ['50000000UL','100000000UL','150000000UL','200000000UL','300000000UL','450000000UL'] 
+    # network_delay = ['250000000UL','300000000UL','350000000UL','400000000UL','450000000UL','500000000UL'] 
+    network_delay = ['0UL'] 
+    # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+
+
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT","CROSS_DC_TXN_PERC", "NETWORK_DELAY"]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr,cro_dc_perc,net_del] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc,net_del,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc,network_delay,tapir,early)]
+    return fmt,exp
+
 def ycsb_network_delay():
     wl = 'YCSB'
     nnodes = [8]
@@ -421,6 +445,7 @@ def ycsb_network_delay():
     base_table_size=1048576
     txn_write_perc = [1]
     tup_write_perc = [0.5]
+    # tup_write_perc = [1]
     load = [320]
     tcnt = [40]  #THREAD_CNT
     skew = [0.2]
@@ -433,7 +458,6 @@ def ycsb_network_delay():
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT","CROSS_DC_TXN_PERC", "NETWORK_DELAY"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr,cro_dc_perc,net_del] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc,net_del,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc,network_delay,tapir,early)]
     return fmt,exp
-
 
 def ycsb_network_delay2():
     wl = 'YCSB'
@@ -479,6 +503,28 @@ def ycsb_early_network_delay():
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr,cro_dc_perc,net_del] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc,net_del,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc,network_delay,tapir,early)]
     return fmt,exp
 
+def ycsb_early_network_delay2():
+    wl = 'YCSB'
+    nnodes = [8]
+    algos=['NO_WAIT']
+    tapir=['false']
+    early=['true']
+    base_table_size=1048576
+    txn_write_perc = [1]
+    tup_write_perc = [0.5]
+    load = [320]
+    tcnt = [40]  #THREAD_CNT
+    skew = [0.2]
+    cross_dc_perc = [0]
+    # network_delay = ['50000000UL','100000000UL','150000000UL','200000000UL','250000000UL','300000000UL','350000000UL','400000000UL','450000000UL','500000000UL'] 
+    network_delay = ['0UL'] 
+    # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+
+
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT","CROSS_DC_TXN_PERC", "NETWORK_DELAY"]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr,cro_dc_perc,net_del] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc,net_del,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc,network_delay,tapir,early)]
+    return fmt,exp
+
 def ycsb_tapir_skew():
     wl = 'YCSB'
     nnodes = [8]
@@ -496,9 +542,9 @@ def ycsb_tapir_skew():
 
     tcnt = [40]  #THREAD_CNT
 
-    skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
+    # skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
     # skew = [0.25,0.55,0.65,0.75]
-    # skew = [0.2]
+    skew = [0.5]
     # skew = [0.0,0.1,0.2,0.3,0.4,0.5]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,tapir,early)]
@@ -519,12 +565,9 @@ def ycsb_skew():
     tup_write_perc = [0.5]
     load = [320] #node_cnt*tcnt
 
-    tcnt = [10]  #THREAD_CNT
-
-    # skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
-    # skew = [0.65,0.7,0.8,0.85]
-    skew = [0.2]
-    # skew = [0.0,0.1,0.2,0.3,0.4,0.5]
+    tcnt = [40]  #THREAD_CNT
+    # skew = [0.0,0.2,0.4,0.5]
+    skew = [0.6,0.65,0.7,0.75,0.8,0.85,0.9]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,tapir,early)]
     return fmt,exp
@@ -544,12 +587,12 @@ def ycsb_early_skew():
     tup_write_perc = [0.5]
     load = [320] #node_cnt*tcnt
 
-    tcnt = [10]  #THREAD_CNT
+    tcnt = [40]  #THREAD_CNT
 
-    # skew = [0.0,0.2,0.4,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
-    # skew = [0.25,0.55,0.65,0.75]
-    skew = [0.2]
-    # skew = [0.0,0.1,0.2,0.3,0.4,0.5]
+    # skew = [0.0,0.2,0.4,0.5,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
+    # skew = [0.0,0.2,0.4,0.5]
+    skew = [0.6,0.65,0.7,0.75,0.8,0.85,0.9]
+
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,tapir,early)]
     return fmt,exp
@@ -603,7 +646,7 @@ def ycsb_early_writes():
     base_table_size=1048576
     # txn_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
     txn_write_perc = [1]
-    # txn_write_perc = [0.0]
+    # tup_write_perc = [0.0]
     tup_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
     load = [320]
     tcnt = [40]
@@ -645,25 +688,26 @@ def isolation_levels():
 #     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","ONLY_ONE_HOME","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
 #     exp = [[wl,n,algo,rpq,p,base_table_size*n,tup_wr_perc,txn_wr_perc,'false',ld,sk,thr,1] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts)]
 #     return fmt,exp
+
 def ycsb_partitions():
     wl = 'YCSB'
     # nnodes = [15]
     nnodes = [12]
     algos=['NO_WAIT']
     tapir=['false']
-    early=['false']
+    early=['true']
     # load = [10000,12000]
     load = [240]
-    # nparts = [6]
-    nparts = [2,3,4,5,6]
+    nparts = [4,5,6]
+    # nparts = [2,3,4,5,6]
     base_table_size= 1048576
     txn_write_perc = [1]
     tup_write_perc = [0.5]
     tcnt = [20]
     skew = [0.2]
     rpq =  10
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
-    exp = [[wl,n,algo,rpq,p,base_table_size*n,tup_wr_perc,txn_wr_perc,ir,er,ld,sk,thr,1] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,tapir,early)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","CENTER_CNT","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
+    exp = [[wl,n,algo,rpq,p,base_table_size*n,tup_wr_perc,txn_wr_perc,4,ir,er,ld,sk,thr,1] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,tapir,early)]
     return fmt,exp
 
 def ycsb_tapir_partitions():
@@ -683,8 +727,8 @@ def ycsb_tapir_partitions():
     tcnt = [20]
     skew = [0.2]
     rpq =  10
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
-    exp = [[wl,n,algo,rpq,p,base_table_size*n,tup_wr_perc,txn_wr_perc,ir,er,ld,sk,thr,1] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,tapir,early)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","CENTER_CNT","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
+    exp = [[wl,n,algo,rpq,p,base_table_size*n,tup_wr_perc,txn_wr_perc,4,ir,er,ld,sk,thr,1] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,tapir,early)]
     return fmt,exp
 
 def ycsb_early_partitions():
@@ -703,8 +747,8 @@ def ycsb_early_partitions():
     tcnt = [20]
     skew = [0.2]
     rpq =  10
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
-    exp = [[wl,n,algo,rpq,p,base_table_size*n,tup_wr_perc,txn_wr_perc,ir,er,ld,sk,thr,1] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,tapir,early)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","CENTER_CNT","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
+    exp = [[wl,n,algo,rpq,p,base_table_size*n,tup_wr_perc,txn_wr_perc,4,ir,er,ld,sk,thr,1] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,tapir,early)]
     return fmt,exp
 
 def ycsb_dcs():
@@ -721,12 +765,12 @@ def ycsb_dcs():
     ndcs = [2,3,4,5,6]
     base_table_size= 1048576
     txn_write_perc = [1]
-    tup_write_perc = [0.2]
+    tup_write_perc = [0.5]
     tcnt = [20]
     skew = [0.2]
     rpq =  12
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","DC_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
-    exp = [[wl,n,algo,rpq,p,dc,base_table_size*n,tup_wr_perc,txn_wr_perc,ir,er,ld,sk,thr,0] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,dc,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,ndcs,tapir,early)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","DC_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","CENTER_CNT","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
+    exp = [[wl,n,algo,rpq,p,dc,base_table_size*n,tup_wr_perc,txn_wr_perc,6,ir,er,ld,sk,thr,0] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,dc,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,ndcs,tapir,early)]
     return fmt,exp
 
 def ycsb_tapir_dcs():
@@ -743,12 +787,12 @@ def ycsb_tapir_dcs():
     ndcs = [2,3,4,5,6]
     base_table_size= 1048576
     txn_write_perc = [1]
-    tup_write_perc = [0.2]
+    tup_write_perc = [0.5]
     tcnt = [20]
     skew = [0.2]
     rpq =  12
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","DC_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
-    exp = [[wl,n,algo,rpq,p,dc,base_table_size*n,tup_wr_perc,txn_wr_perc,ir,er,ld,sk,thr,0] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,dc,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,ndcs,tapir,early)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","DC_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","CENTER_CNT","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
+    exp = [[wl,n,algo,rpq,p,dc,base_table_size*n,tup_wr_perc,txn_wr_perc,6,ir,er,ld,sk,thr,0] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,dc,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,ndcs,tapir,early)]
     return fmt,exp
 
 def ycsb_early_dcs():
@@ -765,12 +809,12 @@ def ycsb_early_dcs():
     ndcs = [2,3,4,5,6]
     base_table_size= 1048576
     txn_write_perc = [1]
-    tup_write_perc = [0.2]
+    tup_write_perc = [0.5]
     tcnt = [20]
     skew = [0.2]
     rpq =  12
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","DC_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
-    exp = [[wl,n,algo,rpq,p,dc,base_table_size*n,tup_wr_perc,txn_wr_perc,ir,er,ld,sk,thr,0] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,dc,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,ndcs,tapir,early)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","DC_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","CENTER_CNT","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
+    exp = [[wl,n,algo,rpq,p,dc,base_table_size*n,tup_wr_perc,txn_wr_perc,6,ir,er,ld,sk,thr,0] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,dc,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,ndcs,tapir,early)]
     return fmt,exp
 
 def ycsb_partitions_distr():
@@ -826,8 +870,8 @@ def tpcc_scaling_n():
     load = [320]
     tcnt = [20]
     ctcnt = [1]
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,ir,er,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
+    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
 
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
@@ -847,8 +891,8 @@ def tpcc_scaling_p():
     load = [20000]
     tcnt = [20]
     ctcnt = [4]
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,ir,er,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
+    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
     return fmt,exp
@@ -865,11 +909,11 @@ def tpcc_scaling_n_early():
     # npercpay=[1.0]
     wh=16
     # wh=64
-    load = [320]
+    load = [240]
     tcnt = [20]
     ctcnt = [1]
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,ir,er,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
+    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
 
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
@@ -889,8 +933,8 @@ def tpcc_scaling_p_early():
     load = [20000]
     tcnt = [20]
     ctcnt = [4]
-    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,ir,er,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
+    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
     return fmt,exp
@@ -1205,6 +1249,7 @@ experiment_map = {
     'ycsb_network_delay': ycsb_network_delay,
     'ycsb_network_delay2': ycsb_network_delay2,
     'ycsb_early_network_delay':ycsb_early_network_delay,
+    'ycsb_early_network_delay2':ycsb_early_network_delay2,
     'isolation_levels': isolation_levels,
     'ycsb_partitions': ycsb_partitions,
     'ycsb_tapir_partitions':ycsb_tapir_partitions,
@@ -1259,6 +1304,7 @@ experiment_map = {
     'ycsb_tapir_thread': ycsb_tapir_thread,
     'ycsb_tapir_cross_dc': ycsb_tapir_cross_dc,
     'ycsb_tapir_network_delay':ycsb_tapir_network_delay,
+    'ycsb_tapir_network_delay2':ycsb_tapir_network_delay2,
     'ycsb_tapir_skew':ycsb_tapir_skew,
     'ycsb_tapir_writes':ycsb_tapir_writes,
 }
@@ -1267,6 +1313,7 @@ experiment_map = {
 # Default values for variable configurations
 configs = {
     "NODE_CNT" : 5,
+    "CENTER_CNT": 4,
     "THREAD_CNT": 24,
     "REPLICA_CNT": 0,
     "REPLICA_TYPE": "AP",
@@ -1283,7 +1330,8 @@ configs = {
     "TPORT_TYPE":"IPC",
     "TPORT_PORT":"18000",
     "PART_CNT": "NODE_CNT",
-    "PART_PER_TXN": 4,
+    "PART_PER_TXN": 2,
+    "DC_PER_TXN": 2,
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '100000000UL',
     "COROUTINE_CNT": 4,

@@ -254,7 +254,7 @@ for exp in exps:
 
     wr = []
     for e in experiments:
-        wr.append(e[-5])
+        wr.append(e[4])
     wr = sorted(list(set(wr)))
 
     cn = []
@@ -308,6 +308,8 @@ for exp in exps:
     elif exp == 'ycsb_early_cross_dc':
         cmd='sh result.sh -a ycsb_early_cross_dc -n {} -c {} -dc {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in dcp]), strnow)
     elif exp == 'ycsb_tapir_network_delay':
+        cmd='sh result.sh -a ycsb_tapir_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
+    elif exp == 'ycsb_tapir_network_delay2':
         cmd='sh result.sh -a ycsb_tapir_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
     elif exp == 'ycsb_early_network_delay':
         cmd='sh result.sh -a ycsb_early_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)

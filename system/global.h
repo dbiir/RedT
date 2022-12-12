@@ -453,3 +453,4 @@ extern uint64_t total_num_msgs_commit;
 extern uint64_t max_num_msgs_rw;
 extern uint64_t max_num_msgs_prep;
 extern uint64_t max_num_msgs_commit;
+extern uint64_t total_num_rts_prep;

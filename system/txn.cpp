@@ -771,6 +771,11 @@ void TxnManager::send_prepare_messages() {
 			}
 		}
 	}
+	if(rsp_cnt > 0){
+		total_num_rts_prep += 3;
+	}else{
+		total_num_rts_prep += 2;
+	}
 	// printf("%d:%d start prepare rsp_cnt: %d\n", g_node_id, get_txn_id(),rsp_cnt);
 	for(int i=0;i<rsp_cnt;i++){
 		// printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
