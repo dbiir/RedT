@@ -305,6 +305,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
     else {  //no conflict
     lock:
         DEBUG("1lock (%ld,%ld): owners %d, own type %d, req type %d, key %ld %lx\n", txn->get_txn_id(), txn->get_batch_id(), owner_cnt, lock_type, type, _row->get_primary_key(), (uint64_t)_row);
+        // printf("1lock (%ld,%ld): owners %d, own type %d, req type %d, key %ld %lx\n", txn->get_txn_id(), txn->get_batch_id(), owner_cnt, lock_type, type, _row->get_primary_key(), (uint64_t)_row);
 #if DEBUG_TIMELINE
         printf("LOCK %ld %ld\n",entry->txn->get_txn_id(),entry->start_ts);
 #endif
@@ -391,6 +392,8 @@ RC Row_lock::lock_release(TxnManager * txn) {
     }
     DEBUG("unlock (%ld,%ld) success: owners %d, own type %d, key %ld %lx\n", txn->get_txn_id(),
             txn->get_batch_id(), owner_cnt, lock_type, _row->get_primary_key(), (uint64_t)_row);
+    // printf("unlock (%ld,%ld) success: owners %d, own type %d, key %ld %lx\n", txn->get_txn_id(),
+            // txn->get_batch_id(), owner_cnt, lock_type, _row->get_primary_key(), (uint64_t)_row);
 #else
     // Try to find the entry in the owners
     LockEntry * en = owners[hash(txn->get_txn_id())];

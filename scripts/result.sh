@@ -1,4 +1,4 @@
-set -x
+# set -x
 
 PHASE=5
 Latency="trans_total_run_time
@@ -59,6 +59,12 @@ do
             ;;
         -CO)
             COROUTINE=($(echo $2 | tr ',' ' '))
+            shift
+            shift
+            ;;
+        -D)
+            # DCS=$2
+            DCS=($(echo $2 | tr ',' ' '))
             shift
             shift
             ;;
@@ -171,16 +177,25 @@ ArgsType() {
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_skew' ]]
     then
         args=("${SKEW[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_skew' ]]
+    then
+        args=("${SKEW[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_cross_dc' ]]
     then
         args=("${CROSSDCPERC[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_cross_dc' ]]
     then
         args=("${CROSSDCPERC[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_cross_dc' ]]
+    then
+        args=("${CROSSDCPERC[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_network_delay' ]]
     then
         args=("${NETWORKDELAY[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_network_delay' ]]
+    then
+        args=("${NETWORKDELAY[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_network_delay' ]]
     then
         args=("${NETWORKDELAY[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_scaling' || "${TEST_TYPE}" == 'ycsb_scaling_tcp' || "${TEST_TYPE}" == 'ycsb_scaling_two_sided' || "${TEST_TYPE}" == 'ycsb_scaling_one_sided' || "${TEST_TYPE}" == 'ycsb_scaling_coroutine' || "${TEST_TYPE}" == 'ycsb_scaling_dbpa' || "${TEST_TYPE}" == 'ycsb_scaling_all' ]]
@@ -216,6 +231,9 @@ ArgsType() {
     elif [[ "${TEST_TYPE}" == 'ycsb_partitions' ]]
     then
         args=("${PART[@]}")
+    elif [[ "${TEST_TYPE}" == 'ycsb_dcs' ]]
+    then
+        args=("${DCS[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_sk_partitions' ]]
     then
         args=("${PART[@]}")
@@ -232,16 +250,25 @@ FileName() {
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_skew' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _SKEW-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_skew' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _SKEW-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_cross_dc' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_cross_dc' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_cross_dc' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_network_delay' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_network_delay' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_early_network_delay' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_scaling' || "${TEST_TYPE}" == 'ycsb_scaling_tcp' || "${TEST_TYPE}" == 'ycsb_scaling_two_sided' || "${TEST_TYPE}" == 'ycsb_scaling_one_sided' || "${TEST_TYPE}" == 'ycsb_scaling_coroutine' || "${TEST_TYPE}" == 'ycsb_scaling_dbpa' || "${TEST_TYPE}" == 'ycsb_scaling_all' ]]
@@ -277,6 +304,9 @@ FileName() {
     elif [[ "${TEST_TYPE}" == 'ycsb_partitions' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _PPT-${arg}_ | grep ^${i}_)
+    elif [[ "${TEST_TYPE}" == 'ycsb_dcs' ]]
+    then
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _DC_PER_TXN-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_sk_partitions' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _PPT-${arg}_ | grep ^${i}_ | grep _SKEW-${SKEW})

@@ -93,21 +93,85 @@ RC YCSBTxnManager::acquire_locks() {
 	return rc;
 }
 
+void YCSBTxnManager::get_num_msgs_statistics() {
+	//node location of replicas
+	unordered_set<uint64_t> w_pry_loc;
+	unordered_set<uint64_t> r_pry_loc;
+	unordered_set<uint64_t> w_sec_loc;
+	unordered_set<uint64_t> r_sec_loc;
+	//note: each node is counted only once, with priority in descending order.
+	uint64_t w_pry_num[g_center_cnt];	//num of nodes with primary replicas to write, in each center
+	uint64_t r_pry_num[g_center_cnt];	//num of nodes with primary replicas to read, in each center
+	uint64_t w_sec_num[g_center_cnt];	//num of nodes with secondary replicas to write, in each center
+	uint64_t r_sec_num[g_center_cnt];	//num of nodes with secondary replicas to read, in each center
+	for(uint64_t i=0;i<g_center_cnt;i++){
+		w_pry_num[i] = 0; r_pry_num[i] = 0; w_sec_num[i] = 0; r_sec_num[i] = 0;
+	}
+	// //TAPIR may read from the nearest replica
+	// unordered_set<uint64_t> read_to_reduce; 
+	// uint64_t reduce_cnt = 0;
+	
+	//get location
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	for(int i = 0; i < ycsb_query->requests.size(); i++) {
+		ycsb_request * req = ycsb_query->requests[i];
+		uint64_t part_id = _wl->key_to_part(req->key);
+		if(req->acctype == WR){
+			w_pry_loc.insert(GET_NODE_ID(part_id));
+			w_sec_loc.insert(GET_FOLLOWER1_NODE(part_id));
+			w_sec_loc.insert(GET_FOLLOWER2_NODE(part_id));
+		}else if(req->acctype == RD){
+			r_pry_loc.insert(GET_NODE_ID(part_id));
+			r_sec_loc.insert(GET_FOLLOWER1_NODE(part_id));
+			r_sec_loc.insert(GET_FOLLOWER2_NODE(part_id));			
+			// if(GET_CENTER_ID(GET_NODE_ID(part_id)) != g_center_id && (GET_CENTER_ID(GET_FOLLOWER1_NODE(part_id)) == g_center_id || GET_CENTER_ID(GET_FOLLOWER2_NODE(part_id)) == g_center_id)){
+			// 	read_to_reduce.insert(GET_NODE_ID(part_id));
+			// }
+		}else assert(false);
+	}
+	
+	//get num of nodes per center
+	for(int j=0;j<g_node_cnt;j++){
+		if(w_pry_loc.count(j) > 0){
+			w_pry_num[GET_CENTER_ID(j)]++;
+		}else if(r_pry_loc.count(j) > 0){
+			r_pry_num[GET_CENTER_ID(j)]++;
+			// if(read_to_reduce.count(j)>0) reduce_cnt++;				
+		}else if(w_sec_loc.count(j) > 0){
+			w_sec_num[GET_CENTER_ID(j)]++;
+		}else if(r_sec_loc.count(j) > 0){
+			r_sec_num[GET_CENTER_ID(j)]++;
+		}
+	}
+	
+	//get number of messages
+	assert(num_msgs_rw==0);
+	assert(num_msgs_prep==0);
+	assert(num_msgs_commit==0);
+	int m = 2;
+	int M = 2;
+
+#if USE_TAPIR
+	//for TAPIR
+	for(uint64_t i=0;i<g_center_cnt;i++){
+		if(i == g_center_id){
+		}else{
+			num_msgs_rw += w_pry_num[i] + r_pry_num[i] + w_sec_num[i] + r_sec_num[i];
+			num_msgs_prep += w_pry_num[i] + w_sec_num[i];
+			num_msgs_commit += w_pry_num[i] + r_pry_num[i] + w_sec_num[i] + r_sec_num[i];
+		}
+	}
+#endif
+
+	num_msgs_rw *= 2;
+	num_msgs_prep *= 2;
+	num_msgs_commit *= 2;
+}
+
+
 RC YCSBTxnManager::send_remote_subtxn() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	RC rc = RCOK;
-
-	unordered_set<uint64_t> at;
-	unordered_set<uint64_t> bt;
-	unordered_set<uint64_t> ct;
-	uint64_t aa[g_center_cnt];	//write primary
-	uint64_t bb[g_center_cnt];	//read primary
-	uint64_t cc[g_center_cnt];	//write secondary
-	unordered_set<uint64_t> read_to_reduce; 
-	uint64_t reduce_cnt = 0;
-	for(uint64_t i=0;i<g_center_cnt;i++){
-		aa[i] = 0; bb[i] = 0; cc[i] = 0;
-	}
 
 	bool is_primary[g_node_cnt]; //is center_master has primary replica or not
 	// int remote_replica_node[g_node_cnt];
@@ -117,110 +181,89 @@ RC YCSBTxnManager::send_remote_subtxn() {
 		uint64_t part_id = _wl->key_to_part(req->key);
 		vector<uint64_t> node_id;
 #if USE_REPLICA	
-		if(req->acctype == WR){
-			at.insert(GET_NODE_ID(part_id));
-			ct.insert(GET_FOLLOWER1_NODE(part_id));
-			ct.insert(GET_FOLLOWER2_NODE(part_id));
-		}else if(req->acctype == RD){
-			bt.insert(GET_NODE_ID(part_id));
-			if(GET_CENTER_ID(GET_NODE_ID(part_id)) != g_center_id && (GET_CENTER_ID(GET_FOLLOWER1_NODE(part_id)) == g_center_id || GET_CENTER_ID(GET_FOLLOWER2_NODE(part_id)) == g_center_id)){
-				read_to_reduce.insert(GET_NODE_ID(part_id));
-			}
-		}else assert(false);
 		// node_id.push_back(GET_NODE_ID(part_id));
 		// node_id.push_back(GET_FOLLOWER1_NODE(part_id));
 		// node_id.push_back(GET_FOLLOWER2_NODE(part_id));		
 #else
 		node_id.push_back(GET_NODE_ID(part_id));		
 #endif
-#if USE_TAPIR && TAPIR_REPLICA
-		for(int j = 0; j < node_id.size(); j++) {
-			// remote_replica_node[j] = 1;
-			ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id[j]));
-		}
-		if(req->acctype == WR) ycsb_query->partitions_modified.add_unique(_wl->key_to_part(ycsb_query->requests[i]->key));
-	}
-	rsp_cnt = query->partitions_touched.size() - 1;
-	#if TAPIR_DEBUG
-		printf("send %d rqry %d messages\n",get_txn_id(), rsp_cnt);
-	#endif
-	for(int i = 0; i < query->partitions_touched.size(); i++) {
-		if(query->partitions_touched[i] != g_node_id) {
-	#if TAPIR_DEBUG
-				printf("send %d rqry message to node:%d \n",get_txn_id(), query->partitions_touched[i]);
-	#endif
-			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),query->partitions_touched[i]);
-		}
+// #if USE_TAPIR && TAPIR_REPLICA
+// 		for(int j = 0; j < node_id.size(); j++) {
+// 			// remote_replica_node[j] = 1;
+// 			ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id[j]));
+// 		}
+// 		if(req->acctype == WR) ycsb_query->partitions_modified.add_unique(_wl->key_to_part(ycsb_query->requests[i]->key));
+// 	}
+// 	rsp_cnt = query->partitions_touched.size() - 1;
+// 	#if TAPIR_DEBUG
+// 		printf("send %d rqry %d messages\n",get_txn_id(), rsp_cnt);
+// 	#endif
+// 	for(int i = 0; i < query->partitions_touched.size(); i++) {
+// 		if(query->partitions_touched[i] != g_node_id) {
+// 	#if TAPIR_DEBUG
+// 				printf("send %d rqry message to node:%d \n",get_txn_id(), query->partitions_touched[i]);
+// 	#endif
+// 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),query->partitions_touched[i]);
+// 		}
 		
-	}
-		// for(int i = 0; i < g_node_cnt; i++) {
-		// if(i != g_node_id && remote_node[i].size() > 0) {//send message to all masters
-		// 	remote_next_node_id = i;
-		// 	// printf("%d \n",remote_node[i].size());
-		// 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
-		// 	// printf("send subtxn to %d\n", i);
-		// }
-#else
+// 	}
+// 		// for(int i = 0; i < g_node_cnt; i++) {
+// 		// if(i != g_node_id && remote_node[i].size() > 0) {//send message to all masters
+// 		// 	remote_next_node_id = i;
+// 		// 	// printf("%d \n",remote_node[i].size());
+// 		// 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
+// 		// 	// printf("send subtxn to %d\n", i);
+// 		// }
+// #else
 		uint64_t n_id = GET_NODE_ID(part_id);
 		remote_node[n_id].push_back(i);
 		// ycsb_query->centers_touched.add_unique(center_id);
 		ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,n_id));
+		// ycsb_query->centers_touched.add_unique(center_id);
+#if USE_TAPIR && TAPIR_REPLICA 
+		n_id = GET_FOLLOWER1_NODE(part_id);
+		remote_node[n_id].push_back(i);
+		n_id = GET_FOLLOWER2_NODE(part_id);
+		remote_node[n_id].push_back(i);
+#endif
 		//center_master is set as the first toughed primary, if not exist, use the first toughed backup.
 		// auto ret = center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id[j]));
 		if(req->acctype == WR) ycsb_query->partitions_modified.add_unique(_wl->key_to_part(ycsb_query->requests[i]->key));
 	}
-	
-	for(int j=0;j<g_node_cnt;j++){
-		if(at.count(j) > 0){
-			aa[GET_CENTER_ID(j)]++;
-		}else if(bt.count(j) > 0){
-			bb[GET_CENTER_ID(j)]++;
-			if(read_to_reduce.count(j)>0) reduce_cnt++;				
-		}else if(ct.count(j) > 0){
-			cc[GET_CENTER_ID(j)]++;
+#if USE_TAPIR && TAPIR_REPLICA
+	// rsp_cnt = query->partitions_touched.size() - 1;
+	rsp_cnt = 0;
+	for(int i = 0; i < query->partitions_touched.size(); i++) {
+		uint64_t part_id = query->partitions_touched[i];
+		ir_log_rsp_cnt[i] = 3;
+		uint64_t l_node = GET_NODE_ID(part_id);
+		uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
+		uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
+		bool exist = false;
+		if(l_node == g_node_id || f1 == g_node_id || f2 == g_node_id) {
+			ir_log_rsp_cnt[i]--;
 		}
 	}
+#else
 	rsp_cnt = query->partitions_touched.size() - 1;
-	assert(num_msgs_rw==0);
+#endif
 	for(int i = 0; i < g_node_cnt; i++) {
 		if(i != g_node_id && remote_node[i].size() > 0) {//send message to all masters
+#if USE_TAPIR && TAPIR_REPLICA
+			rsp_cnt++;
+#endif
 			remote_next_node_id = i;
 			// printf("%d \n",remote_node[i].size());
 #if TAPIR_DEBUG
 			printf("send %d rqry message to node:%d \n",get_txn_id(), i);
 #endif
-			num_msgs_rw++;
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
 			// printf("txn %ld send subtxn to %d\n", get_txn_id(), i);
 		}
 	}
-#endif
+// #endif
 	// printf("txn %d send subtxn success \n", get_txn_id());
-	assert(num_msgs_prep==0);
-	assert(num_msgs_commit==0);
-#if USE_TAPIR	
-	assert(num_msgs_rw >= reduce_cnt);
-	num_msgs_rw -= reduce_cnt;
-	for(uint64_t i=0;i<g_center_cnt;i++){
-		if(i != g_center_id){
-			num_msgs_prep += aa[i] + cc[i];
-			num_msgs_commit += aa[i] + bb[i] + cc[i];
-		}
-	}
-#else 
-	// uint64_t temp_num_msgs_rw;
-	for(uint64_t i=0;i<g_center_cnt;i++){
-		if(i == g_center_id){
-			num_msgs_prep += 2*aa[i];
-			num_msgs_commit += 2*aa[i];
-		}else{
-			num_msgs_prep += 3*aa[i];
-			num_msgs_commit += 3*aa[i] + bb[i];
-			// temp_num_msgs_rw += aa[i] + bb[i];
-		}
-	}
-	// assert(temp_num_msgs_rw == num_msgs_rw);
-#endif 
+	get_num_msgs_statistics();
 	return rc;
 }
 
@@ -279,7 +322,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	// 	INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - start_rw_time);
 	// 	start_logging_time = get_sys_clock();
 	// }
-	if(rsp_cnt > 0) {
+	if(rsp_cnt > 0 && IS_LOCAL(txn->txn_id)) {
 		return WAIT;
 	} else {
 		// if(IS_LOCAL(get_txn_id())) {
@@ -423,7 +466,12 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	ycsb_request * req = ycsb_query->requests[next_record_id];
 	uint64_t part_id = _wl->key_to_part( req->key );
-  	bool loc = GET_NODE_ID(part_id) == g_node_id;
+#if USE_TAPIR && TAPIR_REPLICA
+	bool loc = GET_NODE_ID(part_id) == g_node_id || GET_FOLLOWER1_NODE(part_id) == g_node_id || GET_FOLLOWER2_NODE(part_id) == g_node_id;
+#else
+	bool loc = GET_NODE_ID(part_id) == g_node_id;
+#endif
+	
 	
 	RC rc = RCOK;
 	switch (state) {

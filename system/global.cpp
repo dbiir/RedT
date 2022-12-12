@@ -116,6 +116,7 @@ bool g_mem_pad = MEM_PAD;
 UInt32 g_cc_alg = CC_ALG;
 ts_t g_query_intvl = QUERY_INTVL;
 UInt32 g_part_per_txn = PART_PER_TXN;
+UInt32 g_dc_per_txn = DC_PER_TXN;
 double g_perc_multi_part = PERC_MULTI_PART;
 double g_txn_read_perc = 1.0 - TXN_WRITE_PERC;
 double g_txn_write_perc = TXN_WRITE_PERC;

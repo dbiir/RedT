@@ -332,10 +332,15 @@ void WorkerThread::abort() {
   INC_STATS(get_thd_id(), trans_abort_count, 1);
   INC_STATS(get_thd_id(), trans_total_count, 1);
   #if WORKLOAD != DA //actually DA do not need real abort. Just count it and do not send real abort msg.
+  // uint64_t penalty =
+      // abort_queue.enqueue(get_thd_id(), txn_man->get_txn_id(), txn_man->get_abort_cnt());
   uint64_t penalty =
-      abort_queue.enqueue(get_thd_id(), txn_man->get_txn_id(), txn_man->get_abort_cnt());
+      abort_queue.enqueue(get_thd_id(), txn_man->get_txn_id(), txn_man, txn_man->get_abort_cnt());
   // printf("abort txn %ld client %d, is local %d?\n", txn_man->get_txn_id(), txn_man->client_id, IS_LOCAL(txn_man->get_txn_id()));
   txn_man->txn_stats.total_abort_time += penalty;
+  #if ABORT_TXN_TO_CL_QRY
+  release_txn_man();
+  #endif
   #endif
 }
 
@@ -431,7 +436,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
     DEBUG("worker run txn %ld type %d \n", msg->get_txn_id(),msg->get_rtype());
     if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O && msg->rtype != RLOG && msg->rtype != RFIN_LOG) || CC_ALG == CALVIN) {
       txn_man = get_transaction_manager(msg);
-      if(msg->rtype == RACK_LOG || msg->rtype == RACK_FIN_LOG || msg->rtype == RACK_FIN || msg->rtype == RACK_PREP
+      if(msg->rtype == RACK_LOG || msg->rtype == RACK_FIN_LOG || msg->rtype == RACK_FIN || msg->rtype == RACK_PREP || msg->rtype == RQRY_RSP
       //  || msg->rtype == RPREPARE
        ){ 
         // printf("txn %ld type %d check already commit\n", msg->get_txn_id(),msg->get_rtype());
@@ -845,7 +850,7 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
 #if TAPIR_DEBUG
   printf("%d receive rfin rack messages from %d\n", txn_man->get_txn_id(), msg->return_node_id);
 #endif
-#if USE_TAPIR
+#if USE_TAPIR && !TAPIR_REPLICA
   responses_left = txn_man->received_tapir_fin_response(((AckMessage*)msg)->rc, msg->return_node_id);
   assert(responses_left >= 0);
   // if(responses_left < 0) {
@@ -905,11 +910,17 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
 #endif
 #if PARAL_SUBTXN == true
   if (!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) return RCOK;
-  if(((QueryResponseMessage*)msg)->rc == Abort) {
-    txn_man->start_abort(yield, cor_id);
-    return Abort;
-  }
-  int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+  // if(((QueryResponseMessage*)msg)->rc == Abort) {
+  //   txn_man->start_abort(yield, cor_id);
+  //   return Abort;
+  // }
+  int responses_left = 0;
+  // #if USE_TAPIR && TAPIR_REPLICA
+  // responses_left = txn_man->received_tapir_rw_response(((AckMessage*)msg)->rc);
+  // // assert(responses_left >= 0);
+  // #else
+  responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+  // #endif
   // if(responses_left < 0) {
   //     printf("%d receive extra messages %d\n", txn_man->get_txn_id(), responses_left);
   // }
@@ -924,12 +935,13 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
 #endif
   txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
   
-  if(((QueryResponseMessage*)msg)->rc == Abort) {
-    txn_man->start_abort(yield, cor_id);
-    return Abort;
-  }
+  // if(((QueryResponseMessage*)msg)->rc == Abort) {
+  //   txn_man->start_abort(yield, cor_id);
+  //   return Abort;
+  // }
   txn_man->send_RQRY_RSP = false;
-  RC rc = ((QueryResponseMessage*)msg)->rc;
+  // RC rc = ((QueryResponseMessage*)msg)->rc;
+  RC rc = txn_man->get_rc();
 #if PARAL_SUBTXN
 	if(IS_LOCAL(txn_man->get_txn_id())) {  
     
@@ -975,7 +987,7 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
   txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
 #endif
 #if CC_ALG == MAAT
-    time_table.init(get_thd_id(),txn_man->get_txn_id());
+  time_table.init(get_thd_id(),txn_man->get_txn_id());
 #endif
   txn_man->send_RQRY_RSP = true;
   txn_man->finish_logging = true;
@@ -984,6 +996,9 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
   txn_man->abort_cnt = msg->current_abort_cnt;
   // Send response
   if(rc != WAIT) {
+#if TAPIR_DEBUG
+		printf("%d:%d send rqry_rsp to %d\n", g_node_id, txn_man->get_txn_id(), txn_man->return_id);
+#endif
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),txn_man->return_id);
   }
   return rc;
@@ -1000,6 +1015,9 @@ RC WorkerThread::process_rqry_cont(yield_func_t &yield, Message * msg, uint64_t 
 
   // Send response
   if(rc != WAIT) {
+#if TAPIR_DEBUG
+		printf("%d:%d send rqry_rsp to %d\n", g_node_id, txn_man->get_txn_id(), txn_man->return_id);
+#endif
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RQRY_RSP),txn_man->return_id);
   }
   return rc;
