@@ -183,12 +183,27 @@ void WorkerThread::commit() {
   DEBUG_T("COMMIT %ld -- %f\n", txn_man->get_txn_id(),
         (double)get_sys_clock() - run_starttime / BILLION);
   total_local_txn_commit++;
+#if CC_ALG == MDCC
+  assert(txn_man->num_msgs_rw == 0);
+
+  uint64_t num_msgs;
+  if(txn_man->lock_status == LOCK_FIRST_SUCCESS){ //commit after 2 rts
+    num_msgs = txn_man->num_msgs_prep;
+    total_num_rts_commit += 1; 
+  }else if(txn_man->lock_status == LOCK_SECOND_SUCCESS){ //commit after 4 rts
+    num_msgs = txn_man->num_msgs_prep + txn_man->num_msgs_commit;   
+    total_num_rts_commit += 3; 
+  }else assert(false);
+  total_num_msgs_commit += num_msgs;
+  if(num_msgs > max_num_msgs_commit) max_num_msgs_commit = num_msgs;
+#else
   total_num_msgs_rw += txn_man->num_msgs_rw;
   total_num_msgs_prep += txn_man->num_msgs_prep;
   total_num_msgs_commit += txn_man->num_msgs_commit;
   if(txn_man->num_msgs_rw > max_num_msgs_rw) max_num_msgs_rw = txn_man->num_msgs_rw;
   if(txn_man->num_msgs_prep > max_num_msgs_prep) max_num_msgs_prep = txn_man->num_msgs_prep;
   if(txn_man->num_msgs_commit > max_num_msgs_commit) max_num_msgs_commit = txn_man->num_msgs_commit;
+#endif
 
   assert(txn_man);
   assert(IS_LOCAL(txn_man->get_txn_id()));

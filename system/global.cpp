@@ -292,3 +292,4 @@ uint64_t total_num_msgs_commit = 0;
 uint64_t max_num_msgs_rw = 0;
 uint64_t max_num_msgs_prep = 0;
 uint64_t max_num_msgs_commit = 0;
+uint64_t total_num_rts_commit = 0;

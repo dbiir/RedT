@@ -98,16 +98,18 @@ void YCSBTxnManager::get_num_msgs_statistics() {
 	unordered_set<uint64_t> w_pry_loc;
 	unordered_set<uint64_t> r_pry_loc;
 	unordered_set<uint64_t> w_sec_loc;
+	unordered_set<uint64_t> r_sec_loc;
 	//note: each node is counted only once, with priority in descending order.
 	uint64_t w_pry_num[g_center_cnt];	//num of nodes with primary replicas to write, in each center
 	uint64_t r_pry_num[g_center_cnt];	//num of nodes with primary replicas to read, in each center
 	uint64_t w_sec_num[g_center_cnt];	//num of nodes with secondary replicas to write, in each center
+	uint64_t r_sec_num[g_center_cnt];	//num of nodes with secondary replicas to read, in each center
 	for(uint64_t i=0;i<g_center_cnt;i++){
-		w_pry_num[i] = 0; r_pry_num[i] = 0; w_sec_num[i] = 0;
+		w_pry_num[i] = 0; r_pry_num[i] = 0; w_sec_num[i] = 0; r_sec_num[i] = 0;
 	}
-	//TAPIR may read from the nearest replica
-	unordered_set<uint64_t> read_to_reduce; 
-	uint64_t reduce_cnt = 0;
+	// //TAPIR may read from the nearest replica
+	// unordered_set<uint64_t> read_to_reduce; 
+	// uint64_t reduce_cnt = 0;
 	
 	//get location
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
@@ -120,9 +122,11 @@ void YCSBTxnManager::get_num_msgs_statistics() {
 			w_sec_loc.insert(GET_FOLLOWER2_NODE(part_id));
 		}else if(req->acctype == RD){
 			r_pry_loc.insert(GET_NODE_ID(part_id));
-			if(GET_CENTER_ID(GET_NODE_ID(part_id)) != g_center_id && (GET_CENTER_ID(GET_FOLLOWER1_NODE(part_id)) == g_center_id || GET_CENTER_ID(GET_FOLLOWER2_NODE(part_id)) == g_center_id)){
-				read_to_reduce.insert(GET_NODE_ID(part_id));
-			}
+			r_sec_loc.insert(GET_FOLLOWER1_NODE(part_id));
+			r_sec_loc.insert(GET_FOLLOWER2_NODE(part_id));			
+			// if(GET_CENTER_ID(GET_NODE_ID(part_id)) != g_center_id && (GET_CENTER_ID(GET_FOLLOWER1_NODE(part_id)) == g_center_id || GET_CENTER_ID(GET_FOLLOWER2_NODE(part_id)) == g_center_id)){
+			// 	read_to_reduce.insert(GET_NODE_ID(part_id));
+			// }
 		}else assert(false);
 	}
 	
@@ -132,9 +136,11 @@ void YCSBTxnManager::get_num_msgs_statistics() {
 			w_pry_num[GET_CENTER_ID(j)]++;
 		}else if(r_pry_loc.count(j) > 0){
 			r_pry_num[GET_CENTER_ID(j)]++;
-			if(read_to_reduce.count(j)>0) reduce_cnt++;				
+			// if(read_to_reduce.count(j)>0) reduce_cnt++;				
 		}else if(w_sec_loc.count(j) > 0){
 			w_sec_num[GET_CENTER_ID(j)]++;
+		}else if(r_sec_loc.count(j) > 0){
+			r_sec_num[GET_CENTER_ID(j)]++;
 		}
 	}
 	
@@ -142,29 +148,23 @@ void YCSBTxnManager::get_num_msgs_statistics() {
 	assert(num_msgs_rw==0);
 	assert(num_msgs_prep==0);
 	assert(num_msgs_commit==0);
-#if USE_TAPIR	
-	for(uint64_t i=0;i<g_center_cnt;i++){
-		if(i != g_center_id){
-			num_msgs_rw += w_pry_num[i] + r_pry_num[i];
-			num_msgs_prep += w_pry_num[i] + w_sec_num[i];
-			num_msgs_commit += w_pry_num[i] + r_pry_num[i] + w_sec_num[i];
-		}
-	}
-	assert(num_msgs_rw >= reduce_cnt);
-	num_msgs_rw -= reduce_cnt;
-#else 
+	int m = 2;
+	int M = 2;
+
+#if CC_ALG == MDCC
+	//for MDCC
 	for(uint64_t i=0;i<g_center_cnt;i++){
 		if(i == g_center_id){
-			num_msgs_prep += 2*w_pry_num[i];
-			num_msgs_commit += 2*w_pry_num[i];
+			num_msgs_commit += m*w_pry_num[i] + m*r_pry_num[i];
 		}else{
-			num_msgs_rw += w_pry_num[i] + r_pry_num[i];
-			num_msgs_prep += 3*w_pry_num[i];
-			num_msgs_commit += 3*w_pry_num[i] + r_pry_num[i];
+			num_msgs_prep += w_pry_num[i] + r_pry_num[i] + w_sec_num[i] + r_sec_num[i];
+			num_msgs_commit += (m+1)*w_pry_num[i] + (m+1)*r_pry_num[i];
 		}
 	}
-#endif 
-
+#endif
+	num_msgs_rw *= 2;
+	num_msgs_prep *= 2;
+	num_msgs_commit *= 2;
 }
 
 RC YCSBTxnManager::send_remote_subtxn() {

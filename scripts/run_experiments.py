@@ -254,7 +254,7 @@ for exp in exps:
 
     wr = []
     for e in experiments:
-        wr.append(e[-5])
+        wr.append(e[4])
     wr = sorted(list(set(wr)))
 
     cn = []
@@ -293,18 +293,30 @@ for exp in exps:
         cmd='sh result.sh -a ycsb_skew -n {} -c {} -s {} -t {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in sk]), strnow)
     elif exp == 'ycsb_tapir_skew':
         cmd='sh result.sh -a ycsb_tapir_skew -n {} -c {} -s {} -t {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in sk]), strnow)
+    elif exp == 'ycsb_early_skew':
+        cmd='sh result.sh -a ycsb_early_skew -n {} -c {} -s {} -t {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in sk]), strnow)
     elif exp == 'ycsb_cross_dc':
         cmd='sh result.sh -a ycsb_cross_dc -n {} -c {} -dc {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in dcp]), strnow)
     elif exp == 'ycsb_network_delay':
+        cmd='sh result.sh -a ycsb_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
+    elif exp == 'ycsb_network_delay2':
         cmd='sh result.sh -a ycsb_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
     elif exp == 'ycsb_writes':
         cmd='sh result.sh -a ycsb_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join([str(x) for x in al]), ','.join([str(x) for x in wr]), strnow)
     elif exp == 'ycsb_tapir_cross_dc':
         cmd='sh result.sh -a ycsb_tapir_cross_dc -n {} -c {} -dc {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in dcp]), strnow)
+    elif exp == 'ycsb_early_cross_dc':
+        cmd='sh result.sh -a ycsb_early_cross_dc -n {} -c {} -dc {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in dcp]), strnow)
     elif exp == 'ycsb_tapir_network_delay':
+        cmd='sh result.sh -a ycsb_tapir_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
+    elif exp == 'ycsb_tapir_network_delay2':
         cmd='sh result.sh -a ycsb_tapir_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
     elif exp == 'ycsb_early_network_delay':
         cmd='sh result.sh -a ycsb_early_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
+    elif exp == 'ycsb_early_network_delay2':
+        cmd='sh result.sh -a ycsb_early_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
+    elif exp == 'ycsb_early_writes':
+        cmd='sh result.sh -a ycsb_tapir_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join([str(x) for x in al]), ','.join([str(x) for x in wr]), strnow)
     elif exp == 'ycsb_tapir_writes':
         cmd='sh result.sh -a ycsb_tapir_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join([str(x) for x in al]), ','.join([str(x) for x in wr]), strnow)
     elif 'ycsb_scaling' in exp:
@@ -337,7 +349,15 @@ for exp in exps:
         cmd='sh result.sh -a tpcc_thread -n {} -c {} -t {} -T {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in tcnt]))
     elif 'ycsb_partitions' in exp:
         cmd='sh result.sh -a ycsb_partitions -n {} -c {} -t {} -P {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in part]))
+    elif 'ycsb_tapir_partitions' in exp:
+        cmd='sh result.sh -a ycsb_partitions -n {} -c {} -t {} -P {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in part]))
+    elif 'ycsb_early_partitions' in exp:
+        cmd='sh result.sh -a ycsb_partitions -n {} -c {} -t {} -P {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in part]))
     elif 'ycsb_dcs' in exp:
+        cmd='sh result.sh -a ycsb_dcs -n {} -c {} -t {} -D {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in dc]))
+    elif 'ycsb_tapir_dcs' in exp:
+        cmd='sh result.sh -a ycsb_dcs -n {} -c {} -t {} -D {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in dc]))
+    elif 'ycsb_early_dcs' in exp:
         cmd='sh result.sh -a ycsb_dcs -n {} -c {} -t {} -D {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in dc]))
     elif 'ycsb_coroutine' in exp:
         cmd='sh result.sh -a ycsb_coroutine -n {} -c {} -t {} -CO {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in cocnt]))

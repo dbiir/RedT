@@ -787,6 +787,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
   ",avg_num_msgs_rw=%f"
   ",avg_num_msgs_prep=%f"
   ",avg_num_msgs_commit=%f"
+  ",avg_num_rts_commit=%f"  
   ",max_num_msgs_rw=%lu"
   ",max_num_msgs_prep=%lu"
   ",max_num_msgs_commit=%lu"
@@ -810,6 +811,7 @@ void Stats_thd::print(FILE * outf, bool prog) {
           (double)total_num_msgs_rw / (double)total_local_txn_commit, 
           (double)total_num_msgs_prep / (double)total_local_txn_commit, 
           (double)total_num_msgs_commit / (double)total_local_txn_commit, 
+          (double)total_num_rts_commit / (double)total_local_txn_commit, 
           max_num_msgs_rw, 
           max_num_msgs_prep, 
           max_num_msgs_commit,

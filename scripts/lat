@@ -1,7 +1,7 @@
 MDCC 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
-3877.611505
+3833.314901
 0.0
-8996.775102
-0.062788
-1.076194
+10368.112671
+0.066894
+1.008735
