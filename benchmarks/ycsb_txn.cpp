@@ -503,9 +503,8 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 					 (req->second2.stored_node == g_node_id && 
 					 req->second2.execute_node == g_node_id);
 	#else
-	bool is_center = (req->primary.execute_node == g_node_id) ;
-	bool is_local = (req->primary.stored_node == g_node_id && 
-					 req->primary.execute_node == g_node_id);
+	bool is_center = req->primary.execute_node == g_node_id;
+	bool is_local = req->primary.stored_node == g_node_id && req->primary.execute_node == g_node_id;
 
 	#endif
 

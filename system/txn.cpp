@@ -1657,7 +1657,9 @@ RC TxnManager::read_remote_row(yield_func_t &yield, uint64_t target_server,uint6
 	test_row = (row_t *)mem_allocator.alloc(row_t::get_row_size(ROW_DEFAULT_SIZE));
 	memset(test_row, 0, operate_size);
     memcpy(test_row, local_buf, operate_size);
+	#if WORKLOAD == YCSB
 	if (key != UINT64_MAX) assert(test_row->get_primary_key() == key);
+	#endif
     return rc;
 }
 
@@ -1716,8 +1718,7 @@ RC TxnManager::read_remote_content(yield_func_t &yield, uint64_t target_server,u
 	} while (res_p.first == 0);
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 #else
-	// auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 	endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 	INC_STATS(get_thd_id(), rdma_read_cnt, 1); //include index, row, log,...etc read.
@@ -1799,8 +1800,7 @@ RC TxnManager::write_remote_content(yield_func_t &yield, uint64_t target_server,
 		h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 		// yield(h_thd->_routines[0]);
 #else
-		// auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
-		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 		endtime = get_sys_clock();
 		INC_STATS(get_thd_id(), rdma_read_time, endtime-starttime);
 		INC_STATS(get_thd_id(), rdma_read_cnt, 1);
@@ -1860,8 +1860,7 @@ RC TxnManager::faa_remote_content(yield_func_t &yield, uint64_t target_server,ui
 		h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 
 #else
-		// auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
-		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+		auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
 		// RDMA_ASSERT(res_p == rdmaio::IOCode::Ok);
 		endtime = get_sys_clock();
 		INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
@@ -1923,8 +1922,7 @@ RC TxnManager::cas_remote_content(yield_func_t &yield, uint64_t target_server,ui
 	h_thd->cor_process_starttime[cor_id] = get_sys_clock();
 
 #else
-	// auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
-	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp();
+	auto res_p = rc_qp[target_server][thd_id]->wait_one_comp(RDMA_CALLS_TIMEOUT);
     endtime = get_sys_clock();
 	INC_STATS(get_thd_id(), worker_idle_time, endtime-starttime);
 	DEL_STATS(get_thd_id(), worker_process_time, endtime-starttime);

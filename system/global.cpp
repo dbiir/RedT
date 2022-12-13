@@ -238,13 +238,13 @@ UInt64 max_tuple_size = 0;
 pthread_mutex_t * RDMA_MEMORY_LATCH;
 
 // UInt64 rdma_buffer_size = 4*(1024*1024*1024L);
-UInt64 rdma_buffer_size = 8*(1024*1024*1024L);
+UInt64 rdma_buffer_size = 16*(1024*1024*1024L);
 UInt64 client_rdma_buffer_size = 300*(1024*1024L);
 
 UInt64 rdma_routetable_size = 1024*1024L;
 #if USE_REPLICA
 // UInt64 rdma_index_size = (10*1024*1024L*g_part_cnt);
-UInt64 rdma_index_size = (300*1024*1024L*g_part_cnt);
+UInt64 rdma_index_size = (400*1024*1024L*g_part_cnt);
 #else
 UInt64 rdma_index_size = (300*1024*1024L);
 #endif

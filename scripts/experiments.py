@@ -150,17 +150,17 @@ def ycsb_one_sided_cnt():
 
 def ycsb_scaling():
     wl = 'YCSB'
-    nnodes = [12]
-    # nnodes = [3,6,9,12]
+    # nnodes = [6]
+    nnodes = [3,6,9,12]
 
     algos = ['RDMA_NO_WAIT']
 
-    base_table_size=524288 
+    base_table_size=1048576 
     # base_table_size=1048576 
     txn_write_perc = [1]
     tup_write_perc = [0.5]
     tcnt = [20]
-    ctcnt = [4]
+    ctcnt = [1]
     scnt = [1]
     rcnt = [1]
     skew = [0.2]
@@ -894,9 +894,9 @@ def tpcc_scaling():
 def tpcc_scaling_n():
     wl = 'TPCC'
     nnodes = [3,6,9,12]
-    # nnodes = [3,6,9]
-    # nnodes = [3,6,9,12,15]
-    nalgos=['RDMA_NO_WAIT3']
+    # nnodes = [3]
+
+    nalgos=['RDMA_NO_WAIT']
     npercpay=[0.0]
     # npercpay=[1.0]
     wh=16
@@ -1338,7 +1338,7 @@ configs = {
     "NETWORK_DELAY": '10000UL',
     "NETWORK_DELAY_TEST": 'false',
     "DONE_TIMER": "1 * 20 * BILLION // ~1 minutes",
-    "WARMUP_TIMER": "1 * 0 * BILLION // ~1 minutes",
+    "WARMUP_TIMER": "1 * 10 * BILLION // ~1 minutes",
     "SEQ_BATCH_TIMER": "5 * 1 * MILLION // ~5ms -- same as CALVIN paper",
     "BATCH_TIMER" : "0",
     "PROG_TIMER" : "10 * BILLION // in s",

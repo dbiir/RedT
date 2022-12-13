@@ -110,6 +110,7 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time += curr_time - starttime;
 	txn_stats.process_time_short += curr_time - starttime;
 
+	DEBUG_T("Run RDMA txn %ld complete.\n", get_txn_id());
 	if(IS_LOCAL(get_txn_id())) {
 		if(is_done() && rc == RCOK)
 			rc = start_commit(yield, cor_id);
@@ -132,6 +133,7 @@ bool TPCCTxnManager::is_done() {
 		case TPCC_NEW_ORDER:
 			//done = next_item_id == tpcc_query->ol_cnt || state == TPCC_FIN;
 			done = next_item_id >= tpcc_query->items.size() || state == TPCC_FIN;
+			DEBUG_T("txn %ld has done? item id %ld:%ld, status %d\n",get_txn_id(),next_item_id,tpcc_query->items.size(),state)
 			break;
 		default:
 			assert(false);
@@ -304,8 +306,10 @@ void TPCCTxnManager::next_tpcc_state() {
 		case TPCC_NEWORDER5:
 			if(!IS_LOCAL(txn->txn_id) || !is_done()) {
 				state = TPCC_NEWORDER6;
+				DEBUG_T("Txn %ld enter status NEWORDER6\n",get_txn_id());
 			} else {
 				state = TPCC_FIN;
+				DEBUG_T("Txn %ld enter status TPCC_FIN\n",get_txn_id());
 			}
 			break;
 		case TPCC_NEWORDER6: // loop pt 1
@@ -322,11 +326,19 @@ void TPCCTxnManager::next_tpcc_state() {
 			#if PARAL_SUBTXN == true && CENTER_MASTER == true
 				if(!IS_LOCAL(txn->txn_id) || !is_done()) {
 					state = TPCC_NEWORDER6;
+					DEBUG_T("Txn %ld enter status NEWORDER6\n",get_txn_id());
 				} else {
 					state = TPCC_FIN;
+					DEBUG_T("Txn %ld enter status TPCC_FIN\n",get_txn_id());
 				}
 			#else 
-				state = TPCC_NEWORDER6;
+				if(!IS_LOCAL(txn->txn_id) || !is_done()) {
+					state = TPCC_NEWORDER6;
+					DEBUG_T("Txn %ld enter status NEWORDER6\n",get_txn_id());
+				} else {
+					DEBUG_T("Txn %ld enter status TPCC_FIN\n",get_txn_id());
+					state = TPCC_FIN;
+				}
 			#endif
 			break;
 		case TPCC_FIN:
@@ -379,9 +391,11 @@ RC TPCCTxnManager::generate_center_master(uint64_t w_id, access_t type) {
 RC TPCCTxnManager::send_remote_subtxn() {
 	assert(IS_LOCAL(get_txn_id()));
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
+	// TPCCRemTxnType next_state = TPCC_FIN;
 	RC rc = RCOK;
 	unordered_set<uint64_t> node_id;
 
+	// 
 	uint64_t w_id = tpcc_query->w_id;
 	generate_center_master(w_id, WR);
 
@@ -843,15 +857,14 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			if(c_w_loc)
 				rc = run_payment_4(yield, w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row,cor_id);
 #if PARAL_SUBTXN == true
-			
 			#if REPLICA_CC
 			// else if(rdma_one_side() && is_c_w_cen && g_node_id == center_master[c_w_cen]){//rdma_silo
 			else if(rdma_one_side() && is_c_w_cen){//rdma_silo
 			#else
-			else if(rdma_one_side() && is_c_w_cen){//rdma_silo
+			else if(rdma_one_side() && c_w_cen == g_center_id && g_node_id == center_master[c_w_cen]){//rdma_silo
 			#endif
 #else
-			else if(rdma_one_side() && is_c_w_cen){//rdma_silo
+			else if(rdma_one_side() && c_w_cen == g_center_id){//rdma_silo
 #endif
 				rc = send_remote_one_side_request(yield,tpcc_query,row,cor_id);
 			}else {
@@ -863,8 +876,8 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			}
 			break;
 		case TPCC_PAYMENT5 :
-			// if(c_w_cen == g_center_id){
-			if(is_w_cen){
+			if(c_w_cen == g_center_id){
+			// if(is_c_w_cen){
 				rc = run_payment_5( w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row);
 			}
 			break;
@@ -919,8 +932,7 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 				rc = new_order_8(yield,w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,row,cor_id);
 			}
 #if PARAL_SUBTXN == true
-			else if(rdma_one_side() && is_ol_supply_w_cen){//rdma_silo
-			// else if(rdma_one_side() && is_ol_supply_w_cen && g_node_id == center_master[ol_supply_w_cen]){//rdma_silo
+			else if(rdma_one_side() && ol_supply_w_cen == g_center_id && g_node_id == center_master[ol_supply_w_cen]){//rdma_silo
 #else
 			else if(rdma_one_side() && is_ol_supply_w_cen){//rdma_silo
 #endif
@@ -1875,8 +1887,17 @@ RC TPCCTxnManager::redo_commit_log(yield_func_t &yield,RC status, uint64_t cor_i
 				start_idx = start_idx % redo_log_buf.get_size();
 
 				uint64_t start_offset = redo_log_buf.get_entry_offset(start_idx);
+				
+				// //for debug purpose
+				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
+				// assert(le->state == EMPTY);
+				// assert(le->change_cnt == 0);
 
 				write_remote_log(yield, i, sizeof(LogEntry), start_offset, (char *)newEntry, cor_id);
+				//for debug purpose
+				// LogEntry* le= (LogEntry*)read_remote_log(yield,i,start_offset,cor_id);
+				// assert(le->state == LOGGED);
+
 			}
 			log_idx[i] = start_idx;
 			mem_allocator.free(newEntry, sizeof(LogEntry));

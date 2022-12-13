@@ -152,6 +152,7 @@ int main(int argc, char *argv[]) {
 			rdma_index_size = item_index_size + wh_index_size + stock_index_size + dis_index_size +
 							+ cust_index_size +  cl_index_size + order_index_size + ol_index_size 
 							+ (1024*1024L);
+			rdma_index_size = rdma_index_size * 4;
 			break;
 		case PPS :
 			m_wl = new PPSWorkload;
