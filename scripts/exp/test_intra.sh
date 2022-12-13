@@ -1,0 +1,11 @@
+cd /home/ibtest/sigmod21-deneva/scripts
+sh exp/test_intradelay.sh
+cd /home/ibtest/oRedt/sigmod21-deneva/scripts
+sh exp/test_intradelay.sh
+cd /home/ibtest/tcp/sigmod21-deneva/scripts
+sh exp/test_early_intradelay.sh
+sh exp/test_2pc_interdelay.sh
+cd /home/ibtest/tapir/sigmod21-deneva/scripts
+sh exp/test_tapir_intradelay.sh
+cd /home/ibtest/mdcc/sigmod21-deneva/scripts
+sh exp/test_intradelay.sh

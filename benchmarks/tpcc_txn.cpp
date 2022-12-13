@@ -358,7 +358,7 @@ RC TPCCTxnManager::generate_center_master(uint64_t w_id, access_t type) {
 	vector<uint64_t> node_id;
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
 #if USE_REPLICA
-	if (type == WR) {
+	if (1 || type == WR) {
 		node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
 		node_id.push_back(GET_FOLLOWER1_NODE(wh_to_part(w_id)));
 		node_id.push_back(GET_FOLLOWER2_NODE(wh_to_part(w_id)));
@@ -785,12 +785,49 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	uint64_t part_id_w = wh_to_part(w_id);
 	uint64_t part_id_c_w = wh_to_part(c_w_id);
 	uint64_t part_id_ol_supply_w = wh_to_part(ol_supply_w_id);
+	
+#if REPLICA_CC
+	bool w_loc = GET_NODE_ID(part_id_w) == g_node_id ||
+				 GET_FOLLOWER1_NODE(part_id_w) == g_node_id || 
+				 GET_FOLLOWER2_NODE(part_id_w) == g_node_id;
+	bool c_w_loc = GET_NODE_ID(part_id_c_w) == g_node_id ||
+				   GET_FOLLOWER1_NODE(part_id_c_w) == g_node_id || 
+				   GET_FOLLOWER2_NODE(part_id_c_w) == g_node_id;
+	bool ol_supply_w_loc = GET_NODE_ID(part_id_ol_supply_w) == g_node_id ||
+				   GET_FOLLOWER1_NODE(part_id_ol_supply_w) == g_node_id || 
+				   GET_FOLLOWER2_NODE(part_id_ol_supply_w) == g_node_id;
+	
+	uint32_t w_cen1 = GET_CENTER_ID(GET_NODE_ID(part_id_w));
+	uint32_t w_cen2 = GET_CENTER_ID(GET_FOLLOWER1_NODE(part_id_w));
+	uint32_t w_cen3 = GET_CENTER_ID(GET_FOLLOWER2_NODE(part_id_w));
+	bool is_w_cen = w_cen1 == g_center_id ||
+					w_cen2 == g_center_id ||
+					w_cen3 == g_center_id;
+
+	uint32_t c_w_cen1 = GET_CENTER_ID(GET_NODE_ID(part_id_c_w));
+	uint32_t c_w_cen2 = GET_CENTER_ID(GET_FOLLOWER1_NODE(part_id_c_w));
+	uint32_t c_w_cen3 = GET_CENTER_ID(GET_FOLLOWER2_NODE(part_id_c_w));
+	bool is_c_w_cen = c_w_cen1 == g_center_id ||
+					  c_w_cen2 == g_center_id ||
+					  c_w_cen3 == g_center_id;
+	
+	uint32_t ol_supply_w_cen1 = GET_CENTER_ID(GET_NODE_ID(part_id_ol_supply_w));
+	uint32_t ol_supply_w_cen2 = GET_CENTER_ID(GET_FOLLOWER1_NODE(part_id_ol_supply_w));
+	uint32_t ol_supply_w_cen3 = GET_CENTER_ID(GET_FOLLOWER2_NODE(part_id_ol_supply_w));
+	bool is_ol_supply_w_cen = ol_supply_w_cen1 == g_center_id ||
+					  		  ol_supply_w_cen2 == g_center_id ||
+					  		  ol_supply_w_cen3 == g_center_id;
+#else
 	bool w_loc = GET_NODE_ID(part_id_w) == g_node_id;
 	bool c_w_loc = GET_NODE_ID(part_id_c_w) == g_node_id;
 	bool ol_supply_w_loc = GET_NODE_ID(part_id_ol_supply_w) == g_node_id;
 	uint32_t w_cen = GET_CENTER_ID(part_id_w);
+	bool is_w_cen = w_cen == g_center_id;
 	uint32_t c_w_cen = GET_CENTER_ID(part_id_c_w);
+	bool is_c_w_cen = c_w_cen == g_center_id;
 	uint32_t ol_supply_w_cen = GET_CENTER_ID(part_id_ol_supply_w);
+	bool is_ol_supply_w_cen = c_w_cen == g_center_id;
+#endif
 
 	RC rc = RCOK;
 	INC_STATS(get_thd_id(),trans_benchmark_compute_time,get_sys_clock() - starttime);
@@ -825,9 +862,12 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			if(c_w_loc)
 				rc = run_payment_4(yield, w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row,cor_id);
 			#if PARAL_SUBTXN == true
+			else if(rdma_one_side() && is_c_w_cen){//rdma_silo
+			#if REPLICA_CC
 			else if(rdma_one_side() && c_w_cen == g_center_id && g_node_id == center_master[c_w_cen]){//rdma_silo
+			#endif
 			#else
-			else if(rdma_one_side() && w_cen == g_center_id){//rdma_silo
+			else if(rdma_one_side() && is_c_w_cen){//rdma_silo
 			#endif
 			#if USE_TCP_INTRA_CENTER
 				rc = RCOK;
@@ -851,7 +891,8 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			#if USE_TCP_INTRA_CENTER
 			if(c_w_loc) {
 			#else
-			if(c_w_cen == g_center_id){
+			// if(c_w_cen == g_center_id){
+			if(is_w_cen){
 			#endif
 				rc = run_payment_5( w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row);
 			}
@@ -906,11 +947,12 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			if(ol_supply_w_loc) {
 				rc = new_order_8(yield,w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,row,cor_id);
 			}
-			#if PARAL_SUBTXN == true
-			else if(rdma_one_side() && ol_supply_w_cen == g_center_id && g_node_id == center_master[ol_supply_w_cen]){//rdma_silo
-			#else
-			else if(rdma_one_side() && w_cen == g_center_id){//rdma_silo
-			#endif
+#if PARAL_SUBTXN == true
+			else if(rdma_one_side() && is_ol_supply_w_cen){//rdma_silo
+			// else if(rdma_one_side() && is_ol_supply_w_cen && g_node_id == center_master[ol_supply_w_cen]){//rdma_silo
+#else
+			else if(rdma_one_side() && is_ol_supply_w_cen){//rdma_silo
+#endif
 			#if USE_TCP_INTRA_CENTER
 			// if(waiting_for_intra_response()) {
 			// 	rc = WAIT_REM;

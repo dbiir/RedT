@@ -517,6 +517,27 @@ def ycsb_network_delay():
     skew = [0.2]
     cross_dc_perc = [1]
     network_delay = ['0UL'] 
+    rpq =  10
+    # network_delay = ['50000000UL','10000000UL'] 
+    # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+
+
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","CENTER_CNT","REQ_PER_QUERY","THREAD_CNT","CROSS_DC_TXN_PERC", "NETWORK_DELAY",]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,4,rpq,thr,cro_dc_perc,net_del] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc,net_del in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc,network_delay)]
+    return fmt,exp
+
+def ycsb_network_delay2():
+    wl = 'YCSB'
+    nnodes = [8]
+    algos=['RDMA_NO_WAIT3']
+    base_table_size=1048576
+    txn_write_perc = [1]
+    tup_write_perc = [0.5]
+    load = [320]
+    tcnt = [40]  #THREAD_CNT
+    skew = [0.2]
+    cross_dc_perc = [0]
+    network_delay = ['0UL'] 
     # network_delay = ['50000000UL','10000000UL'] 
     # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
 

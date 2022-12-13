@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.tex": "latex-expl3",
         "cctype": "cpp",
         "clocale": "cpp",
         "cmath": "cpp",
@@ -97,6 +98,8 @@
         "__tree": "cpp",
         "__tuple": "cpp",
         "__functional_03": "cpp",
-        "ciso646": "cpp"
+        "ciso646": "cpp",
+        "hash_map": "cpp",
+        "hash_set": "cpp"
     }
 }

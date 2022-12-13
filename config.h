@@ -76,6 +76,8 @@
 #define THOMAS_WRITE true  //if false, wait and sort
 #define INTER_DC_CONTROL true
 #define RDMA_DBPAOR false //concurrent logging
+#define AGENT_COORDINATOR true
+#define REPLICA_CC false
 
 #if USE_REPLICA
 #define ASYNC_REDO_THREAD_CNT 1
@@ -127,9 +129,9 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 3
-#define NODE_CNT 12
-#define THREAD_CNT 20
+#define CENTER_CNT 4
+#define NODE_CNT 8
+#define THREAD_CNT 40
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -199,7 +201,7 @@
 // Message Passing
 /***********************************************/
 #define TPORT_TYPE tcp
-#define TPORT_PORT 4222
+#define TPORT_PORT 6222
 #define TPORT_TWOSIDE_PORT 13000
 #define SET_AFFINITY true
 
@@ -209,7 +211,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 10000UL
+#define NETWORK_DELAY 0UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -351,13 +353,13 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 12582912
+#define SYNTH_TABLE_SIZE 8388608
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 1
-#define TUP_WRITE_PERC 0.2
+#define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 6
+#define PART_PER_TXN 4
 #define DC_PER_TXN 2
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10

@@ -1,29 +1,20 @@
-sh reset_group_delay.sh 5
+sh set_delay.sh 5 #10
 python run_experiments.py -e -c vcloud ycsb_network_delay
-sleep 10
-sh reset_group_delay.sh 10
+sh set_delay.sh 10 #20
 python run_experiments.py -e -c vcloud ycsb_network_delay
-sleep 10
-sh reset_group_delay.sh 15
+sh set_delay.sh 15 #30
 python run_experiments.py -e -c vcloud ycsb_network_delay
-sleep 10
-sh reset_group_delay.sh 20
+sh set_delay.sh 20 #40
 python run_experiments.py -e -c vcloud ycsb_network_delay
-sleep 10
-sh reset_group_delay.sh 25
+sh set_delay.sh 25 #50
 python run_experiments.py -e -c vcloud ycsb_network_delay
-sleep 10
-sh reset_group_delay.sh 30
+sh set_delay.sh 30 #60
 python run_experiments.py -e -c vcloud ycsb_network_delay
-sleep 10
-sh reset_group_delay.sh 35
+sh set_delay.sh 35 #70
 python run_experiments.py -e -c vcloud ycsb_network_delay
-sleep 10
-sh reset_group_delay.sh 40
+sh set_delay.sh 40 #80
 python run_experiments.py -e -c vcloud ycsb_network_delay
-sleep 10
-sh reset_group_delay.sh 45
+sh set_delay.sh 45 #90
 python run_experiments.py -e -c vcloud ycsb_network_delay
-sleep 10
-sh reset_group_delay.sh 50
+sh set_delay.sh 50 #100
 python run_experiments.py -e -c vcloud ycsb_network_delay
