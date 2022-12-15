@@ -8,7 +8,15 @@ RedT is atop of the opensourced distributed framework Deneva, whose study can be
 
     Rachael Harding, Dana Van Aken, Andrew Pavlo, and Michael Stonebraker. 2017.
     An Evaluation of Distributed Concurrency Control. PVLDB 10, 5 (2017), 553–564.
-    
+
+Each branch records a different protocol
+
+- RedT-replicacc: the newest RedT protocol.
+- tapir: the tapir protocol
+- 2PC-Paxos: the 2PC+Paxos protocol and Early-Prepare+Paxos protocol
+- MDCC: the MDCC protocol
+- RedT-TCP: RedT without RDMA.
+
 
 Dependencies
 ------------
@@ -36,10 +44,3 @@ Run
 - `cd scripts`
 - `python run_experiments.py -e -c vcloud ycsb_scaling`
 
-Each branch records a different protocol
-
-- RedT-replicacc: the newest RedT protocol.
-- tapir: the tapir protocol
-- 2PC-Paxos: the 2PC+Paxos protocol and Early-Prepare+Paxos protocol
-- MDCC: the MDCC protocol
-- RedT-TCP: RedT without RDMA.
