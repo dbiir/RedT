@@ -35,3 +35,11 @@ Run
 -------------
 - `cd scripts`
 - `python run_experiments.py -e -c vcloud ycsb_scaling`
+
+Each branch records a different protocol
+
+- RedT-replicacc: the newest RedT protocol.
+- tapir: the tapir protocol
+- 2PC-Paxos: the 2PC+Paxos protocol and Early-Prepare+Paxos protocol
+- MDCC: the MDCC protocol
+- RedT-TCP: RedT without RDMA.
