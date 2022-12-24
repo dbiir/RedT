@@ -4,6 +4,8 @@ RedT
 RedT is a novel distributed transaction processing protocol that works in heterogeneous networks, it extends two-phase commitment (a.b.a. 2PC) by decomposing
 transactions into sub-transactions in terms of the data center granularity, and proposing a pre-write-log mechanism that is able to eliminate the log synchronization in the prepare phase.
 
+We implemented RedT and other baselines in this repository, and the concurrency control algorithm we used was No-wait. For the other baseline, we use the ordinary No-wait. For RedT, we design three implementations using RDMA single-side primitives.RDMA_NO_WAIT is the algorithm that distinguishes between read and write locks, RDMA_NO_WAIT2 does not distinguish between read and write locks, and RDMA_NO_WAIT3 adds lock_owner to each data item. We used RDMA_NO_WAIT3 in the paper.
+
 RedT is atop of the opensourced distributed framework Deneva, whose study can be found in the following paper:
 
     Rachael Harding, Dana Van Aken, Andrew Pavlo, and Michael Stonebraker. 2017.
@@ -43,4 +45,6 @@ Run
 -------------
 - `cd scripts`
 - `python run_experiments.py -e -c vcloud ycsb_scaling`
+
+
 
