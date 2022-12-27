@@ -43,6 +43,11 @@ In `scripts\run_config.py`, the `vcloud_uname` and `vcloud_machines` need to be 
 
 Run
 -------------
+To test the impact of inter-DC transaction ratio, run the following command:
+- `cd scripts`
+- `python run_experiments.py -e -c vcloud ycsb_cross_dc -l 20 0`
+`-l 20 0` means that the delay between DC is 40ms and the jitter is 0.
+
 - `cd scripts`
 - `python run_experiments.py -e -c vcloud ycsb_scaling`
 
