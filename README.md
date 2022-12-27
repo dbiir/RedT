@@ -22,7 +22,7 @@ Each branch records a different protocol
 
 Dependencies
 ------------
-For build:
+To ensure that the code works properly, the server needs to have the following dependencies:
 - g++ >= 6.4.0
 - Boost = 1.6.1
 - jemalloc >= 5.2.1
@@ -43,13 +43,29 @@ In `scripts\run_config.py`, the `vcloud_uname` and `vcloud_machines` need to be 
 
 Run
 -------------
+### the impact of inter-DC transaction ratio
 To test the impact of inter-DC transaction ratio, run the following command:
 - `cd scripts`
 - `python run_experiments.py -e -c vcloud ycsb_cross_dc -l 20 0`
-`-l 20 0` means that the delay between DC is 40ms and the jitter is 0.
 
+`-l 20 0` means that the delay between DCs is 40ms and the jitter is 0.
+
+### the impact of inter-DC networks
+To test the impact of inter-DC networks, run the following command:
 - `cd scripts`
-- `python run_experiments.py -e -c vcloud ycsb_scaling`
+- `sh exp/test_interdelay.sh`
+
+In 'sh exp/test_interdelay.sh', there are shall commands to set different network delays between data centers.
+
+### the impact of read-write ratio
+To test the impact of read-write ratio, run the following command:
+- `cd scripts`
+- `python run_experiments.py -e -c vcloud ycsb_write -l 20 0`
+
+### the impact of contention level
+To test the impact of contention level, run the following command:
+- `cd scripts`
+- `python run_experiments.py -e -c vcloud ycsb_skew -l 20 0`
 
 
 
