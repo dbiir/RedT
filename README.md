@@ -70,15 +70,14 @@ To test the impact of contention level, run the following command:
 
 How to cite our paper.
 
-(```)
-  @article{RedT,
-    author = {Qian Zhang, Jingyao Li, Hongyao Zhao, Quanqing Xu, Wei Lu, Jinliang Xiao, Fushan Han, Chuanhui Yang, and Xiaoyong Du},
-    year = {2023},
-    pages = {},
-    title = {Efficient Distributed Transaction Processing in Heterogeneous Networks},
-    volume = {16},
-    journal = {Proceedings of the VLDB Endowment},
-  }
-(```)
+
+    @article{RedT,
+      author = {Qian Zhang, Jingyao Li, Hongyao Zhao, Quanqing Xu, Wei Lu, Jinliang Xiao, Fushan Han, Chuanhui Yang, and Xiaoyong Du},
+      year = {2023},
+      pages = {},
+      title = {Efficient Distributed Transaction Processing in Heterogeneous Networks},
+      volume = {16},
+      journal = {Proceedings of the VLDB Endowment},
+    }
 
 
