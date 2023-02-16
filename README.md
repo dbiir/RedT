@@ -1,5 +1,6 @@
 RedT
 =======
+Implementation of the paper "Efficient Distributed Transaction Processing in Heterogeneous Networks".
 
 RedT is a novel distributed transaction processing protocol that works in heterogeneous networks, it extends two-phase commitment (a.b.a. 2PC) by decomposing
 transactions into sub-transactions in terms of the data center granularity, and proposing a pre-write-log mechanism that is able to eliminate the log synchronization in the prepare phase.
@@ -67,5 +68,14 @@ To test the impact of contention level, run the following command:
 - `cd scripts`
 - `python run_experiments.py -e -c vcloud ycsb_skew -l 20 0`
 
+How to cite our paper.
+@article{RedT,
+	author = {Qian Zhang, Jingyao Li, Hongyao Zhao, Quanqing Xu, Wei Lu, Jinliang Xiao, Fushan Han, Chuanhui Yang, and Xiaoyong Du},
+	year = {2023},
+	pages = {},
+	title = {Efficient Distributed Transaction Processing in Heterogeneous Networks},
+	volume = {16},
+	journal = {Proceedings of the VLDB Endowment},
+}
 
 
