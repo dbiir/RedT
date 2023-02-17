@@ -68,8 +68,8 @@ To test the impact of contention level, run the following command:
 - `cd scripts`
 - `python run_experiments.py -e -c vcloud ycsb_skew -l 20 0`
 
-How to cite our paper.
-
+How to cite our paper
+------------
 
     @article{RedT,
       author = {Qian Zhang, Jingyao Li, Hongyao Zhao, Quanqing Xu, Wei Lu, Jinliang Xiao, Fushan Han, Chuanhui Yang, and Xiaoyong Du},
