@@ -141,15 +141,15 @@ for exp in exps:
                     for m in machines:
                         f_ifcfg.write(m + "\n")
 
-                if cfgs["WORKLOAD"] == "TPCC":
-                    files = ["rundb", "runcl", "ifconfig.txt"]
-                elif cfgs["WORKLOAD"] == "YCSB":
-                    files = ["rundb", "runcl", "ifconfig.txt"]
-                
                 # if cfgs["WORKLOAD"] == "TPCC":
-                #     files = ["rundb", "runcl", "ifconfig.txt", "./benchmarks/TPCC_short_schema.txt", "./benchmarks/TPCC_full_schema.txt"]
+                #     files = ["rundb", "runcl", "ifconfig.txt"]
                 # elif cfgs["WORKLOAD"] == "YCSB":
-                #     files = ["rundb", "runcl", "ifconfig.txt", "benchmarks/YCSB_schema.txt"]
+                #     files = ["rundb", "runcl", "ifconfig.txt"]
+                
+                if cfgs["WORKLOAD"] == "TPCC":
+                    files = ["rundb", "runcl", "ifconfig.txt", "./benchmarks/TPCC_short_schema.txt", "./benchmarks/TPCC_full_schema.txt"]
+                elif cfgs["WORKLOAD"] == "YCSB":
+                    files = ["rundb", "runcl", "ifconfig.txt", "benchmarks/YCSB_schema.txt"]
 
                 for m, f in itertools.product(machines, files):
                     if cluster == 'istc':

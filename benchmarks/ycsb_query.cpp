@@ -368,6 +368,7 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 			} else if (g_strict_ppt && !cross_dc_txn) {
 				if (g_part_per_txn <= g_part_cnt) {
 					assert(g_part_per_txn >= g_dc_per_txn);
+					assert(CENTER_CNT >= (NODE_CNT * 2));
 					dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
 					while (dc_id != GET_CENTER_ID(home_partition_id) ||
 							(partitions_accessed.size() < g_part_per_txn         &&
