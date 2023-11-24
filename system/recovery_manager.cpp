@@ -310,6 +310,41 @@ RC HeartBeatThread::update_node_and_route(RouteAndStatus result, uint64_t origin
   }
 }
 
+auto HeartBeatThread::update_node_and_route_new(RouteAndStatus result, uint64_t origin_dest) -> RC {
+  // node status
+  DEBUG_H("Node %ld recieve heart beat from %ld in other data center\n", g_node_id, origin_dest);
+  for (int i = 0; i < g_node_cnt; i++) {
+    status_node* st = node_status.get_node_status(i);
+    status_node tmp_st = result._status[i];
+    DEBUG_H("Node %ld old ts %lu received ts %lu\n", i, st->last_ts, tmp_st.last_ts);
+    if (tmp_st.last_ts > st->last_ts) {
+      st->last_ts = tmp_st.last_ts;
+      st->status = tmp_st.status;
+
+      if ((i == g_node_id && st->status == Failure) ||
+          (i == origin_dest && st->status == Failure)) {
+        assert(false);
+      }
+      DEBUG_H("Node %ld update ts %lu and status %s\n", i, st->last_ts,
+              st->status == OnCall ? "OnCall" : "Failure");
+    }
+  }
+  // route
+  for (int i = 0; i < g_part_cnt; i++) {
+    route_node_ts p_rt;
+    route_node_ts tmp_p_rt;
+    for (int j = 0; j < 5; j++) {
+      p_rt = route_table.get_route_node_new(j, i);
+      tmp_p_rt = result._route[i].new_secondary[j];
+      if (tmp_p_rt.last_ts > p_rt.last_ts) {
+        route_table.set_route_node_new(j, i, tmp_p_rt.node_id, tmp_p_rt.last_ts);
+        DEBUG_H("Route %ld update primary ts %lu and node %d\n", i, tmp_p_rt.last_ts,
+                tmp_p_rt.node_id);
+      }
+    }
+  }
+}
+
 vector<Replica> HeartBeatThread::get_node_replica(uint64_t dest_id) {
   vector<Replica> replica_list;
   for (int i = 0; i < g_part_cnt; i++) {
@@ -329,6 +364,21 @@ vector<Replica> HeartBeatThread::get_node_replica(uint64_t dest_id) {
     if (s2_rt.node_id == dest_id) {
       replica_list.push_back(Replica(i, 2));
       DEBUG_H("Failed node %ld has second2 replica %ld\n", dest_id, i);
+    }
+  }
+  return replica_list;
+}
+
+auto HeartBeatThread::get_node_replica_new(uint64_t dest_id) -> vector<Replica> {
+  vector<Replica> replica_list;
+  for (int i = 0; i < g_part_cnt; i++) {
+    route_node_ts p_rt;
+    for (int j = 0; j < 5; j++) {
+      p_rt = route_table.get_route_node_new(j, i);
+      if (p_rt.node_id == dest_id) {
+        replica_list.push_back(Replica(i, j));
+        DEBUG_H("Failed node %ld has primary replica %ld\n", dest_id, i);
+      }
     }
   }
   return replica_list;
