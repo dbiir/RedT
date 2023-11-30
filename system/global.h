@@ -569,4 +569,6 @@ extern uint64_t max_num_msgs_commit;
 
 extern uint64_t in_latency[5];
 extern uint64_t latency[5];
+extern uint64_t access_count[PART_CNT];
+extern bool is_count[PART_CNT];
 #endif
