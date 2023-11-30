@@ -1978,6 +1978,7 @@ uint64_t HeartBeatMessage::get_size() {
   uint64_t size = Message::mget_size();
   size += SIZE_OF_ROUTE;
   size += SIZE_OF_STATUS;
+  size += sizeof(uint64_t) * 3;  // return_center_id、send_time、latency
   // size += sizeof(LogRecord) * log_records.size();
   return size;
 }
@@ -1997,6 +1998,9 @@ void HeartBeatMessage::copy_from_node_status(route_table_node* route_table,
 void HeartBeatMessage::copy_from_buf(char* buf) {
   Message::mcopy_from_buf(buf);
   uint64_t ptr = Message::mget_size();
+  COPY_VAL(return_center_id, buf, ptr);
+  COPY_VAL(send_time, buf, ptr);
+  COPY_VAL(latency, buf, ptr);
   heartbeatmsg._route = (route_table_node*)malloc(SIZE_OF_ROUTE);
   heartbeatmsg._status = (status_node*)malloc(SIZE_OF_STATUS);
   memcpy(heartbeatmsg._route, buf + ptr, SIZE_OF_ROUTE);
@@ -2011,6 +2015,9 @@ void HeartBeatMessage::copy_from_buf(char* buf) {
 void HeartBeatMessage::copy_to_buf(char* buf) {
   Message::mcopy_to_buf(buf);
   uint64_t ptr = Message::mget_size();
+  COPY_BUF(buf, return_center_id, ptr);
+  COPY_BUF(buf, send_time, ptr);
+  COPY_BUF(buf, latency, ptr);
   memcpy(buf + ptr, heartbeatmsg._route, SIZE_OF_ROUTE);
   ptr += SIZE_OF_ROUTE;
   memcpy(buf + ptr, heartbeatmsg._status, SIZE_OF_STATUS);
