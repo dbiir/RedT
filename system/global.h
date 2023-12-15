@@ -295,6 +295,7 @@ extern pthread_mutex_t *RDMA_MEMORY_LATCH;
 extern uint64_t rdma_buffer_size;
 extern uint64_t client_rdma_buffer_size;
 extern uint64_t rdma_index_size;
+extern UInt32 repl_cnt;
 extern uint64_t rdma_routetable_size;
 // Replica redo log buffer size
 extern uint64_t rdma_log_size;

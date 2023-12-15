@@ -106,15 +106,17 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	while(rc == RCOK && !is_done()) {
 		rc = run_txn_state(yield, cor_id);
 	}
+	update_query_status(g_node_id, OpStatus::PREPARE);
 	uint64_t curr_time = get_sys_clock();
 	txn_stats.process_time += curr_time - starttime;
 	txn_stats.process_time_short += curr_time - starttime;
 
 	DEBUG_T("Run RDMA txn %ld complete.\n", get_txn_id());
 	if(IS_LOCAL(get_txn_id())) {
-		if(is_done() && rc == RCOK)
+		RC result = check_query_status(PREPARE);
+		if(is_done() && rc == RCOK && result == RCOK)
 			rc = start_commit(yield, cor_id);
-		else if(rc == Abort)
+		else if(rc == Abort || result == Abort)
 			rc = start_abort(yield, cor_id);
 	}
 
@@ -356,6 +358,144 @@ bool TPCCTxnManager::is_local_item(uint64_t idx) {
 	return GET_NODE_ID(part_id_ol_supply_w) == g_node_id;
 }
 
+#if REPLICA_COUNT != 0
+RC TPCCTxnManager::generate_center_master(uint64_t w_id, execute_node (&replica)[MAX_REPLICA_COUNT], uint64_t& replica_cnt, access_t type) {
+	vector<uint64_t> node_id;
+	TPCCQuery* tpcc_query = (TPCCQuery*) query;
+	uint64_t part_id = wh_to_part(w_id);
+	assert(USE_REPLICA);
+	if (REPLICA_CC || type == WR) {
+		replica_cnt = get_part_repl_cnt(part_id);
+		for (int j = 0; j < replica_cnt; j++) {
+			uint64_t loc = get_node_id_new(j, part_id);
+			if (loc == -1) return Abort;
+			node_id.push_back(loc);
+			replica[j].stored_node = loc;
+		}
+	} else {
+		replica_cnt = 1;
+		uint64_t loc = get_node_id_new(0, part_id);
+		replica[0].stored_node = loc;
+		node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
+	}
+
+	for(int j=0;j<node_id.size();j++){
+		uint64_t center_id = GET_CENTER_ID(node_id[j]);
+		remote_center[center_id].push_back(w_id);
+		tpcc_query->centers_touched.add_unique(center_id);
+		tpcc_query->partitions_touched.add_unique(GET_PART_ID(0,node_id[j]));
+		//center_master is set as the first toughed primary, if not exist, use the first toughed backup.
+		auto ret = center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id[j]));
+		if(ret.second == false){
+			if(!is_primary[center_id] && j == 0){
+				center_master[center_id] = node_id[j]; //change center_master
+				is_primary[center_id] = true;
+			}
+		}else{
+			is_primary[center_id] = (j == 0 ? true : false); 
+		}
+	}
+}
+RC TPCCTxnManager::send_remote_subtxn() {
+	assert(IS_LOCAL(get_txn_id()));
+	TPCCQuery* tpcc_query = (TPCCQuery*) query;
+	// TPCCRemTxnType next_state = TPCC_FIN;
+	RC rc = RCOK;
+	unordered_set<uint64_t> node_id;
+
+	// 
+	uint64_t w_id = tpcc_query->w_id;
+	generate_center_master(w_id, tpcc_query->w_replica, tpcc_query->w_replica_cnt, WR);
+
+	// for payment
+	uint64_t d_w_id = tpcc_query->d_w_id;
+	uint64_t c_w_id = tpcc_query->c_w_id;
+	if (tpcc_query->txn_type == TPCC_PAYMENT) {
+		generate_center_master(d_w_id, tpcc_query->d_w_replica,	tpcc_query->d_w_replica_cnt, WR);
+		generate_center_master(c_w_id, tpcc_query->c_w_replica,	tpcc_query->c_w_replica_cnt,WR);
+	}
+	// for neworder
+	if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
+		for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
+			uint64_t ol_number = i;
+			uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
+			generate_center_master(ol_supply_w_id, tpcc_query->items[ol_number]->ol_supply_w_replica,	tpcc_query->items[ol_number]->ol_supply_w_replica_cnt, WR);
+		}
+	}
+	rsp_cnt = 0;
+	for(int i=0;i<query->centers_touched.size();i++){
+		if(is_primary[query->centers_touched[i]]) ++rsp_cnt;
+	}
+	--rsp_cnt; //exclude this center
+
+	uint64_t center_id1 = GET_CENTER_ID(GET_FOLLOWER1_NODE(wh_to_part(w_id)));
+	uint64_t center_id2 = GET_CENTER_ID(GET_FOLLOWER2_NODE(wh_to_part(w_id)));
+	if(is_primary[center_id1] || is_primary[center_id2]){
+		//no extra wait for req i
+		wh_extra_wait[0] = -1;
+		wh_extra_wait[1] = -1;			
+	}else{
+		wh_need_wait = true;
+		wh_extra_wait[0] = center_id1;
+		wh_extra_wait[1] = center_id2;
+	}
+
+	if (tpcc_query->txn_type == TPCC_PAYMENT){
+		// customer wait
+		center_id1 = GET_CENTER_ID(GET_FOLLOWER1_NODE(wh_to_part(c_w_id)));
+		center_id2 = GET_CENTER_ID(GET_FOLLOWER2_NODE(wh_to_part(c_w_id)));
+		if(is_primary[center_id1] || is_primary[center_id2]){
+			//no extra wait for req i
+			cus_extra_wait[0] = -1;
+			cus_extra_wait[1] = -1;			
+		}else{
+			cus_need_wait = true;
+			cus_extra_wait[0] = center_id1;
+			cus_extra_wait[1] = center_id2;
+		}
+	}
+
+	if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
+		for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
+			uint64_t ol_number = i;
+			uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
+			center_id1 = GET_CENTER_ID(GET_FOLLOWER1_NODE(wh_to_part(ol_supply_w_id)));
+			center_id2 = GET_CENTER_ID(GET_FOLLOWER2_NODE(wh_to_part(ol_supply_w_id)));
+
+			if(is_primary[center_id1] || is_primary[center_id2]){
+				//no extra wait for req i
+				extra_wait[i][0] = -1;
+				extra_wait[i][1] = -1;			
+			}else{
+				req_need_wait[i] = true;
+				extra_wait[i][0] = center_id1;
+				extra_wait[i][1] = center_id2;
+			}
+		}
+	}
+	assert(num_msgs_rw_prep==0);
+	for(int i = 0; i < g_center_cnt; i++) {
+		if(remote_center[i].size() > 0 && i != g_center_id) {//send message to all masters
+			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),center_master[i]);
+			DEBUG_T("txn %lu, send message to %d\n", get_txn_id(), center_master[i]);
+			num_msgs_rw_prep++;
+		}
+	}
+	#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(),Message::create_message(this,WAIT_TXN),wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n",get_txn_id());
+		is_enqueue = true;
+	} else {
+		DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n",get_txn_id(), wait_queue_entry->txn_id);
+	}
+	
+	#endif
+	return rc;
+}
+
+#else
 RC TPCCTxnManager::generate_center_master(uint64_t w_id, access_t type) {
 	vector<uint64_t> node_id;
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
@@ -486,6 +626,8 @@ RC TPCCTxnManager::send_remote_subtxn() {
 	#endif
 	return rc;
 }
+
+#endif
 
 RC TPCCTxnManager::send_remote_request() {
 	assert(IS_LOCAL(get_txn_id()));
@@ -1905,4 +2047,113 @@ RC TPCCTxnManager::redo_commit_log(yield_func_t &yield,RC status, uint64_t cor_i
 	}
 	return rc;
 }
+
+#if REPLICA_COUNT != 0
+RC TPCCTxnManager::update_single_item_status(uint64_t return_id, execute_node (&replica)[MAX_REPLICA_COUNT], uint64_t& replica_cnt, OpStatus status) {
+	for (int j = 0; j < replica_cnt; j++) {
+		update_single_query_status(replica[j], return_id, status);
+	}
+}
+void TPCCTxnManager::update_query_status(uint64_t return_id, OpStatus status){
+    TPCCQuery *tpcc_query = (TPCCQuery *)query;
+	update_single_item_status(return_id,tpcc_query->w_replica, tpcc_query->w_replica_cnt,status);
+
+	if (tpcc_query->txn_type == TPCC_PAYMENT) {
+		update_single_item_status(return_id,tpcc_query->d_w_replica, tpcc_query->d_w_replica_cnt,status);
+
+		update_single_item_status(return_id,tpcc_query->c_w_replica, tpcc_query->c_w_replica_cnt,status);
+	}
+
+	if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
+		for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
+			uint64_t ol_number = i;
+			update_single_item_status(return_id,tpcc_query->items[ol_number]->ol_supply_w_replica,	tpcc_query->items[ol_number]->ol_supply_w_replica_cnt,status);
+		}
+	}
+}
+
+RC TPCCTxnManager::check_each_item(execute_node (&replica)[MAX_REPLICA_COUNT], uint64_t& replica_cnt, OpStatus status) {
+	uint64_t req_abort_cnt = 0; 
+	for (int j = 0; j < replica_cnt; j++) {
+        if (replica[j].status == PREP_ABORT) req_abort_cnt ++;
+	}
+	#if REPLICA_CC
+	if (req_abort_cnt > (REPLICA_COUNT * 1)/4) {
+	#else 
+	if (req_abort_cnt > (REPLICA_COUNT * 1)/3) {
+	#endif
+		DEBUG_T("txn %ld need abort, due to %d secondary abort\n", get_txn_id(),
+                i, req_abort_cnt);
+		return Abort;
+	}
+
+	uint64_t req_no_complete_cnt = 0; // 当前操作的几个副本中，没有收集的数量
+	for (int j = 0; j < replica_cnt; j++) {
+        if (replica[j].status < status) req_no_complete_cnt ++;
+	}
+	#if REPLICA_CC
+	if (req_no_complete_cnt > (REPLICA_COUNT * 1)/4) {
+	#else 
+	if (req_no_complete_cnt > (REPLICA_COUNT * 1)/3) {
+	#endif
+		DEBUG_T("txn %ld need wait, due to %d secondary do not reach %ld\n", get_txn_id(), i,
+                req_no_complete_cnt, status);
+        return WAIT;
+	}
+	return RCOK;
+}
+RC TPCCTxnManager::check_query_status(OpStatus status){
+	TPCCQuery *tpcc_query = (TPCCQuery *)query;
+	RC can_enter_next_state = RCOK;
+
+	can_enter_next_state = check_each_item(tpcc_query->w_replica, tpcc_query->w_replica_cnt,status);
+	if (can_enter_next_state != RCOK) return can_enter_next_state;
+	
+	if (tpcc_query->txn_type == TPCC_PAYMENT) {
+		can_enter_next_state = check_each_item(tpcc_query->d_w_replica, tpcc_query->d_w_replica_cnt,status);
+		if (can_enter_next_state != RCOK) return can_enter_next_state;
+
+		can_enter_next_state = check_each_item(tpcc_query->c_w_replica, tpcc_query->c_w_replica_cnt,status);
+		if (can_enter_next_state != RCOK) return can_enter_next_state;
+	}
+
+	if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
+		for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
+			uint64_t ol_number = i;
+			can_enter_next_state = check_each_item(tpcc_query->items[ol_number]->ol_supply_w_replica,	tpcc_query->items[ol_number]->ol_supply_w_replica_cnt,status);
+			if (can_enter_next_state != RCOK) return can_enter_next_state;
+		}
+	}
+    return RCOK;
+}
+#else
+void update_query_status(uint64_t return_id, OpStatus status){
+    if (rsp_cnt > 0)--rsp_cnt;
+    uint64_t center_from = GET_CENTER_ID(return_id);
+    if (wh_extra_wait[0] == center_from ||
+        wh_extra_wait[1] == center_from) {
+      	wh_need_wait = false;
+    }
+    if (cus_extra_wait[0] == center_from ||
+        cus_extra_wait[1] == center_from) {
+      	cus_need_wait = false;
+    }
+    for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+		if(extra_wait[i][0] == center_from || extra_wait[i][1] == center_from){
+			req_need_wait[i] = false;
+		}
+    }  
+}
+
+RC check_query_status(OpStatus status){
+    if (wh_need_wait || cus_need_wait || rsp_cnt > 0) {
+		DEBUG_T("txn %ld need wait because wh %ld cus %ld rsp_nct %ld\n",get_txn_id(), wh_need_wait, cus_need_wait, rsp_cnt);
+		return WAIT;
+    }
+    for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
+      	if(req_need_wait[i]) return WAIT;
+    }
+    return RCOK;
+}
+#endif
 #endif

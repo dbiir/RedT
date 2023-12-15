@@ -71,11 +71,17 @@
 #define CENTER_MASTER true  // hg-network without replica stage 2
 #define PARAL_SUBTXN true   // hg-network without replica stage 3
 #define USE_REPLICA true
+#if USE_REPLICA
+  #define REPLICA_COUNT 3     // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
+#else 
+  #define REPLICA_COUNT 0     // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
+#endif
+#define MAX_REPLICA_COUNT REPLICA_COUNT + 2
 #define THOMAS_WRITE true  // if false, wait and sort
 #define INTER_DC_CONTROL true
 #define RDMA_DBPAOR false  // concurrent logging
 #define AGENT_COORDINATOR false
-#define REPLICA_CC false
+#define REPLICA_CC true  // !指副本上是否要做并发控制
 
 #if USE_REPLICA
 #define ASYNC_REDO_THREAD_CNT 1

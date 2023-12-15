@@ -36,9 +36,8 @@ struct Item_no {
 		ol_supply_w_id = item->ol_supply_w_id;
 		ol_quantity = item->ol_quantity;
 	}
-	execute_node ol_supply_w_primary;
-	execute_node ol_supply_w_second1;
-	execute_node ol_supply_w_second2;
+	execute_node ol_supply_w_replica[MAX_REPLICA_COUNT];
+	uint64_t ol_supply_w_replica_cnt;
 };
 
 
@@ -72,16 +71,16 @@ public:
 	uint64_t w_id;
 	uint64_t d_id;
 	uint64_t c_id;
-	execute_node w_primary;
-	execute_node w_second1;
-	execute_node w_second2;
+	execute_node w_replica[MAX_REPLICA_COUNT];
+	uint64_t w_replica_cnt;
 	// txn input for payment
 	uint64_t d_w_id;
 	uint64_t c_w_id;
 	uint64_t c_d_id;
-	execute_node c_w_primary;
-	execute_node c_w_second1;
-	execute_node c_w_second2;
+	execute_node d_w_replica[MAX_REPLICA_COUNT];
+	uint64_t d_w_replica_cnt;
+	execute_node c_w_replica[MAX_REPLICA_COUNT];
+	uint64_t c_w_replica_cnt;
 
 	char c_last[LASTNAME_LEN];
 	double h_amount;

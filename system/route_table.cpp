@@ -18,7 +18,8 @@ void RouteTable::init() {
 
     /*new*/
     table[i].partition_id = i;
-    for (int j = 0; i < 5; j++) {
+    table[i].replica_cnt = repl_cnt;
+    for (int j = 0; i < repl_cnt; j++) {
       table[i].new_secondary[j].node_id = (i + j) % g_node_cnt;
       table[i].new_secondary[j].last_ts = get_wall_clock();
     }

@@ -372,14 +372,6 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 		is_primary[i] = false; 	
 	}
 	#if WORKLOAD == YCSB
-	for(int i=0;i<REQ_PER_QUERY;i++){
-		for(int j=0;j<2;j++){
-			extra_wait[i][j] = -1;
-		}
-	}
-	for(int i=0;i<REQ_PER_QUERY;i++){
-		req_need_wait[i] = false;	
-	}
 	#else 
 	wh_need_wait = false;
 	wh_extra_wait[0] = -1;
@@ -423,14 +415,6 @@ void TxnManager::reset() {
 	}
 	is_logged = false;
 	#if WORKLOAD == YCSB
-	for(int i=0;i<REQ_PER_QUERY;i++){
-		for(int j=0;j<2;j++){
-			extra_wait[i][j] = -1;
-		}
-	}
-	for(int i=0;i<REQ_PER_QUERY;i++){
-		req_need_wait[i] = false;	
-	}
 	#else 
 	wh_need_wait = false;
 	wh_extra_wait[0] = -1;
@@ -509,14 +493,6 @@ void TxnManager::release() {
 		is_primary[i] = false; 	
 	}
 	#if WORKLOAD == YCSB
-	for(int i=0;i<REQ_PER_QUERY;i++){
-		for(int j=0;j<2;j++){
-			extra_wait[i][j] = -1;
-		}
-	}
-	for(int i=0;i<REQ_PER_QUERY;i++){
-		req_need_wait[i] = false;	
-	}
 	#else 
 	wh_need_wait = false;
 	wh_extra_wait[0] = -1;
@@ -779,12 +755,6 @@ void TxnManager::send_finish_messages() {
 	//get req_need_wait
 
 	#if WORKLOAD == YCSB
-	for(int i=0;i<REQ_PER_QUERY;i++){
-		if(extra_wait[i][0] != -1){
-			assert(extra_wait[i][1] != -1);
-			req_need_wait[i] = true;
-		}
-	}	
 	#else 
 	if (wh_extra_wait[0] != -1) {
 		assert(wh_extra_wait[1] != -1);

@@ -320,8 +320,6 @@ public:
 	//for neworder
 
 	#if WORKLOAD == YCSB
-	int extra_wait[REQ_PER_QUERY][2];
-	bool req_need_wait[REQ_PER_QUERY];
 	#elif WORKLOAD == TPCC
 	int extra_wait[MAX_ITEMS_PER_TXN][2];
 	bool req_need_wait[MAX_ITEMS_PER_TXN];

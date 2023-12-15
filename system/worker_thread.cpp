@@ -1385,7 +1385,8 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
 
 #if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3)
   RC result = txn_man->check_query_status(PREPARE);
-  if(txn_man->get_rsp_cnt() == 0 && !txn_man->need_extra_wait() && result == RCOK){
+  if (result == RCOK) {
+  // if(txn_man->get_rsp_cnt() == 0 && !txn_man->need_extra_wait() && result == RCOK){ // !现在不知道有啥用
     // assert(false);
 		assert(IS_LOCAL(txn_man->get_txn_id()));
     if(txn_man->get_rc() != Abort) {
@@ -1399,7 +1400,6 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     //commit phase: now commit or abort
     txn_man->set_commit_timestamp(get_next_ts());
     txn_man->send_finish_messages();
-    // assert(txn_man->get_rsp_cnt() == 0 && !txn_man->need_extra_wait());
 
     if(rc == Abort) {
       txn_man->abort(yield, cor_id);

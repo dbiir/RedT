@@ -18,12 +18,16 @@ struct route_table_node {
   route_node_ts secondary_1;
   route_node_ts secondary_2;
 
-  route_node_ts new_secondary[5];
+  route_node_ts new_secondary[MAX_REPLICA_COUNT];
+  uint64_t replica_cnt;
 };
 class RouteTable {
  public:
   void init();
 
+  auto get_route_table_node(uint64_t partition_id) -> route_table_node {
+    return table[partition_id];
+  }
   auto get_route_node_new(int index, uint64_t partition_id) -> route_node_ts;
   void set_route_node_new(int index, uint64_t partition_id, uint64_t node_id,
                           uint64_t timestamp = 0, uint64_t thd_id = 0);
@@ -140,6 +144,11 @@ auto get_node_id_new(int index, uint64_t part_id) -> uint64_t {
   status_node* st = node_status.get_node_status(node_id);
   if (st->status == NS::Failure) return -1;
   return node_id;
+}
+
+auto get_part_repl_cnt(uint64_t part_id) -> uint64_t {
+  route_table_node node_id = route_table.get_route_table_node(part_id);
+  return node_id.replica_cnt;
 }
 // #define IS_CENTER_PRIMARY(nid) ((nid / g_center_cnt) == 0)
 // ! Recovery manager section end

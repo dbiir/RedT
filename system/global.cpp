@@ -240,6 +240,7 @@ UInt64 rdma_index_size = (400 * 1024 * 1024L * g_part_cnt);
 #else
 UInt64 rdma_index_size = (300 * 1024 * 1024L);
 #endif
+UInt32 repl_cnt = REPLICA_COUNT;
 // Replica redo log buffer size, in bytes
 UInt64 rdma_log_size = 1024 * 1024 * 1024;
 

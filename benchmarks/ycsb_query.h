@@ -44,7 +44,10 @@ public:
 	access_t acctype;
 	uint64_t key;
 	char value;
-  // For 
+  // ! Dynamic Replica cnt
+  execute_node replica_node[MAX_REPLICA_COUNT];
+  uint64_t replica_cnt;
+  // ! Previous code
   execute_node primary;
   execute_node second1;
   execute_node second2;
