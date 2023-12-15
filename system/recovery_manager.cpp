@@ -83,10 +83,18 @@ RC HeartBeatThread::send_tcp_heart_beat() {
     if (dest_id == g_node_id) continue;  // no need to send heartbeat to itself
     if (dest_id == -1) continue;
     auto message = Message::create_message(route_table.table, node_status.table, HEART_BEAT);
-    message->latency = in_latency[i];
+    message->latency = in_latency_[i];
     msg_queue.enqueue(get_thd_id(), message, dest_id);
     DEBUG_H("Node %ld send TCP heartbeat to %ld\n", g_node_id, dest_id);
   }
+  return RCOK;
+}
+
+RC HeartBeatThread::send_stats() {
+  auto message = Message::create_message(STATS_COUNT);
+  msg_queue.enqueue(get_thd_id(), message, 0);
+  memset(access_count_, 0, sizeof(access_count_));
+  DEBUG_H("Node %ld send stats to 0\n", g_node_id);
   return RCOK;
 }
 

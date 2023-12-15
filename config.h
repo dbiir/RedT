@@ -293,8 +293,8 @@
 // per-row lock/ts management or central lock/ts management
 #define CENTRAL_MAN false
 #define BUCKET_CNT 31
-#define ABORT_PENALTY 10 * 1000000UL   // in ns.
-#define ABORT_PENALTY_MAX 5 * 100 * 1000000UL   // in ns.
+#define ABORT_PENALTY 10 * 1000000UL           // in ns.
+#define ABORT_PENALTY_MAX 5 * 100 * 1000000UL  // in ns.
 #define BACKOFF true
 // [ INDEX ]
 #define ENABLE_LATCH false
@@ -365,6 +365,7 @@
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 4194304
 #define ZIPF_THETA 0.2
+#define SIMILAR_GROUP_PERC 0.5
 #define TXN_WRITE_PERC 1
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC 0
@@ -593,11 +594,11 @@ enum PPSTxnType {
 #define MILLION 1000000UL     // in ns => 1 ms
 #define USECONDE 1000UL       // us
 #define STAT_ARR_SIZE 1024
-#define PROG_TIMER 10 * BILLION // in s
+#define PROG_TIMER 10 * BILLION  // in s
 #define BATCH_TIMER 0
-#define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
+#define SEQ_BATCH_TIMER 5 * 1 * MILLION  // ~5ms -- same as CALVIN paper
+#define DONE_TIMER 1 * 20 * BILLION      // ~1 minutes
+#define WARMUP_TIMER 1 * 10 * BILLION    // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false
