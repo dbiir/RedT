@@ -17,87 +17,87 @@
 #ifndef _YCSBQuery_H_
 #define _YCSBQuery_H_
 
+#include "array.h"
 #include "global.h"
 #include "helper.h"
 #include "query.h"
-#include "array.h"
 
 class Workload;
 class Message;
 class YCSBQueryMessage;
 class YCSBClientQueryMessage;
 
-
 // Each YCSBQuery contains several ycsb_requests,
 // each of which is a RD, WR or SCAN
 // to a single table
 
 class ycsb_request {
-public:
+ public:
   ycsb_request() {}
-  ycsb_request(const ycsb_request& req) : acctype(req.acctype), key(req.key), value(req.value) { }
-  void copy(ycsb_request * req) {
+  ycsb_request(const ycsb_request& req) : acctype(req.acctype), key(req.key), value(req.value) {}
+  void copy(ycsb_request* req) {
     this->acctype = req->acctype;
     this->key = req->key;
     this->value = req->value;
   }
-	access_t acctype;
-	uint64_t key;
-	char value;
-  // For 
+  access_t acctype;
+  uint64_t key;
+  char value;
+  // For
   execute_node primary;
   execute_node second1;
   execute_node second2;
 };
 
 class YCSBQueryGenerator : public QueryGenerator {
-public:
+ public:
   void init();
-  BaseQuery * create_query(Workload * h_wl, uint64_t home_partition_id);
-private:
-	BaseQuery * gen_requests_hot(uint64_t home_partition_id, Workload * h_wl);
-	BaseQuery * gen_requests_zipf(uint64_t home_partition_id, Workload * h_wl);
-	// for Zipfian distribution
-	double zeta(uint64_t n, double theta);
-	uint64_t zipf(uint64_t n, double theta);
+  BaseQuery* create_query(Workload* h_wl, uint64_t home_partition_id);
 
-	myrand * mrand;
-	static uint64_t the_n;
-	static double denom;
-	double zeta_2_theta;
+ private:
+  BaseQuery* gen_requests_hot(uint64_t home_partition_id, Workload* h_wl);
+  BaseQuery* gen_requests_zipf(uint64_t home_partition_id, Workload* h_wl);
+  BaseQuery* gen_requests_zipf_new(uint64_t home_partition_id, Workload* h_wl);
+  // for Zipfian distribution
+  double zeta(uint64_t n, double theta);
+  uint64_t zipf(uint64_t n, double theta);
+
+  myrand* mrand;
+  static uint64_t the_n;
+  static double denom;
+  double zeta_2_theta;
 };
 
 class YCSBQuery : public BaseQuery {
-public:
+ public:
   YCSBQuery() {}
   ~YCSBQuery() {}
 
   void print();
 
-	void init(uint64_t thd_id, Workload * h_wl) {};
+  void init(uint64_t thd_id, Workload* h_wl){};
   void init();
   void release();
   void release_requests();
   void reset();
   void reset_query_status();
-  uint64_t get_participants(Workload * wl);
-  static std::set<uint64_t> participants(Message * msg, Workload * wl);
-  static void copy_request_to_msg(YCSBQuery * ycsb_query, YCSBQueryMessage * msg, uint64_t id);
-  uint64_t participants(bool *& pps,Workload * wl);
+  uint64_t get_participants(Workload* wl);
+  static std::set<uint64_t> participants(Message* msg, Workload* wl);
+  static void copy_request_to_msg(YCSBQuery* ycsb_query, YCSBQueryMessage* msg, uint64_t id);
+  uint64_t participants(bool*& pps, Workload* wl);
   bool readonly();
 
-  //std::vector<ycsb_request> requests;
+  // std::vector<ycsb_request> requests;
   Array<ycsb_request*> requests;
   void* orig_request;
   /*
   uint64_t rid;
   uint64_t access_cnt;
-	uint64_t request_cnt;
-	uint64_t req_i;
+        uint64_t request_cnt;
+        uint64_t req_i;
   ycsb_request req;
   uint64_t rqry_req_cnt;
   */
-
 };
 
 #endif

@@ -292,15 +292,13 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
 RC YCSBTxnManager::send_remote_subtxn() {
   YCSBQuery *ycsb_query = (YCSBQuery *)query;
   RC rc = RCOK;
-  for (auto i : is_count) {
-    is_count[i] = false;
-  }
+  memset(is_count_, 0, sizeof(is_count_));
   for (int i = 0; i < ycsb_query->requests.size(); i++) {
     ycsb_request *req = ycsb_query->requests[i];
     uint64_t part_id = _wl->key_to_part(req->key);
-    if (!is_count[part_id]) {
-      access_count[part_id]++;
-      is_count[part_id] = true;
+    if (!is_count_[part_id]) {
+      access_count_[part_id]++;
+      is_count_[part_id] = true;
     }
     vector<uint64_t> node_id;
     uint64_t loc = -1;

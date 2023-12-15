@@ -168,6 +168,7 @@ extern QryPool qry_pool;
 extern TxnTable txn_table;
 extern QWorkQueue work_queue;
 extern QWorkQueue heartbeat_queue;
+extern QWorkQueue stats_queue;
 extern QWorkQueue recover_queue;
 extern AbortQueue abort_queue;
 extern MessageQueue msg_queue;
@@ -331,6 +332,7 @@ extern double g_txn_write_perc;
 extern double g_tup_read_perc;
 extern double g_tup_write_perc;
 extern double g_zipf_theta;
+extern double g_similar_group_perc;
 extern double g_data_perc;
 extern double g_access_perc;
 extern UInt64 g_synth_table_size;
@@ -437,6 +439,7 @@ enum RemReqType {
   LOG_FLUSHED,
   CALVIN_ACK,
   HEART_BEAT,
+  STATS_COUNT,
   RECOVERY,
   WAIT_TXN,
   RECOVER_TXN,
@@ -567,8 +570,8 @@ extern uint64_t total_num_msgs_commit;
 extern uint64_t max_num_msgs_rw_prep;
 extern uint64_t max_num_msgs_commit;
 
-extern uint64_t in_latency[5];
-extern uint64_t latency[5];
-extern uint64_t access_count[PART_CNT];
-extern bool is_count[PART_CNT];
+extern uint64_t in_latency_[5];
+extern uint64_t latency_[5];
+extern uint64_t access_count_[PART_CNT];
+extern bool is_count_[PART_CNT];
 #endif

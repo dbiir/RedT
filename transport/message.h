@@ -39,6 +39,7 @@ class Message {
   static Message* create_message(uint64_t txn_id, uint64_t batch_id, RemReqType rtype);
   static Message* create_message(LogRecord* record, RemReqType rtype);
   static Message* create_message(route_table_node* route, status_node* node, RemReqType rtype);
+  static Message* create_message(uint64_t* access_count, RemReqType rtype);
   static Message* create_message(uint64_t pid, uint64_t rid, NodeStatus node, RemReqType rtype);
   static Message* create_message(RemReqType rtype);
   static std::vector<Message*>* create_messages(char* buf);
@@ -496,6 +497,20 @@ class HeartBeatMessage : public Message {
   RouteAndStatus heartbeatmsg;
   // RouteTable* _route;
   // NodeStatus* _status;
+};
+
+class StatsCountMessage : public Message {
+ public:
+  void copy_from_buf(char* buf);
+  void copy_to_buf(char* buf);
+  void copy_from_txn(TxnManager* txn);
+  void copy_to_txn(TxnManager* txn);
+  uint64_t get_size();
+  void init() {}
+  void release();
+  void copy_from_access_count(uint64_t* access_count);
+
+  uint64_t access_count[PART_CNT];
 };
 
 class ReplicaRecoverMessage : public Message {

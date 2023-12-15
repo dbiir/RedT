@@ -109,6 +109,15 @@ Message* Message::create_message(route_table_node* route, status_node* node, Rem
   return msg;
 }
 
+auto Message::create_message(uint64_t* access_count, RemReqType rtype) -> Message* {
+  auto msg = create_message(rtype);
+  auto stats_count_msg = dynamic_cast<StatsCountMessage*>(msg);
+  stats_count_msg->return_node_id = g_node_id;
+  stats_count_msg->return_center_id = g_center_id;
+  stats_count_msg->copy_from_access_count(access_count);
+  return msg;
+}
+
 auto Message::GetTime() -> uint64_t {
   auto now = std::chrono::system_clock::now();
   auto duration = now.time_since_epoch();
@@ -223,6 +232,9 @@ Message* Message::create_message(RemReqType rtype) {
       break;
     case HEART_BEAT:
       msg = new HeartBeatMessage;
+      break;
+    case STATS_COUNT:
+      msg = new StatsCountMessage;
       break;
     case RECOVERY:
       msg = new ReplicaRecoverMessage;
@@ -2027,6 +2039,46 @@ void HeartBeatMessage::copy_to_buf(char* buf) {
   assert(ptr == get_size());
 }
 
+/************************/
+
+void StatsCountMessage::release() {
+  // log_records.release();
+}
+
+uint64_t StatsCountMessage::get_size() {
+  uint64_t size = Message::mget_size();
+  size += sizeof(uint64_t) * 2;  // return_center_id、return_node_id
+  size += sizeof(access_count);
+  return size;
+}
+
+void StatsCountMessage::copy_from_txn(TxnManager* txn) { Message::mcopy_from_txn(txn); }
+
+void StatsCountMessage::copy_to_txn(TxnManager* txn) { Message::mcopy_to_txn(txn); }
+
+void StatsCountMessage::copy_from_access_count(uint64_t* access_count) {
+  for (int i = 0; i < PART_CNT; i++) {
+    access_count_[i] = access_count[i];
+  }
+}
+
+void StatsCountMessage::copy_from_buf(char* buf) {
+  Message::mcopy_from_buf(buf);
+  uint64_t ptr = Message::mget_size();
+  COPY_VAL(return_node_id, buf, ptr);
+  COPY_VAL(return_center_id, buf, ptr);
+  COPY_VAL(*access_count, buf, ptr);
+  assert(ptr == get_size());
+}
+
+void StatsCountMessage::copy_to_buf(char* buf) {
+  Message::mcopy_to_buf(buf);
+  uint64_t ptr = Message::mget_size();
+  COPY_BUF(buf, return_node_id, ptr);
+  COPY_BUF(buf, return_center_id, ptr);
+  COPY_BUF(buf, *access_count, ptr);
+  assert(ptr == get_size());
+}
 /************************/
 
 void ReplicaRecoverMessage::release() {

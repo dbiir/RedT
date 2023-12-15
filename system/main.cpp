@@ -185,6 +185,12 @@ int main(int argc, char *argv[]) {
   fflush(stdout);
   heartbeat_queue.init();
   printf("Done\n");
+
+  printf("Initializing statics queue... ");
+  fflush(stdout);
+  stats_queue.init();
+  printf("Done\n");
+
   printf("Initializing recover queue... ");
   fflush(stdout);
   recover_queue.init();
