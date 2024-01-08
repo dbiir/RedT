@@ -399,7 +399,7 @@ uint64_t total_num_msgs_commit = 0;
 uint64_t max_num_msgs_rw_prep = 0;
 uint64_t max_num_msgs_commit = 0;
 
-uint64_t in_latency_[5] = {999, 999, 999, 999, 999};
-uint64_t latency_[5] = {999, 999, 999, 999, 999};
-uint64_t access_count_[PART_CNT] = {0};
-bool is_count_[PART_CNT] = {false};
+uint64_t in_latency[5] = {999, 999, 999, 999, 999};
+uint64_t latency[5] = {999, 999, 999, 999, 999};
+uint64_t access_count[PART_CNT] = {0};
+bool is_count[PART_CNT] = {false};

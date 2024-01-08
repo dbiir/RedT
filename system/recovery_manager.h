@@ -9,6 +9,7 @@ class HeartBeatThread : public Thread {
  public:
   RC run();
   RC heartbeat_loop();
+  RC heartbeat_loop_new();
   RC send_rdma_heart_beat(uint64_t dest_id);
   RC send_tcp_heart_beat();
   RC send_stats();

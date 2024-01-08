@@ -197,8 +197,8 @@ RC InputThread::server_recv_loop() {
       } else if (msg->rtype == HEART_BEAT) {
         auto cur_latency = Message::GetTime() - msg->send_time;
         int center_id = static_cast<int>(msg->return_center_id);
-        in_latency_[center_id] = cur_latency;
-        latency_[center_id] = msg->latency + cur_latency;
+        in_latency[center_id] = cur_latency;
+        latency[center_id] = msg->latency + cur_latency;
         heartbeat_queue.enqueue(get_thd_id(), msg, false);
         msgs->erase(msgs->begin());
         continue;

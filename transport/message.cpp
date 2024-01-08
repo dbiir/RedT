@@ -109,12 +109,14 @@ Message* Message::create_message(route_table_node* route, status_node* node, Rem
   return msg;
 }
 
-auto Message::create_message(uint64_t* access_count, RemReqType rtype) -> Message* {
+auto Message::create_message(uint64_t* access_count, uint64_t* latency, RemReqType rtype)
+    -> Message* {
   auto msg = create_message(rtype);
   auto stats_count_msg = dynamic_cast<StatsCountMessage*>(msg);
   stats_count_msg->return_node_id = g_node_id;
   stats_count_msg->return_center_id = g_center_id;
   stats_count_msg->copy_from_access_count(access_count);
+  stats_count_msg->copy_from_latency(latency);
   return msg;
 }
 
@@ -2048,7 +2050,8 @@ void StatsCountMessage::release() {
 uint64_t StatsCountMessage::get_size() {
   uint64_t size = Message::mget_size();
   size += sizeof(uint64_t) * 2;  // return_center_id、return_node_id
-  size += sizeof(access_count);
+  size += sizeof(access_count_);
+  size += sizeof(latency_);
   return size;
 }
 
@@ -2062,12 +2065,19 @@ void StatsCountMessage::copy_from_access_count(uint64_t* access_count) {
   }
 }
 
+void StatsCountMessage::copy_from_latency(uint64_t* latency) {
+  for (int i = 0; i < CENTER_CNT; i++) {
+    latency_[i] = latency[i];
+  }
+}
+
 void StatsCountMessage::copy_from_buf(char* buf) {
   Message::mcopy_from_buf(buf);
   uint64_t ptr = Message::mget_size();
   COPY_VAL(return_node_id, buf, ptr);
   COPY_VAL(return_center_id, buf, ptr);
-  COPY_VAL(*access_count, buf, ptr);
+  COPY_VAL(*access_count_, buf, ptr);
+  COPY_VAL(*latency_, buf, ptr);
   assert(ptr == get_size());
 }
 
@@ -2076,7 +2086,8 @@ void StatsCountMessage::copy_to_buf(char* buf) {
   uint64_t ptr = Message::mget_size();
   COPY_BUF(buf, return_node_id, ptr);
   COPY_BUF(buf, return_center_id, ptr);
-  COPY_BUF(buf, *access_count, ptr);
+  COPY_BUF(buf, *access_count_, ptr);
+  COPY_BUF(buf, *latency_, ptr);
   assert(ptr == get_size());
 }
 /************************/

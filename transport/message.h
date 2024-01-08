@@ -39,7 +39,7 @@ class Message {
   static Message* create_message(uint64_t txn_id, uint64_t batch_id, RemReqType rtype);
   static Message* create_message(LogRecord* record, RemReqType rtype);
   static Message* create_message(route_table_node* route, status_node* node, RemReqType rtype);
-  static Message* create_message(uint64_t* access_count, RemReqType rtype);
+  static Message* create_message(uint64_t* access_count, uint64_t* latency, RemReqType rtype);
   static Message* create_message(uint64_t pid, uint64_t rid, NodeStatus node, RemReqType rtype);
   static Message* create_message(RemReqType rtype);
   static std::vector<Message*>* create_messages(char* buf);
@@ -509,8 +509,10 @@ class StatsCountMessage : public Message {
   void init() {}
   void release();
   void copy_from_access_count(uint64_t* access_count);
+  void copy_from_latency(uint64_t* latency);
 
-  uint64_t access_count[PART_CNT];
+  uint64_t access_count_[PART_CNT];
+  uint64_t latency_[CENTER_CNT];
 };
 
 class ReplicaRecoverMessage : public Message {
