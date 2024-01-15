@@ -139,14 +139,14 @@ inline uint64_t get_follower2_node_id(uint64_t part_id) {
   return node_id;
 }
 
-auto get_node_id_new(int index, uint64_t part_id) -> uint64_t {
+inline auto get_node_id_new(int index, uint64_t part_id) -> uint64_t {
   uint64_t node_id = route_table.get_route_node_new(index, part_id).node_id;
   status_node* st = node_status.get_node_status(node_id);
   if (st->status == NS::Failure) return -1;
   return node_id;
 }
 
-auto get_part_repl_cnt(uint64_t part_id) -> uint64_t {
+inline auto get_part_repl_cnt(uint64_t part_id) -> uint64_t {
   route_table_node node_id = route_table.get_route_table_node(part_id);
   return node_id.replica_cnt;
 }

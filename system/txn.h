@@ -319,11 +319,11 @@ public:
 	bool cus_need_wait;
 	//for neworder
 
-	#if WORKLOAD == YCSB
-	#elif WORKLOAD == TPCC
+	// #if WORKLOAD == YCSB
+	// #elif WORKLOAD == TPCC
 	int extra_wait[MAX_ITEMS_PER_TXN][2];
 	bool req_need_wait[MAX_ITEMS_PER_TXN];
-	#endif
+	// #endif
 	bool send_RQRY_RSP;
 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3

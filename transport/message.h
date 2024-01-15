@@ -38,7 +38,8 @@ class Message {
   static Message* create_message(uint64_t txn_id, RemReqType rtype);
   static Message* create_message(uint64_t txn_id, uint64_t batch_id, RemReqType rtype);
   static Message* create_message(LogRecord* record, RemReqType rtype);
-  static Message* create_message(route_table_node* route, status_node* node, RemReqType rtype);
+  static Message* create_message(route_table_node* route, status_node* node, bool need_flush,
+                                 RemReqType rtype);
   static Message* create_message(uint64_t* access_count, uint64_t* latency, RemReqType rtype);
   static Message* create_message(uint64_t pid, uint64_t rid, NodeStatus node, RemReqType rtype);
   static Message* create_message(RemReqType rtype);
@@ -495,6 +496,7 @@ class HeartBeatMessage : public Message {
 
   // LogRecord record;
   RouteAndStatus heartbeatmsg;
+  bool need_flush_route_;
   // RouteTable* _route;
   // NodeStatus* _status;
 };

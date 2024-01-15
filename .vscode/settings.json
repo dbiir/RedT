@@ -98,5 +98,12 @@
         "__tuple": "cpp",
         "__functional_03": "cpp",
         "ciso646": "cpp"
-    }
+    },
+    "C_Cpp.default.compilerPath": "/home/u2021000884/miniconda3/bin/gcc",
+    "C_Cpp.default.includePath": [
+        "/usr/local/include",
+        "/home/u2021000884/include",
+        "${workspaceFolder}/**"
+    ],
+    "files.autoSave": "onFocusChange"
 }

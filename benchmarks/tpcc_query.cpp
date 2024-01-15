@@ -217,9 +217,13 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
 	query->ol_cnt = URand(5, g_max_items_per_txn);
 	query->o_entry_d = 2013;
 
-  query->c_w_primary.status = OpStatus::RUN;
-  query->c_w_second1.status = OpStatus::RUN;
-  query->c_w_second2.status = OpStatus::RUN;
+  query->c_w_replica[0].status = OpStatus::RUN;
+  query->c_w_replica[1].status = OpStatus::RUN;
+  query->c_w_replica[2].status = OpStatus::RUN;
+
+  // query->c_w_primary.status = OpStatus::RUN;
+  // query->c_w_second1.status = OpStatus::RUN;
+  // query->c_w_second2.status = OpStatus::RUN;
 
   partitions_accessed.insert(wh_to_part(query->w_id));
 
@@ -257,9 +261,12 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
         }
       }
     }
-    item->ol_supply_w_primary.status=OpStatus::RUN;
-		item->ol_supply_w_second1.status=OpStatus::RUN;
-		item->ol_supply_w_second2.status=OpStatus::RUN;
+    item->ol_supply_w_replica[0].status=OpStatus::RUN;
+    item->ol_supply_w_replica[1].status=OpStatus::RUN;
+    item->ol_supply_w_replica[2].status=OpStatus::RUN;
+    // item->ol_supply_w_primary.status=OpStatus::RUN;
+		// item->ol_supply_w_second1.status=OpStatus::RUN;
+		// item->ol_supply_w_second2.status=OpStatus::RUN;
     query->items.add(item);
   }
 
@@ -321,14 +328,20 @@ void TPCCQuery::reset() {
 }
 
 void TPCCQuery::reset_query_status() {
-  c_w_primary.status = OpStatus::RUN;
-  c_w_second1.status = OpStatus::RUN;
-  c_w_second2.status = OpStatus::RUN;
+  c_w_replica[0].status = OpStatus::RUN;
+  c_w_replica[1].status = OpStatus::RUN;
+  c_w_replica[2].status = OpStatus::RUN;
+  // c_w_primary.status = OpStatus::RUN;
+  // c_w_second1.status = OpStatus::RUN;
+  // c_w_second2.status = OpStatus::RUN;
   for (int i = 0; i < items.size(); i++) {
     Item_no * item = items[i];
-    item->ol_supply_w_primary.status=OpStatus::RUN;
-		item->ol_supply_w_second1.status=OpStatus::RUN;
-		item->ol_supply_w_second2.status=OpStatus::RUN;
+    item->ol_supply_w_replica[0].status=OpStatus::RUN;
+    item->ol_supply_w_replica[1].status=OpStatus::RUN;
+    item->ol_supply_w_replica[2].status=OpStatus::RUN;
+    // item->ol_supply_w_primary.status=OpStatus::RUN;
+		// item->ol_supply_w_second1.status=OpStatus::RUN;
+		// item->ol_supply_w_second2.status=OpStatus::RUN;
   }
 }
 

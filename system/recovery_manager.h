@@ -11,7 +11,7 @@ class HeartBeatThread : public Thread {
   RC heartbeat_loop();
   RC heartbeat_loop_new();
   RC send_rdma_heart_beat(uint64_t dest_id);
-  RC send_tcp_heart_beat();
+  RC send_tcp_heart_beat(bool need_flush = false);
   RC send_stats();
   RC check_for_same_center();
   RC check_for_other_center();

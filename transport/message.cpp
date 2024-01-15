@@ -102,13 +102,18 @@ Message* Message::create_message(LogRecord* record, RemReqType rtype) {
   return msg;
 }
 
-Message* Message::create_message(route_table_node* route, status_node* node, RemReqType rtype) {
+// create heartbeat message
+Message* Message::create_message(route_table_node* route, status_node* node, bool need_flush,
+                                 RemReqType rtype) {
   Message* msg = create_message(rtype);
   msg->send_time = GetTime();
-  ((HeartBeatMessage*)msg)->copy_from_node_status(route, node);
+  auto heartbeat_message = dynamic_cast<HeartBeatMessage*>(msg);
+  heartbeat_message->copy_from_node_status(route, node);
+  heartbeat_message->need_flush_route_ = need_flush;
   return msg;
 }
 
+// create statics message
 auto Message::create_message(uint64_t* access_count, uint64_t* latency, RemReqType rtype)
     -> Message* {
   auto msg = create_message(rtype);
@@ -1993,6 +1998,7 @@ uint64_t HeartBeatMessage::get_size() {
   size += SIZE_OF_ROUTE;
   size += SIZE_OF_STATUS;
   size += sizeof(uint64_t) * 3;  // return_center_id、send_time、latency
+  size += sizeof(bool);          // need_flush_route_
   // size += sizeof(LogRecord) * log_records.size();
   return size;
 }
@@ -2015,6 +2021,7 @@ void HeartBeatMessage::copy_from_buf(char* buf) {
   COPY_VAL(return_center_id, buf, ptr);
   COPY_VAL(send_time, buf, ptr);
   COPY_VAL(latency, buf, ptr);
+  COPY_VAL(need_flush_route_, buf, ptr);
   heartbeatmsg._route = (route_table_node*)malloc(SIZE_OF_ROUTE);
   heartbeatmsg._status = (status_node*)malloc(SIZE_OF_STATUS);
   memcpy(heartbeatmsg._route, buf + ptr, SIZE_OF_ROUTE);
@@ -2032,6 +2039,7 @@ void HeartBeatMessage::copy_to_buf(char* buf) {
   COPY_BUF(buf, return_center_id, ptr);
   COPY_BUF(buf, send_time, ptr);
   COPY_BUF(buf, latency, ptr);
+  COPY_BUF(buf, need_flush_route_, ptr);
   memcpy(buf + ptr, heartbeatmsg._route, SIZE_OF_ROUTE);
   ptr += SIZE_OF_ROUTE;
   memcpy(buf + ptr, heartbeatmsg._status, SIZE_OF_STATUS);

@@ -40,7 +40,7 @@ RC HeartBeatThread::heartbeat_loop() {
       if (is_center_primary(g_node_id)) {
         // leader send to other leaders
         // DEBUG_H("Node %ld is center %d primary\n", g_node_id, GET_CENTER_ID(g_node_id));
-        send_tcp_heart_beat();
+        // send_tcp_heart_beat();
       } else {
         // slaves send to their own leaders
         uint64_t center_id = GET_CENTER_ID(g_node_id);
@@ -81,10 +81,12 @@ RC HeartBeatThread::heartbeat_loop_new() {
   while (!simulation->is_done()) {
     now = get_wall_clock();
     node_status.set_node_status(g_node_id, OnCall, get_thd_id());
+
+    // send heartbeat
     if (now - lastsendtime > HEARTBEAT_TIME) {
       if (is_center_primary(g_node_id)) {
         // leader send to other leaders
-        send_tcp_heart_beat();
+        send_tcp_heart_beat(false);
       } else {
         // slaves send to their own leaders
         uint64_t center_id = GET_CENTER_ID(g_node_id);
@@ -93,9 +95,13 @@ RC HeartBeatThread::heartbeat_loop_new() {
       }
       lastsendtime = get_wall_clock();
     }
+
+    // send statics
     if (now - last_collect_time > HEARTBEAT_TIME) {
       send_stats();
     }
+
+    // node 0 receives statics message and generates plan
     if (g_node_id == 0) {
       int access_collector[CENTER_CNT][PART_CNT];
       int latency_collector[CENTER_CNT][CENTER_CNT];
@@ -127,18 +133,18 @@ RC HeartBeatThread::heartbeat_loop_new() {
       set<PartitionInformation> next_partition;
       unordered_map<int, int> remain_partitions;
 
-      int temp = 0;
-      for (int i = 0; i < PART_CNT; i++) {
+      double temp = 0;
+      for (int partition_idx = 0; partition_idx < PART_CNT; partition_idx++) {
         for (int location = 0; location < CENTER_CNT; location++) {
           for (int access_location = 0; access_location < CENTER_CNT; access_location++) {
-            temp +=
-                access_collector[access_location][i] * latency_collector[access_location][location];
+            temp += access_collector[access_location][partition_idx] *
+                    latency_collector[access_location][location];
           }
-          score[i][location] = temp;
-          next_partition.emplace(i, location, temp);
+          score[partition_idx][location] = temp;
+          next_partition.emplace(PartitionInformation{partition_idx, location, temp});
           temp = 0;
         }
-        remain_partitions.emplace(i, MAX_REPLICA_COUNT);
+        remain_partitions.emplace(partition_idx, MAX_REPLICA_COUNT);
       }
 
       // generate plan
@@ -149,9 +155,9 @@ RC HeartBeatThread::heartbeat_loop_new() {
         if (remain_partitions.find(iterator->partition_id)->second == 0) {
           continue;
         }
-        for (int j = 0; j < MAX_REPLICA_COUNT; j++) {
-          if (plan[iterator->partition_id][j] != -1) {
-            plan[iterator->partition_id][j] = iterator->target_location;
+        for (int replica_idx = 0; replica_idx < MAX_REPLICA_COUNT; replica_idx++) {
+          if (plan[iterator->partition_id][replica_idx] != -1) {
+            plan[iterator->partition_id][replica_idx] = iterator->target_location;
             score[iterator->partition_id][iterator->target_location] = -1;
             auto map_iterator = remain_partitions.find(iterator->partition_id);
             map_iterator->second -= 1;
@@ -159,6 +165,17 @@ RC HeartBeatThread::heartbeat_loop_new() {
           }
         }
       }
+
+      // update local route table
+      for (int partition_idx = 0; partition_idx < PART_CNT; partition_idx++) {
+        for (int replica_idx = 0; replica_idx < MAX_REPLICA_COUNT; replica_idx++) {
+          route_table.set_route_node_new(replica_idx, partition_idx,
+                                         plan[partition_idx][replica_idx]);
+        }
+      }
+
+      // send heartbeat contains route table
+      send_tcp_heart_beat(true);
     }
 
     if (is_center_primary(g_node_id)) {
@@ -166,8 +183,10 @@ RC HeartBeatThread::heartbeat_loop_new() {
 
       msg = heartbeat_queue.dequeue(get_thd_id());
       if (msg) {
-        HeartBeatMessage* hmsg = (HeartBeatMessage*)msg;
-        update_node_and_route(hmsg->heartbeatmsg, hmsg->return_node_id);
+        auto heartbeat_message = dynamic_cast<HeartBeatMessage*>(msg);
+        if (heartbeat_message->need_flush_route_) {
+          update_node_and_route(heartbeat_message->heartbeatmsg, heartbeat_message->return_node_id);
+        }
         // handle the failure in the different data center.
         if (is_global_primary(g_node_id)) {
           check_for_other_center();
@@ -186,12 +205,13 @@ RC HeartBeatThread::send_rdma_heart_beat(uint64_t dest_id) {
   return RCOK;
 }
 
-RC HeartBeatThread::send_tcp_heart_beat() {
-  for (int i = 0; i < g_center_cnt; i++) {
+RC HeartBeatThread::send_tcp_heart_beat(bool need_flush) {
+  for (int i = 0; i < CENTER_CNT; i++) {
     uint64_t dest_id = get_center_primary(i);
     if (dest_id == g_node_id) continue;  // no need to send heartbeat to itself
     if (dest_id == -1) continue;
-    auto message = Message::create_message(route_table.table, node_status.table, HEART_BEAT);
+    auto message =
+        Message::create_message(route_table.table, node_status.table, need_flush, HEART_BEAT);
     message->latency = in_latency[i];
     msg_queue.enqueue(get_thd_id(), message, dest_id);
     DEBUG_H("Node %ld send TCP heartbeat to %ld\n", g_node_id, dest_id);
@@ -447,10 +467,10 @@ auto HeartBeatThread::update_node_and_route_new(RouteAndStatus result, uint64_t 
     }
   }
   // route
-  for (int i = 0; i < g_part_cnt; i++) {
+  for (int i = 0; i < PART_CNT; i++) {
     route_node_ts p_rt;
     route_node_ts tmp_p_rt;
-    for (int j = 0; j < 5; j++) {
+    for (int j = 0; j < MAX_REPLICA_COUNT; j++) {
       p_rt = route_table.get_route_node_new(j, i);
       tmp_p_rt = result._route[i].new_secondary[j];
       if (tmp_p_rt.last_ts > p_rt.last_ts) {
@@ -490,7 +510,7 @@ auto HeartBeatThread::get_node_replica_new(uint64_t dest_id) -> vector<Replica> 
   vector<Replica> replica_list;
   for (int i = 0; i < g_part_cnt; i++) {
     route_node_ts p_rt;
-    for (int j = 0; j < 5; j++) {
+    for (int j = 0; j < MAX_REPLICA_COUNT; j++) {
       p_rt = route_table.get_route_node_new(j, i);
       if (p_rt.node_id == dest_id) {
         replica_list.push_back(Replica(i, j));

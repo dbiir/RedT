@@ -34,7 +34,7 @@ auto RouteTable::get_route_node_new(int index, uint64_t partition_id) -> route_n
 }
 
 void RouteTable::set_route_node_new(int index, uint64_t partition_id, uint64_t node_id,
-                                    uint64_t timestamp = 0, uint64_t thd_id = 0) {
+                                    uint64_t timestamp, uint64_t thd_id) {
   table[partition_id].new_secondary[index].node_id = node_id;
   if (timestamp == 0)
     table[partition_id].new_secondary[index].last_ts = get_wall_clock();

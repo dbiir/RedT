@@ -1018,8 +1018,8 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			}
 			break;
 		case TPCC_PAYMENT5 :
-			if(c_w_cen == g_center_id){
-			// if(is_c_w_cen){
+			// if(c_w_cen == g_center_id){
+			if(is_c_w_cen){
 				rc = run_payment_5( w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row);
 			}
 			break;
@@ -1074,7 +1074,8 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 				rc = new_order_8(yield,w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,row,cor_id);
 			}
 #if PARAL_SUBTXN == true
-			else if(rdma_one_side() && ol_supply_w_cen == g_center_id && g_node_id == center_master[ol_supply_w_cen]){//rdma_silo
+			else if(rdma_one_side() && is_ol_supply_w_cen && g_node_id == center_master[ol_supply_w_cen1]){//rdma_silo
+			// else if(rdma_one_side() && ol_supply_w_cen == g_center_id && g_node_id == center_master[ol_supply_w_cen]){//rdma_silo
 #else
 			else if(rdma_one_side() && is_ol_supply_w_cen){//rdma_silo
 #endif
@@ -2082,8 +2083,8 @@ RC TPCCTxnManager::check_each_item(execute_node (&replica)[MAX_REPLICA_COUNT], u
 	#else 
 	if (req_abort_cnt > (REPLICA_COUNT * 1)/3) {
 	#endif
-		DEBUG_T("txn %ld need abort, due to %d secondary abort\n", get_txn_id(),
-                i, req_abort_cnt);
+		DEBUG_T("txn %ld need abort, due to secondary abort\n", get_txn_id(),
+                req_abort_cnt);
 		return Abort;
 	}
 
@@ -2096,7 +2097,7 @@ RC TPCCTxnManager::check_each_item(execute_node (&replica)[MAX_REPLICA_COUNT], u
 	#else 
 	if (req_no_complete_cnt > (REPLICA_COUNT * 1)/3) {
 	#endif
-		DEBUG_T("txn %ld need wait, due to %d secondary do not reach %ld\n", get_txn_id(), i,
+		DEBUG_T("txn %ld need wait, due to secondary do not reach %ld\n", get_txn_id(),
                 req_no_complete_cnt, status);
         return WAIT;
 	}

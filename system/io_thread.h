@@ -19,24 +19,25 @@
 
 #include "global.h"
 #include "message.h"
+#include "thread.h"
 class Workload;
 class MessageThread;
 
 class InputThread : public Thread {
-public:
-	RC 			run();
-  RC  client_recv_loop();
-  RC  server_recv_loop();
-  void  check_for_init_done();
+ public:
+  RC run();
+  RC client_recv_loop();
+  RC server_recv_loop();
+  void check_for_init_done();
   void setup();
-  TxnManager * txn_man;
+  TxnManager* txn_man;
 };
 
 class OutputThread : public Thread {
-public:
-	RC 			run();
+ public:
+  RC run();
   void setup();
-  MessageThread * messager;
+  MessageThread* messager;
 };
 
 #endif
