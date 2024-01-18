@@ -72,9 +72,9 @@
 #define PARAL_SUBTXN true   // hg-network without replica stage 3
 #define USE_REPLICA true
 #if USE_REPLICA
-  #define REPLICA_COUNT 3     // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
-#else 
-  #define REPLICA_COUNT 0     // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
+#define REPLICA_COUNT 3  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
+#else
+#define REPLICA_COUNT 0  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
 #endif
 #define MAX_REPLICA_COUNT REPLICA_COUNT + 2
 #define THOMAS_WRITE true  // if false, wait and sort
@@ -293,8 +293,8 @@
 // per-row lock/ts management or central lock/ts management
 #define CENTRAL_MAN false
 #define BUCKET_CNT 31
-#define ABORT_PENALTY 10 * 1000000UL           // in ns.
-#define ABORT_PENALTY_MAX 5 * 100 * 1000000UL  // in ns.
+#define ABORT_PENALTY 10 * 1000000UL   // in ns.
+#define ABORT_PENALTY_MAX 5 * 100 * 1000000UL   // in ns.
 #define BACKOFF true
 // [ INDEX ]
 #define ENABLE_LATCH false
@@ -486,7 +486,7 @@ enum PPSTxnType {
 #define DEBUG_ASSERT false
 #define DEBUG_DISTR false
 #define DEBUG_ALLOC false
-#define DEBUG_TXN true
+#define DEBUG_TXN false
 #define DEBUG_RECOVER false
 #define DEBUG_RACE false
 #define DEBUG_TIMELINE false
@@ -594,11 +594,11 @@ enum PPSTxnType {
 #define MILLION 1000000UL     // in ns => 1 ms
 #define USECONDE 1000UL       // us
 #define STAT_ARR_SIZE 1024
-#define PROG_TIMER 10 * BILLION  // in s
+#define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
-#define SEQ_BATCH_TIMER 5 * 1 * MILLION  // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 20 * BILLION      // ~1 minutes
-#define WARMUP_TIMER 1 * 10 * BILLION    // ~1 minutes
+#define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
+#define DONE_TIMER 1 * 20 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 10 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false
@@ -606,7 +606,8 @@ enum PPSTxnType {
 
 #define RDMA_CALLS_TIMEOUT 1 * 1000000
 #define MESSAGE_SEND_RETRY_TIME 10 * MILLION
-#define HEARTBEAT_TIME 1000 * MILLION
+#define HEARTBEAT_TIME BILLION    // 1 second
+#define COLLECT_TIME 5 * BILLION  // 5 seconds
 #define SAME_CENTER_FAILED_TIME 5 * HEARTBEAT_TIME
 #define INTER_CENTER_FAILED_TIME 20 * HEARTBEAT_TIME
 #define EXECUTOR_FAILED_TIME 1 * INTER_CENTER_FAILED_TIME

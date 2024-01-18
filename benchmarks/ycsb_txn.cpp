@@ -564,8 +564,8 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 #if REPLICA_COUNT != 0
   for (int j = 0; j < req->replica_cnt; j++) {
     is_center = is_center || req->replica_node[j].execute_node == g_node_id;
-    is_local = is_local ||
-               (req->replica_node[j].execute_node == g_node_id && req->replica_node[j].stored_node);
+    is_local = is_local || (req->replica_node[j].execute_node == g_node_id &&
+                            req->replica_node[j].stored_node == g_node_id);
   }
 #else
   bool is_center = (req->primary.execute_node == g_node_id) ||

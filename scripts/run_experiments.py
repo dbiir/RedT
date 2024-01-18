@@ -110,17 +110,17 @@ for exp in exps:
                     f_cfg.write(line)
 
         cmd = "make clean; make deps; make -j16"
-        print cmd
+        print (cmd)
         os.system(cmd)
         if not execute:
             exit()
 
         if execute:
             cmd = "mkdir -p {}".format(perf_dir)
-            print cmd
+            print(cmd)
             os.system(cmd)
             cmd = "cp config.h {}{}.cfg".format(result_dir,output_f)
-            print cmd
+            print(cmd)
             os.system(cmd)
 
             if remote:
@@ -157,7 +157,7 @@ for exp in exps:
                     elif cluster == 'vcloud':
                         os.system('sh scripts/kill.sh {}'.format(m))
                         cmd = 'scp {}/{} {}:/{}'.format(PATH, f, m, uname)
-                    print cmd
+                    print(cmd)
                     os.system(cmd)
                     # if cluster == 'istc':
                     #     cmd = 'ssh {}.csail.mit.edu:/{}/'.format(PATH, f, m, uname)
@@ -170,19 +170,19 @@ for exp in exps:
                     cmd = 'sh deploy.sh \'{}\' /{}/ {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"])
                 elif cluster == 'vcloud':
                     cmd = 'sh vcloud_deploy.sh \'{}\' /{}/ {} {} {} {} {} {}'.format(' '.join(machines), uname, cfgs["NODE_CNT"], perfTime, uname2, dc_count, latency, latency_range)
-                print cmd
+                print(cmd)
                 fromtimelist.append(str(int(time.time())) + "000")
                 os.system(cmd)
                 totimelist.append(str(int(time.time())) + "000")
                 perfip = machines[0]
                 cmd = "scp getFlame.sh {}:/{}/".format(perfip, uname)
-                print cmd
+                print(cmd)
                 os.system(cmd)
                 cmd = 'ssh {} "bash /{}/getFlame.sh"'.format(perfip, uname)
-                print cmd
+                print(cmd)
                 os.system(cmd)
                 cmd = "scp {}:/{}/perf.svg {}{}.svg".format(perfip, uname, perf_dir, output_f)
-                print cmd
+                print(cmd)
                 os.system(cmd)
                 os.chdir('..')
                 # cpu_usage_path=PATH + "/results/" + strnow + '/cpu_usage_' + str(cpu_usage_index)
@@ -192,14 +192,14 @@ for exp in exps:
                 for m, n in zip(machines, range(len(machines))):
                     if cluster == 'istc':
                         cmd = 'scp {}.csail.mit.edu:/{}/results.out {}{}_{}.out'.format(m,uname,result_dir,n,output_f)
-                        print cmd
+                        print(cmd)
                         os.system(cmd)
                     elif cluster == 'vcloud':
                         cmd = 'scp {}:/{}/dbresults{}.out results/{}/{}_{}.out'.format(m,uname,n,strnow,n,output_f)
-                        print cmd
+                        print(cmd)
                         os.system(cmd)
                         # cmd = 'scp {}:/tmp/{}* {}/'.format(m,uname2,cpu_usage_path)
-                        # print cmd
+                        # print(cmd)
                         # os.system(cmd)
 
             else:
@@ -331,9 +331,9 @@ for exp in exps:
         cmd='sh result.sh -a ycsb_dcs -n {} -c {} -t {} -D {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in dc]))
     elif 'ycsb_coroutine' in exp:
         cmd='sh result.sh -a ycsb_coroutine -n {} -c {} -t {} -CO {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in cocnt]))
-    print cmd
+    print(cmd)
     os.system(cmd)
-    print cmd
+    pprint(cmd)
 
     cmd=''
     os.chdir('../draw')
@@ -353,5 +353,5 @@ for exp in exps:
        cmd='./deneva-plot.sh -a tpcc_stress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
     elif 'tpcc_cstress' in exp:
        cmd='./deneva-plot-his.sh -a tpcc_cstress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
-    print cmd
+    print(cmd)
     os.system(cmd)

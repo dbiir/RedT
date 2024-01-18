@@ -97,8 +97,9 @@ RC HeartBeatThread::heartbeat_loop_new() {
     }
 
     // send statics
-    if (now - last_collect_time > HEARTBEAT_TIME) {
+    if (now - last_collect_time > COLLECT_TIME) {
       send_stats();
+      last_collect_time = get_wall_clock();
     }
 
     // node 0 receives statics message and generates plan
@@ -144,18 +145,18 @@ RC HeartBeatThread::heartbeat_loop_new() {
           next_partition.emplace(PartitionInformation{partition_idx, location, temp});
           temp = 0;
         }
-        remain_partitions.emplace(partition_idx, MAX_REPLICA_COUNT);
+        remain_partitions.emplace(partition_idx, REPLICA_COUNT);
       }
 
       // generate plan
-      int plan[PART_CNT][MAX_REPLICA_COUNT];
-      fill(&plan[0][0], &plan[0][0] + PART_CNT * MAX_REPLICA_COUNT, -1);
+      int plan[PART_CNT][REPLICA_COUNT];
+      fill(&plan[0][0], &plan[0][0] + PART_CNT * REPLICA_COUNT, -1);
       for (auto iterator = next_partition.begin(); iterator != next_partition.end(); iterator++) {
         // check if the partition has no more replica
         if (remain_partitions.find(iterator->partition_id)->second == 0) {
           continue;
         }
-        for (int replica_idx = 0; replica_idx < MAX_REPLICA_COUNT; replica_idx++) {
+        for (int replica_idx = 0; replica_idx < REPLICA_COUNT; replica_idx++) {
           if (plan[iterator->partition_id][replica_idx] != -1) {
             plan[iterator->partition_id][replica_idx] = iterator->target_location;
             score[iterator->partition_id][iterator->target_location] = -1;
@@ -168,13 +169,13 @@ RC HeartBeatThread::heartbeat_loop_new() {
 
       // update local route table
       for (int partition_idx = 0; partition_idx < PART_CNT; partition_idx++) {
-        for (int replica_idx = 0; replica_idx < MAX_REPLICA_COUNT; replica_idx++) {
+        for (int replica_idx = 0; replica_idx < REPLICA_COUNT; replica_idx++) {
           route_table.set_route_node_new(replica_idx, partition_idx,
                                          plan[partition_idx][replica_idx]);
         }
       }
 
-      // send heartbeat contains route table
+      // send heartbeat containing route table
       send_tcp_heart_beat(true);
     }
 
@@ -470,7 +471,7 @@ auto HeartBeatThread::update_node_and_route_new(RouteAndStatus result, uint64_t 
   for (int i = 0; i < PART_CNT; i++) {
     route_node_ts p_rt;
     route_node_ts tmp_p_rt;
-    for (int j = 0; j < MAX_REPLICA_COUNT; j++) {
+    for (int j = 0; j < REPLICA_COUNT; j++) {
       p_rt = route_table.get_route_node_new(j, i);
       tmp_p_rt = result._route[i].new_secondary[j];
       if (tmp_p_rt.last_ts > p_rt.last_ts) {
@@ -510,7 +511,7 @@ auto HeartBeatThread::get_node_replica_new(uint64_t dest_id) -> vector<Replica> 
   vector<Replica> replica_list;
   for (int i = 0; i < g_part_cnt; i++) {
     route_node_ts p_rt;
-    for (int j = 0; j < MAX_REPLICA_COUNT; j++) {
+    for (int j = 0; j < REPLICA_COUNT; j++) {
       p_rt = route_table.get_route_node_new(j, i);
       if (p_rt.node_id == dest_id) {
         replica_list.push_back(Replica(i, j));
