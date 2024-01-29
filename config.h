@@ -492,7 +492,7 @@ enum PPSTxnType {
 #define DEBUG_TIMELINE false
 #define DEBUG_BREAKDOWN false
 #define DEBUG_LATENCY false
-
+#define DEBUG_HEARTBEAT true
 /***********************************************/
 // MODES
 /***********************************************/
@@ -613,6 +613,7 @@ enum PPSTxnType {
 #define EXECUTOR_FAILED_TIME 1 * INTER_CENTER_FAILED_TIME
 
 #define RECOVERY_MANAGER true
+#define RECOVERY_THREAD false
 #define RECOVERY_TXN_MECHANISM false
 
 #endif
