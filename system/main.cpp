@@ -62,7 +62,9 @@ AbortThread *abort_thds;
 LogThread *log_thds;
 #if RECOVERY_MANAGER
 HeartBeatThread *heartbeat_thds;
+#if RECOVERY_THREAD
 RecoveryThread *recovery_thds;
+#endif
 #endif
 #if CC_ALG == CALVIN
 CalvinLockThread *calvin_lock_thds;
@@ -304,7 +306,10 @@ int main(int argc, char *argv[]) {
 #endif
 
 #if RECOVERY_MANAGER
-  all_thd_cnt += 2;
+  all_thd_cnt += 1;
+#if RECOVERY_THREAD
+  all_thd_cnt += 1;
+#endif
 #endif
 
   if (g_ts_alloc == LTS_TCP_CLOCK) {
@@ -333,7 +338,9 @@ int main(int argc, char *argv[]) {
   log_thds = new LogThread[1];
 #if RECOVERY_MANAGER
   heartbeat_thds = new HeartBeatThread[1];
+#if RECOVERY_THREAD
   recovery_thds = new RecoveryThread[1];
+#endif
 #endif
 #if CC_ALG == CALVIN
   calvin_lock_thds = new CalvinLockThread[1];
@@ -447,8 +454,10 @@ int main(int argc, char *argv[]) {
 #if RECOVERY_MANAGER
   heartbeat_thds[0].init(id, g_node_id, m_wl);
   pthread_create(&p_thds[id++], NULL, run_thread, (void *)&heartbeat_thds[0]);
+#if RECOVERY_THREAD
   recovery_thds[0].init(id, g_node_id, m_wl);
   pthread_create(&p_thds[id++], NULL, run_thread, (void *)&recovery_thds[0]);
+#endif
 #endif
   for (uint64_t i = 0; i < all_thd_cnt; i++) pthread_join(p_thds[i], NULL);
 

@@ -17,9 +17,11 @@
 #ifndef _HELPER_H_
 #define _HELPER_H_
 
+#include <stdint.h>
+
 #include <cstdlib>
 #include <iostream>
-#include <stdint.h>
+
 #include "global.h"
 
 void GREENLOG(const char *format, ...);
@@ -28,46 +30,51 @@ void REDLOG(const char *format, ...);
 /************************************************/
 // Debugging
 /************************************************/
-#define DEBUG(...) \
-  if(DEBUG_DISTR) { \
-    fprintf(stdout,__VA_ARGS__); \
-    fflush(stdout); \
+#define DEBUG(...)                \
+  if (DEBUG_DISTR) {              \
+    fprintf(stdout, __VA_ARGS__); \
+    fflush(stdout);               \
   }
 #define DEBUG_FLUSH() \
-  if(DEBUG_DISTR) { \
-    fflush(stdout); \
+  if (DEBUG_DISTR) {  \
+    fflush(stdout);   \
   }
-    //fprintf(stdout,"[alloc] ");
-#define DEBUG_M(...) \
-  if(DEBUG_ALLOC && warmup_done) { \
-    fprintf(stdout,__VA_ARGS__); \
-    fflush(stdout); \
-  }
-
-#define DEBUG_R(...) \
-  if(DEBUG_RACE && warmup_done) { \
-    fprintf(stdout,__VA_ARGS__); \
-    fflush(stdout); \
+// fprintf(stdout,"[alloc] ");
+#define DEBUG_M(...)                \
+  if (DEBUG_ALLOC && warmup_done) { \
+    fprintf(stdout, __VA_ARGS__);   \
+    fflush(stdout);                 \
   }
 
-#define DEBUG_T(...) \
-  if(DEBUG_TXN) { \
-    fprintf(stdout,__VA_ARGS__); \
-    fflush(stdout); \
+#define DEBUG_R(...)               \
+  if (DEBUG_RACE && warmup_done) { \
+    fprintf(stdout, __VA_ARGS__);  \
+    fflush(stdout);                \
   }
 
-#define DEBUG_H(...) \
-  if(DEBUG_RECOVER) { \
-    fprintf(stdout,__VA_ARGS__); \
-    fflush(stdout); \
-  }
-  
-#define PRINT_LATENCY(...) \
-  if(DEBUG_LATENCY && warmup_done) { \
-    fprintf(stdout,__VA_ARGS__); \
-    fflush(stdout); \
+#define DEBUG_T(...)              \
+  if (DEBUG_TXN) {                \
+    fprintf(stdout, __VA_ARGS__); \
+    fflush(stdout);               \
   }
 
+#define DEBUG_H(...)              \
+  if (DEBUG_RECOVER) {            \
+    fprintf(stdout, __VA_ARGS__); \
+    fflush(stdout);               \
+  }
+
+#define PRINT_LATENCY(...)            \
+  if (DEBUG_LATENCY && warmup_done) { \
+    fprintf(stdout, __VA_ARGS__);     \
+    fflush(stdout);                   \
+  }
+
+#define PRINT_HEARTBEAT(...)            \
+  if (DEBUG_HEARTBEAT && warmup_done) { \
+    fprintf(stdout, __VA_ARGS__);       \
+    fflush(stdout);                     \
+  }
 /************************************************/
 // atomic operations
 /************************************************/
@@ -80,25 +87,26 @@ void REDLOG(const char *format, ...);
 #define ATOM_SUB_FETCH(dest, value) __sync_sub_and_fetch(&(dest), value)
 
 #define COMPILER_BARRIER asm volatile("" ::: "memory");
-#define PAUSE_SILO { __asm__ ( "pause;" ); }
+#define PAUSE_SILO \
+  { __asm__("pause;"); }
 
 /************************************************/
 // ASSERT Helper
 /************************************************/
 
-#define M_ASSERT_V(cond, ...) \
-	if (!(cond)) {\
-		fprintf(stdout,"ASSERTION FAILURE [%s : %d]\n", __FILE__, __LINE__);\
-    fprintf(stdout,__VA_ARGS__); \
-    fflush(stdout); \
-    assert(cond); \
-	}
-#define M_ASSERT(cond, str) \
-	if (!(cond)) {\
-		printf("ASSERTION FAILURE [%s : %d] msg:%s\n", __FILE__, __LINE__, str);\
-    fflush(stdout); \
-		exit(0); \
-	}
+#define M_ASSERT_V(cond, ...)                                             \
+  if (!(cond)) {                                                          \
+    fprintf(stdout, "ASSERTION FAILURE [%s : %d]\n", __FILE__, __LINE__); \
+    fprintf(stdout, __VA_ARGS__);                                         \
+    fflush(stdout);                                                       \
+    assert(cond);                                                         \
+  }
+#define M_ASSERT(cond, str)                                                  \
+  if (!(cond)) {                                                             \
+    printf("ASSERTION FAILURE [%s : %d] msg:%s\n", __FILE__, __LINE__, str); \
+    fflush(stdout);                                                          \
+    exit(0);                                                                 \
+  }
 #define ASSERT(cond) assert(cond)
 
 /************************************************/
@@ -124,8 +132,8 @@ void REDLOG(const char *format, ...);
 /************************************************/
 #define LIST_GET_HEAD(lhead, ltail, en) \
   {                                     \
-    en = lhead; \
-    if (lhead) lhead = lhead->next; \
+    en = lhead;                         \
+    if (lhead) lhead = lhead->next;     \
     if (lhead)                          \
       lhead->prev = NULL;               \
     else                                \
@@ -134,8 +142,8 @@ void REDLOG(const char *format, ...);
   }
 #define LIST_PUT_TAIL(lhead, ltail, en) \
   {                                     \
-	en->next = NULL; \
-	en->prev = NULL; \
+    en->next = NULL;                    \
+    en->prev = NULL;                    \
     if (ltail) {                        \
       en->prev = ltail;                 \
       ltail->next = en;                 \
@@ -147,16 +155,16 @@ void REDLOG(const char *format, ...);
   }
 #define LIST_INSERT_BEFORE(entry, newentry, lhead) \
   {                                                \
-	newentry->next = entry; \
-	newentry->prev = entry->prev; \
-	if (entry->prev) entry->prev->next = newentry; \
-	entry->prev = newentry; \
+    newentry->next = entry;                        \
+    newentry->prev = entry->prev;                  \
+    if (entry->prev) entry->prev->next = newentry; \
+    entry->prev = newentry;                        \
     if (lhead == entry) lhead = newentry;          \
   }
 #define LIST_REMOVE(entry)                            \
   {                                                   \
-	if (entry->next) entry->next->prev = entry->prev; \
-	if (entry->prev) entry->prev->next = entry->next; \
+    if (entry->next) entry->next->prev = entry->prev; \
+    if (entry->prev) entry->prev->next = entry->next; \
   }
 #define LIST_REMOVE_HT(entry, head, tail) \
   {                                       \
@@ -172,7 +180,7 @@ void REDLOG(const char *format, ...);
       assert(entry == head);              \
       head = entry->next;                 \
     }                                     \
-}
+  }
 
 /************************************************/
 // STATS helper
@@ -195,20 +203,20 @@ void REDLOG(const char *format, ...);
 /************************************************/
 // mem copy helper
 /************************************************/
-#define COPY_VAL(v,d,p) \
-  memcpy(&v,&d[p],sizeof(v)); \
+#define COPY_VAL(v, d, p)       \
+  memcpy(&v, &d[p], sizeof(v)); \
   p += sizeof(v);
 
-#define COPY_VAL_SIZE(v,d,p,s) \
-  memcpy(&v,&d[p],s); \
+#define COPY_VAL_SIZE(v, d, p, s) \
+  memcpy(&v, &d[p], s);           \
   p += s;
 
-#define COPY_BUF(d,v,p) \
-  memcpy(&((char*)d)[p],(char*)&v,sizeof(v)); \
+#define COPY_BUF(d, v, p)                         \
+  memcpy(&((char *)d)[p], (char *)&v, sizeof(v)); \
   p += sizeof(v);
 
-#define COPY_BUF_SIZE(d,v,p,s) \
-  memcpy(&((char*)d)[p],(char*)&v,s); \
+#define COPY_BUF_SIZE(d, v, p, s)         \
+  memcpy(&((char *)d)[p], (char *)&v, s); \
   p += s;
 
 #define WRITE_VAL(f, v) f.write((char *)&v, sizeof(v));
@@ -221,31 +229,31 @@ void REDLOG(const char *format, ...);
 // cache line should be modified to be read only array with pointers to thread local data block.
 // TODO. in order to have per-thread malloc, this needs to be modified !!!
 
-#define ARR_PTR_MULTI(type, name, size, scale) \
-	name = new type * [size]; \
-	if (g_part_alloc || THREAD_ALLOC) { \
-		for (UInt32 i = 0; i < size; i ++) {\
-			UInt32 padsize = sizeof(type) * (scale); \
+#define ARR_PTR_MULTI(type, name, size, scale)                                         \
+  name = new type *[size];                                                             \
+  if (g_part_alloc || THREAD_ALLOC) {                                                  \
+    for (UInt32 i = 0; i < size; i++) {                                                \
+      UInt32 padsize = sizeof(type) * (scale);                                         \
       if (g_mem_pad && padsize % CL_SIZE != 0) padsize += CL_SIZE - padsize % CL_SIZE; \
-			name[i] = (type *) mem_allocator.alloc(padsize); \
+      name[i] = (type *)mem_allocator.alloc(padsize);                                  \
       for (UInt32 j = 0; j < scale; j++) new (&name[i][j]) type();                     \
-		}\
-	} else { \
+    }                                                                                  \
+  } else {                                                                             \
     for (UInt32 i = 0; i < size; i++) name[i] = new type[scale];                       \
-	}
+  }
 
 #define ARR_PTR(type, name, size) ARR_PTR_MULTI(type, name, size, 1)
 
-#define ARR_PTR_INIT(type, name, size, value) \
-	name = new type * [size]; \
-	if (g_part_alloc) { \
-		for (UInt32 i = 0; i < size; i ++) {\
-			int padsize = sizeof(type); \
+#define ARR_PTR_INIT(type, name, size, value)                                          \
+  name = new type *[size];                                                             \
+  if (g_part_alloc) {                                                                  \
+    for (UInt32 i = 0; i < size; i++) {                                                \
+      int padsize = sizeof(type);                                                      \
       if (g_mem_pad && padsize % CL_SIZE != 0) padsize += CL_SIZE - padsize % CL_SIZE; \
-			name[i] = (type *) mem_allocator.alloc(padsize); \
-			new (name[i]) type(); \
-		}\
-	} else \
+      name[i] = (type *)mem_allocator.alloc(padsize);                                  \
+      new (name[i]) type();                                                            \
+    }                                                                                  \
+  } else                                                                               \
     for (UInt32 i = 0; i < size; i++) name[i] = new type;                              \
   for (UInt32 i = 0; i < size; i++) *name[i] = value;
 
@@ -256,32 +264,28 @@ void REDLOG(const char *format, ...);
   mem_allocator.free(query->requests,sizeof(ycsb_query)*query->request_cnt); \
   mem_allocator.free(query,sizeof(ycsb_query));
   */
-enum Data_type {
-  DT_table,
-  DT_page,
-  DT_row
-};
+enum Data_type { DT_table, DT_page, DT_row };
 
 // TODO currently, only DR_row supported
 // data item type.
 class itemid_t {
-public:
-	itemid_t() { };
-	itemid_t(Data_type type, void * loc) {
-        this->type = type;
-        this->location = loc;
-    };
-	Data_type type;
-	void * location; // points to the table | page | row
+ public:
+  itemid_t(){};
+  itemid_t(Data_type type, void *loc) {
+    this->type = type;
+    this->location = loc;
+  };
+  Data_type type;
+  void *location;  // points to the table | page | row
   uint64_t offset;
   uint64_t table_offset;
-	itemid_t * next;
+  itemid_t *next;
   uint64_t key;
-	bool valid;
-	void init();
-	bool operator==(const itemid_t &other) const;
-	bool operator!=(const itemid_t &other) const;
-	void operator=(const itemid_t &other);
+  bool valid;
+  void init();
+  bool operator==(const itemid_t &other) const;
+  bool operator!=(const itemid_t &other) const;
+  void operator=(const itemid_t &other);
 };
 
 int get_thdid_from_txnid(uint64_t txnid);
@@ -290,26 +294,27 @@ uint64_t get_cor_id_from_txn_id(uint64_t txn_id);
 
 // key_to_part() is only for ycsb
 uint64_t key_to_part(uint64_t key);
-uint64_t get_part_id(void * addr);
+uint64_t get_part_id(void *addr);
 // TODO can the following two functions be merged?
-uint64_t merge_idx_key(uint64_t key_cnt, uint64_t * keys);
+uint64_t merge_idx_key(uint64_t key_cnt, uint64_t *keys);
 uint64_t merge_idx_key(uint64_t key1, uint64_t key2);
 uint64_t merge_idx_key(uint64_t key1, uint64_t key2, uint64_t key3);
 
 void init_client_globals();
 void init_globals();
 
-extern timespec * res;
+extern timespec *res;
 uint64_t get_wall_clock();
 uint64_t get_server_clock();
-uint64_t get_sys_clock(); // return: in ns
+uint64_t get_sys_clock();  // return: in ns
 
 class myrand {
-public:
-	void init(uint64_t seed);
-	uint64_t next();
-private:
-	uint64_t seed;
+ public:
+  void init(uint64_t seed);
+  uint64_t next();
+
+ private:
+  uint64_t seed;
 };
 
 #endif

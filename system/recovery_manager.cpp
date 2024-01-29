@@ -22,6 +22,7 @@ RC HeartBeatThread::run() {
   tsetup();
   printf("Running HeartBeatThread %ld\n", _thd_id);
   heartbeat_loop();
+  // heartbeat_loop_new();
   return FINISH;
 }
 
@@ -40,7 +41,7 @@ RC HeartBeatThread::heartbeat_loop() {
       if (is_center_primary(g_node_id)) {
         // leader send to other leaders
         // DEBUG_H("Node %ld is center %d primary\n", g_node_id, GET_CENTER_ID(g_node_id));
-        // send_tcp_heart_beat();
+        send_tcp_heart_beat();
       } else {
         // slaves send to their own leaders
         uint64_t center_id = GET_CENTER_ID(g_node_id);
@@ -50,16 +51,27 @@ RC HeartBeatThread::heartbeat_loop() {
       lastsendtime = get_wall_clock();
     }
     if (is_center_primary(g_node_id)) {
-      check_for_same_center();  // handle the failure in the same data center.
+      // check_for_same_center();  // handle the failure in the same data center.
 
       msg = heartbeat_queue.dequeue(get_thd_id());
       if (msg) {
         HeartBeatMessage* hmsg = (HeartBeatMessage*)msg;
-        update_node_and_route(hmsg->heartbeatmsg, hmsg->return_node_id);
+        // update_node_and_route_new(hmsg->heartbeatmsg, hmsg->return_node_id);
+
+        PRINT_HEARTBEAT("heartbeat from node %d\n", hmsg->return_node_id);
+        PRINT_HEARTBEAT("need_flush_route_ = %d\n", hmsg->need_flush_route_);
+        hmsg->heartbeatmsg.printRouteTable();
+        PRINT_HEARTBEAT("node %d local route table:\n", g_node_id);
+        route_table.printRouteTable();
+
+        if (hmsg->need_flush_route_) {
+          update_node_and_route_new(hmsg->heartbeatmsg, hmsg->return_node_id);
+        }
+
         // handle the failure in the different data center.
         if (is_global_primary(g_node_id)) {
           // DEBUG_H("Node %ld is global primary\n", g_node_id);
-          check_for_other_center();
+          // check_for_other_center();
           delete msg;
         }
       }
@@ -75,7 +87,7 @@ RC HeartBeatThread::heartbeat_loop_new() {
   rdm.init(get_thd_id());
   RC rc = RCOK;
   assert(rc == RCOK);
-  uint64_t starttime, lastsendtime, last_collect_time = 0;
+  uint64_t starttime, lastsendtime = 0, last_collect_time = 0;
   uint64_t now;
   Message* msg;
   while (!simulation->is_done()) {
@@ -96,88 +108,89 @@ RC HeartBeatThread::heartbeat_loop_new() {
       lastsendtime = get_wall_clock();
     }
 
-    // send statics
-    if (now - last_collect_time > COLLECT_TIME) {
-      send_stats();
-      last_collect_time = get_wall_clock();
-    }
+    // // send statics
+    // if (now - last_collect_time > COLLECT_TIME) {
+    //   send_stats();
+    //   last_collect_time = get_wall_clock();
 
-    // node 0 receives statics message and generates plan
-    if (g_node_id == 0) {
-      int access_collector[CENTER_CNT][PART_CNT];
-      int latency_collector[CENTER_CNT][CENTER_CNT];
-      double score[PART_CNT][CENTER_CNT];
-      memset(access_collector, 0, sizeof(access_collector));
-      memset(latency_collector, 0, sizeof(latency_collector));
-      memset(score, 0, sizeof(latency_collector));
+    //   // node 0 receives statics message and generates plan
+    //   if (g_node_id == 0) {
+    //     int access_collector[CENTER_CNT][PART_CNT];
+    //     int latency_collector[CENTER_CNT][CENTER_CNT];
+    //     double score[PART_CNT][CENTER_CNT];
+    //     memset(access_collector, 0, sizeof(access_collector));
+    //     memset(latency_collector, 0, sizeof(latency_collector));
+    //     memset(score, 0, sizeof(latency_collector));
 
-      // summary statics
-      while (msg = stats_queue.dequeue(get_thd_id())) {
-        auto stats_msg = dynamic_cast<StatsCountMessage*>(msg);
-        for (int i = 0; i < PART_CNT; i++) {
-          access_collector[stats_msg->return_center_id][i] += stats_msg->access_count_[i];
-        }
-        for (int i = 0; i < CENTER_CNT; i++) {
-          latency_collector[stats_msg->return_center_id][i] = stats_msg->latency_[i];
-        }
-      }
+    //     // summary statics
+    //     while (msg = stats_queue.dequeue(get_thd_id())) {
+    //       auto stats_msg = dynamic_cast<StatsCountMessage*>(msg);
+    //       for (int i = 0; i < PART_CNT; i++) {
+    //         access_collector[stats_msg->return_center_id][i] += stats_msg->access_count_[i];
+    //       }
+    //       for (int i = 0; i < CENTER_CNT; i++) {
+    //         latency_collector[stats_msg->return_center_id][i] = stats_msg->latency_[i];
+    //       }
+    //     }
 
-      // calculate score and build set
-      struct PartitionInformation {
-        int partition_id;
-        int target_location;
-        double score;
-        auto operator<(const PartitionInformation& other) const -> bool {
-          return score < other.score;
-        }
-      };
-      set<PartitionInformation> next_partition;
-      unordered_map<int, int> remain_partitions;
+    //     // calculate score and build set
+    //     struct PartitionInformation {
+    //       int partition_id;
+    //       int target_location;
+    //       double score;
+    //       auto operator<(const PartitionInformation& other) const -> bool {
+    //         return score < other.score;
+    //       }
+    //     };
+    //     set<PartitionInformation> next_partition;
+    //     unordered_map<int, int> remain_partitions;
 
-      double temp = 0;
-      for (int partition_idx = 0; partition_idx < PART_CNT; partition_idx++) {
-        for (int location = 0; location < CENTER_CNT; location++) {
-          for (int access_location = 0; access_location < CENTER_CNT; access_location++) {
-            temp += access_collector[access_location][partition_idx] *
-                    latency_collector[access_location][location];
-          }
-          score[partition_idx][location] = temp;
-          next_partition.emplace(PartitionInformation{partition_idx, location, temp});
-          temp = 0;
-        }
-        remain_partitions.emplace(partition_idx, REPLICA_COUNT);
-      }
+    //     double temp = 0;
+    //     for (int partition_idx = 0; partition_idx < PART_CNT; partition_idx++) {
+    //       for (int location = 0; location < CENTER_CNT; location++) {
+    //         for (int access_location = 0; access_location < CENTER_CNT; access_location++) {
+    //           temp += access_collector[access_location][partition_idx] *
+    //                   latency_collector[access_location][location];
+    //         }
+    //         score[partition_idx][location] = temp;
+    //         next_partition.emplace(PartitionInformation{partition_idx, location, temp});
+    //         temp = 0;
+    //       }
+    //       remain_partitions.emplace(partition_idx, REPLICA_COUNT);
+    //     }
 
-      // generate plan
-      int plan[PART_CNT][REPLICA_COUNT];
-      fill(&plan[0][0], &plan[0][0] + PART_CNT * REPLICA_COUNT, -1);
-      for (auto iterator = next_partition.begin(); iterator != next_partition.end(); iterator++) {
-        // check if the partition has no more replica
-        if (remain_partitions.find(iterator->partition_id)->second == 0) {
-          continue;
-        }
-        for (int replica_idx = 0; replica_idx < REPLICA_COUNT; replica_idx++) {
-          if (plan[iterator->partition_id][replica_idx] != -1) {
-            plan[iterator->partition_id][replica_idx] = iterator->target_location;
-            score[iterator->partition_id][iterator->target_location] = -1;
-            auto map_iterator = remain_partitions.find(iterator->partition_id);
-            map_iterator->second -= 1;
-            break;
-          }
-        }
-      }
+    //     // generate plan
+    //     int plan[PART_CNT][REPLICA_COUNT];
+    //     fill(&plan[0][0], &plan[0][0] + PART_CNT * REPLICA_COUNT, -1);
+    //     for (auto iterator = next_partition.begin(); iterator != next_partition.end();
+    //     iterator++) {
+    //       // check if the partition has no more replica
+    //       if (remain_partitions.find(iterator->partition_id)->second == 0) {
+    //         continue;
+    //       }
+    //       for (int replica_idx = 0; replica_idx < REPLICA_COUNT; replica_idx++) {
+    //         if (plan[iterator->partition_id][replica_idx] != -1) {
+    //           plan[iterator->partition_id][replica_idx] = iterator->target_location;
+    //           score[iterator->partition_id][iterator->target_location] = -1;
+    //           auto map_iterator = remain_partitions.find(iterator->partition_id);
+    //           map_iterator->second -= 1;
+    //           break;
+    //         }
+    //       }
+    //     }
 
-      // update local route table
-      for (int partition_idx = 0; partition_idx < PART_CNT; partition_idx++) {
-        for (int replica_idx = 0; replica_idx < REPLICA_COUNT; replica_idx++) {
-          route_table.set_route_node_new(replica_idx, partition_idx,
-                                         plan[partition_idx][replica_idx]);
-        }
-      }
+    //     // update local route table
+    //     for (int partition_idx = 0; partition_idx < PART_CNT; partition_idx++) {
+    //       for (int replica_idx = 0; replica_idx < REPLICA_COUNT; replica_idx++) {
+    //         route_table.set_route_node_new(replica_idx, partition_idx,
+    //                                        plan[partition_idx][replica_idx]);
+    //       }
+    //     }
 
-      // send heartbeat containing route table
-      send_tcp_heart_beat(true);
-    }
+    //     // send heartbeat containing route table
+    //     send_tcp_heart_beat(true);
+    //   }
+    // }
 
     if (is_center_primary(g_node_id)) {
       check_for_same_center();  // handle the failure in the same data center.
@@ -222,7 +235,7 @@ RC HeartBeatThread::send_tcp_heart_beat(bool need_flush) {
 
 RC HeartBeatThread::send_stats() {
   auto message = Message::create_message(access_count, latency, STATS_COUNT);
-  msg_queue.enqueue(get_thd_id(), message, 0);
+  stats_queue.enqueue(get_thd_id(), message, 0);
   memset(access_count, 0, sizeof(access_count));
   DEBUG_H("Node %ld send stats to 0\n", g_node_id);
   return RCOK;

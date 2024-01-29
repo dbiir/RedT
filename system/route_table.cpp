@@ -18,14 +18,16 @@ void RouteTable::init() {
 
     /*new*/
     table[i].partition_id = i;
-    table[i].replica_cnt = repl_cnt;
-    for (int j = 0; j < repl_cnt; j++) {
+    table[i].replica_cnt = REPLICA_COUNT;
+    for (int j = 0; j < REPLICA_COUNT; j++) {
       table[i].new_secondary[j].node_id = (i + j) % g_node_cnt;
       table[i].new_secondary[j].last_ts = get_wall_clock();
     }
 
-    DEBUG_H("Route table init part %d primary %d second1 %d second2 %d\n", i,
-            table[i].primary.node_id, table[i].secondary_1.node_id, table[i].secondary_2.node_id);
+    printf("Route table after initing:\n partition %d: primary %d, secondary1 %d, secondary2 %d\n",
+           i, table[i].new_secondary[0].node_id, table[i].new_secondary[1].node_id,
+           table[i].new_secondary[2].node_id);
+    fflush(stdout);
   }
 }
 

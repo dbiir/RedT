@@ -177,7 +177,11 @@ UInt32 g_async_redo_thread_cnt = 0;
 #endif
 
 #if RECOVERY_MANAGER
+#if RECOVERY_THREAD
 UInt32 g_recover_thread_cnt = 2;
+#else
+UInt32 g_recover_thread_cnt = 1;
+#endif
 #else
 UInt32 g_recover_thread_cnt = 0;
 #endif

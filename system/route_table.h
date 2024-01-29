@@ -43,6 +43,14 @@ class RouteTable {
                        uint64_t thd_id = 0);
   // private:
   route_table_node* table;
+
+  void printRouteTable() {
+    for (int i = 0; i < PART_CNT; i++) {
+      PRINT_HEARTBEAT("partition %d: primary %d, secondary1 %d, secondary2 %d\n", i,
+                      table[i].new_secondary[0].node_id, table[i].new_secondary[1].node_id,
+                      table[i].new_secondary[2].node_id);
+    }
+  }
 };
 
 struct status_node {
@@ -63,6 +71,13 @@ class RouteAndStatus {
  public:
   status_node* _status;
   route_table_node* _route;
+  void printRouteTable() {
+    for (int i = 0; i < PART_CNT; i++) {
+      PRINT_HEARTBEAT("partition %d: primary %d, secondary1 %d, secondary2 %d\n", i,
+                      _route[i].new_secondary[0].node_id, _route[i].new_secondary[1].node_id,
+                      _route[i].new_secondary[2].node_id);
+    }
+  }
 };
 
 class Replica {
