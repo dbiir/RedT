@@ -515,6 +515,19 @@ class StatsCountMessage : public Message {
 
   uint64_t access_count_[PART_CNT];
   uint64_t latency_[CENTER_CNT];
+
+  void printAccessCount() {
+    PRINT_HEARTBEAT("node %d access count:\n", return_node_id);
+    for (int i = 0; i < PART_CNT; i++) {
+      PRINT_HEARTBEAT("partition %d : %d\n", i, access_count_[i]);
+    }
+  }
+  void printLatency() {
+    PRINT_HEARTBEAT("node %d latency:\n", return_node_id);
+    for (int i = 0; i < CENTER_CNT; i++) {
+      PRINT_HEARTBEAT("center %d : %dms\n", i, latency_[i]);
+    }
+  }
 };
 
 class ReplicaRecoverMessage : public Message {

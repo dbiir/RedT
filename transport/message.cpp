@@ -106,7 +106,6 @@ Message* Message::create_message(LogRecord* record, RemReqType rtype) {
 Message* Message::create_message(route_table_node* route, status_node* node, bool need_flush,
                                  RemReqType rtype) {
   Message* msg = create_message(rtype);
-  msg->send_time = GetTime();
   auto heartbeat_message = dynamic_cast<HeartBeatMessage*>(msg);
   heartbeat_message->copy_from_node_status(route, node);
   heartbeat_message->need_flush_route_ = need_flush;
@@ -128,7 +127,7 @@ auto Message::create_message(uint64_t* access_count, uint64_t* latency, RemReqTy
 auto Message::GetTime() -> uint64_t {
   auto now = std::chrono::system_clock::now();
   auto duration = now.time_since_epoch();
-  auto millis = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+  auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
   return millis;
 }
 
@@ -462,6 +461,12 @@ void Message::release_message(Message* msg) {
     }
     case HEART_BEAT: {
       HeartBeatMessage* m_msg = (HeartBeatMessage*)msg;
+      m_msg->release();
+      delete m_msg;
+      break;
+    }
+    case STATS_COUNT: {
+      StatsCountMessage* m_msg = (StatsCountMessage*)msg;
       m_msg->release();
       delete m_msg;
       break;
@@ -2084,8 +2089,10 @@ void StatsCountMessage::copy_from_buf(char* buf) {
   uint64_t ptr = Message::mget_size();
   COPY_VAL(return_node_id, buf, ptr);
   COPY_VAL(return_center_id, buf, ptr);
-  COPY_VAL(*access_count_, buf, ptr);
-  COPY_VAL(*latency_, buf, ptr);
+  // COPY_VAL(*access_count_, buf, ptr);
+  // COPY_VAL(*latency_, buf, ptr);
+  COPY_VAL_SIZE(access_count_, buf, ptr, sizeof(access_count_));
+  COPY_VAL_SIZE(latency_, buf, ptr, sizeof(latency_));
   assert(ptr == get_size());
 }
 
@@ -2094,8 +2101,11 @@ void StatsCountMessage::copy_to_buf(char* buf) {
   uint64_t ptr = Message::mget_size();
   COPY_BUF(buf, return_node_id, ptr);
   COPY_BUF(buf, return_center_id, ptr);
-  COPY_BUF(buf, *access_count_, ptr);
-  COPY_BUF(buf, *latency_, ptr);
+  // COPY_BUF(buf, *access_count_, ptr);
+  // COPY_BUF(buf, *latency_, ptr);
+  COPY_BUF_SIZE(buf, access_count_, ptr, sizeof(access_count_));
+  COPY_BUF_SIZE(buf, latency_, ptr, sizeof(latency_));
+  auto size = get_size();
   assert(ptr == get_size());
 }
 /************************/

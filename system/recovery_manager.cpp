@@ -92,9 +92,10 @@ RC HeartBeatThread::heartbeat_loop_new() {
   rdm.init(get_thd_id());
   RC rc = RCOK;
   assert(rc == RCOK);
-  uint64_t starttime, lastsendtime = 0, last_collect_time = 0;
+  uint64_t starttime, lastsendtime = 0;
   uint64_t now;
   Message* msg;
+  uint64_t last_collect_time = get_wall_clock();
   while (!simulation->is_done()) {
     now = get_wall_clock();
     node_status.set_node_status(g_node_id, OnCall, get_thd_id());
@@ -117,13 +118,13 @@ RC HeartBeatThread::heartbeat_loop_new() {
     if (now - last_collect_time > COLLECT_TIME) {
       send_stats();
       last_collect_time = get_wall_clock();
-
       // node 0 receives statics message and generates plan
       if (g_node_id == 0) {
-        PRINT_HEARTBEAT("node 0 collect statics...\n");
+        sleep(1);
+        PRINT_HEARTBEAT("\n***node 0 collect statics...\n");
         int access_collector[CENTER_CNT][PART_CNT];
         int latency_collector[CENTER_CNT][CENTER_CNT];
-        double score[PART_CNT][CENTER_CNT];
+        int score[PART_CNT][CENTER_CNT];
         memset(access_collector, 0, sizeof(access_collector));
         memset(latency_collector, 0, sizeof(latency_collector));
         memset(score, 0, sizeof(latency_collector));
@@ -131,11 +132,17 @@ RC HeartBeatThread::heartbeat_loop_new() {
         // summary statics
         while (msg = stats_queue.dequeue(get_thd_id())) {
           auto stats_msg = dynamic_cast<StatsCountMessage*>(msg);
+          stats_msg->printAccessCount();
+          stats_msg->printLatency();
           for (int i = 0; i < PART_CNT; i++) {
             access_collector[stats_msg->return_center_id][i] += stats_msg->access_count_[i];
+            PRINT_HEARTBEAT("access_collector[%d][%d]:%d\n", stats_msg->return_center_id, i,
+                            access_collector[stats_msg->return_center_id][i]);
           }
           for (int i = 0; i < CENTER_CNT; i++) {
             latency_collector[stats_msg->return_center_id][i] = stats_msg->latency_[i];
+            PRINT_HEARTBEAT("latency_collector[%d][%d]:%d\n", stats_msg->return_center_id, i,
+                            latency_collector[stats_msg->return_center_id][i]);
           }
         }
 
@@ -143,7 +150,7 @@ RC HeartBeatThread::heartbeat_loop_new() {
         struct PartitionInformation {
           int partition_id;
           int target_location;
-          double score;
+          int score;
           auto operator<(const PartitionInformation& other) const -> bool {
             return score < other.score;
           }
@@ -151,7 +158,7 @@ RC HeartBeatThread::heartbeat_loop_new() {
         set<PartitionInformation> next_partition;
         unordered_map<int, int> remain_partitions;
 
-        double temp = 0;
+        int temp = 0;
         for (int partition_idx = 0; partition_idx < PART_CNT; partition_idx++) {
           for (int location = 0; location < CENTER_CNT; location++) {
             for (int access_location = 0; access_location < CENTER_CNT; access_location++) {
@@ -165,6 +172,14 @@ RC HeartBeatThread::heartbeat_loop_new() {
           remain_partitions.emplace(partition_idx, REPLICA_COUNT);
         }
 
+        PRINT_HEARTBEAT("\nscore:\n");
+        for (int i = 0; i < PART_CNT; i++) {
+          for (int j = 0; j < CENTER_CNT; j++) {
+            PRINT_HEARTBEAT("p%d.d%d.%d ", i, j, score[i][j]);
+          }
+          PRINT_HEARTBEAT("\n");
+        }
+
         // generate plan
         int plan[PART_CNT][REPLICA_COUNT];
         fill(&plan[0][0], &plan[0][0] + PART_CNT * REPLICA_COUNT, -1);
@@ -174,7 +189,7 @@ RC HeartBeatThread::heartbeat_loop_new() {
             continue;
           }
           for (int replica_idx = 0; replica_idx < REPLICA_COUNT; replica_idx++) {
-            if (plan[iterator->partition_id][replica_idx] != -1) {
+            if (plan[iterator->partition_id][replica_idx] == -1) {
               plan[iterator->partition_id][replica_idx] = iterator->target_location;
               score[iterator->partition_id][iterator->target_location] = -1;
               auto map_iterator = remain_partitions.find(iterator->partition_id);
@@ -184,11 +199,19 @@ RC HeartBeatThread::heartbeat_loop_new() {
           }
         }
 
+        PRINT_HEARTBEAT("\nplan:\n");
+        for (int i = 0; i < PART_CNT; i++) {
+          for (int j = 0; j < REPLICA_COUNT; j++) {
+            PRINT_HEARTBEAT("p%d.r%d.%d ", i, j, plan[i][j]);
+          }
+          PRINT_HEARTBEAT("\n");
+        }
+
         // update local route table
-        PRINT_HEARTBEAT("node 0 local route table and status:\n");
+        PRINT_HEARTBEAT("\nlocal route table and status:\n");
         route_table.printRouteTable();
         node_status.printStatusTable();
-        PRINT_HEARTBEAT("node 0 update local route table\n");
+        PRINT_HEARTBEAT("update local route table\n");
         for (int partition_idx = 0; partition_idx < PART_CNT; partition_idx++) {
           for (int replica_idx = 0; replica_idx < REPLICA_COUNT; replica_idx++) {
             route_table.set_route_node_new(replica_idx, partition_idx,
@@ -201,6 +224,7 @@ RC HeartBeatThread::heartbeat_loop_new() {
         // send heartbeat containing route table
         send_tcp_heart_beat(true);
       }
+      PRINT_HEARTBEAT("***collect finish\n\n");
     }
 
     if (is_center_primary(g_node_id)) {
@@ -216,7 +240,8 @@ RC HeartBeatThread::heartbeat_loop_new() {
         node_status.printStatusTable();
 
         if (heartbeat_message->need_flush_route_) {
-          update_node_and_route(heartbeat_message->heartbeatmsg, heartbeat_message->return_node_id);
+          update_node_and_route_new(heartbeat_message->heartbeatmsg,
+                                    heartbeat_message->return_node_id);
         }
       }
     }
@@ -240,6 +265,7 @@ RC HeartBeatThread::send_tcp_heart_beat(bool need_flush) {
     auto message =
         Message::create_message(route_table.table, node_status.table, need_flush, HEART_BEAT);
     message->latency = in_latency[i];
+    message->send_time = Message::GetTime();
     msg_queue.enqueue(get_thd_id(), message, dest_id);
     DEBUG_H("Node %ld send TCP heartbeat to %ld\n", g_node_id, dest_id);
   }
@@ -248,9 +274,13 @@ RC HeartBeatThread::send_tcp_heart_beat(bool need_flush) {
 
 RC HeartBeatThread::send_stats() {
   auto message = Message::create_message(access_count, latency, STATS_COUNT);
-  stats_queue.enqueue(get_thd_id(), message, 0);
+  if (g_node_id != 0) {
+    msg_queue.enqueue(get_thd_id(), message, 0);
+  } else {
+    stats_queue.enqueue(get_thd_id(), message, false);
+  }
   memset(access_count, 0, sizeof(access_count));
-  DEBUG_H("Node %ld send stats to 0\n", g_node_id);
+  PRINT_HEARTBEAT("\n***Node %ld send stats to 0\n\n", g_node_id);
   return RCOK;
 }
 
