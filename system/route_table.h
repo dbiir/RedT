@@ -65,6 +65,12 @@ class NodeStatus {
   void set_node_status(uint64_t node_id, NS newSatus, uint64_t thd_id);
   // private:
   status_node* table;
+
+  void printStatusTable() {
+    for (int i = 0; i < NODE_CNT; i++) {
+      PRINT_HEARTBEAT("node %d last_ts: %lu, status %d\n", i, table[i].last_ts, table[i].status);
+    }
+  }
 };
 
 class RouteAndStatus {
@@ -76,6 +82,10 @@ class RouteAndStatus {
       PRINT_HEARTBEAT("partition %d: primary %d, secondary1 %d, secondary2 %d\n", i,
                       _route[i].new_secondary[0].node_id, _route[i].new_secondary[1].node_id,
                       _route[i].new_secondary[2].node_id);
+    }
+    for (int i = 0; i < NODE_CNT; i++) {
+      PRINT_HEARTBEAT("node status %d: last_ts %lu, status %d\n", i, _status[i].last_ts,
+                      _status[i].status);
     }
   }
 };
