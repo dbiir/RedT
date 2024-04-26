@@ -1,0 +1,144 @@
+#include "helper.h"
+#include "manager.h"
+#include "mem_alloc.h"
+#include "row.h"
+#include "txn.h"
+#include "rdma.h"
+#include "qps/op.hh"
+#include "row_rdma_redt.h"
+#include "global.h"
+
+#if CC_ALG == RDMA_RED_T
+
+void Row_rdma_redt::init(row_t * row){
+	_row = row;
+}
+
+void Row_rdma_redt::info_decode(uint64_t lock_info,uint64_t& lock_type,uint64_t& lock_num){
+    lock_type = (lock_info)&1;  //第1位为锁类型信息 0：shared_lock 1: mutex_lock
+    lock_num = (lock_info>>1); //第2位及以后为锁数量信息
+}
+void Row_rdma_redt::info_encode(uint64_t& lock_info,uint64_t lock_type,uint64_t lock_num){
+    lock_info = (lock_num<<1)+lock_type;
+}
+
+bool Row_rdma_redt::conflict_lock(uint64_t lock_info, lock_t l2, uint64_t& new_lock_info) {
+    uint64_t lock_type; 
+    uint64_t lock_num;
+    info_decode(lock_info,lock_type,lock_num);
+    
+    if(lock_num == 0) {//无锁
+        if(l2 == DLOCK_EX) info_encode(new_lock_info, 1, 1);
+        else info_encode(new_lock_info, 0, 1);
+        return false;
+    }
+    if(l2 == DLOCK_EX || lock_type == 1)  return true;
+    else{ //l2==DLOCK_SH&&lock_type == 0
+        uint64_t new_lock_num = lock_num + 1;
+        //if(new_lock_num != 1) printf("---new_lock_num:%lu\n",new_lock_num);
+        info_encode(new_lock_info,lock_type,new_lock_num);
+		if(new_lock_info == 0) {
+        printf("---lock_info:%lu, lock_type:%lu, lock_num:%lu\n",lock_info,lock_type,lock_num);
+        printf("---new_lock_info:%lu, lock_type:%lu, new_lock_num:%lu\n",new_lock_info, lock_type, new_lock_num);
+        }
+        return false;
+    }
+}
+
+RC Row_rdma_redt::lock_get(yield_func_t &yield,lock_t type, TxnManager * txn, row_t * row,uint64_t cor_id) {  //本地加锁
+    RC rc;
+    uint64_t retry_time = 0;
+    uint64_t loc = g_node_id;
+local_retry_lock:
+
+    uint64_t try_lock = -1;
+    uint64_t lock_type = 0;
+    
+    rc = txn->cas_remote_content(yield,loc,(char*)row - rdma_global_buffer,0,txn->get_txn_id(),&try_lock, cor_id);
+    if (rc != RCOK) {
+        rc = rc == NODE_FAILED ? Abort : rc;
+        return rc;
+    }
+    if(try_lock != 0 && !simulation->is_done()) {
+        retry_time ++;
+        if (retry_time > 5) {
+            #if DEBUG_PRINTF
+            printf("txn %d add local mutx lock on item %d failed !!!!!\n", txn->get_txn_id(), row->get_primary_key());
+            #endif
+            return Abort;
+        }
+        goto local_retry_lock;
+    }
+    lock_type = row->lock_type;
+    if(lock_type == 0) {
+        uint64_t lock_index = txn->get_txn_id() % LOCK_LENGTH;
+        row->lock_owner[lock_index] = txn->get_txn_id();
+        row->lock_type = type == DLOCK_EX? 1:2;
+        // _row->_tid_word = 0;
+        rc = RCOK;
+    } else if(lock_type == 1 || type == DLOCK_EX) {
+        // printf("Row_rdma_redt:119\n");
+        row->_tid_word = 0;
+        #if DEBUG_PRINTF
+        printf("txn %d add remote lock on item %d failed !!!!! because lock type %s, lock type %s, lock owner %ld\n", txn->get_txn_id(), row->get_primary_key(),lock_type == 1 ? "EX":"SH", type == DLOCK_EX ? "EX":"SH", row->lock_owner[0]);
+            // printf("txn %d add local lock on item %d, lock_type: %d failed !!!!! because conflict\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
+        #endif
+        rc = Abort;
+        return rc;
+    } else {
+        uint64_t lock_index = txn->get_txn_id() % LOCK_LENGTH;
+        uint64_t try_time = 0;
+        while(try_time <= LOCK_LENGTH) {
+            // printf("Row_rdma_redt:125 try_time: %d\n", try_time);
+            // printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
+            if(row->lock_owner[lock_index] == 0) {
+                row->lock_owner[lock_index] = txn->get_txn_id();
+                row->lock_type = row->lock_type + 1;
+                // row->_tid_word = 0;
+                rc = RCOK;
+                break;
+            }
+            lock_index = (lock_index + 1) % LOCK_LENGTH;
+            try_time ++;
+        }
+        if(try_time > LOCK_LENGTH) {
+            // printf("Row_rdma_redt:138\n");
+            #if DEBUG_PRINTF
+                printf("txn %d add local lock on item %d, lock_type: %d failed !!!!! because too many locks\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
+            #endif
+            row->_tid_word = 0;
+            rc = Abort;
+            return rc;
+        }      
+    }
+    row->_tid_word = 0;
+    #if DEBUG_PRINTF
+        printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
+    #endif
+    // printf("txn %d add local lock on item %d, lock_type: %d\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
+	return rc;
+}
+
+RC Row_rdma_redt::read_only_get(uint64_t snapshot, uint64_t &idx, TxnManager * txn, row_t * row) {  //本地读数据项
+    RC rc = RCOK;
+    uint64_t loc = g_node_id;
+    
+    for (int i = row->newest_index; i > row->newest_index - HIS_CHAIN_NUM; i--) {
+        int index = i % HIS_CHAIN_NUM;
+        if (row->commit_ts[index] <= snapshot) {
+            idx = index;
+            #if DEBUG_PRINTF
+            printf("row_rdma_redt.cpp:130 txn %ld get version %ld\n", txn->get_txn_id(),idx);
+            #endif
+            return RCOK;
+        } else {
+            // printf("row_rdma_redt.cpp:133 txn %ld search version %ld commit_ts %ld\n", txn->get_txn_id(),idx,row->commit_ts[index]);
+        }
+    }
+
+    #if DEBUG_PRINTF
+        printf("row_rdma_redt.cpp:140 txn %ld get version failed\n", txn->get_txn_id());
+    #endif
+	return Abort;
+}
+#endif

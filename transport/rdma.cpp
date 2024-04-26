@@ -220,6 +220,14 @@ char* Rdma::get_status_client_memory(uint64_t thd_id) { //num>=1
 	return temp;
 }
 
+char* Rdma::get_route_node_client_memory(uint64_t thd_id) { //num>=1
+	//when num>1, get extra row for doorbell batched RDMA requests
+	char* temp = (char *)(client_rdma_rm->raw_ptr);
+	temp += client_rdma_buffer_size;
+	temp = temp - SIZE_OF_ROUTE;
+	return temp;
+}
+
 #if USE_REPLICA
 char* Rdma::get_log_client_memory(uint64_t thd_id,int num) { //num>=1
 	char* temp = (char *)(client_rdma_rm->raw_ptr);

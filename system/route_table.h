@@ -4,12 +4,21 @@
 #include "global.h"
 #include "helper.h"
 
+#include "dbpa.hpp"
+#include "routine.h"
+#include "lib.hh"
+#include "qps/op.hh"
+#include "transport/rdma.h"
+#include "src/rdma/sop.hh"
+
 #define SIZE_OF_ROUTE (sizeof(route_table_node) * PART_CNT)
 #define SIZE_OF_STATUS (sizeof(status_node) * NODE_CNT)
 enum NS { OnCall = 0, Failure };
 struct route_node_ts {
   uint64_t node_id;
   uint64_t last_ts;
+
+  uint64_t watermark; //只有在本地的副本会有水印值
 };
 struct route_table_node {
  public:
@@ -33,7 +42,10 @@ class RouteTable {
   auto get_route_node_new(int index, uint64_t partition_id) -> route_node_ts;
   void set_route_node_new(int index, uint64_t partition_id, uint64_t node_id,
                           uint64_t timestamp = 0, uint64_t thd_id = 0);
-
+  void set_route_node_watermark_new(uint64_t partition_id, uint64_t node_id,
+                                    uint64_t watermark, uint64_t thd_id) ;
+  void set_remote_route_node_watermark(yield_func_t &yield, uint64_t partition_id, uint64_t node_id,
+                                    uint64_t watermark, uint64_t thd_id,uint64_t cor_id);
   route_node_ts get_primary(uint64_t partition_id);
   route_node_ts get_secondary_1(uint64_t partition_id);
   route_node_ts get_secondary_2(uint64_t partition_id);
@@ -43,6 +55,9 @@ class RouteTable {
                        uint64_t thd_id = 0);
   void set_secondary_2(uint64_t partition_id, uint64_t node_id, uint64_t timestamp = 0,
                        uint64_t thd_id = 0);
+  
+  route_table_node* read_remote_route_node(yield_func_t &yield, uint64_t target_server, uint64_t partition_id, uint64_t thd_id,uint64_t cor_id);
+  RC cas_remote_route_node_watermark(yield_func_t &yield, uint64_t target_server,uint64_t partition_id,uint64_t index,uint64_t old_value,uint64_t new_value, uint64_t *try_lock, uint64_t thrd_id, uint64_t cor_id);
   // private:
   route_table_node* table;
 
@@ -175,6 +190,21 @@ inline auto get_node_id_new(int index, uint64_t part_id) -> uint64_t {
   status_node* st = node_status.get_node_status(node_id);
   if (st->status == NS::Failure) return -1;
   return node_id;
+}
+
+inline auto get_watermark(int index, uint64_t part_id) -> uint64_t {
+  return route_table.get_route_node_new(index, part_id).watermark;
+}
+
+inline auto set_watermark(uint64_t part_id, uint64_t watermark) -> bool {
+  route_table.set_route_node_watermark_new(part_id, g_node_id, watermark, 0);
+  return true;
+}
+
+inline auto set_remote_watermark(yield_func_t &yield, uint64_t part_id, uint64_t node_id,
+                                 uint64_t watermark, uint64_t thd_id,uint64_t cor_id) -> bool {
+  route_table.set_remote_route_node_watermark(yield, part_id, node_id, watermark, thd_id, cor_id);
+  return true;
 }
 
 inline auto get_part_repl_cnt(uint64_t part_id) -> uint64_t {

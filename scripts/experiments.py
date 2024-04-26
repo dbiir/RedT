@@ -173,10 +173,11 @@ def ycsb_scaling_l():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     # nnodes = [9,12,15]
-    nnodes = [12]
+    nnodes = [3]
     # nnodes = [3,6,9,12,15]
 
-    algos = ['RDMA_NO_WAIT3']
+    algos = ['RDMA_RED_T']
+    # algos = ['RDMA_NO_WAIT3']
     # algos = ['CALVIN']
     # algos = ['WOUND_WAIT']
     # base_table_size=262144*10
@@ -468,7 +469,6 @@ def ecwc():
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
     return fmt,exp
 
-
 def ycsb_scaling_abort():
     wl = 'YCSB'
     nnodes = [1,2,4,8,16,32,64]
@@ -484,18 +484,18 @@ def ycsb_scaling_abort():
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr,'true'] for thr,txn_wr_perc,tup_wr_perc,sk,ld,n,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,skew,load,nnodes,algos)]
     return fmt,exp
 
-
 def ycsb_cross_dc():
     wl = 'YCSB'
-    nnodes = [8]
-    dcs = [8]
-    algos=['RDMA_NO_WAIT3']
+    nnodes = [3]
+    dcs = [3]
+    algos=['RDMA_RED_T']
+    # algos=['RDMA_NO_WAIT3']
+    base_table_size=104857
     # base_table_size=1048576
-    base_table_size=524288
     txn_write_perc = [1]
     tup_write_perc = [0.5]
-    load = [720]
-    tcnt = [12]  #THREAD_CNT
+    load = [320]
+    tcnt = [5]  #THREAD_CNT
     skew = [0.2]
     cross_dc_perc = [1.0] 
     # cross_dc_perc = [0] 
@@ -1324,7 +1324,7 @@ configs = {
     "REPLICA_TYPE": "AP",
     "REM_THREAD_CNT": 1,
     "SEND_THREAD_CNT": 1,
-    "CLIENT_NODE_CNT" : 8,
+    "CLIENT_NODE_CNT" : 1,
     "CLIENT_THREAD_CNT" : 4,
     "CLIENT_REM_THREAD_CNT" : 1,
     "CLIENT_SEND_THREAD_CNT" : 1,

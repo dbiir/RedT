@@ -29,6 +29,7 @@
 #include "query.h"
 #include "rdma.h"
 #include "rdma_2pl.h"
+#include "rdma_redt.h"
 #include "route_table.h"
 #include "sequencer.h"
 #include "sim_manager.h"
@@ -67,6 +68,9 @@ Rdma rdma_man;
 
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 RDMA_2pl r2pl_man;
+#endif
+#if CC_ALG == RDMA_RED_T
+RDMA_redt rredt_man; 
 #endif
 #if USE_REPLICA
 RedoLogBuffer redo_log_buf;

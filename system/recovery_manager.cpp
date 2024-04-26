@@ -284,7 +284,7 @@ RC HeartBeatThread::send_rdma_heart_beat(uint64_t dest_id) {
   PRINT_HEARTBEAT("call send_rdma_heart_beat\n");
   write_remote_heartbeat(dest_id);
   RouteAndStatus result = read_remote_status(dest_id);
-  update_node_and_route(result, dest_id);
+  update_node_and_route_new(result, dest_id);
   return RCOK;
 }
 
