@@ -516,6 +516,7 @@ RC YCSBTxnManager::read_only_optimization() {
 
         uint64_t p_watermark = get_watermark(j,part_id);
         watermark = watermark < p_watermark ? watermark : p_watermark;
+        // printf("ycsb_txn.cpp:519 txn %ld get watermark %lu-%lu part %ld ind %ld node %ld watermark %lu-%lu-%lu-%lu-%lu\n", get_txn_id(), watermark, p_watermark, part_id, j, loc, get_watermark(0,part_id), get_watermark(1,part_id),get_watermark(2,part_id),get_watermark(3,part_id),get_watermark(4,part_id));
         // assert(watermark != 0);
         assert(watermark != UINT64_MAX);
         break;
@@ -571,7 +572,7 @@ RC YCSBTxnManager::read_only_optimization() {
   }
   // !还需要增加获取snapshot的代码
   set_start_timestamp(watermark);
-  // printf("ycsb_txn.cpp:573 txn %ld set start timestamp %ld\n", get_txn_id(), get_start_timestamp());
+  // printf("ycsb_txn.cpp:573 txn %ld set start timestamp %lu\n", get_txn_id(), get_start_timestamp());
   // !------------------------
   for (auto iter = center_master.begin(); iter != center_master.end(); iter++) {
     uint64_t center_id = iter->first;

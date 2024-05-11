@@ -838,22 +838,12 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 
   int responses_left = txn_man->received_response((AckMessage*)msg, OpStatus::PREPARE);
   if (responses_left > 0) return WAIT;
-
-  // #if WORKLOAD == YCSB
-  // for(int i=0;i<REQ_PER_QUERY;i++){
-  //   if(txn_man->req_need_wait[i]) return WAIT;
-  // }
-  // #else 
-  // if (txn_man->wh_need_wait || txn_man->cus_need_wait) {
-  //   return WAIT;
-  // }
-  // for(int i=0;i<MAX_ITEMS_PER_TXN;i++){
-  //   if(txn_man->req_need_wait[i]) return WAIT;
-  // }
-  // #endif
   
   // Done waiting
   txn_man->set_commit_timestamp(get_next_ts());
+  #if DEBUG_PRINTF
+    printf("---thd %lu, txn: %lu set cts %lu\n", txn_man->get_thd_id(), txn_man->get_txn_id(), txn_man->get_commit_timestamp());
+  #endif
 
   uint64_t curr_time = get_sys_clock();
   INC_STATS(get_thd_id(),trans_wait_for_rsp_time, curr_time - txn_man->txn_stats.wait_for_rsp_time);
@@ -1398,7 +1388,11 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     }
 
     //commit phase: now commit or abort
-    txn_man->set_commit_timestamp(get_next_ts());
+    ts_t cts = get_next_ts();
+    txn_man->set_commit_timestamp(cts);
+    #if DEBUG_PRINTF
+    printf("---thd %lu, txn: %lu set cts %lu\n", txn_man->get_thd_id(), txn_man->get_txn_id(), txn_man->get_commit_timestamp());
+    #endif
     txn_man->send_finish_messages();
 
     if(rc == Abort) {

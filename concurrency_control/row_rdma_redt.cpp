@@ -80,8 +80,7 @@ local_retry_lock:
         // printf("Row_rdma_redt:119\n");
         row->_tid_word = 0;
         #if DEBUG_PRINTF
-        printf("txn %d add remote lock on item %d failed !!!!! because lock type %s, lock type %s, lock owner %ld\n", txn->get_txn_id(), row->get_primary_key(),lock_type == 1 ? "EX":"SH", type == DLOCK_EX ? "EX":"SH", row->lock_owner[0]);
-            // printf("txn %d add local lock on item %d, lock_type: %d failed !!!!! because conflict\n", txn->get_txn_id(), row->get_primary_key(), row->lock_type);
+        printf("txn %d add local lock on item %d failed !!!!! because lock type %s, lock type %s, lock owner %ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld\n", txn->get_txn_id(), row->get_primary_key(),lock_type == 1 ? "EX":"SH", type == DLOCK_EX ? "EX":"SH", row->lock_owner[0],row->lock_owner[1],row->lock_owner[2],row->lock_owner[3],row->lock_owner[4],row->lock_owner[5],row->lock_owner[6],row->lock_owner[7],row->lock_owner[8],row->lock_owner[9]);
         #endif
         rc = Abort;
         return rc;
@@ -128,11 +127,11 @@ RC Row_rdma_redt::read_only_get(uint64_t snapshot, uint64_t &idx, TxnManager * t
         if (row->commit_ts[index] <= snapshot) {
             idx = index;
             #if DEBUG_PRINTF
-            printf("row_rdma_redt.cpp:130 txn %ld get version %ld\n", txn->get_txn_id(),idx);
+            printf("row_rdma_redt.cpp:130 txn %ld sts %ld get row %ld version %ld commit_ts %lu\n", txn->get_txn_id(),txn->get_start_timestamp(),row->get_primary_key(),idx,row->commit_ts[index]);
             #endif
             return RCOK;
         } else {
-            // printf("row_rdma_redt.cpp:133 txn %ld search version %ld commit_ts %ld\n", txn->get_txn_id(),idx,row->commit_ts[index]);
+            // printf("row_rdma_redt.cpp:133 txn %ld sts %lu search row %ld version %ld commit_ts %lu\n", txn->get_txn_id(),txn->get_start_timestamp(),row->get_primary_key(),idx,row->commit_ts[index]);
         }
     }
 

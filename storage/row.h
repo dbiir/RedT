@@ -141,7 +141,7 @@ public:
 	#elif CC_ALG == RDMA_RED_T
 		volatile uint64_t _tid_word; 
 		volatile uint64_t wts; //commit timestamp of the latest transaction that writes this item
-		volatile uint64_t lock_type;
+		volatile uint64_t lock_type; // 0是没有锁, 1是排他锁, 2是共享锁
 		volatile uint64_t lock_owner[LOCK_LENGTH]; //解锁
 
 		volatile int64_t newest_index;

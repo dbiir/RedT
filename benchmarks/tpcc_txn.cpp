@@ -1718,21 +1718,21 @@ RC TPCCTxnManager::run_tpcc_phase2(yield_func_t &yield, uint64_t cor_id) {
 				tpcc_query->o_id = *(int64_t *) row->get_value(D_NEXT_O_ID);
 				//rc = new_order_5( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
 			}
-				for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
+			for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
 
-					uint64_t ol_number = i;
-					uint64_t ol_i_id = tpcc_query->items[ol_number]->ol_i_id;
-					uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
-					//uint64_t ol_quantity = tpcc_query->items[ol_number].ol_quantity;
-					//uint64_t ol_amount = tpcc_query->ol_amount;
-					uint64_t part_id_ol_supply_w = wh_to_part(ol_supply_w_id);
-					bool ol_supply_w_loc = GET_NODE_ID(part_id_ol_supply_w) == g_node_id;
-					if(ol_supply_w_loc) {
-						rc = new_order_6(yield,ol_i_id, row,cor_id);
-						rc = new_order_7(ol_i_id, row);
-					}
+				uint64_t ol_number = i;
+				uint64_t ol_i_id = tpcc_query->items[ol_number]->ol_i_id;
+				uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
+				//uint64_t ol_quantity = tpcc_query->items[ol_number].ol_quantity;
+				//uint64_t ol_amount = tpcc_query->ol_amount;
+				uint64_t part_id_ol_supply_w = wh_to_part(ol_supply_w_id);
+				bool ol_supply_w_loc = GET_NODE_ID(part_id_ol_supply_w) == g_node_id;
+				if(ol_supply_w_loc) {
+					rc = new_order_6(yield,ol_i_id, row,cor_id);
+					rc = new_order_7(ol_i_id, row);
 				}
-				break;
+			}
+			break;
 		default:
 			assert(false);
 	}
@@ -1782,23 +1782,23 @@ RC TPCCTxnManager::run_tpcc_phase5(yield_func_t &yield, uint64_t cor_id) {
 				//rc = new_order_4( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
 				rc = new_order_5( w_id, d_id, c_id, remote, ol_cnt, o_entry_d, &tpcc_query->o_id, row);
 			}
-				for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
+			for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
 
-					uint64_t ol_number = i;
-					uint64_t ol_i_id = tpcc_query->items[ol_number]->ol_i_id;
-					uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
-					uint64_t ol_quantity = tpcc_query->items[ol_number]->ol_quantity;
-					uint64_t ol_amount = tpcc_query->ol_amount;
-					uint64_t part_id_ol_supply_w = wh_to_part(ol_supply_w_id);
-					bool ol_supply_w_loc = GET_NODE_ID(part_id_ol_supply_w) == g_node_id;
-					if(ol_supply_w_loc) {
-					rc = new_order_8(yield,w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number,
-													 o_id, row,cor_id);
-					rc = new_order_9(w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number,
-													 ol_amount, o_id, row);
-					}
+				uint64_t ol_number = i;
+				uint64_t ol_i_id = tpcc_query->items[ol_number]->ol_i_id;
+				uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
+				uint64_t ol_quantity = tpcc_query->items[ol_number]->ol_quantity;
+				uint64_t ol_amount = tpcc_query->ol_amount;
+				uint64_t part_id_ol_supply_w = wh_to_part(ol_supply_w_id);
+				bool ol_supply_w_loc = GET_NODE_ID(part_id_ol_supply_w) == g_node_id;
+				if(ol_supply_w_loc) {
+				rc = new_order_8(yield,w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number,
+													o_id, row,cor_id);
+				rc = new_order_9(w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number,
+													ol_amount, o_id, row);
 				}
-				break;
+			}
+			break;
 		default:
 			assert(false);
 	}

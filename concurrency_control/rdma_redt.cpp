@@ -24,6 +24,7 @@ retry_unlock:
     if (rc == NODE_FAILED) {
         node_status.set_node_status(loc, NS::Failure, txnMng->get_thd_id());
         // txnMng->insert_failed_partition();
+        printf("txn %ld cas happen node failed\n",txnMng->get_txn_id());
         return RCOK;
     }
 
@@ -48,11 +49,13 @@ retry_unlock:
     memcpy(row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
     // 调整时间戳
     set_watermark(row->get_part_id(),txnMng->get_commit_timestamp());
-
+// #if DEBUG_PRINTF
+//     printf("---thd %lu, txn: %lu txn cts %lu update part %ld watermark to %lu-%lu-%lu-%lu-%lu\n", txnMng->get_thd_id(), txnMng->get_txn_id(), txnMng->get_commit_timestamp(), row->get_part_id(), get_watermark(0,row->get_part_id()),get_watermark(1,row->get_part_id()),get_watermark(2,row->get_part_id()),get_watermark(3,row->get_part_id()),get_watermark(4,row->get_part_id()));
+// #endif
     row->_tid_word = 0;
     // printf("txn %d release local lock on item %d, lock_type: %d, try_time:%d \n", txnMng->get_txn_id(), row->get_primary_key(), row->lock_type, try_time);
 #if DEBUG_PRINTF
-    printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id());
+    printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu txn cts %lu, update version %ld commit ts %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id(), txnMng->get_commit_timestamp(), index%HIS_CHAIN_NUM, row->commit_ts[index%HIS_CHAIN_NUM]);
 #endif
 }
 
@@ -108,11 +111,12 @@ retry_remote_unlock:
     // 调整远程的时间戳
     set_remote_watermark(yield,test_row->get_part_id(),loc,txnMng->get_commit_timestamp(),txnMng->get_thd_id(),cor_id);
     // !--------
-
     test_row->_tid_word = 0;
     rc = txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id);
     // todo: how to continue the commit operation.
-
+#if DEBUG_PRINTF
+    printf("---thd %lu, remote unlock write succ, lock location: %u; %lu, txn: %lu cts %lu, update version %ld commit ts %lu\n", txnMng->get_thd_id(), g_node_id, test_row->get_primary_key(), txnMng->get_txn_id(), txnMng->get_commit_timestamp(), index%HIS_CHAIN_NUM, test_row->commit_ts[index%HIS_CHAIN_NUM]);
+#endif
 
 	mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 }
@@ -319,11 +323,13 @@ RC RDMA_redt::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor
         //local
         if(txn->accesses[read_set[i]]->location == g_node_id){
             Access * access = txn->accesses[ read_set[i] ];
+            // printf("txn %ld try to local unlock read row %ld.\n", txnMng->get_txn_id(),access->orig_row->get_primary_key());
             if (!txnMng->is_recover) unlock(yield,access->orig_row, txnMng,cor_id);
         }else{
         //remote
             remote_access[txn->accesses[read_set[i]]->location].push_back(read_set[i]);
             Access * access = txn->accesses[ read_set[i] ];
+            // printf("txn %ld try to remote unlock read row %ld.\n", txnMng->get_txn_id(),access->orig_row->get_primary_key());
             if (!txnMng->is_recover)remote_unlock(yield,txnMng, read_set[i],cor_id);
         }
     }
@@ -332,11 +338,13 @@ RC RDMA_redt::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor
         //local
         if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
             Access * access = txn->accesses[ txnMng->write_set[i] ];
+            // printf("txn %ld try to local unlock write row %ld.\n", txnMng->get_txn_id(),access->orig_row->get_primary_key());
             write_and_unlock(yield,access->orig_row, access->data, txnMng,cor_id); 
         }else{
         //remote
             remote_access[txn->accesses[txnMng->write_set[i]]->location].push_back(txnMng->write_set[i]);
             Access * access = txn->accesses[ txnMng->write_set[i] ];
+            // printf("txn %ld try to remote unlock write row %ld.\n", txnMng->get_txn_id(),access->orig_row->get_primary_key());
             remote_write_and_unlock(yield,rc, txnMng, txnMng->write_set[i],cor_id);
         }
     }

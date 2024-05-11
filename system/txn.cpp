@@ -1051,7 +1051,7 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 	if (type == WR) txn->accesses[rid]->version = version;
 
 #if CC_ALG != RDMA_NO_WAIT && CC_ALG != RDMA_NO_WAIT3 && CC_ALG != RDMA_RED_T
-  txn->accesses[rid]->data = NULL;
+  	txn->accesses[rid]->data = NULL;
 #endif
 }
 
@@ -1568,7 +1568,7 @@ remote_atomic_retry_lock:
 				}
 			} else if(lock_type == 1 || type == WR) {
 				test_row->_tid_word = 0;
-				DEBUG_T("txn %d add remote lock on item %d failed !!!!! because lock type %s, lock type %s, lock owner %ld\n", txn->txn_id, test_row->get_primary_key(),lock_type == 1 ? "EX":"SH", type == WR ? "EX":"SH", test_row->lock_owner[0]);
+				DEBUG_T("txn %d add remote lock on item %d failed !!!!! because lock type %s, lock type %s, lock owner %ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld\n", txn->txn_id, test_row->get_primary_key(),lock_type == 1 ? "EX":"SH", type == WR ? "EX":"SH", test_row->lock_owner[0], test_row->lock_owner[1], test_row->lock_owner[2], test_row->lock_owner[3], test_row->lock_owner[4], test_row->lock_owner[5], test_row->lock_owner[6], test_row->lock_owner[7], test_row->lock_owner[8], test_row->lock_owner[9]);
 
 				rc = write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id);
 				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));

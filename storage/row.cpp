@@ -541,9 +541,9 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	return 0;
 #elif CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T
 	assert(row == NULL || row == this || type == XP);
-	if (ROLL_BACK && type == XP) {  // recover from previous writes.
-		this->copy(row);  //for abort of local txn ABORT, copy orig_data to orig_row. remote ABORT dont need this operate
-	}
+	// if (ROLL_BACK && type == XP) {  // recover from previous writes.
+	// 	this->copy(row);  //for abort of local txn ABORT, copy orig_data to orig_row. remote ABORT dont need this operate
+	// }
 	return 0;
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC 
 	// for RD or SCAN or XP, the row should be deleted.
