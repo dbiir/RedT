@@ -74,7 +74,7 @@
 #if USE_REPLICA
 #define REPLICA_COUNT 3  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
 #define MINOR_REPLICA \
-  4  // 返回需要（1-1/x）的副本，如果x是2，则代表只要多余一半的副本返回就可以提交
+  2  // 返回需要（1-1/x）的副本，如果x是2，则代表只要多余一半的副本返回就可以提交
 #else
 #define REPLICA_COUNT 0  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
 #endif

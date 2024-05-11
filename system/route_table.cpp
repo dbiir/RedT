@@ -76,15 +76,23 @@ void RouteTable::set_route_node_new(int index, uint64_t partition_id, uint64_t n
 
 void RouteTable::set_route_node_watermark_new(uint64_t partition_id, uint64_t node_id,
                                     uint64_t watermark, uint64_t thd_id) {
-  int index = 0;
-  for (int i = 0; i < table[partition_id].replica_cnt; i++) {
-    if (table[partition_id].new_secondary[index].node_id == node_id) {
+  uint64_t index = 0;
+  for (uint64_t i = 0; i < table[partition_id].replica_cnt; i++) {
+    if (GET_CENTER_ID(table[partition_id].new_secondary[i].node_id) == GET_CENTER_ID(node_id)) {
       index = i;
       break;
     } 
+    #if DEBUG_PRINTF
+      printf("part %ld id %ld in node %ld target %ld\n", partition_id, i, table[partition_id].new_secondary[i].node_id,node_id);
+    #endif
   }
-  if (table[partition_id].new_secondary[index].watermark < watermark)
+  if (table[partition_id].new_secondary[index].watermark < watermark) {
     table[partition_id].new_secondary[index].watermark = watermark;
+    #if DEBUG_PRINTF
+      printf("part %ld id %ld's watermark is set to %lu, it has %ld replica\n", partition_id, index, watermark,table[partition_id].replica_cnt);
+    #endif
+  }
+    
 }
 
 
@@ -214,9 +222,10 @@ void RouteTable::set_remote_route_node_watermark(yield_func_t &yield, uint64_t p
                                     uint64_t watermark, uint64_t thd_id,uint64_t cor_id) {
   route_table_node* tmp_node = read_remote_route_node(yield, node_id, partition_id, thd_id, cor_id);
 
-  int index = 0;
-  for (int i = 0; i < tmp_node->replica_cnt; i++) {
-    if (tmp_node->new_secondary[index].node_id == node_id) {
+  uint64_t index = 0;
+  for (uint64_t i = 0; i < tmp_node->replica_cnt; i++) {
+    if (GET_CENTER_ID(tmp_node->new_secondary[i].node_id) == GET_CENTER_ID(node_id)) {
+    // if (tmp_node->new_secondary[index].node_id == node_id) {
       index = i;
       break;
     } 
