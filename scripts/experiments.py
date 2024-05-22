@@ -488,8 +488,8 @@ def ycsb_cross_dc():
     wl = 'YCSB'
     nnodes = [3]
     dcs = [3]
-    algos=['RDMA_RED_T']
-    # algos=['RDMA_NO_WAIT3']
+    # algos=['RDMA_RED_T']
+    algos=['RDMA_NO_WAIT3']
     base_table_size=104857
     # base_table_size=1048576
     txn_write_perc = [1]

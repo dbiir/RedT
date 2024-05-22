@@ -98,7 +98,7 @@ RC HeartBeatThread::heartbeat_loop_new() {
   uint64_t now;
   Message* msg;
   uint64_t last_collect_time = get_wall_clock();
-  bool once = false;
+  bool once = ENABLE_REPLICA_OPTIMIZE;
   while (!simulation->is_done()) {
     now = get_wall_clock();
     node_status.set_node_status(g_node_id, OnCall, get_thd_id());
@@ -159,23 +159,25 @@ RC HeartBeatThread::heartbeat_loop_new() {
           auto operator<(const PartitionInformation& other) const -> bool {
             return partition_id < other.partition_id ||
                    (partition_id == other.partition_id && score < other.score) ||
-                   (partition_id == other.partition_id && score == other.score &&
-                    target_location > other.target_location);
+                   (partition_id % 2 == 0 && partition_id == other.partition_id &&
+                    score == other.score && target_location > other.target_location) ||
+                   (partition_id % 2 != 0 && partition_id == other.partition_id &&
+                    score == other.score && target_location < other.target_location);
           }
         };
         set<PartitionInformation> next_partition;
         unordered_map<int, int> remain_partitions;
 
-        int temp = 0;
+        int count_score = 0;
         for (int partition_idx = 0; partition_idx < PART_CNT; partition_idx++) {
           for (int location = 0; location < CENTER_CNT; location++) {
             for (int access_location = 0; access_location < CENTER_CNT; access_location++) {
-              temp += access_collector[access_location][partition_idx] *
-                      latency_collector[access_location][location];
+              count_score += access_collector[access_location][partition_idx] *
+                             latency_collector[access_location][location];
             }
-            score[partition_idx][location] = temp;
-            next_partition.emplace(PartitionInformation{partition_idx, location, temp});
-            temp = 0;
+            score[partition_idx][location] = count_score;
+            next_partition.emplace(PartitionInformation{partition_idx, location, count_score});
+            count_score = 0;
           }
           remain_partitions.emplace(partition_idx, REPLICA_COUNT);
         }
@@ -228,6 +230,8 @@ RC HeartBeatThread::heartbeat_loop_new() {
             auto node_id = route_table.get_route_node_new(replica_index, partition_id).node_id;
             old.emplace(node_id, replica_index);
           }
+          // compare the new plan to the old because we don't need to move replicas in the same
+          // location even they had different index
           for (int replica_index = 0; replica_index < REPLICA_COUNT; replica_index++) {
             auto iterator = old.find(plan[partition_id][replica_index]);
             if (iterator != old.end()) {

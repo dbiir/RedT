@@ -75,6 +75,7 @@
 #define REPLICA_COUNT 3  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
 #define MINOR_REPLICA \
   2  // 返回需要（1-1/x）的副本，如果x是2，则代表只要多余一半的副本返回就可以提交
+#define ENABLE_REPLICA_OPTIMIZE true
 #else
 #define REPLICA_COUNT 0  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
 #endif
@@ -147,7 +148,7 @@
 #define COROUTINE_CNT 4
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
-#define PART_CNT 2*NODE_CNT
+#define PART_CNT 2 * NODE_CNT
 #define CLIENT_NODE_CNT 1
 #define CLIENT_THREAD_CNT 4
 #define CLIENT_REM_THREAD_CNT 1
@@ -241,7 +242,7 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_RED_T
+#define CC_ALG RDMA_NO_WAIT3
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C APACITY_NEW 1000000
@@ -295,8 +296,8 @@
 // per-row lock/ts management or central lock/ts management
 #define CENTRAL_MAN false
 #define BUCKET_CNT 31
-#define ABORT_PENALTY 10 * 1000000UL   // in ns.
-#define ABORT_PENALTY_MAX 5 * 100 * 1000000UL   // in ns.
+#define ABORT_PENALTY 10 * 1000000UL           // in ns.
+#define ABORT_PENALTY_MAX 5 * 100 * 1000000UL  // in ns.
 #define BACKOFF true
 // [ INDEX ]
 #define ENABLE_LATCH false
@@ -551,7 +552,7 @@ enum PPSTxnType {
 #define CNULL 28
 #define RDMA_NO_WAIT 31
 #define RDMA_NO_WAIT3 32  // add owner list
-#define RDMA_RED_T 33  // RDMA MVCC + NO WAIT with read only optimization
+#define RDMA_RED_T 33     // RDMA MVCC + NO WAIT with read only optimization
 #define WOUND_WAIT 41
 // TIMESTAMP allocation method.
 #define TS_MUTEX 1
@@ -597,11 +598,11 @@ enum PPSTxnType {
 #define MILLION 1000000UL     // in ns => 1 ms
 #define USECONDE 1000UL       // us
 #define STAT_ARR_SIZE 1024
-#define PROG_TIMER 10 * BILLION // in s
+#define PROG_TIMER 10 * BILLION  // in s
 #define BATCH_TIMER 0
-#define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 40 * BILLION // ~1 minutes
-#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
+#define SEQ_BATCH_TIMER 5 * 1 * MILLION  // ~5ms -- same as CALVIN paper
+#define DONE_TIMER 1 * 40 * BILLION      // ~1 minutes
+#define WARMUP_TIMER 1 * 20 * BILLION    // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false
