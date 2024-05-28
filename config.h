@@ -72,10 +72,10 @@
 #define PARAL_SUBTXN true   // hg-network without replica stage 3
 #define USE_REPLICA true
 #if USE_REPLICA
-#define REPLICA_COUNT 3  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
+#define REPLICA_COUNT 5  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
 #define MINOR_REPLICA \
-  2  // 返回需要（1-1/x）的副本，如果x是2，则代表只要多余一半的副本返回就可以提交
-#define ENABLE_REPLICA_OPTIMIZE true
+  4  // 返回需要（1-1/x）的副本，如果x是2，则代表只要多余一半的副本返回就可以提交
+#define ENABLE_REPLICA_OPTIMIZE false
 #else
 #define REPLICA_COUNT 0  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
 #endif
@@ -140,15 +140,15 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 3
-#define NODE_CNT 3
+#define CENTER_CNT 5
+#define NODE_CNT 5
 #define THREAD_CNT 5
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
 #define CORE_CNT 2
 // PART_CNT should be at least NODE_CNT
-#define PART_CNT 2 * NODE_CNT
+#define PART_CNT 2*NODE_CNT
 #define CLIENT_NODE_CNT 1
 #define CLIENT_THREAD_CNT 4
 #define CLIENT_REM_THREAD_CNT 1
@@ -242,7 +242,7 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_NO_WAIT3
+#define CC_ALG RDMA_RED_T
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C APACITY_NEW 1000000
@@ -296,8 +296,8 @@
 // per-row lock/ts management or central lock/ts management
 #define CENTRAL_MAN false
 #define BUCKET_CNT 31
-#define ABORT_PENALTY 10 * 1000000UL           // in ns.
-#define ABORT_PENALTY_MAX 5 * 100 * 1000000UL  // in ns.
+#define ABORT_PENALTY 10 * 1000000UL   // in ns.
+#define ABORT_PENALTY_MAX 5 * 100 * 1000000UL   // in ns.
 #define BACKOFF true
 // [ INDEX ]
 #define ENABLE_LATCH false
@@ -366,10 +366,10 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 314571
+#define SYNTH_TABLE_SIZE 524285
 #define ZIPF_THETA 0.2
 #define SIMILAR_GROUP_PERC 0.5
-#define TXN_WRITE_PERC 1
+#define TXN_WRITE_PERC 0
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC 0
 #define SCAN_LEN 20
@@ -598,11 +598,11 @@ enum PPSTxnType {
 #define MILLION 1000000UL     // in ns => 1 ms
 #define USECONDE 1000UL       // us
 #define STAT_ARR_SIZE 1024
-#define PROG_TIMER 10 * BILLION  // in s
+#define PROG_TIMER 10 * BILLION // in s
 #define BATCH_TIMER 0
-#define SEQ_BATCH_TIMER 5 * 1 * MILLION  // ~5ms -- same as CALVIN paper
-#define DONE_TIMER 1 * 40 * BILLION      // ~1 minutes
-#define WARMUP_TIMER 1 * 20 * BILLION    // ~1 minutes
+#define SEQ_BATCH_TIMER 5 * 1 * MILLION // ~5ms -- same as CALVIN paper
+#define DONE_TIMER 1 * 40 * BILLION // ~1 minutes
+#define WARMUP_TIMER 1 * 20 * BILLION // ~1 minutes
 
 #define SEED 0
 #define SHMEM_ENV false
