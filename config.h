@@ -75,7 +75,7 @@
 #define REPLICA_COUNT 5  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
 #define MINOR_REPLICA \
   4  // 返回需要（1-1/x）的副本，如果x是2，则代表只要多余一半的副本返回就可以提交
-#define ENABLE_REPLICA_OPTIMIZE false
+#define ENABLE_REPLICA_OPTIMIZE true
 #else
 #define REPLICA_COUNT 0  // !0默认采用写死的3副本机制，目前TPCC只能采用写死的3副本机制
 #endif
@@ -140,8 +140,8 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 5
-#define NODE_CNT 5
+#define CENTER_CNT 8
+#define NODE_CNT 8
 #define THREAD_CNT 5
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
@@ -366,10 +366,10 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 524285
+#define SYNTH_TABLE_SIZE 838856
 #define ZIPF_THETA 0.2
-#define SIMILAR_GROUP_PERC 0.5
-#define TXN_WRITE_PERC 0
+#define SIMILAR_GROUP_PERC 0.6
+#define TXN_WRITE_PERC 0.6
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC 0
 #define SCAN_LEN 20

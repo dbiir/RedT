@@ -317,6 +317,8 @@ RC HeartBeatThread::send_stats() {
       } else {
         latency[i] = time;
       }
+    } else {
+      latency[i] = 1;
     }
   }
   auto message = Message::create_message(access_count, latency, STATS_COUNT);

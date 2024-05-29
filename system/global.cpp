@@ -70,7 +70,7 @@ Rdma rdma_man;
 RDMA_2pl r2pl_man;
 #endif
 #if CC_ALG == RDMA_RED_T
-RDMA_redt rredt_man; 
+RDMA_redt rredt_man;
 #endif
 #if USE_REPLICA
 RedoLogBuffer redo_log_buf;
@@ -407,6 +407,6 @@ uint64_t total_num_msgs_commit = 0;
 uint64_t max_num_msgs_rw_prep = 0;
 uint64_t max_num_msgs_commit = 0;
 
-uint64_t latency[6] = {1, 1, 1, 1, 1, 1};
+uint64_t latency[CENTER_CNT];
 uint64_t access_count[PART_CNT] = {0};
 bool is_count[PART_CNT] = {false};

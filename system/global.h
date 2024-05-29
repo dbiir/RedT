@@ -88,7 +88,7 @@ class Rdma;
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 class RDMA_2pl;
 #endif
-#if CC_ALG == RDMA_RED_T 
+#if CC_ALG == RDMA_RED_T
 class RDMA_redt;
 #endif
 #if USE_REPLICA
@@ -577,7 +577,7 @@ extern uint64_t total_num_msgs_commit;
 extern uint64_t max_num_msgs_rw_prep;
 extern uint64_t max_num_msgs_commit;
 
-extern uint64_t latency[6];
+extern uint64_t latency[CENTER_CNT];
 extern uint64_t access_count[PART_CNT];
 extern bool is_count[PART_CNT];
 #endif

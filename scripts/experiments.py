@@ -486,13 +486,13 @@ def ycsb_scaling_abort():
 
 def ycsb_cross_dc():
     wl = 'YCSB'
-    nnodes = [5]
-    dcs = [5]
+    nnodes = [8]
+    dcs = [8]
     algos=['RDMA_RED_T']
     # algos=['RDMA_NO_WAIT3']
     base_table_size=104857
     # base_table_size=1048576
-    txn_write_perc = [0]
+    txn_write_perc = [0.6]
     tup_write_perc = [0.5]
     load = [320]
     tcnt = [5]  #THREAD_CNT
