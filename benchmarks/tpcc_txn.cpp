@@ -102,7 +102,6 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 	}
 
-
 	while(rc == RCOK && !is_done()) {
 		rc = run_txn_state(yield, cor_id);
 	}

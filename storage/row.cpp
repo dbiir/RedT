@@ -89,10 +89,9 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 	newest_index = 0;
 	for (int i = 0; i < HIS_CHAIN_NUM; i++) {
 		commit_ts[i] = UINT64_MAX;
-		memset(datas[i], 0, ROW_DEFAULT_SIZE);
+		// memset(datas[i], 0, ROW_DEFAULT_SIZE);
 	}
 	commit_ts[newest_index] = 0;
-	// memcpy(datas[newest_index], data, ROW_DEFAULT_SIZE);
 #endif
 
 	return RCOK;
@@ -165,7 +164,7 @@ void row_t::set_value(int id, void * ptr) {
 #endif
 
 #if CC_ALG == RDMA_RED_T
-	memcpy(datas[newest_index], ptr, datasize);
+	// memcpy(datas[newest_index], ptr, datasize);
 #endif
 }
 

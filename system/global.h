@@ -422,11 +422,11 @@ enum RemReqType {
   INIT_DONE = 0,
   RLK,
   RULK,
-  CL_QRY,
+  CL_QRY, //3
   CL_QRY_O,  // one server but use the msg queue
-  RQRY,
+  RQRY, // 5
   RQRY_CONT,
-  RFIN,
+  RFIN, //7
   RLK_RSP,
   RULK_RSP,
   RQRY_RSP,

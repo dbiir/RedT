@@ -44,7 +44,8 @@ BaseQuery* YCSBQueryGenerator::create_query(Workload* h_wl, uint64_t home_partit
     query = gen_requests_hot(home_partition_id, h_wl);
   } else if (SKEW_METHOD == ZIPF) {
     assert(the_n != 0);
-    query = gen_requests_zipf_new(home_partition_id, h_wl);
+    query = gen_requests_zipf(home_partition_id, h_wl);
+    // query = gen_requests_zipf_new(home_partition_id, h_wl);
   }
 
   return query;
@@ -93,15 +94,9 @@ void YCSBQuery::reset() {
 void YCSBQuery::reset_query_status() {
   for (int i = 0; i < requests.size(); i++) {
     ycsb_request* req = requests[i];
-#if REPLICA_COUNT != 0
     for (int j = 0; j < MAX_REPLICA_COUNT; j++) {
       req->replica_node[j].status = OpStatus::RUN;
     }
-#else
-    req->primary.status = OpStatus::RUN;
-    req->second1.status = OpStatus::RUN;
-    req->second2.status = OpStatus::RUN;
-#endif
   }
 }
 
@@ -293,181 +288,178 @@ BaseQuery* YCSBQueryGenerator::gen_requests_hot(uint64_t home_partition_id, Work
   return query;
 }
 
-BaseQuery* YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Workload* h_wl) {
-  YCSBQuery* query = (YCSBQuery*)mem_allocator.alloc(sizeof(YCSBQuery));
-  new (query) YCSBQuery();
-  query->requests.init(g_req_per_query);
+BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Workload * h_wl) {
+	YCSBQuery * query = (YCSBQuery*) mem_allocator.alloc(sizeof(YCSBQuery));
+	new(query) YCSBQuery();
+	query->requests.init(g_req_per_query);
 
-  uint64_t access_cnt = 0;
-  set<uint64_t> all_keys;
-  set<uint64_t> partitions_accessed;
-  set<uint64_t> dcs_accessed;
-  uint64_t table_size = g_synth_table_size / g_part_cnt;
+	uint64_t access_cnt = 0;
+	set<uint64_t> all_keys;
+	set<uint64_t> partitions_accessed;
+	set<uint64_t> dcs_accessed;
+	uint64_t table_size = g_synth_table_size / g_part_cnt;
 
-  double r_twr = (double)(mrand->next() % 10000) / 10000;
+	double r_twr = (double)(mrand->next() % 10000) / 10000;
 
 #if INTER_DC_CONTROL
-  bool cross_dc_txn = false;
-  double cc = (double)(mrand->next() % 10000) / 10000;
-  if (cc < g_cross_dc_txn_perc) {
-    cross_dc_txn = true;
-  }
-  bool has_cross_dc_part = false;  // not used when cross_dc_txn = false
+	bool cross_dc_txn = false;
+	double cc = (double)(mrand->next() % 10000) / 10000;
+	if (cc < g_cross_dc_txn_perc) {
+		cross_dc_txn = true;
+	}
+	bool has_cross_dc_part = false; //not used when cross_dc_txn = false
 #endif
-  int rid = 0;
-  for (UInt32 i = 0; i < g_req_per_query; i++) {
-    double r = (double)(mrand->next() % 10000) / 10000;
-    uint64_t partition_id;
-    uint64_t dc_id;
+	int rid = 0;
+	for (UInt32 i = 0; i < g_req_per_query; i ++) {
+		double r = (double)(mrand->next() % 10000) / 10000;
+		uint64_t partition_id;
+		uint64_t dc_id;
 #ifdef LESS_DIS
-    if (rid < LESS_DIS_NUM) {
-      partition_id = home_partition_id;
-    } else {
-      partition_id = (home_partition_id + 1) % g_part_cnt;
-    }
+		if ( rid < LESS_DIS_NUM) {
+			partition_id = home_partition_id;
+		} else {
+			partition_id = (home_partition_id + 1) % g_part_cnt;
+		}
 #else
-#ifdef NO_REMOTE
-    partition_id = home_partition_id;
-#elif ONLY_ONE_HOME
-    if ((FIRST_PART_LOCAL && rid == 0) || g_node_cnt == 1) {
-      partition_id = home_partition_id;
-    } else {
-      partition_id = mrand->next() % g_part_cnt;
-      if (g_strict_ppt && g_part_per_txn <= g_part_cnt || partition_id == home_partition_id) {
-        while ((partitions_accessed.size() < g_part_per_txn &&
-                partitions_accessed.count(partition_id) > 0) ||
-               (partitions_accessed.size() == g_part_per_txn &&
-                partitions_accessed.count(partition_id) == 0) ||
-               partition_id == home_partition_id) {
-          partition_id = mrand->next() % g_part_cnt;
-        }
-      }
-    }
-#else
-    if ((FIRST_PART_LOCAL && rid == 0) || g_node_cnt == 1) {
-      partition_id = home_partition_id;
-      dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
-    } else {
-      partition_id = mrand->next() % g_part_cnt;
-#if INTER_DC_CONTROL
-      if (g_strict_ppt && cross_dc_txn) {
-        if (g_part_per_txn <= g_part_cnt || g_dc_per_txn <= g_center_cnt) {
-          assert(g_part_per_txn >= g_dc_per_txn);
-          dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
-          while ((dcs_accessed.size() < g_dc_per_txn && dcs_accessed.count(dc_id) > 0) ||
-                 (dcs_accessed.size() == g_dc_per_txn && dcs_accessed.count(dc_id) == 0) ||
-                 (partitions_accessed.size() < g_part_per_txn &&
-                  partitions_accessed.count(partition_id) > 0) ||
-                 (partitions_accessed.size() == g_part_per_txn &&
-                  partitions_accessed.count(partition_id) == 0)) {
-            partition_id = mrand->next() % g_part_cnt;
-            dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
-          }
-        }
-      } else if (g_strict_ppt && !cross_dc_txn) {
-        if (g_part_per_txn <= g_part_cnt) {
-          assert(g_part_per_txn >= g_dc_per_txn);
-          assert(CENTER_CNT >= (NODE_CNT * 2));
-          dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
-          while (dc_id != GET_CENTER_ID(home_partition_id) ||
-                 (partitions_accessed.size() < g_part_per_txn &&
-                  partitions_accessed.count(partition_id) > 0) ||
-                 (partitions_accessed.size() == g_part_per_txn &&
-                  partitions_accessed.count(partition_id) == 0)) {
-            partition_id = mrand->next() % g_part_cnt;
-            dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
-          }
-        }
-      } else if (!g_strict_ppt && cross_dc_txn) {
-        if (g_dc_per_txn <= g_center_cnt) {
-          dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
-          while ((dcs_accessed.size() < g_dc_per_txn && dcs_accessed.count(dc_id) > 0) ||
-                 (dcs_accessed.size() == g_dc_per_txn && dcs_accessed.count(dc_id) == 0)) {
-            partition_id = mrand->next() % g_part_cnt;
-            dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
-          }
-        }
-      }
-#else
-      if (g_strict_ppt && g_part_per_txn <= g_part_cnt) {
-        while ((partitions_accessed.size() < g_part_per_txn &&
-                partitions_accessed.count(partition_id) > 0) ||
-               (partitions_accessed.size() == g_part_per_txn &&
-                partitions_accessed.count(partition_id) == 0)) {
-          partition_id = mrand->next() % g_part_cnt;
-        }
-      }
-#endif
-    }
-#endif
+		#ifdef NO_REMOTE
+		partition_id = home_partition_id;
+		#elif ONLY_ONE_HOME
+		if ( (FIRST_PART_LOCAL && rid == 0) || g_node_cnt == 1 ) {
+			partition_id = home_partition_id;
+		} else {
+			partition_id = mrand->next() % g_part_cnt;
+			if(g_strict_ppt && g_part_per_txn <= g_part_cnt || partition_id == home_partition_id) {
+				while ((partitions_accessed.size() < g_part_per_txn &&
+								partitions_accessed.count(partition_id) > 0) ||
+							 (partitions_accessed.size() == g_part_per_txn &&
+								partitions_accessed.count(partition_id) == 0) || partition_id == home_partition_id) {
+					partition_id = mrand->next() % g_part_cnt;
+				}
+			}
+		}
+		#else
+		if ( (FIRST_PART_LOCAL && rid == 0) || g_node_cnt == 1 ) {
+			partition_id = home_partition_id;
+			dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+		} else {
+			partition_id = mrand->next() % g_part_cnt;
+			#if INTER_DC_CONTROL
+			if(g_strict_ppt && cross_dc_txn) {
+				if (g_part_per_txn <= g_part_cnt || g_dc_per_txn <= g_center_cnt) {
+					assert(g_part_per_txn >= g_dc_per_txn);
+					dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					while ((dcs_accessed.size() < g_dc_per_txn && dcs_accessed.count(dc_id) > 0) || 
+							(dcs_accessed.size() == g_dc_per_txn && 
+							dcs_accessed.count(dc_id) == 0)      ||
+							(partitions_accessed.size() < g_part_per_txn         &&
+									partitions_accessed.count(partition_id) > 0) ||
+							(partitions_accessed.size() == g_part_per_txn        &&
+									partitions_accessed.count(partition_id) == 0)
+							) {
+						partition_id = mrand->next() % g_part_cnt;
+						dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					}
+			   	}
+			} else if (g_strict_ppt && !cross_dc_txn) {
+				if (g_part_per_txn <= g_part_cnt) {
+					assert(g_part_per_txn >= g_dc_per_txn);
+					dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					while (dc_id != GET_CENTER_ID(home_partition_id) ||
+							(partitions_accessed.size() < g_part_per_txn         &&
+									partitions_accessed.count(partition_id) > 0) ||
+							(partitions_accessed.size() == g_part_per_txn        &&
+									partitions_accessed.count(partition_id) == 0)
+							) {
+						partition_id = mrand->next() % g_part_cnt;
+						dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					}
+			   	}
+			} else if (!g_strict_ppt && cross_dc_txn) {
+				if (g_dc_per_txn <= g_center_cnt) {
+					dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					while ((dcs_accessed.size() < g_dc_per_txn   && 
+							dcs_accessed.count(dc_id) > 0)       || 
+							(dcs_accessed.size() == g_dc_per_txn && 
+							dcs_accessed.count(dc_id) == 0)) {
+						partition_id = mrand->next() % g_part_cnt;
+						dc_id = GET_CENTER_ID(GET_NODE_ID(partition_id));
+					}
+				}
+			}
+			#else 
+			if(g_strict_ppt && g_part_per_txn <= g_part_cnt) {
+				while ((partitions_accessed.size() < g_part_per_txn &&
+								partitions_accessed.count(partition_id) > 0) ||
+					    (partitions_accessed.size() == g_part_per_txn &&
+								partitions_accessed.count(partition_id) == 0)) {
+					partition_id = mrand->next() % g_part_cnt;
+				}
+			}
+			#endif
+		}
+		#endif
 
 #endif
-    // #if INTER_DC_CONTROL
-    // 		if(cross_dc_txn && !has_cross_dc_part && GET_CENTER_ID(GET_NODE_ID(partition_id)) !=
-    // GET_CENTER_ID(GET_NODE_ID(home_partition_id))){ 			has_cross_dc_part = true;
-    // 		}
-    // #endif
-    ycsb_request* req = (ycsb_request*)mem_allocator.alloc(sizeof(ycsb_request));
-    if (r_twr < g_txn_read_perc || r < g_tup_read_perc)
-      req->acctype = RD;
-    else
-      req->acctype = WR;
-    uint64_t row_id = zipf(table_size - 1, g_zipf_theta);
-    assert(row_id < table_size);
-    uint64_t primary_key = row_id * g_part_cnt + partition_id;
-    assert(primary_key < g_synth_table_size);
+// #if INTER_DC_CONTROL
+// 		if(cross_dc_txn && !has_cross_dc_part && GET_CENTER_ID(GET_NODE_ID(partition_id)) != GET_CENTER_ID(GET_NODE_ID(home_partition_id))){
+// 			has_cross_dc_part = true;
+// 		}
+// #endif
+		ycsb_request * req = (ycsb_request*) mem_allocator.alloc(sizeof(ycsb_request));
+		if (r_twr < g_txn_read_perc || r < g_tup_read_perc)
+			req->acctype = RD;
+		else
+			req->acctype = WR;
+		uint64_t row_id = zipf(table_size - 1, g_zipf_theta);
+		assert(row_id < table_size);
+		uint64_t primary_key = row_id * g_part_cnt + partition_id;
+		assert(primary_key < g_synth_table_size);
 
-    req->key = primary_key;
-    req->value = mrand->next() % (1 << 8);
-    // Make sure a single row is not accessed twice
-    if (all_keys.find(req->key) == all_keys.end()) {
-      all_keys.insert(req->key);
-      access_cnt++;
-    } else {
-      // Need to have the full g_req_per_query amount
-      i--;
-      continue;
-    }
-#if REPLICA_COUNT != 0
+		req->key = primary_key;
+		req->value = mrand->next() % (1<<8);
+		// Make sure a single row is not accessed twice
+		if (all_keys.find(req->key) == all_keys.end()) {
+			all_keys.insert(req->key);
+			access_cnt ++;
+		} else {
+			// Need to have the full g_req_per_query amount
+			i--;
+			continue;
+		}
     for (int j = 0; j < MAX_REPLICA_COUNT; j++) {
       req->replica_node[j].status = OpStatus::RUN;
     }
-#else
-    req->primary.status = OpStatus::RUN;
-    req->second1.status = OpStatus::RUN;
-    req->second2.status = OpStatus::RUN;
-#endif
-    partitions_accessed.insert(partition_id);
-    dcs_accessed.insert(dc_id);
-    rid++;
+		partitions_accessed.insert(partition_id);
+		dcs_accessed.insert(dc_id);
+		rid ++;
 
-    query->requests.add(req);
-  }
-  assert(query->requests.size() == g_req_per_query);
-  // Sort the requests in key order.
-  if (g_key_order) {
-    for (uint64_t i = 0; i < query->requests.size(); i++) {
-      for (uint64_t j = query->requests.size() - 1; j > i; j--) {
-        if (query->requests[j]->key < query->requests[j - 1]->key) {
-          query->requests.swap(j, j - 1);
-        }
-      }
-    }
-    // std::sort(query->requests.begin(),query->requests.end(),[](ycsb_request lhs, ycsb_request
-    // rhs) { return lhs.key < rhs.key;});
-  }
-  query->partitions.init(partitions_accessed.size());
-  for (auto it = partitions_accessed.begin(); it != partitions_accessed.end(); ++it) {
-    query->partitions.add(*it);
-  }
-  query->centers.init(dcs_accessed.size());
-  for (auto it = dcs_accessed.begin(); it != dcs_accessed.end(); ++it) {
-    query->centers.add(*it);
-  }
-  // DEBUG("YCSB QUERY: homeid %ld and the first partion: %ld\n",
-  // 			home_partition_id, query->partitions[0]);
-  // query->print();
-  return query;
+		query->requests.add(req);
+	}
+	assert(query->requests.size() == g_req_per_query);
+	// Sort the requests in key order.
+	if (g_key_order) {
+		for(uint64_t i = 0; i < query->requests.size(); i++) {
+			for(uint64_t j = query->requests.size() - 1; j > i ; j--) {
+				if(query->requests[j]->key < query->requests[j-1]->key) {
+					query->requests.swap(j,j-1);
+				}
+			}
+		}
+		// std::sort(query->requests.begin(),query->requests.end(),[](ycsb_request lhs, ycsb_request
+		// rhs) { return lhs.key < rhs.key;});
+	}
+	query->partitions.init(partitions_accessed.size());
+	for(auto it = partitions_accessed.begin(); it != partitions_accessed.end(); ++it) {
+		query->partitions.add(*it);
+	}
+	query->centers.init(dcs_accessed.size());
+	for(auto it = dcs_accessed.begin(); it != dcs_accessed.end(); ++it) {
+		query->centers.add(*it);
+	}
+	// DEBUG("YCSB QUERY: homeid %ld and the first partion: %ld\n",
+	// 			home_partition_id, query->partitions[0]);
+	//query->print();
+	return query;
 }
 
 BaseQuery* YCSBQueryGenerator::gen_requests_zipf_new(uint64_t home_partition_id, Workload* h_wl) {
@@ -545,15 +537,9 @@ BaseQuery* YCSBQueryGenerator::gen_requests_zipf_new(uint64_t home_partition_id,
       continue;
     }
 
-#if REPLICA_COUNT != 0
     for (int j = 0; j < MAX_REPLICA_COUNT; j++) {
       req->replica_node[j].status = OpStatus::RUN;
     }
-#else
-    req->primary.status = OpStatus::RUN;
-    req->second1.status = OpStatus::RUN;
-    req->second2.status = OpStatus::RUN;
-#endif
     partitions_accessed.insert(partition_id);
     dcs_accessed.insert(dc_id);
     rid++;

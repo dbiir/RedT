@@ -392,6 +392,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	commit_timestamp = 0;
 	rsp_cnt = 0;
 	abort_cnt = 0;
+	enable_read_only_optimization = false;
 }
 
 // reset after abort
@@ -458,6 +459,7 @@ void TxnManager::reset() {
 	failed_partition.clear();
 	// Stats
 	txn_stats.reset();
+	enable_read_only_optimization = false;
 }
 
 void TxnManager::release() {
@@ -1068,7 +1070,6 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 
 	DEBUG("Cleanup %ld %ld\n",get_txn_id(),row_cnt);
 
-
 	vector<vector<uint64_t>> remote_access(g_node_cnt); //for DBPA, collect remote abort write
 	for (int rid = row_cnt - 1; rid >= 0; rid --) {
 		cleanup_row(yield, rc,rid,remote_access,cor_id);  //return abort write row
@@ -1519,8 +1520,6 @@ remote_atomic_retry_lock:
 		return Abort;
 
 	} else if(type == RD || type == WR){
-		// uint64_t new_lock_info;
-		// uint64_t lock_info;
 		row_t * test_row = NULL;
 		uint64_t retry_time = 0;
 	retry_lock:
@@ -1542,7 +1541,9 @@ remote_atomic_retry_lock:
 				// printf("retry cas lock \n");
 				retry_time++;
 				if (retry_time > 5) {
-					DEBUG_T("txn %d add remote mutx lock on item %d failed !!!!!\n", txn->txn_id, key);
+					#if DEBUG_PRINTF
+					printf("txn %d add remote mutx lock on item %d failed !!!!!\n", txn->txn_id, key);
+					#endif
 					return Abort;
 				}
 				goto retry_lock;
@@ -1568,7 +1569,9 @@ remote_atomic_retry_lock:
 				}
 			} else if(lock_type == 1 || type == WR) {
 				test_row->_tid_word = 0;
-				DEBUG_T("txn %d add remote lock on item %d failed !!!!! because lock type %s, lock type %s, lock owner %ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld\n", txn->txn_id, test_row->get_primary_key(),lock_type == 1 ? "EX":"SH", type == WR ? "EX":"SH", test_row->lock_owner[0], test_row->lock_owner[1], test_row->lock_owner[2], test_row->lock_owner[3], test_row->lock_owner[4], test_row->lock_owner[5], test_row->lock_owner[6], test_row->lock_owner[7], test_row->lock_owner[8], test_row->lock_owner[9]);
+				#if DEBUG_PRINTF
+				printf("txn %d add remote lock on item %d failed !!!!! because lock type %s, lock type %s, lock owner %ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld-%ld\n", txn->txn_id, test_row->get_primary_key(),lock_type == 1 ? "EX":"SH", type == WR ? "EX":"SH", test_row->lock_owner[0], test_row->lock_owner[1], test_row->lock_owner[2], test_row->lock_owner[3], test_row->lock_owner[4], test_row->lock_owner[5], test_row->lock_owner[6], test_row->lock_owner[7], test_row->lock_owner[8], test_row->lock_owner[9]);
+				#endif
 
 				rc = write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id);
 				mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
@@ -1597,7 +1600,9 @@ remote_atomic_retry_lock:
 				if(try_time > LOCK_LENGTH) {
 					test_row->_tid_word = 0;
 					rc = write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), m_item->offset,(char*)test_row, cor_id);
-					DEBUG_T("txn %d add remote lock on item %d failed !!!!! because lock owner is too long\n", txn->txn_id, test_row->get_primary_key());
+					#if DEBUG_PRINTF
+					printf("txn %d add remote lock on item %d failed !!!!! because lock owner is too long\n", txn->txn_id, test_row->get_primary_key());
+					#endif
 					mem_allocator.free(test_row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 					mem_allocator.free(m_item, sizeof(itemid_t));
 					rc = Abort;
@@ -1605,13 +1610,14 @@ remote_atomic_retry_lock:
 				}
 			}
 		}
-		
-		DEBUG_T("txn %d add remote lock on item %d, lock_type: %d\n", txn->txn_id, test_row->get_primary_key(), lock_type);
+		#if DEBUG_PRINTF
+		printf("txn %d add remote lock on item %d, lock_type: %d\n", txn->txn_id, test_row->get_primary_key(), lock_type);
+		#endif
         //preserve the txn->access
 		++num_locks;
         rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc,test_row->get_part_id());
         return rc;
-	}		
+	}
 	rc = RCOK;
 	return rc;
 	#endif
@@ -2100,7 +2106,7 @@ RC TxnManager::preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_ro
     assert(test_row->get_primary_key() == access->data->get_primary_key());
 
 	#if CC_ALG == RDMA_RED_T
-	memcpy((char*)cur_row->data, (char*)test_row->datas[idx], ROW_DEFAULT_SIZE);
+	// memcpy((char*)cur_row->data, (char*)test_row->datas[idx], ROW_DEFAULT_SIZE);
 	#endif
     if (rc == Abort || rc == WAIT) {
         DEBUG_T("TxnManager::get_row(abort) access free\n");

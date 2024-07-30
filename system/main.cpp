@@ -54,6 +54,7 @@ void network_test_recv();
 void *run_thread(void *);
 void *run_co_thread(void *);
 void *run_nco_thread(void *);
+void *run_nco_aync_redo_thread(void *);
 WorkerThread *worker_thds;
 WorkerNumThread *worker_num_thds;
 InputThread *input_thds;
@@ -414,7 +415,7 @@ int main(int argc, char *argv[]) {
 // #endif
 #if USE_REPLICA
   async_redo_thds[0].init(id, g_node_id, m_wl);
-  pthread_create(&p_thds[id++], &attr, run_thread, (void *)&async_redo_thds[0]);
+  pthread_create(&p_thds[id++], &attr, run_nco_aync_redo_thread, (void *)&async_redo_thds[0]);
 #endif
 
 #if LOGGING
@@ -502,6 +503,12 @@ void *run_thread(void *id) {
 }
 void *run_nco_thread(void *id) {
   WorkerThread *thd = (WorkerThread *)id;
+  thd->no_routines();
+  thd->start_routine();
+  return NULL;
+}
+void *run_nco_aync_redo_thread(void *id) {
+  AsyncRedoThread *thd = (AsyncRedoThread *)id;
   thd->no_routines();
   thd->start_routine();
   return NULL;

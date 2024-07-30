@@ -46,9 +46,14 @@ retry_unlock:
     // 调整版本链
     uint64_t index = ++row->newest_index;
     row->commit_ts[index%HIS_CHAIN_NUM] = txnMng->get_commit_timestamp();
-    memcpy(row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
+    // memcpy(row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
     // 调整时间戳
     set_watermark(row->get_part_id(),txnMng->get_commit_timestamp());
+    for (int node_id = 0; node_id < NODE_CNT; node_id++) {
+        if (GET_CENTER_ID(node_id) == GET_CENTER_ID(g_node_id)) {
+            set_remote_watermark(yield, row->get_part_id(), node_id, txnMng->get_commit_timestamp(), txnMng->get_thd_id(), cor_id);
+        }
+    }
 // #if DEBUG_PRINTF
 //     printf("---thd %lu, txn: %lu txn cts %lu update part %ld watermark to %lu-%lu-%lu-%lu-%lu\n", txnMng->get_thd_id(), txnMng->get_txn_id(), txnMng->get_commit_timestamp(), row->get_part_id(), get_watermark(0,row->get_part_id()),get_watermark(1,row->get_part_id()),get_watermark(2,row->get_part_id()),get_watermark(3,row->get_part_id()),get_watermark(4,row->get_part_id()));
 // #endif
@@ -109,7 +114,14 @@ retry_remote_unlock:
     test_row->commit_ts[index%HIS_CHAIN_NUM] = txnMng->get_commit_timestamp();
     // memcpy(test_row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
     // 调整远程的时间戳
+    set_watermark(test_row->get_part_id(),txnMng->get_commit_timestamp());
     set_remote_watermark(yield,test_row->get_part_id(),loc,txnMng->get_commit_timestamp(),txnMng->get_thd_id(),cor_id);
+    // for (int j = 0; j < REPLICA_COUNT; j++) {
+    //     loc = get_node_id_new(j, test_row->get_part_id());
+    //     if (GET_CENTER_ID(loc) == GET_CENTER_ID(g_node_id)) {
+    //         set_remote_watermark(yield, test_row->get_part_id(), loc, txnMng->get_commit_timestamp(), txnMng->get_thd_id(), cor_id);
+    //     }
+    // }
     // !--------
     test_row->_tid_word = 0;
     rc = txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id);
@@ -298,7 +310,9 @@ RC RDMA_redt::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor
     Transaction *txn = txnMng->txn;
 
     RC arc = RCOK;
-    if (txnMng->enable_read_only_optimization) return arc;
+    if (txnMng->enable_read_only_optimization) {
+        return arc;
+    }
     if (!txnMng->is_recover && txnMng->is_logged) arc = commit_log(yield, rc, txnMng, cor_id);
     else if (rc == RCOK) arc = commit_recover_log(yield, rc, txnMng, cor_id);
     if (arc == NODE_FAILED) {

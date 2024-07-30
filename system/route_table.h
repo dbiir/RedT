@@ -13,6 +13,9 @@
 
 #define SIZE_OF_ROUTE (sizeof(route_table_node) * PART_CNT)
 #define SIZE_OF_STATUS (sizeof(status_node) * NODE_CNT)
+
+#define SIZE_OF_CLIENT_ROUTE (sizeof(route_table_node) * RDMA_MAX_CLIENT_QP)
+#define SIZE_OF_CLIENT_STATUS (sizeof(status_node) * RDMA_MAX_CLIENT_QP)
 enum NS { OnCall = 0, Failure };
 struct route_node_ts {
   uint64_t node_id;
@@ -23,14 +26,8 @@ struct route_node_ts {
 struct route_table_node {
  public:
   uint64_t partition_id;
-  #if REPLICA_COUNT != 0
   route_node_ts new_secondary[MAX_REPLICA_COUNT];
   uint64_t replica_cnt;
-  #else 
-  route_node_ts primary;
-  route_node_ts secondary_1;
-  route_node_ts secondary_2;
-  #endif
 };
 class RouteTable {
  public:
@@ -164,29 +161,9 @@ inline uint64_t get_global_primary(uint64_t center_id) {
   }
 }
 
-#if REPLICA_COUNT == 0
-inline uint64_t get_primary_node_id(uint64_t part_id) {
-  uint64_t node_id = route_table.get_primary(part_id).node_id;
-  status_node* st = node_status.get_node_status(node_id);
-  if (st->status == NS::Failure) return -1;
-  return node_id;
-}
-inline uint64_t get_follower1_node_id(uint64_t part_id) {
-  uint64_t node_id = route_table.get_secondary_1(part_id).node_id;
-  status_node* st = node_status.get_node_status(node_id);
-  if (st->status == NS::Failure) return -1;
-  return node_id;
-}
-inline uint64_t get_follower2_node_id(uint64_t part_id) {
-  uint64_t node_id = route_table.get_secondary_2(part_id).node_id;
-  status_node* st = node_status.get_node_status(node_id);
-  if (st->status == NS::Failure) return -1;
-  return node_id;
-}
-#else
-
 inline auto get_node_id_new(int index, uint64_t part_id) -> uint64_t {
   uint64_t node_id = route_table.get_route_node_new(index, part_id).node_id;
+  assert(node_id < g_node_cnt);
   status_node* st = node_status.get_node_status(node_id);
   if (st->status == NS::Failure) return -1;
   return node_id;
@@ -214,5 +191,3 @@ inline auto get_part_repl_cnt(uint64_t part_id) -> uint64_t {
 #endif
 // #define IS_CENTER_PRIMARY(nid) ((nid / g_center_cnt) == 0)
 // ! Recovery manager section end
-
-#endif

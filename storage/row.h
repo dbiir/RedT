@@ -146,7 +146,7 @@ public:
 
 		volatile int64_t newest_index;
 		volatile uint64_t commit_ts[HIS_CHAIN_NUM]; // MVCC版本的提交时间戳
-		char datas[HIS_CHAIN_NUM][ROW_DEFAULT_SIZE]; // MVCC版本
+		// char datas[HIS_CHAIN_NUM][ROW_DEFAULT_SIZE]; // MVCC版本
 
 		Row_rdma_redt * manager;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT

@@ -44,15 +44,8 @@ class ycsb_request {
 	uint64_t key;
 	char value;
   // ! Dynamic Replica cnt
-  #if REPLICA_COUNT != 0
   execute_node replica_node[MAX_REPLICA_COUNT];
   uint64_t replica_cnt;
-  // ! Previous code
-  #else
-  execute_node primary;
-  execute_node second1;
-  execute_node second2;
-  #endif
 };
 
 class YCSBQueryGenerator : public QueryGenerator {

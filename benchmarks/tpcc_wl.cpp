@@ -268,7 +268,8 @@ void TPCCWorkload::init_tab_wh() {
   	if (WL_VERB) printf("[init] workload table.\n");
 	for (UInt32 wid = 1; wid <= g_num_wh; wid ++) {
 		#if 1 || !RECOVERY_MANAGER
-		if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
+		if (GET_NODE_ID(wh_to_part(wid)) != g_node_id && GET_FOLLOWER1_NODE(wh_to_part(wid)) != g_node_id && GET_FOLLOWER2_NODE(wh_to_part(wid)) != g_node_id) continue;
+		// if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
 		#endif
 		row_t * row;
 		uint64_t row_id;

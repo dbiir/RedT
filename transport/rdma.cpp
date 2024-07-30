@@ -206,7 +206,7 @@ char* Rdma::get_row_client_memory(uint64_t thd_id,int num) { //num>=1
 	uint64_t start_offset = 0;
 	start_offset += sizeof(IndexInfo) * (max_batch_num * g_total_thread_cnt * (COROUTINE_CNT + 1));
 	start_offset += row_t::get_row_size(ROW_DEFAULT_SIZE) * ((num-1) * g_total_thread_cnt * (COROUTINE_CNT + 1) + thd_id);
-	assert(start_offset + row_t::get_row_size(ROW_DEFAULT_SIZE) < (client_rdma_buffer_size - SIZE_OF_ROUTE - SIZE_OF_STATUS));
+	assert(start_offset + row_t::get_row_size(ROW_DEFAULT_SIZE) < (client_rdma_buffer_size - SIZE_OF_CLIENT_ROUTE - SIZE_OF_CLIENT_STATUS));
 	temp += start_offset;
 	return temp;
 }
@@ -216,7 +216,7 @@ char* Rdma::get_status_client_memory(uint64_t thd_id) { //num>=1
 	//when num>1, get extra row for doorbell batched RDMA requests
 	char* temp = (char *)(client_rdma_rm->raw_ptr);
 	temp += client_rdma_buffer_size;
-	temp = temp - SIZE_OF_ROUTE - SIZE_OF_STATUS;
+	temp = temp - SIZE_OF_CLIENT_ROUTE - SIZE_OF_CLIENT_STATUS;
 	return temp;
 }
 
@@ -224,7 +224,8 @@ char* Rdma::get_route_node_client_memory(uint64_t thd_id) { //num>=1
 	//when num>1, get extra row for doorbell batched RDMA requests
 	char* temp = (char *)(client_rdma_rm->raw_ptr);
 	temp += client_rdma_buffer_size;
-	temp = temp - SIZE_OF_ROUTE;
+	temp = temp - SIZE_OF_CLIENT_ROUTE;
+	temp += thd_id * sizeof(route_table_node);
 	return temp;
 }
 

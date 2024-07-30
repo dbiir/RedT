@@ -19,24 +19,18 @@ void RouteTable::init() {
 
   for (int i = 0; i < PART_CNT; i++) {
     table[i].partition_id = i;
-
-#if REPLICA_COUNT != 0
-    /*new*/
-    table[i].partition_id = i;
     table[i].replica_cnt = REPLICA_COUNT;
+    // for (int j = 0; j < REPLICA_COUNT; j++) {
+    //   table[i].new_secondary[j].node_id = (i / 2 + j + 1) % g_node_cnt;
+    //   table[i].new_secondary[j].last_ts = get_wall_clock();
+    //   table[i].new_secondary[j].watermark = 0;
+    // }
     for (int j = 0; j < REPLICA_COUNT; j++) {
-      table[i].new_secondary[j].node_id = (i / 2 + j + 1) % g_node_cnt;
+      table[i].new_secondary[j].node_id = (i + j) % g_node_cnt;
       table[i].new_secondary[j].last_ts = get_wall_clock();
       table[i].new_secondary[j].watermark = 0;
     }
-#else
-    table[i].primary.node_id = GET_NODE_ID(i);
-    table[i].secondary_1.node_id = GET_FOLLOWER1_NODE(i);
-    table[i].secondary_2.node_id = GET_FOLLOWER2_NODE(i);
-    table[i].primary.last_ts = get_wall_clock();
-    table[i].secondary_1.last_ts = get_wall_clock();
-    table[i].secondary_2.last_ts = get_wall_clock();
-#endif
+
     // for 5 replica
     // for (int j = 0; j < REPLICA_COUNT; j++) {
     //   if (j <= 3) {
@@ -146,7 +140,7 @@ route_table_node* RouteTable::read_remote_route_node(yield_func_t &yield, uint64
   endtime = get_sys_clock();
   #endif
   route_table_node* temp_node = (route_table_node*)mem_allocator.alloc(sizeof(route_table_node));
-  memcpy(temp_node, local_buf, SIZE_OF_ROUTE);
+  memcpy(temp_node, local_buf, sizeof(route_table_node));
 
   return temp_node;
 
@@ -155,13 +149,15 @@ route_table_node* RouteTable::read_remote_route_node(yield_func_t &yield, uint64
 RC RouteTable::cas_remote_route_node_watermark(yield_func_t &yield, uint64_t target_server,uint64_t partition_id,uint64_t index,uint64_t old_value,uint64_t new_value, uint64_t *try_lock, uint64_t thrd_id, uint64_t cor_id){
     
   rdmaio::qp::Op<> op;
-  uint64_t operate_size = sizeof(route_table_node);
   // 计算初始route table位置
   uint64_t remote_offset = rdma_buffer_size - rdma_log_size - rdma_routetable_size;
   // 计算对应part的route node位置
   remote_offset += sizeof(route_table_node) * partition_id;
   // 计算node里watermark的位置
-  remote_offset += sizeof(uint64_t) + sizeof(route_node_ts) * 3 + sizeof(route_node_ts) * index + sizeof(uint64_t) * 2;
+  remote_offset += sizeof(uint64_t) + // partition_id
+                  //  sizeof(route_node_ts) * 3 + 
+                   sizeof(route_node_ts) * index + 
+                   sizeof(uint64_t) * 2;
 
   uint64_t thd_id = thrd_id + cor_id * g_thread_cnt;
   uint64_t *local_buf = (uint64_t *)Rdma::get_row_client_memory(thd_id);
@@ -238,43 +234,10 @@ void RouteTable::set_remote_route_node_watermark(yield_func_t &yield, uint64_t p
     if (orig_watermark == remote_value) break; //此时修改成功
     orig_watermark = remote_value; //否则继续尝试
   }
+  #if DEBUG_PRINTF
+    printf("part %ld id %ld's remote watermark is set to %lu from %lu\n", partition_id, index, watermark, orig_watermark);
+  #endif
 }
-
-
-#if REPLICA_COUNT == 0
-route_node_ts RouteTable::get_primary(uint64_t partition_id) { return table[partition_id].primary; }
-
-route_node_ts RouteTable::get_secondary_1(uint64_t partition_id) {
-  return table[partition_id].secondary_1;
-}
-route_node_ts RouteTable::get_secondary_2(uint64_t partition_id) {
-  return table[partition_id].secondary_2;
-}
-void RouteTable::set_primary(uint64_t partition_id, uint64_t node_id, uint64_t timestamp,
-                             uint64_t thd_id) {
-  table[partition_id].primary.node_id = node_id;
-  if (timestamp == 0)
-    table[partition_id].primary.last_ts = get_wall_clock();
-  else
-    table[partition_id].primary.last_ts = timestamp;
-}
-void RouteTable::set_secondary_1(uint64_t partition_id, uint64_t node_id, uint64_t timestamp,
-                                 uint64_t thd_id) {
-  table[partition_id].secondary_1.node_id = node_id;
-  if (timestamp == 0)
-    table[partition_id].secondary_1.last_ts = get_wall_clock();
-  else
-    table[partition_id].secondary_1.last_ts = timestamp;
-}
-void RouteTable::set_secondary_2(uint64_t partition_id, uint64_t node_id, uint64_t timestamp,
-                                 uint64_t thd_id) {
-  table[partition_id].secondary_2.node_id = node_id;
-  if (timestamp == 0)
-    table[partition_id].secondary_2.last_ts = get_wall_clock();
-  else
-    table[partition_id].secondary_2.last_ts = timestamp;
-}
-#endif
 
 void NodeStatus::init() {
   uint64_t node_table_size = (NODE_CNT) * sizeof(status_node);

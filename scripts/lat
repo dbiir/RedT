@@ -1,7 +1,7 @@
-RDMA_RED_T 
+RDMA_NO_WAIT3 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
-64.452952
+0.017213
 0.0
-64.891247
-13.807473
-0.0
+20089.534141
+18682.61695
+66.462501

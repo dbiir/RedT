@@ -100,6 +100,7 @@ RC HeartBeatThread::heartbeat_loop_new() {
   uint64_t last_collect_time = get_wall_clock();
   bool once = ENABLE_REPLICA_OPTIMIZE;
   while (!simulation->is_done()) {
+    once = ENABLE_REPLICA_OPTIMIZE;
     now = get_wall_clock();
     node_status.set_node_status(g_node_id, OnCall, get_thd_id());
 

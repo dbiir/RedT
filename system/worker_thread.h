@@ -108,7 +108,13 @@ public:
 #if USE_REPLICA
 class AsyncRedoThread : public Thread {
 public:
-    RC run();
+    RC run() {}
+    RC run(yield_func_t &yield, uint64_t cor_id);
+    void no_routines();
+    void start_routine() {
+        printf("start routine 0\n");
+        _routines[0]();
+    }
     void setup();
 };
 #endif

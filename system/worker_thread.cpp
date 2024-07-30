@@ -1682,7 +1682,13 @@ RC WorkerNumThread::run() {
 void AsyncRedoThread::setup() {
 }
 
-RC AsyncRedoThread::run() {
+void AsyncRedoThread::no_routines() {
+    _routines = new coroutine_func_t[1];
+    _routines[0] = coroutine_func_t(bind(&AsyncRedoThread::run, this, _1, 0));
+    printf("Init coroutine succ\n");
+}
+  
+RC AsyncRedoThread::run(yield_func_t &yield, uint64_t cor_id) {
   tsetup();
   printf("Running AsyncRedoThread %ld\n",_thd_id);
 
@@ -1718,9 +1724,23 @@ RC AsyncRedoThread::run() {
             if(cur_entry->c_ts > tar_wts){ //update data and cts
               memcpy((char *)tar_row,cur_entry->change[j].content,cur_entry->change[j].size);
               tar_row->wts = cur_entry->c_ts;
-            }else {
+            } else {
               //do nothing 
             }
+            // 设置水印--------------
+            uint64_t part_id = tar_row->get_part_id();
+            // #if DEBUG_PRINTF
+            //   printf("part %ld try to update watermark %lu\n", part_id, cur_entry->c_ts);
+            // #endif
+            set_watermark(part_id,cur_entry->c_ts);
+            uint64_t loc = -1;
+            for (int j = 0; j < REPLICA_COUNT; j++) {
+              loc = get_node_id_new(j, part_id);
+              if (GET_CENTER_ID(loc) == GET_CENTER_ID(g_node_id)) {
+                set_remote_watermark(yield, part_id, loc, cur_entry->c_ts, get_thd_id(), cor_id);
+              }
+            }
+            // 设置水印--------------
           }
           cur_entry->set_flushed();
         }else continue;
