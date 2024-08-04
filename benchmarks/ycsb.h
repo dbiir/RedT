@@ -79,6 +79,9 @@ public:
   RC check_query_status(OpStatus status);
 
   RC resend_remote_subtxn();
+
+  bool is_readonly();
+  
 private:
   void next_ycsb_state();
   RC run_txn_state(yield_func_t &yield, uint64_t cor_id);
@@ -98,7 +101,7 @@ private:
   RC send_remote_request();
   RC send_remote_subtxn();
   RC agent_check_commit();
-
+  RC read_only_optimization(yield_func_t &yield, uint64_t cor_id);
   row_t * row;
 	YCSBWorkload * _wl;
 	YCSBRemTxnType state;

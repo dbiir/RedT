@@ -4,12 +4,23 @@
 #include "global.h"
 #include "helper.h"
 
+#include "dbpa.hpp"
+#include "routine.h"
+#include "lib.hh"
+#include "qps/op.hh"
+#include "transport/rdma.h"
+#include "src/rdma/sop.hh"
+
 #define SIZE_OF_ROUTE (sizeof(route_table_node) * PART_CNT)
 #define SIZE_OF_STATUS (sizeof(status_node) * NODE_CNT)
+
+#define SIZE_OF_CLIENT_ROUTE (sizeof(route_table_node) * RDMA_MAX_CLIENT_QP)
+#define SIZE_OF_CLIENT_STATUS (sizeof(status_node) * RDMA_MAX_CLIENT_QP)
 enum NS { OnCall=0, Failure};
 struct route_node_ts {
     uint64_t node_id;
     uint64_t last_ts;
+    uint64_t watermark; //只有在本地的副本会有水印值
 };
 struct route_table_node {
 public:
@@ -27,6 +38,12 @@ public:
     void set_primary(uint64_t partition_id, uint64_t node_id, uint64_t timestamp = 0, uint64_t thd_id= 0);
     void set_secondary_1(uint64_t partition_id, uint64_t node_id, uint64_t timestamp = 0, uint64_t thd_id = 0);
     void set_secondary_2(uint64_t partition_id, uint64_t node_id, uint64_t timestamp = 0, uint64_t thd_id = 0);
+    void set_route_node_watermark(uint64_t partition_id, uint64_t node_id,
+                                    uint64_t watermark, uint64_t thd_id) ;
+    void set_remote_route_node_watermark(yield_func_t &yield, uint64_t partition_id, uint64_t node_id,
+                                    uint64_t watermark, uint64_t thd_id,uint64_t cor_id);
+    route_table_node* read_remote_route_node(yield_func_t &yield, uint64_t target_server, uint64_t partition_id, uint64_t thd_id,uint64_t cor_id);
+    RC cas_remote_route_node_watermark(yield_func_t &yield, uint64_t target_server,uint64_t partition_id,uint64_t index,uint64_t old_value,uint64_t new_value, uint64_t *try_lock, uint64_t thrd_id, uint64_t cor_id);
 // private:
     route_table_node *table;
 };
@@ -124,6 +141,40 @@ inline uint64_t get_follower2_node_id(uint64_t part_id) {
     status_node* st = node_status.get_node_status(node_id);
     if (st->status == NS::Failure) return -1;
     return node_id;
+}
+
+inline auto get_watermark(int index, uint64_t part_id) -> uint64_t {
+    switch (index)
+    {
+    case 0: return route_table.get_primary(part_id).watermark;
+    case 1: return route_table.get_secondary_1(part_id).watermark;
+    case 2: return route_table.get_secondary_2(part_id).watermark;
+    default:
+        break;
+    }
+}
+
+inline auto get_remote_watermark(yield_func_t &yield, int index, uint64_t part_id, uint64_t node_id, uint64_t thd_id, uint64_t cor_id) -> uint64_t {
+    route_table_node* tmp_node = route_table.read_remote_route_node(yield, node_id, part_id, thd_id, cor_id);
+    switch (index)
+    {
+    case 0: return tmp_node->primary.watermark;
+    case 1: return tmp_node->secondary_1.watermark;
+    case 2: return tmp_node->secondary_2.watermark;
+    default:
+        break;
+    }
+}
+
+inline auto set_watermark(uint64_t part_id, uint64_t watermark) -> bool {
+  route_table.set_route_node_watermark(part_id, g_node_id, watermark, 0);
+  return true;
+}
+
+inline auto set_remote_watermark(yield_func_t &yield, uint64_t part_id, uint64_t node_id,
+                                 uint64_t watermark, uint64_t thd_id,uint64_t cor_id) -> bool {
+  route_table.set_remote_route_node_watermark(yield, part_id, node_id, watermark, thd_id, cor_id);
+  return true;
 }
 // #define IS_CENTER_PRIMARY(nid) ((nid / g_center_cnt) == 0)
 // ! Recovery manager section end

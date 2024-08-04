@@ -2,7 +2,7 @@ set -x
 DELAY=${1}
 RANGE=${2:-0}
 IP_TITLE=192.168.1
-DEVICE=ib0.806c
+DEVICE=lo
 password=zb7022406
 for i in $(seq 1 4)
 do

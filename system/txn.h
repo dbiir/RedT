@@ -52,7 +52,7 @@ public:
 	row_t * 	data;
 	row_t * 	orig_data;
 	uint64_t    version;
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T
 	uint64_t    location;   //node id of server the data location
 	uint64_t    offset;
 #endif
@@ -223,13 +223,14 @@ public:
 	void release_locks(yield_func_t &yield, RC rc, uint64_t cor_id);
 
 	bool rdma_one_side() {
-	if (CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3) return true;
+	if (CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T) return true;
 	else return false;
 	}
 
     uint64_t get_part_num(uint64_t num,uint64_t part);
 	RC get_remote_row(yield_func_t &yield, access_t type, uint64_t key, uint64_t loc, itemid_t *m_item, row_t *& row_local, uint64_t cor_id);
     RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc,uint64_t part_id);
+	RC preserve_access(row_t *&row_local,itemid_t* m_item,row_t *test_row,access_t type,uint64_t key,uint64_t loc,uint64_t part_id,uint64_t idx);
 
 	//---- Base RDMA primitives ----//
 	RC read_remote_content(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t operate_size, char* local_buf, uint64_t cor_id);
@@ -284,7 +285,12 @@ public:
 			}	
 			if (node.status != PREP_ABORT &&
 				node.status != COM_ABORT &&
-				node.status < status) node.status = status;
+				node.status < status) {
+				node.status = status;
+				#if DEBUG_PRINTF
+				printf("txn:291 txn %ld update req node %ld - return node %ld, status %ld\n",get_txn_id(), node.execute_node, return_id, status);
+				#endif
+			}
 		}
 	}
 	virtual RC check_query_status(OpStatus status) = 0;
@@ -328,11 +334,13 @@ public:
 	#endif
 	bool send_RQRY_RSP;
 
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T
     int             write_set[100];
     int*            read_set;
 	int				num_atomic_retry; //num of txn atomic_retry
 	int				num_locks;
+
+	bool			enable_read_only_optimization;
 #endif
 
 #if CC_ALG == WOUND_WAIT

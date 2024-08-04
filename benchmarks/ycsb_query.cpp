@@ -95,9 +95,12 @@ void YCSBQuery::reset() {
 void YCSBQuery::reset_query_status() {
 	for (int i = 0; i < requests.size(); i++) {
 		ycsb_request* req = requests[i];
-		req->primary.status = OpStatus::RUN;
-		req->second1.status = OpStatus::RUN;
-		req->second2.status = OpStatus::RUN;
+		req->primary.reset();
+		req->second1.reset();
+		req->second2.reset();
+		// req->primary.status = OpStatus::RUN;
+		// req->second1.status = OpStatus::RUN;
+		// req->second2.status = OpStatus::RUN;
 	}
 }
 
@@ -431,9 +434,12 @@ BaseQuery * YCSBQueryGenerator::gen_requests_zipf(uint64_t home_partition_id, Wo
 			i--;
 			continue;
 		}
-		req->primary.status=OpStatus::RUN;
-		req->second1.status=OpStatus::RUN;
-		req->second2.status=OpStatus::RUN;
+		req->primary.reset();
+		req->second1.reset();
+		req->second2.reset();
+		// req->primary.status=OpStatus::RUN;
+		// req->second1.status=OpStatus::RUN;
+		// req->second2.status=OpStatus::RUN;
 		partitions_accessed.insert(partition_id);
 		dcs_accessed.insert(dc_id);
 		rid ++;

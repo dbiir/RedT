@@ -34,10 +34,16 @@ enum OpStatus {
     COM_ABORT, // 提交阶段发生的错误
     COMMIT};
 
-typedef struct execute_node {
+typedef class execute_node {
+public:
   uint64_t stored_node;
   uint64_t execute_node;
   OpStatus status;
+  void reset() {
+    stored_node = -1;
+    execute_node = -1;
+    status = OpStatus::RUN;
+  }
 }execute_node;
 
 class BaseQuery {

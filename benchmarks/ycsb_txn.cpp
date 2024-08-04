@@ -112,17 +112,30 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 		printf("[txn start]txn %d on node %u, is_local?%d\n",txn->txn_id,g_node_id,IS_LOCAL(txn->txn_id));
 #endif
 
-	if(IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
-		DEBUG_T("Running txn %ld\n",txn->txn_id);
-		//query->print();
-		query->partitions_touched.add_unique(GET_PART_ID(0,g_node_id));
-		query->centers_touched.add_unique(g_center_id);
+  if (IS_LOCAL(txn->txn_id) && state == YCSB_0 && next_record_id == 0) {
+    DEBUG_T("Running txn %ld\n", txn->txn_id);
+    // query->print();
+    query->partitions_touched.add_unique(GET_PART_ID(0, g_node_id));
+    query->centers_touched.add_unique(g_center_id);
 #if PARAL_SUBTXN
-		rc = send_remote_subtxn();
+    // #if CC_ALG == RDMA_RED_T
+      if (CC_ALG == RDMA_RED_T && is_readonly() && read_only_optimization(yield, cor_id) != Abort) {
+        enable_read_only_optimization = true;
+		#if DEBUG_PRINTF
+        printf("ycsb_txn.cpp:121 txn %ld enable read only optimization\n", get_txn_id());
+		#endif
+      } 
+      else {
+        enable_read_only_optimization = false;
+        rc = send_remote_subtxn();
+      }
+    // #else
+		//   enable_read_only_optimization = false;
+    //   rc = send_remote_subtxn();
+    // #endif
 #endif
-	}
-	
-	uint64_t starttime = get_sys_clock();
+  }
+  uint64_t starttime = get_sys_clock();
 
 #if BATCH_INDEX_AND_READ
 	//batch read all index for remote access
@@ -402,6 +415,150 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	return rc;
 }
 
+bool YCSBTxnManager::is_readonly() {
+  YCSBQuery *ycsb_query = (YCSBQuery *)query;
+  for (int i = 0; i < ycsb_query->requests.size(); i++) {
+    ycsb_request *req = ycsb_query->requests[i];
+    if (req->acctype == WR) return false;
+  }
+  return true;
+}
+
+RC YCSBTxnManager::read_only_optimization(yield_func_t &yield, uint64_t cor_id) {
+  
+	YCSBQuery *ycsb_query = (YCSBQuery *)query;
+	RC rc = RCOK;
+	uint64_t watermark = UINT64_MAX;
+	for (int i = 0; i < ycsb_query->requests.size(); i++) {
+		ycsb_request *req = ycsb_query->requests[i];
+		uint64_t part_id = _wl->key_to_part(req->key);
+		vector<uint64_t> node_id;
+		uint64_t loc1 = -1, loc2 = -1, loc3 = -1;
+#if USE_REPLICA
+		loc1 = get_primary_node_id(part_id);
+		uint64_t center_id1 = GET_CENTER_ID(loc1);
+		loc2 = get_follower1_node_id(part_id);
+		uint64_t center_id2 = GET_CENTER_ID(loc2);
+		loc3 = get_follower2_node_id(part_id);
+		uint64_t center_id3 = GET_CENTER_ID(loc3);
+		uint64_t p_watermark = 0;
+		if (center_id1 == GET_CENTER_ID(g_node_id)) {
+			req->primary.stored_node = loc1;
+			if (loc1 == g_node_id) 
+				p_watermark = get_watermark(0,part_id);
+			else 
+				p_watermark = get_remote_watermark(yield,0, part_id, loc1, get_thd_id(), cor_id);
+			node_id.push_back(loc1);
+		} else if (center_id2 == GET_CENTER_ID(g_node_id)) {
+			req->second1.stored_node = loc2;
+			if (loc2 == g_node_id) 
+				p_watermark = get_watermark(1,part_id);
+			else 
+				p_watermark = get_remote_watermark(yield,1, part_id, loc2, get_thd_id(), cor_id);
+			// p_watermark = get_watermark(1,part_id);
+			node_id.push_back(loc2);
+		} else if (center_id3 == GET_CENTER_ID(g_node_id)) {
+			req->second2.stored_node = loc3;
+			// p_watermark = get_watermark(2,part_id);
+			if (loc3 == g_node_id) 
+				p_watermark = get_watermark(2,part_id);
+			else 
+				p_watermark = get_remote_watermark(yield,2, part_id, loc3, get_thd_id(), cor_id);
+			node_id.push_back(loc3);
+		} else {
+			return Abort;
+		}
+		watermark = watermark < p_watermark ? watermark : p_watermark;
+#else
+    	return Abort;
+#endif
+		for (int j = 0; j < node_id.size(); j++) {
+			uint64_t center_id = GET_CENTER_ID(node_id[j]);
+			assert(center_id == GET_CENTER_ID(g_node_id));
+
+			remote_center[center_id].push_back(i);
+			ycsb_query->centers_touched.add_unique(center_id);
+			ycsb_query->partitions_touched.add_unique(GET_PART_ID(0, node_id[j]));
+			// center_master is set as the first toughed primary, if not exist, use the first toughed
+			// backup.
+			auto ret = center_master.insert(pair<uint64_t, uint64_t>(center_id, node_id[j]));
+			if (ret.second == false) {
+				if (!is_primary[center_id] && j == 0) {
+				center_master[center_id] = node_id[j];  // change center_master
+				is_primary[center_id] = true;
+				}
+			} else {
+				is_primary[center_id] = (j == 0 ? true : false);
+			}
+		}
+  	}
+	// !还需要增加获取snapshot的代码
+	set_start_timestamp(watermark);
+	#if DEBUG_PRINTF
+	printf("ycsb_txn.cpp:573 txn %ld set start timestamp %ld\n", get_txn_id(), get_start_timestamp());
+	#endif
+	// !------------------------
+	for (auto iter = center_master.begin(); iter != center_master.end(); iter++) {
+		uint64_t center_id = iter->first;
+		uint64_t executore_id = iter->second;
+		for (int i = 0; i < ycsb_query->requests.size(); i++) {
+		ycsb_request *req = ycsb_query->requests[i];
+		if (GET_CENTER_ID(req->primary.stored_node) == center_id) {
+			req->primary.execute_node = executore_id;
+			#if DEBUG_PRINTF
+			printf("txn %lu, node %ld needs to handle req %d primary replica\n", get_txn_id(),
+					executore_id, i);
+			#endif
+		}
+		if (GET_CENTER_ID(req->second1.stored_node) == center_id) {
+			req->second1.execute_node = executore_id;
+			#if DEBUG_PRINTF
+			printf("txn %lu, node %ld needs to handle req %d second1 replica\n", get_txn_id(),
+					executore_id, i);
+			#endif
+		}
+		if (GET_CENTER_ID(req->second2.stored_node) == center_id) {
+			req->second2.execute_node = executore_id;
+			#if DEBUG_PRINTF
+			printf("txn %lu, node %ld needs to handle req %d second2 replica\n", get_txn_id(),
+					executore_id, i);
+			#endif
+		}
+		}
+	}
+	rsp_cnt = 0;
+	for (int i = 0; i < query->centers_touched.size(); i++) {
+		if (is_primary[query->centers_touched[i]]) {
+		++rsp_cnt;
+		DEBUG_T("txn %lu, needs send inter-txn primary to %lu nodes\n", get_txn_id(),
+				query->centers_touched[i]);
+		}
+	}
+	--rsp_cnt;  // exclude this center
+	DEBUG_T("txn %lu, needs send inter-txn to %lu nodes\n", get_txn_id(), rsp_cnt);
+	assert(num_msgs_rw_prep == 0);
+	for (int i = 0; i < g_center_cnt; i++) {
+		if (remote_center[i].size() > 0 && i != g_center_id) {  // send message to all masters
+		assert(false);
+		}
+	}
+#if RECOVERY_TXN_MECHANISM
+	update_send_time();
+	if (!is_enqueue && wait_queue_entry == nullptr) {
+		work_queue.waittxn_enqueue(get_thd_id(), Message::create_message(this, WAIT_TXN),
+								wait_queue_entry);
+		DEBUG_T("Txn %ld enqueue wait queue.\n", get_txn_id());
+		is_enqueue = true;
+	} else {
+		DEBUG_T("Txn %ld has already enqueue wait queue %ld.\n", get_txn_id(),
+				wait_queue_entry->txn_id);
+	}
+
+#endif
+	// txn_stats.wait_for_rsp_time = get_sys_clock();
+	return rc;
+}
+
 //! now useless
 RC YCSBTxnManager::send_remote_request() {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
@@ -483,7 +640,6 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 	}
 #endif
 }
-
 
 RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
@@ -699,7 +855,7 @@ RC YCSBTxnManager::run_ycsb(yield_func_t &yield,uint64_t cor_id) {
 
 #if USE_REPLICA
 RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
-	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3){
+	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T){
 		assert(status != Abort);
 		status = RCOK;		
 	}
@@ -757,7 +913,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			assert(p_loc != follow1_loc);
 		}
 		else if(status == Abort){ //validate fail, only log the primary replicas that have been locked
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T
 			// int sum = 0;
 			// for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
 			// if(sum>=num_locks) break;
@@ -778,7 +934,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 			//for simulation purpose, only write back metadata here
 			//in actual application, data in req should also be written back
 			temp_row->_tid_word = 0;
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T
 			uint64_t op_size = sizeof(temp_row->_tid_word);
 			bool is_primary = (node_id[i] == get_primary_node_id(part_id));
 			newChange.set_change_info(req->key,op_size,(char *)temp_row,is_primary); //local 
@@ -991,7 +1147,7 @@ RC YCSBTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 
 // Write a new log, which records current transaction is committed.
 RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_id) {
-	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3){
+	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T){
 		assert(status != Abort);
 		status = RCOK;		
 	}
@@ -1052,7 +1208,7 @@ RC YCSBTxnManager::redo_commit_log(yield_func_t &yield, RC status, uint64_t cor_
 			//for simulation purpose, only write back metadata here
 			//in actual application, data in req should also be written back
 			temp_row->_tid_word = 0;
-			#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
+			#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T
 			uint64_t op_size = sizeof(temp_row->_tid_word);
 			#if REPLICA_CC
 			bool is_primary = true;
@@ -1266,6 +1422,9 @@ void YCSBTxnManager::update_query_status(uint64_t return_id, OpStatus status) {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	for(int i=0;i<ycsb_query->requests.size();i++){ 
 		ycsb_request * req = ycsb_query->requests[i];
+		#if DEBUG_PRINTF
+		printf("ycsb_txn.cpp:1426 txn %ld try to update req %ld - node %ld,%ld,%ld - return node %ld, status %ld\n",get_txn_id(), i,req->primary.execute_node,req->second1.execute_node,req->second2.execute_node, return_id, status);
+		#endif
 		update_single_query_status(req->primary, return_id, status);
 		update_single_query_status(req->second1, return_id, status);
 		update_single_query_status(req->second2, return_id, status);
@@ -1302,36 +1461,64 @@ RC YCSBTxnManager::check_query_status(OpStatus status) {
 	for(int i=0;i<ycsb_query->requests.size();i++){ 
 		ycsb_request * req = ycsb_query->requests[i];
 		// DEBUG_T("txn %ld check req %d, its primary status %ld\n",get_txn_id(), i, req->primary.status);
-		if(req->primary.status == PREP_ABORT) {
-			DEBUG_T("txn %ld need abort, due to req %d abort\n",get_txn_id(), i);
-			return Abort;
-		}
-		else if (req->primary.status < status) {
-			DEBUG_T("txn %ld need wait, due to req %d primary status %ld:%ld\n",get_txn_id(), i, req->primary.status, status);
-			return WAIT;
-		}
-		if(req->acctype==WR) {
-			#if REPLICA_CC
-			if (req->second1.status == PREP_ABORT ||
-				req->second2.status == PREP_ABORT) {
-			#else
-			if (req->second1.status == PREP_ABORT &&
-				req->second2.status == PREP_ABORT) {
-			#endif
-				DEBUG_T("txn %ld need abort, due to req %d secondary status %ld, %ld abort\n",get_txn_id(), i, req->second1.status, req->second2.status);
+		if (enable_read_only_optimization) {
+			if(req->primary.status == PREP_ABORT || 
+			   req->second1.status == PREP_ABORT ||
+			   req->second2.status == PREP_ABORT) {
+				#if DEBUG_PRINTF
+				printf("txn %ld need abort, due to req %d abort\n",get_txn_id(), i);
+				#endif
 				return Abort;
 			}
-			#if REPLICA_CC
-			if (req->second1.status < status ||
-				req->second2.status < status) {
-			#else
-			if (req->second1.status < status &&
-				req->second2.status < status) {
-			#endif
-				DEBUG_T("txn %ld need wait, due to req %d secondary status %ld,%ld:%ld\n",get_txn_id(), i, req->second1.status, req->second2.status, status);
+			else if (req->primary.status < status &&
+					 req->second1.status < status &&
+					 req->second2.status < status) {
+				#if DEBUG_PRINTF
+				printf("txn %ld need wait, due to req %d primary status %ld-%ld-%ld:%ld\n",get_txn_id(), i, req->primary.status,req->second1.status,req->second2.status, status);
+				#endif
 				return WAIT;
 			}
+		} else {
+			if(req->primary.status == PREP_ABORT) {
+				#if DEBUG_PRINTF
+				printf("txn %ld need abort, due to req %d abort\n",get_txn_id(), i);
+				#endif
+				return Abort;
+			}
+			else if (req->primary.status < status) {
+				#if DEBUG_PRINTF
+				printf("txn %ld need wait, due to req %d primary status %ld:%ld\n",get_txn_id(), i, req->primary.status, status);
+				#endif
+				return WAIT;
+			}
+			if(REPLICA_CC || req->acctype==WR) {
+				#if REPLICA_CC
+				if (req->second1.status == PREP_ABORT ||
+					req->second2.status == PREP_ABORT) {
+				#else
+				if (req->second1.status == PREP_ABORT &&
+					req->second2.status == PREP_ABORT) {
+				#endif
+					#if DEBUG_PRINTF
+					printf("txn %ld need abort, due to req %d secondary status %ld, %ld abort\n",get_txn_id(), i, req->second1.status, req->second2.status);
+					#endif
+					return Abort;
+				}
+				#if REPLICA_CC
+				if (req->second1.status < status ||
+					req->second2.status < status) {
+				#else
+				if (req->second1.status < status &&
+					req->second2.status < status) {
+				#endif
+					#if DEBUG_PRINTF
+					printf("txn %ld need wait, due to req %d secondary status %ld,%ld:%ld\n",get_txn_id(), i, req->second1.status, req->second2.status, status);
+					#endif
+					return WAIT;
+				}
+			}
 		}
+		
 	}
 
 	return can_enter_next_state;

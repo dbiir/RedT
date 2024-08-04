@@ -86,6 +86,9 @@ class Rdma;
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 class RDMA_2pl;
 #endif
+#if CC_ALG == RDMA_RED_T 
+class RDMA_redt;
+#endif
 #if USE_REPLICA
 class RedoLogBuffer;
 #endif
@@ -151,6 +154,9 @@ extern Transport tport_man;
 extern Rdma rdma_man;
 #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3
 extern RDMA_2pl r2pl_man;
+#endif
+#if CC_ALG == RDMA_RED_T
+extern RDMA_redt rredt_man;
 #endif
 #if USE_REPLICA
 extern RedoLogBuffer redo_log_buf;

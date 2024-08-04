@@ -6,6 +6,9 @@
 //#include "rdma_ctrl.hpp"
 
 // using namespace rdmaio;
+#ifndef _RDMA_H_
+#define _RDMA_H_
+
 using namespace rdmaio;
 using namespace rdmaio::rmem;
 using namespace rdmaio::qp;
@@ -30,6 +33,7 @@ class Rdma {
   static char* get_log_buffer_client_memory(uint64_t thd_id,int num = 1);
 #endif
   static char* get_status_client_memory(uint64_t thd_id);
+  static char* get_route_node_client_memory(uint64_t thd_id);
   //static char *get_table_client_memory(uint64_t thd_id);
 
   static char *get_queue_client_memory();
@@ -48,3 +52,5 @@ typedef struct {
   uint64_t node_id;
   uint64_t thread_num;
 } rdmaParameter;
+
+#endif
