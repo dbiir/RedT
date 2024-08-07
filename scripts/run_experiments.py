@@ -254,7 +254,7 @@ for exp in exps:
 
     wr = []
     for e in experiments:
-        wr.append(e[4])
+        wr.append(e[5])
     wr = sorted(list(set(wr)))
 
     cn = []

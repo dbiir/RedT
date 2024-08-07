@@ -62,13 +62,13 @@ do
             shift
             shift
             ;;
-        -D)
-            DCS=($(echo $2 | tr ',' ' '))
+        -p)
+            PHASE=$2
             shift
             shift
             ;;
-        -p)
-            PHASE=$2
+        -D)
+            DCS=($(echo $2 | tr ',' ' '))
             shift
             shift
             ;;
@@ -93,7 +93,8 @@ do
             shift
             ;;
         --wr)
-            TWR=($(echo $2 | tr ',' ' '))
+            WR=($(echo $2 | tr ',' ' '))
+            # TWR=($(echo $2 | tr ',' ' '))
             shift
             shift
             ;;
@@ -202,10 +203,10 @@ ArgsType() {
         args=("${NUMBEROFNODE[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_writes' ]]
     then
-        args=("${TWR[@]}")
+        args=("${WR[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_writes' ]]
     then
-        args=("${TWR[@]}")
+        args=("${WR[@]}")
     elif [[ "${TEST_TYPE}" == 'tpcc_scaling' ]]
     then
         args=("${NUMBEROFNODE[@]}")
@@ -275,10 +276,10 @@ FileName() {
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_writes' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _TWR-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _WR-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_writes' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _TWR-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _WR-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'tpcc_scaling' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${arg}_ | grep ^${i}_)
@@ -337,7 +338,7 @@ touch ${LATFILE} ${LTFILE}
 addTableTitle
 addContent '<tr>'
 addContent "<td>AlgoName\\NodeCount</td>"
-echo "根据测试，确定第一个循环体类型"
+# echo "根据测试，确定第一个循环体类型"
 ArgsType
 #根据测试，确定第一个循环体类型
 for arg in ${args[@]}
@@ -368,7 +369,7 @@ do
     CPUFILE=cpu-${cc}
     rm -rf ${CPUFILE}
     touch ${CPUFILE}
-    echo "根据测试，确定第2个循环体类型"
+    # echo "根据测试，确定第2个循环体类型"
     #根据测试，确定第2个循环体类型
     ArgsType
     #根据测试，确定第2个循环体类型
@@ -381,14 +382,14 @@ do
         echo -n ${arg}" " >> ${DIS_FILE}
         echo -n ${arg}" " >> ${CPUFILE}
         AS=''
-        echo "根据测试，确定TMPN"
+        # echo "根据测试，确定TMPN"
         #根据测试，确定TMPN
         TmpFileNum
         #根据测试，确定TMPN
         let TMPN--
         for i in $(seq 0 $TMPN)
         do
-            echo "根据测试，确定文件名"
+            # echo "根据测试，确定文件名"
             #根据测试，确定文件名
             FileName
             #根据测试，确定文件名            
@@ -407,7 +408,7 @@ do
         addContent "<td>${tput}</td>"
         addContent "<td>${ar}</td>"
         addContent "<td>${dr}</td>"
-        # echo $(cat ${RESULT_PATH}/cpu_usage_${num}/root_*_avg| awk '{sum+=$1}END{print "",sum}') >> ${CPUFILE}
+        echo $(cat ${RESULT_PATH}/cpu_usage_${num}/root_*_avg| awk '{sum+=$1}END{print "",sum}') >> ${CPUFILE}
         
     done
     let num++
@@ -512,13 +513,13 @@ do
         if [[ "${cc}" == 'MVCC' ]]
         then
         alg_tmpresult=$(python pl/parse_latency_mvcc.py $AS)
-        sh draw_latency.sh ${cc} "$tmpresult" "$alg_tmpresult"
+        ./draw_latency.sh ${cc} "$tmpresult" "$alg_tmpresult"
         elif [[ "${cc}" == 'DLI_OCC' ]] || [[ "${cc}" == 'DLI_DTA3' ]] || [[ "${cc}" == 'DLI_DTA' ]] || [[ "${cc}" == 'DLI_DTA2' ]]
         then
         alg_tmpresult=$(python pl/parse_latency_dli.py $AS)
-        sh draw_latency.sh ${cc} "$tmpresult" "$alg_tmpresult"
+        ./draw_latency.sh ${cc} "$tmpresult" "$alg_tmpresult"
         else
-        sh draw_latency.sh ${cc} "$tmpresult"
+        ./draw_latency.sh ${cc} "$tmpresult"
         fi
         dot -Tjpg draw_latency_tmp.dot -o draw_latency_${cc}_${arg}.jpg
         mv draw_latency_${cc}_${arg}.jpg ${RESULT_PATH}/
