@@ -1,5 +1,8 @@
 set -x
-for i in $(seq 144 147)
+IP_TITLE=192.168.1
+DEVICE=ib0.806c
+password=zb7022406
+for i in $(seq 1 4)
 do
-    ssh 10.77.110.$i "sudo tc qdisc del root dev em1 2>/dev/null"
+    ssh $IP_TITLE.$i "sudo tc qdisc del root dev $DEVICE 2>/dev/null"
 done

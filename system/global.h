@@ -318,16 +318,16 @@ enum RemReqType {
     RULK_RSP,
     RQRY_RSP,
     RACK,
-    RACK_PREP,
+    RACK_PREP, //12
     RLOG,
     RACK_LOG,
     RFIN_LOG,
-    RACK_FIN_LOG,
-    RACK_FIN,
-    RTXN,
+    RACK_FIN_LOG, 
+    RACK_FIN, //17
+    RTXN, //18
     RTXN_CONT,
     RINIT,
-    RPREPARE,
+    RPREPARE, //21
     RPASS,
     RFWD,
     RDONE,

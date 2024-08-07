@@ -83,9 +83,9 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 4
-#define NODE_CNT 8
-#define THREAD_CNT 40
+#define CENTER_CNT 8
+#define NODE_CNT 16
+#define THREAD_CNT 12
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -126,7 +126,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 320
+#define MAX_TXN_IN_FLIGHT 240
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -166,7 +166,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 0UL
+#define NETWORK_DELAY 100000000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -193,7 +193,7 @@
 #define INTER_DC_CONTROL true
 
 #define TAPIR_DEBUG false
-#define TAPIR_REPLICA false
+#define TAPIR_REPLICA true
 #if WORKLOAD == YCSB
 #define ABORT_TXN_TO_CL_QRY false
 #else 
@@ -327,19 +327,19 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 8388608
+#define SYNTH_TABLE_SIZE 16777216
 #define ZIPF_THETA 0.2
-#define TXN_WRITE_PERC 1
+#define TXN_WRITE_PERC 0.8
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 2
-#define DC_PER_TXN 2
+#define PART_PER_TXN 8
+#define DC_PER_TXN 8
 #define PERC_MULTI_PART     MPR
-#define REQ_PER_QUERY 10
+#define REQ_PER_QUERY 12
 #define FIELD_PER_TUPLE       10
 #define CREATE_TXN_FILE false
-#define STRICT_PPT 1
+#define STRICT_PPT 0
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
 #define CROSS_DC_TXN_PERC 1.0

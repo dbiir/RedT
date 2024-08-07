@@ -181,45 +181,12 @@ RC YCSBTxnManager::send_remote_subtxn() {
 		uint64_t part_id = _wl->key_to_part(req->key);
 		vector<uint64_t> node_id;
 #if USE_REPLICA	
-		// node_id.push_back(GET_NODE_ID(part_id));
-		// node_id.push_back(GET_FOLLOWER1_NODE(part_id));
-		// node_id.push_back(GET_FOLLOWER2_NODE(part_id));		
 #else
 		node_id.push_back(GET_NODE_ID(part_id));		
 #endif
-// #if USE_TAPIR && TAPIR_REPLICA
-// 		for(int j = 0; j < node_id.size(); j++) {
-// 			// remote_replica_node[j] = 1;
-// 			ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id[j]));
-// 		}
-// 		if(req->acctype == WR) ycsb_query->partitions_modified.add_unique(_wl->key_to_part(ycsb_query->requests[i]->key));
-// 	}
-// 	rsp_cnt = query->partitions_touched.size() - 1;
-// 	#if TAPIR_DEBUG
-// 		printf("send %d rqry %d messages\n",get_txn_id(), rsp_cnt);
-// 	#endif
-// 	for(int i = 0; i < query->partitions_touched.size(); i++) {
-// 		if(query->partitions_touched[i] != g_node_id) {
-// 	#if TAPIR_DEBUG
-// 				printf("send %d rqry message to node:%d \n",get_txn_id(), query->partitions_touched[i]);
-// 	#endif
-// 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),query->partitions_touched[i]);
-// 		}
-		
-// 	}
-// 		// for(int i = 0; i < g_node_cnt; i++) {
-// 		// if(i != g_node_id && remote_node[i].size() > 0) {//send message to all masters
-// 		// 	remote_next_node_id = i;
-// 		// 	// printf("%d \n",remote_node[i].size());
-// 		// 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
-// 		// 	// printf("send subtxn to %d\n", i);
-// 		// }
-// #else
 		uint64_t n_id = GET_NODE_ID(part_id);
 		remote_node[n_id].push_back(i);
-		// ycsb_query->centers_touched.add_unique(center_id);
 		ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,n_id));
-		// ycsb_query->centers_touched.add_unique(center_id);
 #if USE_TAPIR && TAPIR_REPLICA 
 		n_id = GET_FOLLOWER1_NODE(part_id);
 		remote_node[n_id].push_back(i);
