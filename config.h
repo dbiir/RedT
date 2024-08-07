@@ -63,7 +63,7 @@
 #define SECOND 200 // Set the queue monitoring time.
 // #define THD_ID_QUEUE
 #define ONE_NODE_RECIEVE 0 // only node 0 will receive the txn query
-#define USE_WORK_NUM_THREAD false
+#define USE_WORK_NUM_THREAD true
 #if 1
 // #define LESS_DIS // Reduce the number of yCSB remote data to 1
 // #define LESS_DIS_NUM 0 // Reduce the number of yCSB remote data to 1
@@ -85,7 +85,7 @@
 /***********************************************/
 #define CENTER_CNT 4
 #define NODE_CNT 8
-#define THREAD_CNT 40
+#define THREAD_CNT 30
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -126,7 +126,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 320
+#define MAX_TXN_IN_FLIGHT 240
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -181,7 +181,7 @@
 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG NO_WAIT
+#define CC_ALG SI
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -190,7 +190,7 @@
 #define USE_TAPIR false
 #define MAJORITY true
 #define INTER_DC_CONTROL true
-#define EARLY_PREPARE false
+#define EARLY_PREPARE true
 
 #define TAPIR_DEBUG false
 #define TAPIR_REPLICA false
@@ -326,7 +326,7 @@
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 8388608
 #define ZIPF_THETA 0.2
-#define TXN_WRITE_PERC 1
+#define TXN_WRITE_PERC 0.8
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
@@ -495,6 +495,7 @@ enum PPSTxnType {
 #define CALVIN      10
 #define MAAT      11
 #define WDL           12
+#define SI    13
 // #define WOOKONG     13
 // #define TICTOC     14
 // #define FOCC       15

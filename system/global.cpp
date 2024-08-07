@@ -49,6 +49,7 @@
 #include <boost/lockfree/queue.hpp>
 #include "da_block_queue.h"
 #include "wl.h"
+#include "si.h"
 
 
 mem_alloc mem_allocator;
@@ -76,6 +77,8 @@ Client_txn client_man;
 Sequencer seq_man;
 Logger logger;
 TimeTable time_table;
+
+si si_man;
 // QTcpQueue tcp_queue;
 // TcpTimestamp tcp_ts;
 

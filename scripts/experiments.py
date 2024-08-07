@@ -61,7 +61,8 @@ ycsb_loads = ['50', '100', '200', '500', '1000', '2000', '5000']
 def ycsb_early_cross_dc():
     wl = 'YCSB'
     nnodes = [8]
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['true']
     base_table_size=1048576
@@ -81,7 +82,8 @@ def ycsb_early_cross_dc():
 def ycsb_cross_dc():
     wl = 'YCSB'
     nnodes = [8]
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['false']
     base_table_size=1048576
@@ -101,7 +103,8 @@ def ycsb_cross_dc():
 def ycsb_network_delay():
     wl = 'YCSB'
     nnodes = [8]
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['false']
     base_table_size=1048576
@@ -124,7 +127,8 @@ def ycsb_network_delay():
 def ycsb_early_network_delay():
     wl = 'YCSB'
     nnodes = [8]
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['true']
     base_table_size=1048576
@@ -147,7 +151,8 @@ def ycsb_skew():
     wl = 'YCSB'
     nnodes = [8]
 
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['false']
     # base_table_size=1048576*10
@@ -170,7 +175,8 @@ def ycsb_early_skew():
     wl = 'YCSB'
     nnodes = [8]
 
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['true']
     # base_table_size=1048576*10
@@ -195,7 +201,8 @@ def ycsb_writes():
     wl = 'YCSB'
     nnodes = [8]
 
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['false']
     base_table_size=1048576
@@ -214,7 +221,8 @@ def ycsb_early_writes():
     wl = 'YCSB'
     nnodes = [8]
 
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['true']
     base_table_size=1048576
@@ -233,7 +241,8 @@ def ycsb_partitions():
     wl = 'YCSB'
     # nnodes = [15]
     nnodes = [16]
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['false']
     # load = [10000,12000]
@@ -256,7 +265,8 @@ def ycsb_early_partitions():
     wl = 'YCSB'
     # nnodes = [15]
     nnodes = [16]
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['true']
     load = [200]
@@ -278,7 +288,8 @@ def ycsb_dcs():
     wl = 'YCSB'
     # nnodes = [15]
     nnodes = [16]
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['false']
     # load = [10000,12000]
@@ -300,7 +311,8 @@ def ycsb_early_dcs():
     wl = 'YCSB'
     # nnodes = [15]
     nnodes = [16]
-    algos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     tapir=['false']
     early=['true']
     # load = [10000,12000]
@@ -374,7 +386,8 @@ def tpcc_scaling():
     nnodes = [4,8,12,16]
     tapir=['false']
     early=['false']
-    nalgos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     npercpay=[0.489]
     # npercpay=[1.0]
     wh=16
@@ -383,7 +396,7 @@ def tpcc_scaling():
     tcnt = [12]
     ctcnt = [1]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
+    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,algos,tapir,early)]
 
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
@@ -397,7 +410,8 @@ def tpcc_scaling_n():
     # nnodes = [16,20]
     # nnodes = [4,8,12,16,20]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN']
-    nalgos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     npercpay=[0.0]
     # npercpay=[1.0]
     wh=16
@@ -406,7 +420,7 @@ def tpcc_scaling_n():
     tcnt = [12]
     ctcnt = [1]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
+    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,algos,tapir,early)]
 
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
@@ -418,7 +432,8 @@ def tpcc_scaling_p():
     tapir=['false']
     early=['false']
     # nnodes = [3,6,9,12,15]
-    nalgos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
 
     npercpay=[1.0]
     # npercpay=[1.0]
@@ -428,7 +443,7 @@ def tpcc_scaling_p():
     tcnt = [12]
     ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
+    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,algos,tapir,early)]
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
     return fmt,exp
@@ -441,7 +456,8 @@ def tpcc_scaling_early():
     # nnodes = [16,20]
     # nnodes = [4,8,12,16,20]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN']
-    nalgos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     npercpay=[0.489]
     # npercpay=[1.0]
     wh=16
@@ -450,7 +466,7 @@ def tpcc_scaling_early():
     tcnt = [12]
     ctcnt = [1]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
+    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,algos,tapir,early)]
 
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
@@ -464,7 +480,8 @@ def tpcc_scaling_n_early():
     # nnodes = [16,20]
     # nnodes = [4,8,12,16,20]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN']
-    nalgos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
     npercpay=[0.0]
     # npercpay=[1.0]
     wh=16
@@ -473,7 +490,7 @@ def tpcc_scaling_n_early():
     tcnt = [12]
     ctcnt = [1]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
+    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,algos,tapir,early)]
 
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
@@ -484,7 +501,8 @@ def tpcc_scaling_p_early():
     tapir=['false']
     early=['true']
     # nnodes = [3,6,9,12,15]
-    nalgos=['NO_WAIT']
+    # algos=['NO_WAIT']
+    algos=['SI']
 
     npercpay=[1.0]
     # npercpay=[1.0]
@@ -494,7 +512,7 @@ def tpcc_scaling_p_early():
     tcnt = [12]
     ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
-    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos,tapir,early)]
+    exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,algos,tapir,early)]
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
     return fmt,exp

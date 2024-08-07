@@ -23,6 +23,7 @@
 #include "mem_alloc.h"
 #include "occ.h"
 #include "row_occ.h"
+#include "row_si.h"
 #include "table.h"
 #include "catalog.h"
 #include "index_btree.h"
@@ -33,6 +34,7 @@
 #include "message.h"
 #include "msg_queue.h"
 #include "occ.h"
+#include "si.h"
 #include "pool.h"
 #include "message.h"
 #include "ycsb_query.h"
@@ -653,6 +655,9 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
 		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
+		if(CC_ALG == SI) {
+            si_man.gene_finish_ts(this);
+        }
 		if(rc == RCOK){ 
 			// printf("commit transaction\n");
 			// if(IS_LOCAL(get_txn_id())) {
@@ -1526,12 +1531,15 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 #if MODE != NORMAL_MODE
 	return RCOK;
 #endif
-	if (CC_ALG != OCC && CC_ALG != MAAT) {
+	if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != SI) {
 		return RCOK;
 	}
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
 	if (CC_ALG == OCC && rc == RCOK) rc = occ_man.validate(this);
+	if (CC_ALG == SI) {
+        rc = si_man.validate(this);
+    } 
 	if(CC_ALG == MAAT  && rc == RCOK) {
 		rc = maat_man.validate(this);
 		// Note: home node must be last to validate

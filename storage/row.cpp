@@ -29,6 +29,7 @@
 #include "row_occ.h"
 #include "row_ts.h"
 #include "row_null.h"
+#include "row_si.h"
 #include "mem_alloc.h"
 #include "manager.h"
 #include "wl.h"
@@ -83,6 +84,8 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_maat *) mem_allocator.align_alloc(sizeof(Row_maat));
 #elif CC_ALG == CNULL
 	manager = (Row_null *) mem_allocator.align_alloc(sizeof(Row_null));
+#elif CC_ALG == SI
+    manager = (Row_si *) mem_allocator.align_alloc(sizeof(Row_si));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -286,7 +289,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	}
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
-#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC
+#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SI
 	//uint64_t thd_id = txn->get_thd_id();
 // For TIMESTAMP RD, a new copy of the access->data will be returned.
 
@@ -328,7 +331,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 			assert(access->data->get_table_name() != NULL);
 		}
 	}
-	if (rc != Abort && (CC_ALG == MVCC) && type == WR) {
+	if (rc != Abort && (CC_ALG == MVCC || CC_ALG == SI) && type == WR) {
 			DEBUG_M("row_t::get_row MVCC alloc \n");
 		row_t * newr = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 		newr->init(this->get_table(), get_part_id());
@@ -446,7 +449,7 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	}
 	this->manager->lock_release(txn);
 	return 0;
-#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC
+#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SI
 	// for RD or SCAN or XP, the row should be deleted.
 	// because all WR should be companied by a RD
 	// for MVCC RD, the row is not copied, so no need to free.

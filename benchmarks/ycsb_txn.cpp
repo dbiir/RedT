@@ -287,7 +287,10 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	if(rc == Abort){
 		rc = start_abort(yield, cor_id);
 	}else{
-		if(rsp_cnt > 0) return WAIT;
+		if(rsp_cnt > 0) {
+			// printf("SI wait remote %ld cnp %ld\n",get_txn_id(),rsp_cnt);
+			return WAIT;
+		}
 		if(is_done()){
 #if CC_ALG == WOUND_WAIT
 			txn_state = STARTCOMMIT;

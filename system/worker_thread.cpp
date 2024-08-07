@@ -33,6 +33,7 @@
 #include "work_queue.h"
 #include "ycsb_query.h"
 #include "maat.h"
+#include "si.h"
 #include "transport.h"
 #include "routine.h"
 #include <boost/bind.hpp>
@@ -507,7 +508,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
 //now commit 
   txn_man->commit(yield, cor_id);
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
-  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT)
+  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT || CC_ALG == SI)
 #if TAPIR_DEBUG
     printf("%d:%d send commit finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
 #endif
@@ -798,7 +799,9 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   }
   return rc;
 #endif
-
+  if(CC_ALG == SI) {
+    si_man.gene_finish_ts(txn_man);
+  }
   if(rc == Abort) {
 #if !EARLY_PREPARE
     txn_man->send_finish_messages();
@@ -937,7 +940,11 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
 #endif
 
 #if PARAL_SUBTXN == true
-  if (!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) return RCOK;
+  if (!txn_man->query || txn_man->query->partitions_touched.size() == 0 || txn_man->abort_cnt != msg->current_abort_cnt) {
+    DEBUG_T("RQRY_RSP skip %ld from %ld, %ld, %ld, %ld\n",msg->get_txn_id(),msg->get_return_id(), txn_man->query->partitions_touched.size(),txn_man->abort_cnt, msg->current_abort_cnt);
+    // printf("worker_thread.cpp:944 SI receive wrong msg, remote %ld \n",txn_man->get_txn_id(), txn_man->abort_cnt, msg->current_abort_cnt);
+    return RCOK;
+  }
 
   int responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
   assert(responses_left >=0);
@@ -946,7 +953,10 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
     txn_man->start_abort(yield, cor_id);
   }
 
-  if (responses_left > 0) return WAIT;
+  if (responses_left > 0) {
+    // printf("worker_thread.cpp:953 SI wait remote %ld cnt %ld\n",txn_man->get_txn_id(),responses_left);
+    return WAIT;
+  }
   //Done Waiting
   txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
   INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - txn_man->start_rw_time);
@@ -991,6 +1001,9 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 
 #if CC_ALG == MVCC
   txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
+#endif
+#if CC_ALG == SI
+  txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_start_timestamp());
 #endif
 #if CC_ALG == MAAT
     time_table.init(get_thd_id(),txn_man->get_txn_id());
@@ -1166,7 +1179,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
 #if CC_ALG == MVCC
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
 #endif
-#if CC_ALG == OCC
+#if CC_ALG == OCC || CC_ALG == SI
   #if WORKLOAD==DA
     if(da_start_stamp_tab.count(txn_man->get_txn_id())==0)
     {
@@ -1178,6 +1191,9 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   #else
       txn_man->set_start_timestamp(get_next_ts());
   #endif
+#endif
+#if CC_ALG == SI
+    txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_start_timestamp());
 #endif
 #if CC_ALG == MAAT
   #if WORKLOAD==DA
