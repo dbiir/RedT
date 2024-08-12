@@ -1699,7 +1699,7 @@ RC construct_log(uint64_t w_id,
 		node_id.push_back(GET_NODE_ID(part_id));
 	}
 	else if(status == Abort){ //validate fail, only log the primary replicas that have been locked	
-	#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T
+	#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T || CC_ALG == RDMA_SI
 		// int sum = 0;
 		// for(int i=0;i<g_node_cnt;i++) sum += change_cnt[i];
 		// if(sum>=num_locks) break;
@@ -1721,7 +1721,7 @@ RC construct_log(uint64_t w_id,
 
 RC TPCCTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	// return RCOK;
-	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T){
+	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T|| CC_ALG == RDMA_SI){
 		assert(status != Abort);
 		status = RCOK;		
 	}
@@ -1821,7 +1821,7 @@ RC TPCCTxnManager::redo_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 
 RC TPCCTxnManager::redo_commit_log(yield_func_t &yield,RC status, uint64_t cor_id) {
 	// return RCOK;
-	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T){
+	if(CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T|| CC_ALG == RDMA_SI){
 		assert(status != Abort);
 		status = RCOK;		
 	}

@@ -89,6 +89,9 @@ class RDMA_2pl;
 #if CC_ALG == RDMA_RED_T 
 class RDMA_redt;
 #endif
+#if CC_ALG == RDMA_SI
+class RDMA_si;
+#endif
 #if USE_REPLICA
 class RedoLogBuffer;
 #endif
@@ -157,6 +160,9 @@ extern RDMA_2pl r2pl_man;
 #endif
 #if CC_ALG == RDMA_RED_T
 extern RDMA_redt rredt_man;
+#endif
+#if CC_ALG == RDMA_SI
+extern RDMA_si rsi_man;
 #endif
 #if USE_REPLICA
 extern RedoLogBuffer redo_log_buf;

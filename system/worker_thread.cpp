@@ -1009,7 +1009,7 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
   rc = txn_man->run_txn(yield, cor_id);
 
   // Send response
-#if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T)
+#if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T|| CC_ALG == RDMA_SI)
   assert(rc != WAIT);
 #endif 
 
@@ -1018,7 +1018,7 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
     tport_man.rdma_thd_send_msg(get_thd_id(), txn_man->return_id, Message::create_message(txn_man,RQRY_RSP));
 #else
 #if PARAL_SUBTXN == true && CENTER_MASTER == true
-#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T
+#if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T|| CC_ALG == RDMA_SI
 #if USE_REPLICA
     if(rc != Abort) {
       rc = txn_man->redo_log(yield,rc,cor_id);
@@ -1383,7 +1383,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
     rc = txn_man->run_txn(yield, cor_id);
   }
 
-#if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T)
+#if USE_REPLICA && (CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T|| CC_ALG == RDMA_SI)
   RC result = txn_man->check_query_status(PREPARE);
   if(txn_man->get_rsp_cnt() == 0 && !txn_man->need_extra_wait() && result == RCOK){
     // assert(false);

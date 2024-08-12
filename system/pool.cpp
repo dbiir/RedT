@@ -292,7 +292,7 @@ void AccessPool::get(uint64_t thd_id, Access *& item) {
   item->orig_row = NULL;
   item->data = NULL;
   item->orig_data = NULL;
-  #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T
+  #if CC_ALG == RDMA_NO_WAIT || CC_ALG == RDMA_NO_WAIT3 || CC_ALG == RDMA_RED_T|| CC_ALG == RDMA_SI
   item->location = g_node_id;
   item->offset = 0;
   #endif

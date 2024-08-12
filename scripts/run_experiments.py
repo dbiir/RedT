@@ -291,15 +291,15 @@ for exp in exps:
 
     cmd = ''
     os.chdir('./scripts')
-    if exp == 'ycsb_skew':
+    if 'ycsb_skew' in exp:
         cmd='sh result.sh -a ycsb_skew -n {} -c {} -s {} -t {}'.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in sk]), strnow)
-    elif exp == 'ycsb_cross_dc':
+    elif 'ycsb_cross_dc' in exp:
         cmd='sh result.sh -a ycsb_cross_dc -n {} -c {} -dc {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in dcp]), strnow)
-    elif exp == 'ycsb_network_delay':
+    elif 'ycsb_network_delay' in exp:
         cmd='sh result.sh -a ycsb_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
     elif exp == 'ycsb_network_delay2':
         cmd='sh result.sh -a ycsb_network_delay -n {} -c {} -nd {} -t {} '.format(str(cn[0]), ','.join([str(x) for x in al]), ','.join([str(x) for x in nd]), strnow)
-    elif exp == 'ycsb_writes':
+    elif 'ycsb_writes' in exp:
         cmd='sh result.sh -a ycsb_writes -n {} -c {} --wr {} -t {}'.format(cn[0], ','.join([str(x) for x in al]), ','.join([str(x) for x in wr]), strnow)
     elif 'ycsb_scaling' in exp:
         cmd='sh result.sh -a ycsb_scaling -n {} -c {} -t {} --ft {} --tt {}'.format(','.join([str(x) for x in cn]), ','.join([str(x) for x in al]), strnow, ','.join(fromtimelist), ','.join(totimelist))

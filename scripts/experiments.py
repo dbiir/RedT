@@ -48,7 +48,7 @@ fmt_title=["NODE_CNT","CC_ALG","ACCESS_PERC","TXN_WRITE_PERC","PERC_PAYMENT","MP
 ##############################
 # PLOTS
 ##############################
-dta_target_algos=['TIMESTAMP']
+dta_target_algos=['RDMA_REDT']
 # tpcc load
 #tpcc_loads = ['50', '100', '200', '500', '1000', '2000', '5000']
 tpcc_loads = ['50', '100', '200', '500', '1000', '2000', '5000']
@@ -60,8 +60,9 @@ def ycsb_cross_dc():
     wl = 'YCSB'
     nnodes = [8]
     dcs = [4]
-    algos=['RDMA_RED_T']
     # algos=['RDMA_RED_T']
+    algos=['RDMA_SI']
+    # algos=['RDMA_SI']
     # base_table_size=524288
     base_table_size=1048576
     # txn_write_perc = [1]
@@ -70,19 +71,39 @@ def ycsb_cross_dc():
     load = [240]
     tcnt = [30]  #THREAD_CNT
     skew = [0.2]
-    # cross_dc_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
-    # cross_dc_perc = [0] 
-    # cross_dc_perc = [0.6,0.7,0.8,0.9,1.0] 
+    # cross_dc_perc = [0.1] 
     cross_dc_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","CENTER_CNT","THREAD_CNT","CROSS_DC_TXN_PERC"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,dc,thr,cro_dc_perc] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc,dc in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc,dcs)]
     return fmt,exp
 
+def ycsb_cross_dc_no_ro():
+    wl = 'YCSB'
+    nnodes = [8]
+    dcs = [4]
+    # algos=['RDMA_RED_T']
+    # algos=['RDMA_NO_WAIT3']
+    algos=['RDMA_SI']
+    # base_table_size=524288
+    base_table_size=1048576
+    # txn_write_perc = [1]
+    txn_write_perc = [0.8]
+    tup_write_perc = [0.5]
+    # tup_write_perc = [1]
+    load = [240]
+    tcnt = [30]  #THREAD_CNT
+    skew = [0.2]
+    # cross_dc_perc = [1.0] 
+    cross_dc_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","ZIPF_THETA","CENTER_CNT","THREAD_CNT","CROSS_DC_TXN_PERC"]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,"false",sk,dc,thr,cro_dc_perc] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc,dc in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc,dcs)]
+    return fmt,exp
+
 def ycsb_network_delay():
     wl = 'YCSB'
     nnodes = [8]
+    algos=['RDMA_SI']
     # algos=['RDMA_RED_T']
-    algos=['RDMA_RED_T']
     base_table_size=1048576
     # base_table_size=524288
     txn_write_perc = [0.8]
@@ -100,10 +121,33 @@ def ycsb_network_delay():
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,4,rpq,thr,cro_dc_perc,net_del] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc,net_del in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc,network_delay)]
     return fmt,exp
 
+def ycsb_network_delay_no_ro():
+    wl = 'YCSB'
+    nnodes = [8]
+    algos=['RDMA_SI']
+    # algos=['RDMA_RED_T']
+    base_table_size=1048576
+    # base_table_size=524288
+    txn_write_perc = [0.8]
+    tup_write_perc = [0.5]
+    load = [240]
+    tcnt = [30]  #THREAD_CNT
+    skew = [0.2]
+    cross_dc_perc = [1]
+    network_delay = ['0UL'] 
+    rpq =  10
+    # network_delay = ['50000000UL','10000000UL'] 
+    # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","ZIPF_THETA","CENTER_CNT","REQ_PER_QUERY","THREAD_CNT","CROSS_DC_TXN_PERC", "NETWORK_DELAY",]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,"false",sk,4,rpq,thr,cro_dc_perc,net_del] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,cro_dc_perc,net_del in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,cross_dc_perc,network_delay)]
+    return fmt,exp
+
 def ycsb_skew():
     wl = 'YCSB'
     nnodes = [8]
-    algos=['RDMA_RED_T']
+    # algos=['RDMA_RED_T']
+    algos=['RDMA_SI']
     # base_table_size=1048576*10
     # base_table_size=524288
     base_table_size=1048576
@@ -125,12 +169,37 @@ def ycsb_skew():
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,4,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
     return fmt,exp
 
+def ycsb_skew_no_ro():
+    wl = 'YCSB'
+    nnodes = [8]
+    # algos=['RDMA_RED_T']
+    algos=['RDMA_SI']
+    base_table_size=1048576
+
+    txn_write_perc = [0.8]
+    tup_write_perc = [0.5]
+    load = [240]
+
+    tcnt = [30]  #THREAD_CNT
+
+    skew = [0.0,0.2,0.4,0.5,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
+    # skew = [0.0,0.2,0.4,0.5]
+    # skew = [0.6,0.65,0.7,0.75,0.8,0.85,0.9]
+    # skew = [0.25,0.55,0.65,0.75]
+    # skew = [0.8]
+    # skew = [0.0,0.1,0.2,0.3,0.4,0.5]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","CENTER_CNT","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","ZIPF_THETA","THREAD_CNT"]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,4,ld,"false",sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
+    return fmt,exp
+
+
 def ycsb_writes():
     wl = 'YCSB'
     nnodes = [8]
     # algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=dta_target_algos
-    algos=['RDMA_RED_T']
+    # algos=['RDMA_RED_T']
+    algos=['RDMA_SI']
     base_table_size=1048576
     # base_table_size=524288
     txn_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
@@ -144,6 +213,26 @@ def ycsb_writes():
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
     return fmt,exp
+
+def ycsb_writes_no_ro():
+    wl = 'YCSB'
+    nnodes = [8]
+    # algos=['RDMA_RED_T']
+    algos=['RDMA_SI']
+    base_table_size=1048576
+    # base_table_size=524288
+    txn_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+    # txn_write_perc = [1.0]
+    # txn_write_perc = [0.0]
+    # tup_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+    tup_write_perc = [0.5]
+    load = [240]
+    tcnt = [30]
+    skew = [0.2]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","ZIPF_THETA","THREAD_CNT"]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,"false",sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos)]
+    return fmt,exp
+
 
 def isolation_levels():
     wl = 'YCSB'
@@ -164,8 +253,8 @@ def ycsb_partitions():
     wl = 'YCSB'
     # nnodes = [15]
     nnodes = [16]
-    algos=['RDMA_RED_T']
-    # algos=['RDMA_NO_WAIT3']
+    # algos=['RDMA_RED_T']
+    algos=['RDMA_SI']
     # load = [10000,12000]
     load = [200]
     nparts = [2,3,4,5,6,7,8]
@@ -182,11 +271,34 @@ def ycsb_partitions():
     exp = [[wl,n,algo,rpq,p,base_table_size*n,tup_wr_perc,txn_wr_perc,4,ld,sk,thr,1] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts)]
     return fmt,exp
 
+def ycsb_partitions_no_ro():
+    wl = 'YCSB'
+    # nnodes = [15]
+    nnodes = [16]
+    # algos=['RDMA_RED_T']
+    algos=['RDMA_SI']
+    # load = [10000,12000]
+    load = [200]
+    nparts = [2,3,4,5,6,7,8]
+    # nparts = [2]
+    ndcs = [2]
+    base_table_size= 1048576
+    # txn_write_perc = [1]
+    txn_write_perc = [0.8]
+    tup_write_perc = [0.5]
+    tcnt = [12]
+    skew = [0.2]
+    rpq =  10
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","CENTER_CNT","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
+    exp = [[wl,n,algo,rpq,p,base_table_size*n,tup_wr_perc,txn_wr_perc,4,ld,"false",sk,thr,1] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts)]
+    return fmt,exp
+
 def ycsb_dcs():
     wl = 'YCSB'
     # nnodes = [15]
     nnodes = [16]
-    algos=['RDMA_RED_T']
+    # algos=['RDMA_RED_T']
+    algos=['RDMA_SI']
     # algos=['RDMA_NO_WAIT3']
     # load = [10000,12000]
     load = [200]
@@ -204,12 +316,34 @@ def ycsb_dcs():
     exp = [[wl,n,algo,rpq,p,dc,base_table_size*n,tup_wr_perc,txn_wr_perc,8,ld,sk,thr,0] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,dc in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,ndcs)]
     return fmt,exp
 
-def ycsb_scaling():
+def ycsb_dcs_no_ro():
     wl = 'YCSB'
     nnodes = [16]
-    # nnodes = [4,8,12,16]
+    # algos=['RDMA_RED_T']
+    algos=['RDMA_SI']
+    # load = [10000,12000]
+    load = [200]
+    nparts = [8]
+    # nparts = [4]
+    ndcs = [2,3,4,5,6,7,8]
+    # ndcs = [3]
+    base_table_size= 1048576
+    txn_write_perc = [0.8]
+    tup_write_perc = [0.5]
+    tcnt = [12]
+    skew = [0.2]
+    rpq =  12
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","REQ_PER_QUERY","PART_PER_TXN","DC_PER_TXN","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","CENTER_CNT","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","ZIPF_THETA","THREAD_CNT","STRICT_PPT"]
+    exp = [[wl,n,algo,rpq,p,dc,base_table_size*n,tup_wr_perc,txn_wr_perc,8,ld,"false",sk,thr,0] for thr,txn_wr_perc,tup_wr_perc,algo,sk,ld,n,p,dc in itertools.product(tcnt,txn_write_perc,tup_write_perc,algos,skew,load,nnodes,nparts,ndcs)]
+    return fmt,exp
 
-    algos = ['RDMA_RED_T']
+def ycsb_scaling():
+    wl = 'YCSB'
+    # nnodes = [16]
+    nnodes = [4,8,12,16]
+
+    # algos = ['RDMA_RED_T']
+    algos=['RDMA_SI']
 
     # base_table_size=524288 
     base_table_size=1048576 
@@ -227,10 +361,11 @@ def ycsb_scaling():
 
 def tpcc_scaling_n():
     wl = 'TPCC'
-    # nnodes = [4,8,12,16]
-    nnodes = [4]
+    nnodes = [4,8,12,16]
+    # nnodes = [4]
 
-    nalgos=['RDMA_RED_T']
+    # nalgos=['RDMA_RED_T']
+    nalgos=['RDMA_SI']
     npercpay=[0.0]
     # npercpay=[1.0]
     wh=16
@@ -249,7 +384,8 @@ def tpcc_scaling_p():
     wl = 'TPCC'
     nnodes = [4,8,12,16]
     # nnodes = [3,6,9]
-    nalgos=['RDMA_RED_T']
+    # nalgos=['RDMA_RED_T']
+    nalgos=['RDMA_SI']
     npercpay=[1.0]
     # npercpay=[1.0]
     wh=16
@@ -259,6 +395,106 @@ def tpcc_scaling_p():
     ctcnt = [4]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,1,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
+    # wh=4
+    # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
+    return fmt,exp
+
+def tpcc_scaling():
+    wl = 'TPCC'
+    nnodes = [4,8,12,16]
+    # nnodes = [8]
+
+    nalgos=['RDMA_SI']
+    npercpay=[0.489]
+    # npercpay=[1.0]
+    wh=16
+    # wh=64
+    load = [240]
+    tcnt = [12]
+    ctcnt = [1]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","THREAD_CNT","CLIENT_THREAD_CNT"]
+    exp = [[wl,n,cc,pp,wh*n,1,thr*n,"false",thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
+
+    # wh=4
+    # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
+    return fmt,exp
+
+def ycsb_scaling_no():
+    wl = 'YCSB'
+    # nnodes = [16]
+    nnodes = [4,8,12,16]
+
+    # algos = ['RDMA_RED_T']
+    nalgos=['RDMA_SI']
+
+    # base_table_size=524288 
+    base_table_size=1048576 
+    txn_write_perc = [0.8]
+    tup_write_perc = [0.5]
+    tcnt = [12]
+    ctcnt = [1]
+    scnt = [1]
+    rcnt = [1]
+    skew = [0.2]
+    # skew = [0.0,0.5,0.9]    
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT","SEND_THREAD_CNT","REM_THREAD_CNT","CLIENT_SEND_THREAD_CNT","CLIENT_REM_THREAD_CNT","CENTER_CNT"]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,n*thr,"false",sk,thr,cthr,sthr,rthr,sthr,rthr,3] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,nnodes,algos)]
+    return fmt,exp
+
+def tpcc_scaling_n_no_ro():
+    wl = 'TPCC'
+    nnodes = [4,8,12,16]
+    # nnodes = [4]
+
+    # nalgos=['RDMA_RED_T']
+    nalgos=['RDMA_SI']
+    npercpay=[0.0]
+    wh=16
+    # wh=64
+    load = [240]
+    tcnt = [12]
+    ctcnt = [1]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","THREAD_CNT","CLIENT_THREAD_CNT"]
+    exp = [[wl,n,cc,pp,wh*n,1,thr*n,"false",thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
+
+    # wh=4
+    # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
+    return fmt,exp
+
+def tpcc_scaling_p_no_ro():
+    wl = 'TPCC'
+    nnodes = [4,8,12,16]
+    # nalgos=['RDMA_RED_T']
+    nalgos=['RDMA_SI']
+    npercpay=[1.0]
+    # npercpay=[1.0]
+    wh=16
+    # wh=64
+    load = [20000]
+    tcnt = [12]
+    ctcnt = [4]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","THREAD_CNT","CLIENT_THREAD_CNT"]
+    exp = [[wl,n,cc,pp,wh*n,1,thr*n,"false",thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
+    # wh=4
+    # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
+    return fmt,exp
+
+def tpcc_scaling_no_ro():
+    wl = 'TPCC'
+    nnodes = [4,8,12,16]
+    # nnodes = [8]
+
+    nalgos=['RDMA_SI']
+    npercpay=[0.489]
+    # npercpay=[1.0]
+    wh=16
+    # wh=64
+    load = [240]
+    tcnt = [12]
+    ctcnt = [1]
+    fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","THREAD_CNT","CLIENT_THREAD_CNT"]
+    exp = [[wl,n,cc,pp,wh*n,1,thr*n,"false",thr,cthr] for thr,cthr,tif,pp,n,cc in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,nalgos)]
+
     # wh=4
     # exp = exp+[[wl,n,cc,pp,wh*n,tif] for tif,pp,n,cc in itertools.product(load,npercpay,nnodes,nalgos)]
     return fmt,exp
@@ -277,6 +513,15 @@ experiment_map = {
     'ycsb_dcs': ycsb_dcs,
     'tpcc_scaling_n':tpcc_scaling_n,
     'tpcc_scaling_p':tpcc_scaling_p,
+    'ycsb_scaling_no': ycsb_scaling,
+    'ycsb_writes_no': ycsb_writes,
+    'ycsb_skew_no': ycsb_skew,
+    'ycsb_cross_dc_no_ro': ycsb_cross_dc_no_ro,
+    'ycsb_network_delay_no_ro': ycsb_partitions_no_ro,
+    'ycsb_partitions_no_ro': ycsb_partitions,
+    'ycsb_dcs_no_ro': ycsb_dcs_no_ro,
+    'tpcc_scaling_n_no_ro':tpcc_scaling_n_no_ro,
+    'tpcc_scaling_p_no_ro':tpcc_scaling_p_no_ro,
 }
 
 
@@ -320,6 +565,7 @@ configs = {
     "PRIORITY":"PRIORITY_ACTIVE",
     "TWOPL_LITE":"false",
     "RDMA_SIT":"SIT_COROUTINE",
+    "READ_OPTIMIZATION":"false",
 #YCSB
     "INIT_PARALLELISM" : 1,
     "TUP_WRITE_PERC":0.2,

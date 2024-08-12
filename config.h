@@ -128,8 +128,8 @@
 // Simulation + Hardware
 /***********************************************/
 #define CENTER_CNT 4
-#define NODE_CNT 16
-#define THREAD_CNT 12
+#define NODE_CNT 8
+#define THREAD_CNT 30
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -170,7 +170,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 200
+#define MAX_TXN_IN_FLIGHT 240
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -229,7 +229,7 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_RED_T
+#define CC_ALG RDMA_SI
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -351,13 +351,13 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 16777216
+#define SYNTH_TABLE_SIZE 8388608
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.8
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 8
+#define PART_PER_TXN 2
 #define DC_PER_TXN 2
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10
@@ -366,7 +366,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 1
+#define CROSS_DC_TXN_PERC 0.5
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.
@@ -461,7 +461,10 @@ enum PPSTxnType {
 #define WAIT_QUEUE_LENGTH int(PERC_PAYMENT * PERC_PAYMENT * 100 + 3)
 #define ROW_SET_LENGTH int(PERC_PAYMENT * 100 + 30)
 #endif
- 
+
+// [RDMA_RED_T || [RDMA_SI]
+#define READ_OPTIMIZATION true 
+
 #define HOT_VALUE 10000
 #define MOCC_MAX_RETRY_COUNT 5
 #define MAAT_CAS true
@@ -544,6 +547,7 @@ enum PPSTxnType {
 #define RDMA_NO_WAIT 31
 #define RDMA_NO_WAIT3 32  // add owner list
 #define RDMA_RED_T 33  // RDMA MVCC + NO WAIT with read only optimization
+#define RDMA_SI 34
 #define WOUND_WAIT 41
 // TIMESTAMP allocation method.
 #define TS_MUTEX          1

@@ -47,6 +47,7 @@
 #include "logger.h"
 #include "maat.h"
 #include "rdma_2pl.h"
+#include "rdma_si.h"
 #include "route_table.h"
 #include "src/allocator_master.hh"
 //#include "rdma_ctrl.hpp"
@@ -81,6 +82,9 @@ RDMA_2pl r2pl_man;
 #endif
 #if CC_ALG == RDMA_RED_T
 RDMA_redt rredt_man; 
+#endif
+#if CC_ALG == RDMA_SI
+RDMA_si rsi_man; 
 #endif
 #if USE_REPLICA
 RedoLogBuffer redo_log_buf;
