@@ -1,11 +1,11 @@
 sh clean_group_delay.sh
 sh set_group_delay.sh 0 4
 
-# RedT
-cd ../../RedTR/scripts 
-# python run_experiments.py -e -c vcloud ycsb_skew_no_ro -l 20 0
-python run_experiments.py -e -c vcloud ycsb_skew -l 20 0
-sleep 10
+# # RedT
+# cd ../../RedTR/scripts 
+# # python run_experiments.py -e -c vcloud ycsb_skew_no_ro -l 20 0
+# python run_experiments.py -e -c vcloud ycsb_skew -l 20 0
+# sleep 10
 
 # Multiple-2pc
 # cd ../../M2PC/scripts 
@@ -25,10 +25,10 @@ sleep 10
 # sleep 10
 
 
-# # TAPIR
-# cd ../../TAPIR/scripts 
-# python run_experiments.py -e -c vcloud ycsb_tapir_skew -l 20 0
-# sleep 10
+# TAPIR
+cd ../../TAPIR/scripts 
+python run_experiments.py -e -c vcloud ycsb_tapir_skew -l 20 0
+sleep 10
 
 
 # # mdcc

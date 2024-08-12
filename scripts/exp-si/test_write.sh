@@ -1,8 +1,8 @@
-# RedT
-cd ../../RedTR/scripts 
-python run_experiments.py -e -c vcloud ycsb_writes_no_ro -l 20 0 
-python run_experiments.py -e -c vcloud ycsb_writes -l 20 0 
-sleep 10
+# # RedT
+# cd ../../RedTR/scripts 
+# python run_experiments.py -e -c vcloud ycsb_writes_no_ro -l 20 0 
+# python run_experiments.py -e -c vcloud ycsb_writes -l 20 0 
+# sleep 10
 
 # Multiple-2pc
 # cd ../../M2PC/scripts 
@@ -21,10 +21,10 @@ sleep 10
 # python run_experiments.py -e -c vcloud ycsb_writes -l 20 0 #
 # sleep 10
 
-# # TAPIR
-# cd ../../TAPIR/scripts 
-# python run_experiments.py -e -c vcloud ycsb_tapir_writes -l 20 0 
-# sleep 10
+# TAPIR
+cd ../../TAPIR/scripts 
+python run_experiments.py -e -c vcloud ycsb_tapir_writes -l 20 0 
+sleep 10
 
 # # MDCC
 # # cd ../../MDCC/scripts 

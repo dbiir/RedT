@@ -24,8 +24,9 @@ RC RDMA_si::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnM
     row->wts = txnMng->get_commit_timestamp();
     // memcpy(row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
     // 调整时间戳
+    #if READ_OPTIMIZATION && WORKLOAD != TPCC
     set_watermark(row->get_part_id(),txnMng->get_commit_timestamp());
-
+    #endif
     row->_tid_word = 0;
 #if DEBUG_PRINTF
     printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id());
@@ -57,7 +58,9 @@ RC RDMA_si::remote_write_and_unlock(yield_func_t &yield,RC rc, TxnManager * txnM
     // memcpy(test_row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
     // 调整远程的时间戳
     // set_watermark(test_row->get_part_id(),txnMng->get_commit_timestamp());
+    #if READ_OPTIMIZATION && WORKLOAD != TPCC
     set_remote_watermark(yield,test_row->get_part_id(),loc,txnMng->get_commit_timestamp(),txnMng->get_thd_id(),cor_id);
+    #endif
 
     test_row->_tid_word = 0;
     rc = txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id);

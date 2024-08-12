@@ -1,2 +1,7 @@
-RDMA_SI 
+RDMA_RED_T 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
+68.766901
+0.0
+117273.173285
+116368.80198
+3132.212305

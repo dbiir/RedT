@@ -13,19 +13,19 @@ sh set_group_delay.sh 0 4
 # sleep 10
 
 # # 优化后的RedT
-cd ../../RedTR/scripts 
-# python run_experiments.py -e -c vcloud ycsb_partitions_no_ro -l 20 80
-python run_experiments.py -e -c vcloud ycsb_partitions -l 20 80
-sleep 10
+# cd ../../RedTR/scripts 
+# # python run_experiments.py -e -c vcloud ycsb_partitions_no_ro -l 20 80
+# python run_experiments.py -e -c vcloud ycsb_partitions -l 20 80
+# sleep 10
 
-# 2pc / early prepare
+# # 2pc / early prepare
 # cd ../../2PC/scripts 
 # python run_experiments.py -e -c vcloud ycsb_early_partitions -l 20 80
 # sleep 10
 # python run_experiments.py -e -c vcloud ycsb_partitions -l 20 80
 # sleep 10
 
-# # TAPIR
-# cd ../../TAPIR/scripts 
-# python run_experiments.py -e -c vcloud ycsb_tapir_partitions -l 20 80
-# sleep 10
+# TAPIR
+cd ../../TAPIR/scripts 
+python run_experiments.py -e -c vcloud ycsb_tapir_partitions -l 20 80
+sleep 10

@@ -198,8 +198,8 @@ def ycsb_writes():
     nnodes = [8]
     # algos=['WAIT_DIE','MVCC','MAAT','TIMESTAMP','OCC']
     # algos=dta_target_algos
-    # algos=['RDMA_RED_T']
-    algos=['RDMA_SI']
+    algos=['RDMA_RED_T']
+    # algos=['RDMA_SI']
     base_table_size=1048576
     # base_table_size=524288
     txn_write_perc = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
@@ -356,7 +356,7 @@ def ycsb_scaling():
     skew = [0.2]
     # skew = [0.0,0.5,0.9]    
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT","SEND_THREAD_CNT","REM_THREAD_CNT","CLIENT_SEND_THREAD_CNT","CLIENT_REM_THREAD_CNT","CENTER_CNT"]
-    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,n*thr,sk,thr,cthr,sthr,rthr,sthr,rthr,3] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,nnodes,algos)]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,n*thr,sk,thr,cthr,sthr,rthr,sthr,rthr,4] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,nnodes,algos)]
     return fmt,exp
 
 def tpcc_scaling_n():
@@ -438,7 +438,7 @@ def ycsb_scaling_no():
     skew = [0.2]
     # skew = [0.0,0.5,0.9]    
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","READ_OPTIMIZATION","ZIPF_THETA","THREAD_CNT","CLIENT_THREAD_CNT","SEND_THREAD_CNT","REM_THREAD_CNT","CLIENT_SEND_THREAD_CNT","CLIENT_REM_THREAD_CNT","CENTER_CNT"]
-    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,n*thr,"false",sk,thr,cthr,sthr,rthr,sthr,rthr,3] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,nnodes,algos)]
+    exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,n*thr,"false",sk,thr,cthr,sthr,rthr,sthr,rthr,4] for thr,cthr,sthr,rthr,txn_wr_perc,tup_wr_perc,sk,n,algo in itertools.product(tcnt,ctcnt,scnt,rcnt,txn_write_perc,tup_write_perc,skew,nnodes,algos)]
     return fmt,exp
 
 def tpcc_scaling_n_no_ro():
@@ -522,6 +522,7 @@ experiment_map = {
     'ycsb_dcs_no_ro': ycsb_dcs_no_ro,
     'tpcc_scaling_n_no_ro':tpcc_scaling_n_no_ro,
     'tpcc_scaling_p_no_ro':tpcc_scaling_p_no_ro,
+    'tpcc_scaling': tpcc_scaling
 }
 
 
@@ -565,7 +566,7 @@ configs = {
     "PRIORITY":"PRIORITY_ACTIVE",
     "TWOPL_LITE":"false",
     "RDMA_SIT":"SIT_COROUTINE",
-    "READ_OPTIMIZATION":"false",
+    "READ_OPTIMIZATION":"true",
 #YCSB
     "INIT_PARALLELISM" : 1,
     "TUP_WRITE_PERC":0.2,

@@ -2,7 +2,7 @@ sh clean_group_delay.sh
 sh set_group_delay.sh 0 4
 
 # # RedT
-cd ../../RedTR/scripts 
+# cd ../../RedTR/scripts 
 # python run_experiments.py -e -c vcloud ycsb_scaling_no_ro -l 20 0
 # sleep 10
 # python run_experiments.py -e -c vcloud tpcc_scaling_n_no_ro -l 20 0
@@ -14,12 +14,12 @@ cd ../../RedTR/scripts
 
 # python run_experiments.py -e -c vcloud ycsb_scaling -l 20 0
 # sleep 10
-python run_experiments.py -e -c vcloud tpcc_scaling_n -l 20 0
-sleep 10
-python run_experiments.py -e -c vcloud tpcc_scaling_p -l 20 0
-sleep 10
-python run_experiments.py -e -c vcloud tpcc_scaling -l 20 0
-sleep 10
+# python run_experiments.py -e -c vcloud tpcc_scaling_n -l 20 0
+# sleep 10
+# python run_experiments.py -e -c vcloud tpcc_scaling_p -l 20 0
+# sleep 10
+# python run_experiments.py -e -c vcloud tpcc_scaling -l 20 0
+# sleep 10
 
 # # Multiple-2pc
 # # cd ../../M2PC/scripts 
@@ -39,7 +39,7 @@ sleep 10
 # # sleep 10
 
 
-# # 2pc / early prepare
+# 2pc / early prepare
 # cd ../../2PC/scripts 
 # python run_experiments.py -e -c vcloud ycsb_scaling_early -l 20 0
 # sleep 10
@@ -55,11 +55,11 @@ sleep 10
 # sleep 10
 
 
-# # TAPIR
-# cd ../../TAPIR/scripts 
-# python run_experiments.py -e -c vcloud ycsb_scaling -l 20 0
-# sleep 10
+# TAPIR
+cd ../../TAPIR/scripts 
+python run_experiments.py -e -c vcloud ycsb_scaling -l 20 0
+sleep 10
 # python run_experiments.py -e -c vcloud tpcc_scaling_n -l 20 0
 # sleep 10
-# python run_experiments.py -e -c vcloud tpcc_scaling_p -l 20 0
-# sleep 10
+python run_experiments.py -e -c vcloud tpcc_scaling_p -l 20 0
+sleep 10

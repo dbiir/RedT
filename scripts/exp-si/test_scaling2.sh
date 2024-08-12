@@ -1,10 +1,10 @@
 sh clean_group_delay.sh
-sh set_group_delay.sh 0 3
+sh set_group_delay.sh 0 4
 
-# RedT
-cd ../../RedT/scripts 
-python run_experiments.py -e -c vcloud tpcc_scaling -l 20 0
-sleep 10
+# # RedT
+# cd ../../RedT/scripts 
+# python run_experiments.py -e -c vcloud tpcc_scaling -l 20 0
+# sleep 10
 
 # Multiple-2pc
 # cd ../../M2PC/scripts 
@@ -17,12 +17,12 @@ sleep 10
 
 # 2pc / early prepare
 cd ../../2PC/scripts 
-python run_experiments.py -e -c vcloud tpcc_scaling_early -l 20 0
-sleep 10
+# python run_experiments.py -e -c vcloud tpcc_scaling_early -l 20 0
+# sleep 10
 python run_experiments.py -e -c vcloud tpcc_scaling -l 20 0
 sleep 10
 
 # TAPIR
-cd ../../TAPIR/scripts 
-python run_experiments.py -e -c vcloud tpcc_scaling -l 20 0
-sleep 10
+# cd ../../TAPIR/scripts 
+# python run_experiments.py -e -c vcloud tpcc_scaling -l 20 0
+# sleep 10

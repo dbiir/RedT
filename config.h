@@ -229,7 +229,7 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_SI
+#define CC_ALG RDMA_RED_T
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -353,7 +353,7 @@
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 8388608
 #define ZIPF_THETA 0.2
-#define TXN_WRITE_PERC 0.8
+#define TXN_WRITE_PERC 1.0
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
@@ -366,7 +366,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 0.5
+#define CROSS_DC_TXN_PERC 1.0
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.
@@ -463,7 +463,7 @@ enum PPSTxnType {
 #endif
 
 // [RDMA_RED_T || [RDMA_SI]
-#define READ_OPTIMIZATION true 
+#define READ_OPTIMIZATION true
 
 #define HOT_VALUE 10000
 #define MOCC_MAX_RETRY_COUNT 5
