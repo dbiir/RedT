@@ -39,6 +39,7 @@
 #include "ycsb.h"
 #include "ycsb_query.h"
 #include "da.h"
+#include "si.h"
 #include "maat.h"
 #include "client_query.h"
 #include "lib.hh"
@@ -203,6 +204,12 @@ int main(int argc, char *argv[]) {
 	seq_man.init(m_wl);
 	printf("Done\n");
 
+#endif
+#if CC_ALG == SI
+	printf("Initializing SI manager... ");
+	fflush(stdout);
+	si_man.init();
+	printf("Done\n");
 #endif
 #if CC_ALG == MAAT
 	printf("Initializing Time Table... ");

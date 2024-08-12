@@ -62,7 +62,7 @@ public:
 	//vector<Access*> accesses;
 	Array<Access*> accesses;
 	uint64_t timestamp;
-	// For OCC and SSI
+	// For OCC and SI
 	uint64_t start_timestamp;
 	uint64_t end_timestamp;
 

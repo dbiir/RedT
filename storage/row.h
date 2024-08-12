@@ -53,6 +53,7 @@ class Row_occ;
 class Row_maat;
 class Row_specex;
 class Row_null;
+class Row_si;
 
 class row_t {
 public:
@@ -126,6 +127,8 @@ public:
 		Row_avoid * manager;
 	#elif CC_ALG == CNULL
 		Row_null * manager;
+	#elif CC_ALG == SI
+    	Row_si * manager;
 	#endif
 	int tuple_size;
 	table_t * table;

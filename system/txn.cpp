@@ -23,6 +23,7 @@
 #include "mem_alloc.h"
 #include "occ.h"
 #include "row_occ.h"
+#include "row_si.h"
 #include "table.h"
 #include "catalog.h"
 #include "index_btree.h"
@@ -33,6 +34,7 @@
 #include "message.h"
 #include "msg_queue.h"
 #include "occ.h"
+#include "si.h"
 #include "pool.h"
 #include "message.h"
 #include "ycsb_query.h"
@@ -662,6 +664,9 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
 		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
     	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
+		if(CC_ALG == SI) {
+			si_man.gene_finish_ts(this);
+        }
 		if(rc == RCOK){   //for NO_WAIT , rc == RCOK
 			// printf("commit transaction\n");
 			// if(IS_LOCAL(get_txn_id())) {
@@ -1497,7 +1502,7 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 #if MODE != NORMAL_MODE
 	return RCOK;
 #endif
-	if (CC_ALG != OCC && CC_ALG != MAAT) {
+	if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != SI) {
 		return RCOK; //no validate in NO_WAIT
 	}
 	RC rc = RCOK;
@@ -1510,7 +1515,9 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 			rc = maat_man.find_bound(this);
 		}
 	}
-	
+	if (CC_ALG == SI) {
+        rc = si_man.validate(this);
+    } 
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);
     INC_STATS(get_thd_id(),trans_validate_count, 1);

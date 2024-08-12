@@ -33,6 +33,7 @@
 #include "work_queue.h"
 #include "ycsb_query.h"
 #include "maat.h"
+#include "si.h"
 #include "transport.h"
 #include "routine.h"
 #include <boost/bind.hpp>
@@ -566,7 +567,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
 
   txn_man->commit(yield, cor_id);
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
-  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT)
+  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT || CC_ALG == SI)
     txn_man->abort_cnt = msg->current_abort_cnt;
 
 #if TAPIR_DEBUG
@@ -801,6 +802,9 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   uint64_t finish_start_time = get_sys_clock();
   txn_man->txn_stats.finish_start_time = finish_start_time;
   uint64_t prepare_timespan  = finish_start_time - txn_man->txn_stats.prepare_start_time;
+  if(CC_ALG == SI) {
+    si_man.gene_finish_ts(txn_man);
+  }
   // INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
   // INC_STATS(get_thd_id(), trans_prepare_count, 1);
   if(rc == Abort || txn_man->get_rc() == Abort) {
@@ -818,6 +822,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   #else
     txn_man->send_finish_messages();
   #endif
+
   if(rc == Abort) {
     txn_man->abort(yield, cor_id);
   } else {
@@ -989,6 +994,9 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 #if CC_ALG == MAAT
   time_table.init(get_thd_id(),txn_man->get_txn_id());
 #endif
+#if CC_ALG == SI
+  txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_start_timestamp());
+#endif
   txn_man->send_RQRY_RSP = true;
   txn_man->finish_logging = true;
   txn_man->abort_cnt = msg->current_abort_cnt;
@@ -1157,7 +1165,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
 #if CC_ALG == MVCC
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
 #endif
-#if CC_ALG == OCC
+#if CC_ALG == OCC || CC_ALG == SI
   #if WORKLOAD==DA
     if(da_start_stamp_tab.count(txn_man->get_txn_id())==0)
     {
@@ -1169,6 +1177,9 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   #else
       txn_man->set_start_timestamp(get_next_ts());
   #endif
+#endif
+#if CC_ALG == SI
+    txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_start_timestamp());
 #endif
 #if CC_ALG == MAAT
   #if WORKLOAD==DA
