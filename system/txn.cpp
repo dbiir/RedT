@@ -23,6 +23,7 @@
 #include "mem_alloc.h"
 #include "occ.h"
 #include "row_occ.h"
+#include "row_si.h"
 #include "table.h"
 #include "catalog.h"
 #include "index_btree.h"
@@ -33,6 +34,7 @@
 #include "message.h"
 #include "msg_queue.h"
 #include "occ.h"
+#include "si.h"
 #include "pool.h"
 #include "message.h"
 #include "ycsb_query.h"
@@ -618,6 +620,13 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	if(rc == Abort) lock_status = LOCK_FIRST_FAIL;
 	else lock_status = LOCK_FIRST_SUCCESS;
 #endif
+#if CC_ALG == SI
+	rc = validate(yield, cor_id);
+	set_rc(rc);
+	assert(lock_status == LOCK_EMPTY);
+	if(rc == Abort) lock_status = LOCK_FIRST_FAIL;
+	else lock_status = LOCK_FIRST_SUCCESS;
+#endif
 	// printf("%d query_partitions_modified size: %d\n", get_txn_id(), query->partitions_modified.size());
 	if(query->partitions_touched.size() != 0)
 		return WAIT_REM;	
@@ -626,72 +635,75 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	assert(query->partitions_modified.size() == 0);	
 #endif
 
-	if(is_multi_part()) {
-		if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT) {
-			// send prepare messages
-			send_prepare_messages();
-			rc = WAIT_REM;
-		} else {
-			uint64_t finish_start_time = get_sys_clock();
-			txn_stats.finish_start_time = finish_start_time;
-			uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-			// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-      		// INC_STATS(get_thd_id(), trans_prepare_count, 1);
-			if(IS_LOCAL(get_txn_id())) {
-				INC_STATS(get_thd_id(), trans_logging_count, 1);
-				INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
-				start_fin_time = get_sys_clock();
-			}
-			send_finish_messages();
-			txn_state = 2;
-		#if !USE_TAPIR
-			// rsp_cnt = 0;
-		#endif
-			rc = commit(yield, cor_id);
-		}
-	} 
-	else { // is not multi-part 
-		rc = validate(yield, cor_id);
-		// rc = RCOK;
-		uint64_t finish_start_time = get_sys_clock();
-		txn_stats.finish_start_time = finish_start_time;
-		if(IS_LOCAL(get_txn_id())) {
-			INC_STATS(get_thd_id(), trans_logging_count, 1);
-			INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
-			start_fin_time = get_sys_clock();
-		}
-		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
-		if(rc == RCOK){ 
-			// printf("commit transaction\n");
-			// if(IS_LOCAL(get_txn_id())) {
-			// 	INC_STATS(get_thd_id(), trans_logging_count, 1);
-			// 	INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
-			// 	start_fin_time = get_sys_clock();
-			// }
-		#if USE_TAPIR
-			send_finish_messages();
-			txn_state = 2;
-		#endif
-			rc = commit(yield, cor_id);
-		}		
-		else {
-			txn->rc = Abort;
-			DEBUG("%ld start_abort\n",get_txn_id());
-			if(query->partitions_touched.size() > 1) {
-				send_finish_messages();
-				abort(yield, cor_id);
-				rc = Abort;
-			}
-			rc = abort(yield, cor_id);
-		}
-	}
+	// if(is_multi_part()) {
+	// 	if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT) {
+	// 		// send prepare messages
+	// 		send_prepare_messages();
+	// 		rc = WAIT_REM;
+	// 	} else {
+	// 		uint64_t finish_start_time = get_sys_clock();
+	// 		txn_stats.finish_start_time = finish_start_time;
+	// 		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
+	// 		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+    //   		// INC_STATS(get_thd_id(), trans_prepare_count, 1);
+	// 		if(IS_LOCAL(get_txn_id())) {
+	// 			INC_STATS(get_thd_id(), trans_logging_count, 1);
+	// 			INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
+	// 			start_fin_time = get_sys_clock();
+	// 		}
+	// 		send_finish_messages();
+	// 		txn_state = 2;
+	// 	#if !USE_TAPIR
+	// 		// rsp_cnt = 0;
+	// 	#endif
+	// 		rc = commit(yield, cor_id);
+	// 	}
+	// } 
+	// else { // is not multi-part 
+	// 	rc = validate(yield, cor_id);
+	// 	// rc = RCOK;
+	// 	uint64_t finish_start_time = get_sys_clock();
+	// 	txn_stats.finish_start_time = finish_start_time;
+	// 	if(IS_LOCAL(get_txn_id())) {
+	// 		INC_STATS(get_thd_id(), trans_logging_count, 1);
+	// 		INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
+	// 		start_fin_time = get_sys_clock();
+	// 	}
+	// 	uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
+	// 	// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
+    // 	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
+	// 	if(CC_ALG == SI) {
+    //         si_man.gene_finish_ts(this);
+    //     }
+	// 	if(rc == RCOK){ 
+	// 		// printf("commit transaction\n");
+	// 		// if(IS_LOCAL(get_txn_id())) {
+	// 		// 	INC_STATS(get_thd_id(), trans_logging_count, 1);
+	// 		// 	INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
+	// 		// 	start_fin_time = get_sys_clock();
+	// 		// }
+	// 	#if USE_TAPIR
+	// 		send_finish_messages();
+	// 		txn_state = 2;
+	// 	#endif
+	// 		rc = commit(yield, cor_id);
+	// 	}		
+	// 	else {
+	// 		txn->rc = Abort;
+	// 		DEBUG("%ld start_abort\n",get_txn_id());
+	// 		if(query->partitions_touched.size() > 1) {
+	// 			send_finish_messages();
+	// 			abort(yield, cor_id);
+	// 			rc = Abort;
+	// 		}
+	// 		rc = abort(yield, cor_id);
+	// 	}
+	// }
 	return rc;
 }
 #endif
 void TxnManager::send_prepare_messages() {
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC || CC_ALG == SI
 	// this means that it is the FIRST round of prepare in MDCC; 
 	// otherwise, it is the SECOND round of prepare to resolve conflicts.
 	if(get_rc() != Abort){ 
@@ -812,7 +824,7 @@ void TxnManager::send_finish_messages() {
 	// 	INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
 	// 	start_fin_time = get_sys_clock();
 	// }
-#if CC_ALG == MDCC 
+#if CC_ALG == MDCC || CC_ALG == SI
 	// similar to send_prepare_message()	
 	// no need to wait for message response
 	uint64_t tar_nodes[g_node_cnt];
@@ -1058,7 +1070,7 @@ int TxnManager::received_tapir_response(RC rc, uint64_t return_node_id) {
 		}
 	}
 	for(int i = 0; i < query->partitions_touched.size(); i++) {
-#if MAJORITY && CC_ALG != MDCC
+#if MAJORITY && CC_ALG != MDCC && CC_ALG != SI
 		if(ir_log_rsp_cnt[i] > 1) {
 			return 1;
 		}
@@ -1287,7 +1299,7 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 	row_t * orig_r = txn->accesses[rid]->orig_row;
 
   if (ROLL_BACK && type == XP &&
-      (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == MDCC || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT)) {
+      (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == MDCC || CC_ALG == WAIT_DIE || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT || CC_ALG == SI)) {
     orig_r->return_row(rc,type, this, txn->accesses[rid]->orig_data); 
   } else {
 #if ISOLATION_LEVEL == READ_COMMITTED
@@ -1301,7 +1313,7 @@ void TxnManager::cleanup_row(yield_func_t &yield, RC rc, uint64_t rid, vector<ve
 #endif
 
 #if ROLL_BACK && \
-		(CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT)
+		(CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT|| CC_ALG == SI)
 	if (type == WR && is_local) {
 		//printf("free 10 %ld\n",get_txn_id());
 		txn->accesses[rid]->orig_data->free_row();
@@ -1411,7 +1423,7 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	//!formally! _wl->key_to_part() should be used here
 	access->is_primary = (GET_NODE_ID(row->get_primary_key() % g_part_cnt) == g_node_id ? true : false) ;
 
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT)
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT|| CC_ALG == SI)
 	if (type == WR) {
 	//printf("alloc 10 %ld\n",get_txn_id());
 	uint64_t part_id = row->get_part_id();
@@ -1458,7 +1470,7 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
     INC_STATS(get_thd_id(), trans_store_access_time, timespan + starttime - middle_time);
   	INC_STATS(get_thd_id(), trans_store_access_count, 1);
 	INC_STATS(get_thd_id(), txn_manager_time, timespan);
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC|| CC_ALG == SI
 	row_rtn  = row;
 #else
 	row_rtn  = access->data;
@@ -1484,7 +1496,7 @@ RC TxnManager::get_row_post_wait(row_t *& row_rtn) {
 
 	access->type = type;
 	access->orig_row = row;
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC )
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC|| CC_ALG == SI )
 	if (type == WR) {
 		uint64_t part_id = row->get_part_id();
 		//printf("alloc 10 %ld\n",get_txn_id());
@@ -1603,7 +1615,7 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 #if MODE != NORMAL_MODE
 	return RCOK;
 #endif
-	if (CC_ALG != OCC && CC_ALG != MAAT) {
+	if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != SI) {
 		return RCOK;
 	}
 	RC rc = RCOK;
@@ -1616,6 +1628,9 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 			rc = maat_man.find_bound(this);
 		}
 	}
+	if (CC_ALG == SI) {
+        rc = si_man.validate(this);
+    } 
 
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);

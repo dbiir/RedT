@@ -63,6 +63,7 @@ class Manager;
 class Query_queue;
 class OptCC;
 class Maat;
+class si;
 class Transport;
 class Remote_query;
 class TxnManPool;
@@ -126,6 +127,8 @@ extern Logger logger;
 extern TimeTable time_table;
 extern InOutTable inout_table;
 extern WkdbTimeTable wkdb_time_table;
+
+extern si si_man;
 // extern QTcpQueue tcp_queue;
 // extern TcpTimestamp tcp_ts;
 

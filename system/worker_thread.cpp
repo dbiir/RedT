@@ -33,6 +33,7 @@
 #include "work_queue.h"
 #include "ycsb_query.h"
 #include "maat.h"
+#include "si.h"
 #include "transport.h"
 #include "routine.h"
 #include <boost/bind.hpp>
@@ -183,7 +184,7 @@ void WorkerThread::commit() {
   DEBUG_T("COMMIT %ld -- %f\n", txn_man->get_txn_id(),
         (double)get_sys_clock() - run_starttime / BILLION);
   total_local_txn_commit++;
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC || CC_ALG == SI
   assert(txn_man->num_msgs_rw == 0);
 
   uint64_t num_msgs;
@@ -367,7 +368,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
     }
     //uint64_t starttime = get_sys_clock();
     DEBUG_T("worker run txn %ld type %d \n", msg->get_txn_id(),msg->get_rtype());
-    if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O && msg->rtype != RLOG && msg->rtype != RFIN_LOG) || CC_ALG == CALVIN || (CC_ALG == MDCC && msg->rtype == RLOG)) {
+    if((msg->rtype != CL_QRY && msg->rtype != CL_QRY_O && msg->rtype != RLOG && msg->rtype != RFIN_LOG) || CC_ALG == CALVIN || (CC_ALG == MDCC || CC_ALG == SI && msg->rtype == RLOG)) {
       txn_man = get_transaction_manager(msg);
       if(msg->rtype == RACK_LOG || msg->rtype == RACK_FIN_LOG || msg->rtype == RACK_FIN || msg->rtype == RACK_PREP
       //  || msg->rtype == RPREPARE
@@ -503,7 +504,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
     txn_man->reset();
     txn_man->reset_query();
     // printf("%d:%d send abort finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));  
-    if(CC_ALG != MDCC)
+    if(CC_ALG != MDCC && CC_ALG != SI)
       msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN), GET_NODE_ID(msg->get_txn_id()));
     return Abort;
   }
@@ -511,7 +512,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
 //now commit 
   txn_man->commit(yield, cor_id);
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
-  if (CC_ALG != MDCC && (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT)){
+  if (CC_ALG != MDCC && CC_ALG != SI && (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT || CC_ALG == SI)){
 #if TAPIR_DEBUG
     printf("%d:%d send commit finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
 #endif
@@ -535,7 +536,7 @@ RC WorkerThread::process_rlog(yield_func_t &yield, Message * msg, uint64_t cor_i
 	// log_content = log_count;
 	// pthread_mutex_unlock(&log_lock);
 #endif
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC || CC_ALG == SI
     rc = ((PrepareMessage*)msg)->rc;
     LockState ls = txn_man->lock_status;    
     // assert(ls == LOCK_FIRST_FAIL || ls == LOCK_FIRST_SUCCESS);
@@ -545,18 +546,26 @@ RC WorkerThread::process_rlog(yield_func_t &yield, Message * msg, uint64_t cor_i
       txn_man->abort(yield, cor_id);
       txn_man->lock_status = LOCK_SECOND_FAIL;
     }else{ //rc==RCOK && (ls == LOCK_FIRST_FAIL || ls == LOCK_FIRST_SUCCESS || ls == LOCK_SECOND_SUCCESS)
-      for(int i=0;i<txn_man->get_access_cnt();i++){
-        Access* acc = txn_man->txn->accesses[i];
-      	//!formally! _wl->key_to_part() should be used here
-        uint64_t part_id = acc->orig_row->get_primary_key() % g_part_cnt;
-        bool is_target = (GET_NODE_ID(part_id) == msg->return_node_id ? true : false);
-        if(is_target && !acc->is_primary){
-          row_t* orig_row = acc->orig_row;
-          access_t type = acc->type;
-          RC row_rc = orig_row->get_row(yield, type, txn_man, acc, cor_id);
-          assert(row_rc == RCOK);
+      if (CC_ALG == MDCC) {
+        for(int i=0;i<txn_man->get_access_cnt();i++){
+          Access* acc = txn_man->txn->accesses[i];
+          //!formally! _wl->key_to_part() should be used here
+          uint64_t part_id = acc->orig_row->get_primary_key() % g_part_cnt;
+          bool is_target = (GET_NODE_ID(part_id) == msg->return_node_id ? true : false);
+          if(is_target && !acc->is_primary){
+            row_t* orig_row = acc->orig_row;
+            access_t type = acc->type;
+            RC row_rc = orig_row->get_row(yield, type, txn_man, acc, cor_id);
+            assert(row_rc == RCOK);
+          }
         }
+      } else if (CC_ALG == SI) {
+        rc = txn_man->validate(yield, cor_id);
+	      txn_man->set_rc(rc);
+      } else {
+        assert(false);
       }
+
       // txn_man->set_rc(((PrepareMessage*)msg)->rc);
       txn_man->lock_status = LOCK_SECOND_SUCCESS;      
     }
@@ -579,7 +588,7 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
   // INC_STATS(get_thd_id(), trans_prepare_log_message_count, 1);
   // }
   assert(responses_left >=0);
-#if MAJORITY && CC_ALG != MDCC
+#if MAJORITY && CC_ALG != MDCC && CC_ALG != SI
   if(responses_left == 1){//able to return with 2 confirm(local+one remote)
 #else
   if(responses_left == 0){
@@ -608,7 +617,7 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
 #endif
       txn_man->send_finish_messages();
       assert(txn_man->get_local_log());
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC || CC_ALG == SI
     rc = txn_man->get_rc();
     if(rc == Abort){
       txn_man->abort(yield, cor_id);
@@ -716,7 +725,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #endif
 #if USE_TAPIR
 
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC || CC_ALG == SI
   LockState ls = txn_man->lock_status;
   if(ls == LOCK_FIRST_FAIL || ls == LOCK_FIRST_SUCCESS)
     responses_left = txn_man->received_tapir_response(((AckMessage*)msg)->rc, msg->return_node_id);
@@ -810,7 +819,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #endif
 
   if (responses_left > 0) return WAIT;
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC || CC_ALG == SI
   if(ls == LOCK_SECOND_FAIL || ls == LOCK_SECOND_SUCCESS)  
     if(txn_man->get_log_rsp_cnt() > 0)
       return WAIT;
@@ -844,7 +853,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     rc = Abort;
   }
 
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC || CC_ALG == SI
   if(ls == LOCK_FIRST_FAIL || ls == LOCK_FIRST_SUCCESS){
     //this is the receive of the FIRST round of RACK_PREPARE
     if(rc == Abort){ // extra two round-trips
@@ -908,7 +917,9 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   }
   return rc;
 #endif
-
+  if(CC_ALG == SI) {
+    si_man.gene_finish_ts(txn_man);
+  }
   if(rc == Abort) {
 #if !EARLY_PREPARE
     txn_man->send_finish_messages();
@@ -1031,7 +1042,10 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
     txn_man->start_abort(yield, cor_id);
   }
 
-  if (responses_left > 0) return WAIT;
+  if (responses_left > 0) {
+    // printf("worker_thread.cpp:953 SI wait remote %ld cnt %ld\n",txn_man->get_txn_id(),responses_left);
+    return WAIT;
+  }
   //Done Waiting
   txn_man->txn_stats.remote_wait_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
   INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - txn_man->start_rw_time);
@@ -1076,6 +1090,9 @@ RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_i
 
 #if CC_ALG == MVCC
   txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_timestamp());
+#endif
+#if CC_ALG == SI
+  txn_table.update_min_ts(get_thd_id(),txn_man->get_txn_id(),0,txn_man->get_start_timestamp());
 #endif
 #if CC_ALG == MAAT
     time_table.init(get_thd_id(),txn_man->get_txn_id());
@@ -1134,7 +1151,7 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
     printf("%d:%d send prepare ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
 #endif
 
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC|| CC_ALG == SI
     LockState ls = txn_man->lock_status;
     if(ls == LOCK_EMPTY){
       //this is the FIRST try of lock
@@ -1296,7 +1313,7 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
 #if CC_ALG == MVCC
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
 #endif
-#if CC_ALG == OCC
+#if CC_ALG == OCC || CC_ALG == SI
   #if WORKLOAD==DA
     if(da_start_stamp_tab.count(txn_man->get_txn_id())==0)
     {
@@ -1308,6 +1325,9 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   #else
       txn_man->set_start_timestamp(get_next_ts());
   #endif
+#endif
+#if CC_ALG == SI
+    txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_start_timestamp());
 #endif
 #if CC_ALG == MAAT
   #if WORKLOAD==DA

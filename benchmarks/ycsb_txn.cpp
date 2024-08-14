@@ -151,7 +151,7 @@ void YCSBTxnManager::get_num_msgs_statistics() {
 	int m = 2;
 	int M = 2;
 
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC || CC_ALG == SI
 	//for MDCC
 	for(uint64_t i=0;i<g_center_cnt;i++){
 		if(i == g_center_id){
@@ -180,7 +180,7 @@ RC YCSBTxnManager::send_remote_subtxn() {
 		ycsb_query->partitions_touched.add_unique(GET_PART_ID(0,node_id));
 		if(req->acctype == WR) ycsb_query->partitions_modified.add_unique(part_id);
 		remote_node[node_id].push_back(i);
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC || CC_ALG == SI
 		uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
 		uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
 		remote_node[f1].push_back(i);	
@@ -273,7 +273,10 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	if(rc == Abort){
 		rc = start_abort(yield, cor_id);
 	}else{
-		if(rsp_cnt > 0) return WAIT;
+		if(rsp_cnt > 0) {
+			// printf("SI wait remote %ld cnp %ld\n",get_txn_id(),rsp_cnt);
+			return WAIT;
+		}
 		if(is_done()){
 #if CC_ALG == WOUND_WAIT
 			txn_state = STARTCOMMIT;
@@ -369,7 +372,7 @@ RC YCSBTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	ycsb_request * req = ycsb_query->requests[next_record_id];
 	uint64_t part_id = _wl->key_to_part( req->key );
-#if CC_ALG == MDCC
+#if CC_ALG == MDCC || CC_ALG == SI
   	bool loc = (GET_NODE_ID(part_id) == g_node_id || GET_FOLLOWER1_NODE(part_id) == g_node_id || GET_FOLLOWER2_NODE(part_id) == g_node_id);	
 #else
   	bool loc = GET_NODE_ID(part_id) == g_node_id;

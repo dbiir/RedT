@@ -63,7 +63,7 @@
 #define SECOND 200 // Set the queue monitoring time.
 // #define THD_ID_QUEUE
 #define ONE_NODE_RECIEVE 0 // only node 0 will receive the txn query
-#define USE_WORK_NUM_THREAD false
+#define USE_WORK_NUM_THREAD true
 #if 1
 // #define LESS_DIS // Reduce the number of yCSB remote data to 1
 // #define LESS_DIS_NUM 0 // Reduce the number of yCSB remote data to 1
@@ -181,7 +181,7 @@
 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG MDCC
+#define CC_ALG SI
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -325,7 +325,7 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 8388608
-#define ZIPF_THETA 0.5
+#define ZIPF_THETA 0.9
 #define TXN_WRITE_PERC 0.8
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
@@ -495,6 +495,7 @@ enum PPSTxnType {
 #define MAAT      11
 #define WDL           12
 #define MDCC           13
+#define SI    14
 // #define WOOKONG     13
 // #define TICTOC     14
 // #define FOCC       15
