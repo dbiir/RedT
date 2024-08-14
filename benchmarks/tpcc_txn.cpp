@@ -411,6 +411,7 @@ RC TPCCTxnManager::send_remote_subtxn() {
 		for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
 			uint64_t ol_number = i;
 			uint64_t ol_supply_w_id = tpcc_query->items[ol_number]->ol_supply_w_id;
+			assert(ol_supply_w_id != 0);
 			generate_center_master(ol_supply_w_id, WR);
 		}
 	}
@@ -724,16 +725,32 @@ RC TPCCTxnManager::send_remote_one_side_request(yield_func_t &yield, TPCCQuery *
     uint64_t c_w_id = tpcc_query->c_w_id;
 
     uint64_t loc = w_loc;
-    if(state == TPCC_PAYMENT0) {
-		loc = GET_NODE_ID(wh_to_part(w_id));
+	uint64_t loc1,loc2,loc3;
+    if(state == TPCC_PAYMENT0 || state == TPCC_NEWORDER0) {
+		loc1 = GET_NODE_ID(wh_to_part(w_id));
+		loc2 = GET_FOLLOWER1_NODE(wh_to_part(w_id));
+		loc3 = GET_FOLLOWER2_NODE(wh_to_part(w_id));
+		if (GET_CENTER_ID(loc1) == g_center_id) loc = loc1;
+		if (GET_CENTER_ID(loc2) == g_center_id) loc = loc2;
+		if (GET_CENTER_ID(loc3) == g_center_id) loc = loc3;
 	} else if(state == TPCC_PAYMENT4) {
-		loc = GET_NODE_ID(wh_to_part(c_w_id));
-	} else if(state == TPCC_NEWORDER0) {
-		loc = GET_NODE_ID(wh_to_part(w_id));
+		loc1 = GET_NODE_ID(wh_to_part(c_w_id));
+		loc2 = GET_FOLLOWER1_NODE(wh_to_part(c_w_id));
+		loc3 = GET_FOLLOWER2_NODE(wh_to_part(c_w_id));
+		if (GET_CENTER_ID(loc1) == g_center_id) loc = loc1;
+		if (GET_CENTER_ID(loc2) == g_center_id) loc = loc2;
+		if (GET_CENTER_ID(loc3) == g_center_id) loc = loc3;
 	} else if(state == TPCC_NEWORDER8) {
-		loc = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
+		loc1 = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
+		loc2 = GET_FOLLOWER1_NODE(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
+		loc3 = GET_FOLLOWER2_NODE(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
+		if (GET_CENTER_ID(loc1) == g_center_id) loc = loc1;
+		if (GET_CENTER_ID(loc2) == g_center_id) loc = loc2;
+		if (GET_CENTER_ID(loc3) == g_center_id) loc = loc3;
+		// loc = GET_NODE_ID(wh_to_part(tpcc_query->items[next_item_id]->ol_supply_w_id));
     }
 	assert(loc != g_node_id);
+	assert(GET_CENTER_ID(loc) == GET_CENTER_ID(g_node_id));
 
     uint64_t remote_offset = m_item->offset;
 
@@ -876,8 +893,12 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 			}
 			break;
 		case TPCC_PAYMENT5 :
+			#if REPLICA_CC
+			if(is_c_w_cen){
+			#else
 			if(c_w_cen == g_center_id){
-			// if(is_c_w_cen){
+			#endif
+			// 
 				rc = run_payment_5( w_id,  d_id, c_id, c_w_id,  c_d_id, c_last, h_amount, by_last_name, row);
 			}
 			break;
@@ -932,7 +953,11 @@ RC TPCCTxnManager::run_txn_state(yield_func_t &yield, uint64_t cor_id) {
 				rc = new_order_8(yield,w_id, d_id, remote, ol_i_id, ol_supply_w_id, ol_quantity, ol_number, o_id,row,cor_id);
 			}
 #if PARAL_SUBTXN == true
+		#if REPLICA_CC
+			else if(rdma_one_side() && is_ol_supply_w_cen){//rdma_silo
+		#else
 			else if(rdma_one_side() && ol_supply_w_cen == g_center_id && g_node_id == center_master[ol_supply_w_cen]){//rdma_silo
+		#endif
 #else
 			else if(rdma_one_side() && is_ol_supply_w_cen){//rdma_silo
 #endif

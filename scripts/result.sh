@@ -93,7 +93,8 @@ do
             shift
             ;;
         --wr)
-            TWR=($(echo $2 | tr ',' ' '))
+            WR=($(echo $2 | tr ',' ' '))
+            # TWR=($(echo $2 | tr ',' ' '))
             shift
             shift
             ;;
@@ -184,7 +185,8 @@ ArgsType() {
         args=("${NUMBEROFNODE[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_writes' ]]
     then
-        args=("${TWR[@]}")
+        args=("${WR[@]}")
+        # args=("${TWR[@]}")
     elif [[ "${TEST_TYPE}" == 'tpcc_scaling' ]]
     then
         args=("${NUMBEROFNODE[@]}")
@@ -233,7 +235,8 @@ FileName() {
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_writes' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _TWR-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _WR-${arg}_ | grep ^${i}_)
+        # f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _TWR-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'tpcc_scaling' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${arg}_ | grep ^${i}_)

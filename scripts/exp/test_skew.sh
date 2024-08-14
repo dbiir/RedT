@@ -1,23 +1,35 @@
 sh clean_group_delay.sh
 sh set_group_delay.sh 0 4
-# Multiple-2pc
-# cd /home/ibtest/sigmod21-deneva/scripts 
-# python run_experiments.py -e -c vcloud ycsb_skew -l 20 0
-# sleep 10
+
 # RedT
-cd /home/ibtest/origin/sigmod21-deneva/scripts 
+cd ../../RedT/scripts 
 python run_experiments.py -e -c vcloud ycsb_skew -l 20 0
 sleep 10
+
+# Multiple-2pc
+# cd ../../M2PC/scripts 
+# python run_experiments.py -e -c vcloud ycsb_skew -l 20 0
+# sleep 10
+
+# 优化后的RedT
+cd ../../RedT-RO/scripts 
+python run_experiments.py -e -c vcloud ycsb_skew -l 20 0
+sleep 10
+
 # 2pc / early prepare
-cd /home/ibtest/tcp/sigmod21-deneva/scripts 
+cd ../../2PC/scripts 
 python run_experiments.py -e -c vcloud ycsb_early_skew -l 20 0
 sleep 10
 python run_experiments.py -e -c vcloud ycsb_skew -l 20 0
 sleep 10
-# # tapir
-cd /home/ibtest/tapir/sigmod21-deneva/scripts 
+
+
+# TAPIR
+cd ../../TAPIR/scripts 
 python run_experiments.py -e -c vcloud ycsb_tapir_skew -l 20 0
 sleep 10
-# # mdcc
-# cd /home/ibtest/mdcc/sigmod21-deneva/scripts
-# python run_experiments.py -e -c vcloud ycsb_tapir_skew -l 20 0
+
+
+# mdcc
+cd ../../MDCC/scripts 
+python run_experiments.py -e -c vcloud ycsb_tapir_skew -l 20 0

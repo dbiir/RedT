@@ -257,6 +257,7 @@ BaseQuery * TPCCQueryGenerator::gen_new_order(uint64_t home_partition) {
         }
       }
     }
+    assert(item->ol_supply_w_id != 0);
     item->ol_supply_w_primary.status=OpStatus::RUN;
 		item->ol_supply_w_second1.status=OpStatus::RUN;
 		item->ol_supply_w_second2.status=OpStatus::RUN;

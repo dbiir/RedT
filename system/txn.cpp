@@ -1315,7 +1315,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t key, 
 			#if !DEBUG_PRINTF
 			mem_allocator.free(lock_read, row_t::get_row_size(ROW_DEFAULT_SIZE));
 			#endif
-remote_atomic_retry_lock:
+		remote_atomic_retry_lock:
 			bool conflict = Row_rdma_2pl::conflict_lock(lock_info, DLOCK_SH, new_lock_info);
 
 			if(conflict){

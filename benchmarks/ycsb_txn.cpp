@@ -1310,7 +1310,7 @@ RC YCSBTxnManager::check_query_status(OpStatus status) {
 			DEBUG_T("txn %ld need wait, due to req %d primary status %ld:%ld\n",get_txn_id(), i, req->primary.status, status);
 			return WAIT;
 		}
-		if(req->acctype==WR) {
+		if(REPLICA_CC || req->acctype==WR) {
 			#if REPLICA_CC
 			if (req->second1.status == PREP_ABORT ||
 				req->second2.status == PREP_ABORT) {
