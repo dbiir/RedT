@@ -5,7 +5,7 @@ Implementation of the paper "Efficient Distributed Transaction Processing in Het
 RedT is a novel distributed transaction processing protocol that works in heterogeneous networks, it extends two-phase commitment (a.b.a. 2PC) by decomposing
 transactions into sub-transactions in terms of the data center granularity, and proposing a pre-write-log mechanism that is able to eliminate the log synchronization in the prepare phase.
 
-We implemented RedT and other baselines in this repository, and the concurrency control algorithm we used was _No-wait_ for serializability and _si_ for snapshot isolation. For the other baseline, we also use the _No-wait_ and _si_. For _No-wait_ in RedT, we design three implementations using RDMA one-side verbs. RDMA_NO_WAIT is the algorithm that distinguishes between read and write locks, RDMA_NO_WAIT2 does not distinguish between read and write locks, and RDMA_NO_WAIT3 adds lock_owner to each data item. We used RDMA_NO_WAIT3 in the paper.
+We implemented RedT and other baselines in this repository, and the concurrency control algorithm we used was _No-wait_ for serializability and _si_ for snapshot isolation. For the other baseline, we also use the _No-wait_ and _si_. For _No-wait_ in RedT, we design three implementations using RDMA one-side verbs. _RDMA_NO_WAIT_ is the algorithm that distinguishes between read and write locks, _RDMA_NO_WAIT2_ does not distinguish between read and write locks, and _RDMA_NO_WAIT3_ adds lock_owner to each data item. We used _RDMA_NO_WAIT3_ in the paper.
 
 RedT is atop of the opensourced distributed framework Deneva, whose study can be found in the following paper:
 
