@@ -14,7 +14,8 @@ RedT is atop of the opensourced distributed framework Deneva, whose study can be
 
 Each branch records a different protocol
 
-- RedT-replicacc: the newest RedT protocol.
+- RedT-replicacc: the RedT protocol without read only optimization.
+- RedT-readop: the RedT protocol with read only optimization.
 - tapir: the tapir protocol
 - 2PC-Paxos: the 2PC+Paxos protocol and Early-Prepare+Paxos protocol
 - MDCC: the MDCC protocol
