@@ -54,6 +54,7 @@ class Row_maat;
 class Row_specex;
 class Row_null;
 class Row_si;
+class Row_ncc;
 
 class row_t {
 public:
@@ -129,6 +130,8 @@ public:
 		Row_null * manager;
 	#elif CC_ALG == SI
     	Row_si * manager;
+	#elif CC_ALG == NCC
+		Row_ncc * manager;
 	#endif
 	int tuple_size;
 	table_t * table;

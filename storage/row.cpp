@@ -30,6 +30,7 @@
 #include "row_ts.h"
 #include "row_null.h"
 #include "row_si.h"
+#include "row_ncc.h"
 #include "mem_alloc.h"
 #include "manager.h"
 #include "wl.h"
@@ -272,7 +273,6 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	goto end;
 #endif
 
-
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT
   	uint64_t init_time = get_sys_clock();
 	//uint64_t thd_id = txn->get_thd_id();
@@ -289,9 +289,20 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	}
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
+#elif CC_ALG == NCC
+	uint64_t init_time = get_sys_clock();
+	NCCTimeStamp ts = txn->get_ncc_timestamp();
+	INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
+	rc = this->manager->non_blocking_execute(ts, type, this, access);
+	uint64_t copy_time = get_sys_clock();
+	access->data = this;
+	access->txn = txn;
+  	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+	goto end;
+
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == SI
 	//uint64_t thd_id = txn->get_thd_id();
-// For TIMESTAMP RD, a new copy of the access->data will be returned.
+	// For TIMESTAMP RD, a new copy of the access->data will be returned.
 
 	// for MVCC RD, the version will be returned instead of a copy
 	// So for MVCC RD-WR, the version should be explicitly copied.
