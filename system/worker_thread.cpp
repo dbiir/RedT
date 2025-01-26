@@ -486,7 +486,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
   txn_man->abort_cnt = msg->current_abort_cnt;
   txn_man->set_rc(((FinishMessage*)msg)->rc);
 
-#if USE_REPLICA && !USE_TAPIR
+#if USE_REPLICA
   if(txn_man->get_local_log()){
     txn_man->log_replica(RFIN_LOG, GET_NODE_ID(msg->get_txn_id()));
     RC rc = WAIT_REM;
@@ -665,21 +665,6 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     DEBUG_T("RPREP_ACK skip %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
     return RCOK;
   }
-  // if(!txn_man || !(txn_man->txn)){//txn already committed
-  //   return rc;
-  // }
-#if TAPIR_DEBUG
-  printf("%d receive prep rack messages from %d\n", txn_man->get_txn_id(), msg->return_node_id);
-#endif
-#if USE_TAPIR
-  responses_left = txn_man->received_tapir_response(((AckMessage*)msg)->rc, msg->return_node_id);
-  // if(responses_left < 0) {
-  //   return RCOK;
-  // }
-  
-  assert(responses_left >= 0);
-  // if (responses_left == 0) printf("recive prepare %d message\n", txn_man->prepare_count);
-#else
   responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
 
   uint64_t prepare_message_timespan = get_sys_clock() - txn_man->txn_stats.prepare_start_time;
@@ -687,7 +672,6 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   INC_STATS(get_thd_id(), trans_prepare_message_count, 1);
 
   assert(responses_left >= 0);
-#endif
 #if CC_ALG == MAAT
   // Integrate bounds
   uint64_t lower = ((AckMessage*)msg)->lower;
@@ -756,13 +740,13 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #endif
 
   if (responses_left > 0) return WAIT;
-#if !USE_TAPIR
+
 #if MAJORITY
   if (txn_man->get_log_rsp_cnt() > 1) return WAIT;
 #else
   if (txn_man->get_log_rsp_cnt() > 0) return WAIT;  
 #endif
-#endif
+
   // Done waiting
   if(txn_man->get_rc() == RCOK) {
     rc = txn_man->validate(yield, cor_id);
@@ -783,22 +767,6 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     txn_man->txn->rc = Abort;
     rc = Abort;
   }
-#if USE_TAPIR
-  // printf("prepare %d\n", txn_man->txn_state);
-  if(txn_man->txn_state == 1) {
-    txn_man->send_finish_messages();
-    txn_man->txn_state = 2;
-  } else {
-    return rc;
-  }
-  if(rc == Abort) {
-    txn_man->abort(yield, cor_id);
-  }else{
-    // if(txn_man->query->partitions_touched.size() != 0)
-      txn_man->commit(yield, cor_id);
-  }
-  return rc;
-#endif
   if(CC_ALG == SI) {
     si_man.gene_finish_ts(txn_man);
   }
@@ -880,25 +848,14 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
 #if TAPIR_DEBUG
   printf("%d receive rfin rack messages from %d\n", txn_man->get_txn_id(), msg->return_node_id);
 #endif
-#if USE_TAPIR
-  responses_left = txn_man->received_tapir_fin_response(((AckMessage*)msg)->rc, msg->return_node_id);
-  assert(responses_left >= 0);
-  // if(responses_left < 0) {
-  //   return RCOK;
-  // }
-  // if (responses_left == 0) printf("%d recive commit %d message\n",txn_man->get_txn_id(), txn_man->commit_count);
-#else
   responses_left = txn_man->received_fin_response(((AckMessage*)msg)->rc);
   assert(responses_left >=0);
   
-#endif
   if (responses_left > 0) return WAIT;
-#if !USE_TAPIR 
 #if MAJORITY
   if (txn_man->get_log_fin_rsp_cnt() > 1) return WAIT;
 #else
   if (txn_man->get_log_fin_rsp_cnt() > 0) return WAIT;
-#endif
 #endif
   // Done waiting
   txn_man->txn_state = 3;
@@ -906,29 +863,11 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
 	INC_STATS(get_thd_id(), trans_fin_time, get_sys_clock() - txn_man->start_fin_time);
 	// start_fin_time = get_sys_clock();
   txn_man->txn_stats.twopc_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
-#if USE_TAPIR
-  // printf("responses_left %d %d\n", responses_left, txn_man->txn_state);
-  if(txn_man->txn_state != 3) return rc;
-  // if (responses_left == 0) printf("%d recive commit %d message\n",txn_man->get_txn_id(), txn_man->commit_count);
-  if(txn_man->get_rc() == RCOK) {
-#if TAPIR_DEBUG
-  printf("%d commit\n", txn_man->get_txn_id());
-#endif
-      commit();
-  } else {
-#if TAPIR_DEBUG
-  printf("%d abort\n", txn_man->get_txn_id());
-#endif
-      abort();
-  }
-  // txn_man->txn_state = 0;
-#else
   if(txn_man->get_rc() == RCOK) {
       commit();
   } else {
       abort();
   }
-#endif
   return rc;
 }
 
@@ -1057,21 +996,9 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
     RC rc = RCOK;
     txn_man->abort_cnt = msg->current_abort_cnt;
 #if USE_REPLICA
-#if USE_TAPIR
-#if TAPIR_DEBUG
-    printf("%d:%d send prepare ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
-#endif
-    pthread_mutex_lock(&log_lock);
-    log_count ++;
-    log_content = log_count;
-    pthread_mutex_unlock(&log_lock);
-    msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
-    return rc;
-#else
     txn_man->log_replica(RLOG, msg->return_node_id);
     rc = WAIT_REM;
     return rc;
-#endif
 #else
 #if CC_ALG == TICTOC
     // Integrate bounds
@@ -1191,6 +1118,9 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   #else
       txn_man->set_start_timestamp(get_next_ts());
   #endif
+#endif
+#if CC_ALG == NCC 
+    txn_man->set_ncc_timestamp(get_next_ts(),g_node_id);
 #endif
 #if CC_ALG == SI
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_start_timestamp());

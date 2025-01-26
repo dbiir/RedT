@@ -207,29 +207,12 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	}
 	rsp_cnt = query->partitions_touched.size() - 1;
 
-#if USE_TAPIR && TAPIR_REPLICA
-	#if TAPIR_DEBUG
-		printf("send %d rqry %d messages\n",get_txn_id(), rsp_cnt);
-	#endif
-	for(int i = 0; i < query->partitions_touched.size(); i++) {
-		if(query->partitions_touched[i] != g_node_id) {
-	#if TAPIR_DEBUG
-				printf("send %d rqry message to node:%d \n",get_txn_id(), query->partitions_touched[i]);
-	#endif
-			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),query->partitions_touched[i]);
-		}
-	}
-#else
 	for(int i = 0; i < g_node_cnt; i++) {
 		if(i != g_node_id && remote_node[i].size() > 0) {//send message to all masters
 			remote_next_node_id = i;
-	#if TAPIR_DEBUG
-			printf("send %d rqry message to node:%d \n",get_txn_id(), i);
-	#endif
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
 		}
 	}
-#endif
 	get_num_msgs_statistics();
 	return rc;
 }
@@ -355,16 +338,10 @@ void YCSBTxnManager::copy_remote_requests(YCSBQueryMessage * msg) {
 	YCSBQuery* ycsb_query = (YCSBQuery*) query;
 	//msg->requests.init(ycsb_query->requests.size());
 #if PARAL_SUBTXN == true
-#if USE_TAPIR && TAPIR_REPLICA
-	for(int i = 0; i < ycsb_query->requests.size();i++) {
-		YCSBQuery::copy_request_to_msg(ycsb_query,msg,i);
-	}
-#else
 	// printf("remote_next_node_id: %d\n", remote_next_node_id);
 	for(uint64_t& i: remote_node[remote_next_node_id]){
 		YCSBQuery::copy_request_to_msg(ycsb_query,msg,i);
 	}
-#endif
 #else
 	uint64_t dest_node_id = GET_NODE_ID(ycsb_query->requests[next_record_id]->key);
 	#if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10

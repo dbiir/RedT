@@ -305,4 +305,48 @@ private:
 	uint64_t seed;
 };
 
+// for NCC
+
+class NCCTimeStamp {
+public:
+  uint64_t time;
+  uint64_t cid;
+  NCCTimeStamp() {
+    time = 0;
+    cid = 0;
+  }
+  // 帮忙写一个重载，用来比较大小
+  // bool operator<(const NCCTimeStamp &other) {
+  //   return true;
+  //   if (time < other.time) {
+  //     return true;
+  //   } else if (time == other.time) {
+  //     return cid < other.cid;
+  //   } else {
+  //     return false;
+  //   }
+  // }
+};
+
+static inline NCCTimeStamp maxNCCTimeStamp(NCCTimeStamp a, NCCTimeStamp b) {
+  if (a.time < b.time) {
+    return b;
+  } else if (a.time == b.time) {
+    return a.cid < b.cid ? b : a;
+  } else {
+    return a;
+  }
+}
+
+static inline NCCTimeStamp minNCCTimeStamp(NCCTimeStamp a, NCCTimeStamp b) {
+  if (a.time < b.time) {
+    return a;
+  } else if (a.time == b.time) {
+    return a.cid < b.cid ? a : b;
+  } else {
+    return b;
+  }
+}
+
+
 #endif

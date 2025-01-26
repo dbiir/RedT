@@ -181,21 +181,21 @@
 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG SI
+#define CC_ALG NCC
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
 
 #define USE_REPLICA true
-#define USE_TAPIR false
 #define MAJORITY true
 #define INTER_DC_CONTROL true
 #define EARLY_PREPARE true
+#define IS_NCC true //NCC不需要单独的客户端副本同步
 
 #define TAPIR_DEBUG false
 #define TAPIR_REPLICA false
 
-#define CO_LOG true
+#define CO_LOG false
 
 /***********************************************/
 // USE RDMA
@@ -495,7 +495,8 @@ enum PPSTxnType {
 #define CALVIN      10
 #define MAAT      11
 #define WDL           12
-#define SI    13
+#define SI          13
+#define NCC       14
 // #define WOOKONG     13
 // #define TICTOC     14
 // #define FOCC       15

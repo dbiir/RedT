@@ -62,7 +62,7 @@ void ResponseQueues::RespTimeingControl(uint64_t key, row_t * row) {
         TxnManager* txn_man = cur->txn_access->txn;
         if (!txn_man->finish_read_write && TxnCanSend(txn_man)) {
             txn_man->finish_read_write = true;
-            txn_man->log_replica(RLOG, msg->return_node_id);
+            txn_man->log_replica(RLOG, g_node_id);
             // msg_queue.enqueue(txn_man->get_thd_id(),Message::create_message(txn_man,RACK_PREP),txn_man->return_id);
         }
         //todo: 检查子事务是否可以返回

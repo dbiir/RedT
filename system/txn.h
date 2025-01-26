@@ -37,6 +37,8 @@ class INDEX;
 class TxnQEntry;
 class YCSBQuery;
 class TPCCQuery;
+class NCCQueueEntry;
+class TxnManager;
 //class r_query;
 
 enum TxnState {START,INIT,EXEC,PREP,FIN,DONE};
@@ -48,6 +50,10 @@ public:
 	row_t * 	orig_row;
 	row_t * 	data;
 	row_t * 	orig_data;
+	// for NCC
+	NCCQueueEntry* ncc_qe;
+	TxnManager*	txn;
+
 	uint64_t    version;
 	void cleanup();
 };
@@ -65,6 +71,7 @@ public:
 	// For OCC and SI
 	uint64_t start_timestamp;
 	uint64_t end_timestamp;
+	NCCTimeStamp ncc_timestamp; // for ncc, 用来区分不同客户端
 
 	uint64_t write_cnt;
 	uint64_t row_cnt;
@@ -166,6 +173,9 @@ public:
 	ts_t            get_timestamp();
 	void            set_start_timestamp(uint64_t start_timestamp);
 	ts_t            get_start_timestamp();
+	void            set_ncc_timestamp(NCCTimeStamp ts);
+	void            set_ncc_timestamp(uint64_t ts, uint64_t cid);
+	NCCTimeStamp	get_ncc_timestamp();
 	uint64_t        get_rsp_cnt() {return rsp_cnt;}
 	uint64_t        get_fin_rsp_cnt() {return fin_rsp_cnt;}
 	uint64_t        get_log_rsp_cnt() {return log_rsp_cnt;}
@@ -239,6 +249,7 @@ public:
 	access_t get_access_type(uint64_t access_id) {return txn->accesses[access_id]->type;}
 	uint64_t get_access_version(uint64_t access_id) { return txn->accesses[access_id]->version; }
 	row_t * get_access_original_row(uint64_t access_id) {return txn->accesses[access_id]->orig_row;}
+	Access* get_access(uint64_t access_id) {return txn->accesses[access_id];}
 	void swap_accesses(uint64_t a, uint64_t b) { txn->accesses.swap(a, b); }
 
 	uint64_t get_batch_id() {return txn->batch_id;}
@@ -322,10 +333,6 @@ public:
 	int last_txn_id;
 	Message* last_msg;
 
-#if USE_TAPIR
-	int prepare_count;
-	int commit_count;
-#endif
 protected:
 
 	int rsp_cnt;
@@ -333,9 +340,6 @@ protected:
 	int log_rsp_cnt;
 	int log_fin_rsp_cnt;
 	bool local_log;
-#if USE_TAPIR
-	int ir_log_rsp_cnt[NODE_CNT];
-#endif
 	
 	uint64_t return_node;
 	void            insert_row(row_t * row, table_t * table);

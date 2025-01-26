@@ -50,7 +50,8 @@
 #include "da_block_queue.h"
 #include "wl.h"
 #include "si.h"
-
+#include "ncc.h"
+#include <unordered_map>
 
 mem_alloc mem_allocator;
 Stats stats;
@@ -60,6 +61,7 @@ Query_queue query_queue;
 Client_query_queue client_query_queue;
 OptCC occ_man;
 Maat maat_man;
+Ncc  ncc_man;
 Transport tport_man;
 Workload * m_wl;
 TxnManPool txn_man_pool;
@@ -77,6 +79,7 @@ Client_txn client_man;
 Sequencer seq_man;
 Logger logger;
 TimeTable time_table;
+ResponseQueues resp_qs;
 
 si si_man;
 // QTcpQueue tcp_queue;

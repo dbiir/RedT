@@ -585,7 +585,6 @@ configs = {
     "TXN_WRITE_PERC":0.2,
     "PRIORITY":"PRIORITY_ACTIVE",
     "TWOPL_LITE":"false",
-    "USE_TAPIR":"true",
     "EARLY_PREPARE":"false",
 #YCSB
     "INIT_PARALLELISM" : 1,
