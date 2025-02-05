@@ -40,6 +40,7 @@
 #include "ycsb_query.h"
 #include "da.h"
 #include "si.h"
+#include "ncc.h"
 #include "maat.h"
 #include "client_query.h"
 #include "lib.hh"
@@ -220,6 +221,9 @@ int main(int argc, char *argv[]) {
 	fflush(stdout);
 	maat_man.init();
 	printf("Done\n");
+#endif
+#if CC_ALG == NCC
+	ncc_man.init();
 #endif
 #if LOGGING
 	printf("Initializing logger... ");

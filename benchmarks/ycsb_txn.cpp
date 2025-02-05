@@ -253,36 +253,39 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.wait_starttime = get_sys_clock();
 
 	// printf("xxx txn %lu exe, rc = %d, local_write %d\n", get_txn_id(), rc, has_local_write());
-
-#if EARLY_PREPARE
-	if(rc == RCOK && has_local_write()){
-		//send log message
-		log_replica(RLOG, GET_NODE_ID(get_txn_id()));
-		return WAIT;
-	}
-#endif
-
-	if(!IS_LOCAL(get_txn_id())){
-		if(rc == Abort) rc = abort(yield, cor_id);
-		return rc;
-	}
-
-	if(rc == Abort){
-		rc = start_abort(yield, cor_id);
-	}else{
-		if(rsp_cnt > 0) {
-			// printf("SI wait remote %ld cnp %ld\n",get_txn_id(),rsp_cnt);
+	// ! NCC肯定需要等待paxos协议
+	return WAIT;
+#if 0
+	#if EARLY_PREPARE
+		if(rc == RCOK && has_local_write()){
+			//send log message
+			log_replica(RLOG, GET_NODE_ID(get_txn_id()));
 			return WAIT;
 		}
-		if(is_done()){
-#if CC_ALG == WOUND_WAIT
-			txn_state = STARTCOMMIT;
-#endif
-			rc = start_commit(yield, cor_id);
-		}
-	}
+	#endif
 
-	return rc;
+		if(!IS_LOCAL(get_txn_id())){
+			if(rc == Abort) rc = abort(yield, cor_id);
+			return rc;
+		}
+
+		if(rc == Abort){
+			rc = start_abort(yield, cor_id);
+		}else{
+			if(rsp_cnt > 0) {
+				// printf("SI wait remote %ld cnp %ld\n",get_txn_id(),rsp_cnt);
+				return WAIT;
+			}
+			if(is_done()){
+	#if CC_ALG == WOUND_WAIT
+				txn_state = STARTCOMMIT;
+	#endif
+				rc = start_commit(yield, cor_id);
+			}
+		}
+
+		return rc;
+#endif
 }
 
 RC YCSBTxnManager::run_txn_post_wait() {

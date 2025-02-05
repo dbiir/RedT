@@ -42,60 +42,90 @@ public:
     Access * txn_access;
     NCCTimeStamp txn_ts;
     NCCStatus q_status;
-    NCCQueueEntry(Response* resp, Access * txn_access, NCCTimeStamp txn_ts, NCCStatus q_status) {
+    row_t* row;
+    NCCQueueEntry(Response* resp, Access * txn_access, NCCTimeStamp txn_ts, NCCStatus q_status, row_t* row) {
         this->resp = resp;
         this->txn_access = txn_access;
         this->txn_ts = txn_ts;
         this->q_status = q_status;
+        this->row = row;
     }
 };
+
+class NCCQueue {
+public:
+    row_t* row;
+    std::list<NCCQueueEntry*> q;
+    pthread_mutex_t* mutx;
+    NCCQueue(row_t* row) {
+        mutx = (pthread_mutex_t *) mem_allocator.alloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init(mutx, NULL);
+        this->row = row;
+    }
+    void insert(NCCQueueEntry* qe) {
+        pthread_mutex_lock(mutx);
+        q.push_back(qe);
+        pthread_mutex_unlock(mutx);
+    }
+    void lock() {
+        pthread_mutex_lock(mutx);
+    }
+    void unlock() {
+        pthread_mutex_unlock(mutx);
+    }
+};
+
+// 自定义哈希函数
+struct pair_hash {
+    template <class T1, class T2>
+    struct hash_pair {
+        size_t operator()(const std::pair<T1, T2>& p) const {
+            auto h1 = std::hash<T1>()(p.first);
+            auto h2 = std::hash<T2>()(p.second);
+
+            // Combine hashes of the first and second element
+            // Here, we are using a simple XOR combination
+            return h1 ^ h2;
+        }
+    };
+};
+
+// 自定义相等比较函数
+struct pair_equal {
+    template <class T1, class T2>
+    struct equal {
+    bool operator()(const std::pair<T1, T2>& lhs, const std::pair<T1, T2>& rhs) const {
+        return lhs.first == rhs.first && lhs.second == rhs.second;
+    }
+    };
+};
+
 class ResponseQueues {
 public:
-    std::unordered_map<uint64_t, std::list<NCCQueueEntry*>> qs;
-    void RespTimeingControl(uint64_t key, row_t * row); 
-    bool TxnCanSend(TxnManager* txn);
-    void insert(uint64_t key, NCCQueueEntry* qe) {
-        qs[key].push_back(qe);
+    std::unordered_map<std::pair<uint64_t,uint64_t>, NCCQueue*, pair_hash::hash_pair<uint64_t, uint64_t>, pair_equal::equal<uint64_t, uint64_t>> qs;
+
+    // 帮忙给每个key加一个锁
+    pthread_mutex_t* mutx;
+    std::unordered_map<uint64_t, pthread_mutex_t*> locks;
+    ResponseQueues() {
+        mutx = (pthread_mutex_t *) mem_allocator.alloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init(mutx, NULL);
     }
+    void create(uint64_t table_id, uint64_t key, row_t* row);
+    void RespTimeingControl() ;
+    void RespTimeingControl(uint64_t table_id, uint64_t key, row_t * row); 
+    bool TxnCanSend(TxnManager* txn);
+    void insert(uint64_t table_id, uint64_t key, NCCQueueEntry* qe, row_t* row);
 };
 
 class Ncc {
 public:
     void init();
     RC async_commit_or_abort(TxnManager * txn,bool is_commit);
-    bool safe_guard_check(TxnManager * txn, NCCTimeStamp commitT) {
-        std::vector<NCCTimeStamp>Trs,Tws;
-        get_rw_set(txn, Trs, Tws);
-        NCCTimeStamp maxTws, minTrs;
-        for (auto &T : Tws) {
-            maxTws = maxNCCTimeStamp(maxTws, T);
-        }
-        for (auto &T : Trs) {
-            minTrs = minNCCTimeStamp(minTrs, T);
-        }
-
-        commitT = maxTws;
-        if (maxTws.time < minTrs.time) {
-            return true;
-        } 
-        else if (maxTws.time == minTrs.time) {
-            return maxTws.cid <= minTrs.cid;
-        }
-        else {
-            return false;
-        }
-    }
+    RC validate(TxnManager * txn); 
+    bool safe_guard_check(TxnManager * txn, NCCTimeStamp &commitT);
 private:
-    void get_rw_set(TxnManager * txn, std::vector<NCCTimeStamp> &Trs, std::vector<NCCTimeStamp> &Tws) {
-        UInt32 n = 0, m = 0;
-        for (uint64_t i = 0; i < txn->get_access_cnt(); i++) {
-            if (txn->get_access_type(i) == WR) {
-                Tws.push_back(txn->get_access(i)->ncc_qe->txn_ts);
-            } else {
-                Trs.push_back(txn->get_access(i)->ncc_qe->txn_ts);
-            }
-        }
-    }
+    void get_rw_set(TxnManager * txn, std::vector<NCCTimeStamp> &Trs, std::vector<NCCTimeStamp> &Tws);
 };
 
 #endif

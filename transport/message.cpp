@@ -1179,6 +1179,9 @@ uint64_t AckMessage::get_size() {
 #if CC_ALG == SILO
   size += sizeof(uint64_t);
 #endif
+#if CC_ALG == NCC
+  size += sizeof(NCCTimeStamp)*2;
+#endif
 #if WORKLOAD == PPS && CC_ALG == CALVIN
   size += sizeof(size_t);
   size += sizeof(uint64_t) * part_keys.size();
@@ -1193,6 +1196,10 @@ void AckMessage::copy_from_txn(TxnManager * txn) {
 #if CC_ALG == MAAT
   lower = time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
   upper = time_table.get_upper(txn->get_thd_id(),txn->get_txn_id());
+#endif
+#if CC_ALG == NCC
+  mintr = txn->get_MinTr();
+  maxtw = txn->get_MaxTw();
 #endif
 #if CC_ALG == WOOKONG
   lower = wkdb_time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
@@ -1216,7 +1223,6 @@ void AckMessage::copy_to_txn(TxnManager * txn) {
   Message::mcopy_to_txn(txn);
   //query->rc = rc;
 #if WORKLOAD == PPS && CC_ALG == CALVIN
-
   PPSQuery* pps_query = (PPSQuery*)(txn->query);
   pps_query->part_keys.append(part_keys);
 #endif
@@ -1229,6 +1235,10 @@ void AckMessage::copy_from_buf(char * buf) {
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
   COPY_VAL(lower,buf,ptr);
   COPY_VAL(upper,buf,ptr);
+#endif
+#if CC_ALG == NCC
+  COPY_VAL(mintr,buf,ptr);
+  COPY_VAL(maxtw,buf,ptr);
 #endif
 #if CC_ALG == SILO
   COPY_VAL(max_tid,buf,ptr);
@@ -1254,6 +1264,10 @@ void AckMessage::copy_to_buf(char * buf) {
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
   COPY_BUF(buf,lower,ptr);
   COPY_BUF(buf,upper,ptr);
+#endif
+#if CC_ALG == NCC
+  COPY_BUF(buf,mintr,ptr);
+  COPY_BUF(buf,maxtw,ptr);
 #endif
 #if CC_ALG == SILO
   COPY_BUF(buf,max_tid,ptr);

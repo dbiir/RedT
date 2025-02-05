@@ -94,7 +94,6 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 #endif
 	}
 
-
 	while(rc == RCOK && !is_done()) {
 		rc = run_txn_state(yield, cor_id);
 	}
@@ -102,26 +101,29 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time += curr_time - starttime;
 	txn_stats.process_time_short += curr_time - starttime;
 
-	if (rc != Abort) {
-		if(rsp_cnt > 0) {
-			return WAIT;
-		} else {
-			if(IS_LOCAL(get_txn_id())) {
-				INC_STATS(get_thd_id(), trans_read_write_count, 1);
-				INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - start_rw_time);
-				start_logging_time = get_sys_clock();
+	// ! NCC需要等待paxos日志同步
+	return WAIT;
+	#if 0
+		if (rc != Abort) {
+			if(rsp_cnt > 0) {
+				return WAIT;
+			} else {
+				if(IS_LOCAL(get_txn_id())) {
+					INC_STATS(get_thd_id(), trans_read_write_count, 1);
+					INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - start_rw_time);
+					start_logging_time = get_sys_clock();
+				}
 			}
 		}
-	}
-	if(IS_LOCAL(get_txn_id())) {
-		if(is_done() && rc == RCOK)
-			rc = start_commit(yield, cor_id);
-		else if(rc == Abort)
-			rc = start_abort(yield, cor_id);
-	}
+		if(IS_LOCAL(get_txn_id())) {
+			if(is_done() && rc == RCOK)
+				rc = start_commit(yield, cor_id);
+			else if(rc == Abort)
+				rc = start_abort(yield, cor_id);
+		}
 
-	return rc;
-
+		return rc;
+	#endif
 }
 
 bool TPCCTxnManager::is_done() {
@@ -348,18 +350,7 @@ bool TPCCTxnManager::is_local_item(uint64_t idx) {
 RC TPCCTxnManager::generate_center_master(uint64_t w_id, access_t type) {
 	vector<uint64_t> node_id;
 	TPCCQuery* tpcc_query = (TPCCQuery*) query;
-#if USE_REPLICA
-	if (type == WR) {
-		node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
-		node_id.push_back(GET_FOLLOWER1_NODE(wh_to_part(w_id)));
-		node_id.push_back(GET_FOLLOWER2_NODE(wh_to_part(w_id)));
-	} else {
-		node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
-	}
-#else
 	node_id.push_back(GET_NODE_ID(wh_to_part(w_id)));
-#endif
-
 	uint64_t n_id = GET_NODE_ID(wh_to_part(w_id));
 	remote_node[n_id].push_back(1);
 	tpcc_query->partitions_touched.add_unique(GET_PART_ID(0,n_id));

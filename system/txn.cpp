@@ -49,6 +49,7 @@
 #include "qps/op.hh"
 #include "src/sshed.hh"
 #include "global.h"
+#include "ncc.h"
 
 void TxnStats::init() {
 	starttime=0;
@@ -268,7 +269,9 @@ void Transaction::init() {
 }
 
 void Transaction::reset(uint64_t thd_id) {
+	#if CC_ALG != NCC
 	release_accesses(thd_id);
+	#endif
 	accesses.clear();
 	release_inserts(thd_id);
 	insert_rows.clear();
@@ -353,6 +356,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	num_msgs_prep = 0;
 	num_msgs_commit = 0;
 	finish_read_write = false;
+	has_send_rlog = true;
 	set_local_log(false);
 }
 
@@ -375,6 +379,7 @@ void TxnManager::reset() {
 	num_msgs_prep = 0;
 	num_msgs_commit = 0;
 	finish_read_write = false;
+	has_send_rlog = false;
 	set_local_log(false);
 
 	// log_content = 0;
@@ -547,21 +552,7 @@ RC TxnManager::start_abort(yield_func_t &yield, uint64_t cor_id) {
 	return abort(yield, cor_id);
 }
 
-#ifdef NO_2PC
-RC TxnManager::start_commit() {
-	RC rc = RCOK;
-	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
-	_is_sub_txn = false;
 
-	rc = validate();
-	if(rc == RCOK)
-		rc = commit();
-	else
-		start_abort();
-
-		return rc;
-}
-#else
 RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	// ! trans process time
 	uint64_t prepare_start_time = get_sys_clock();
@@ -644,7 +635,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	}
 	return rc;
 }
-#endif
+
 void TxnManager::send_prepare_messages() {
 #if USE_REPLICA
 	uint64_t tar_nodes[g_node_cnt];
@@ -945,6 +936,9 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 #if CC_ALG == OCC && MODE == NORMAL_MODE
 	occ_man.finish(rc,this);
 #endif
+#if CC_ALG == NCC
+	ncc_man.async_commit_or_abort(this, rc == RCOK);
+#endif
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
 	assert(txn->accesses.get_count() == txn->row_cnt);
@@ -1191,20 +1185,16 @@ void TxnManager::log_replica(RemReqType req_type,uint64_t ret_nid) {
 	}
 	uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
 	uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
+	assert(f1 != g_node_id && f2 != g_node_id);
 
 	if(req_type == RLOG) set_local_log(true);
-	// pthread_mutex_lock(&log_lock);
-	// h_thd->log_count ++;
-	// h_thd->log_content = h_thd->log_count;
-	// pthread_mutex_unlock(&log_lock);
-
 	if(req_type == RLOG) log_rsp_cnt = 2;
 	else if(req_type == RFIN_LOG) log_fin_rsp_cnt = 2;
 	else assert(false);
 
 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,req_type),f1);
 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,req_type),f2);
-
+	DEBUG_T("TxnManager::log_replica %ld %ld %ld %ld\n",get_txn_id(),part_id,f1,f2);
 	txn_stats.log_start_time = get_sys_clock();
 }
 

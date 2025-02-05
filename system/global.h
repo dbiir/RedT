@@ -318,22 +318,22 @@ enum RemReqType {
     RULK,
     CL_QRY,
     CL_QRY_O,//one server but use the msg queue
-    RQRY,
+    RQRY, // 5
     RQRY_CONT,
     RFIN,
     RLK_RSP,
     RULK_RSP,
-    RQRY_RSP,
+    RQRY_RSP, //10
     RACK,
     RACK_PREP,
-    RLOG,
+    RLOG, //13
     RACK_LOG,
-    RFIN_LOG,
+    RFIN_LOG, //15
     RACK_FIN_LOG,
     RACK_FIN,
     RTXN,
     RTXN_CONT,
-    RINIT,
+    RINIT, //20
     RPREPARE,
     RPASS,
     RFWD,

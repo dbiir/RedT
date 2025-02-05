@@ -190,6 +190,10 @@ public:
 #if CC_ALG == SILO
   uint64_t max_tid;
 #endif
+#if CC_ALG == NCC
+  NCCTimeStamp mintr;
+  NCCTimeStamp maxtw;
+#endif
 
   // For Calvin PPS: part keys from secondary lookup for sequencer response
   Array<uint64_t> part_keys;

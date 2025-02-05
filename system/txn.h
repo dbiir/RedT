@@ -261,6 +261,16 @@ public:
 	void set_commit_timestamp(uint64_t timestamp) {commit_timestamp = timestamp;}
 	uint64_t greatest_write_timestamp;
 	uint64_t greatest_read_timestamp;
+	// For NCC
+	NCCTimeStamp MinTr;
+	NCCTimeStamp MaxTw;
+	NCCTimeStamp get_MinTr() {return MinTr;}
+	NCCTimeStamp get_MaxTw() {return MaxTw;}
+	void set_MinTr(NCCTimeStamp ts) {MinTr = ts;}
+	void set_MaxTw(NCCTimeStamp ts) {MaxTw = ts;}
+	NCCTimeStamp ncc_commit_timestamp;
+	NCCTimeStamp get_ncc_commit_timestamp() {return ncc_commit_timestamp;}
+	void set_ncc_commit_timestamp(NCCTimeStamp ts) {ncc_commit_timestamp = ts;}
 
 	std::set<uint64_t> * uncommitted_reads;
 	std::set<uint64_t> * uncommitted_writes;
@@ -319,6 +329,7 @@ public:
 	bool is_ready() {return txn_ready == true;}
 	volatile int txn_ready;
 	volatile bool finish_read_write;
+	volatile bool has_send_rlog;
 
 	// Calvin
 	uint32_t lock_ready_cnt;

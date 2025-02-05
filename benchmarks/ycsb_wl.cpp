@@ -30,6 +30,7 @@
 #include "row_mvcc.h"
 #include "mem_alloc.h"
 #include "query.h"
+#include "ncc.h"
 
 int YCSBWorkload::next_tid;
 
@@ -106,6 +107,9 @@ RC YCSBWorkload::init_table() {
 			uint64_t primary_key = total_row;
 			new_row->set_primary_key(primary_key);
             new_row->set_value(0, &primary_key);
+			#if CC_ALG == NCC
+			resp_qs.create(the_table->get_table_id(), new_row->get_primary_key(), new_row);
+			#endif
 			Catalog * schema = the_table->get_schema();
 			for (UInt32 fid = 0; fid < schema->get_field_cnt(); fid ++) {
 				int field_size = schema->get_field_size(fid);
@@ -188,6 +192,9 @@ void * YCSBWorkload::init_table_slice() {
 //		uint64_t value = rand();
 		uint64_t primary_key = key;
 		new_row->set_primary_key(primary_key);
+		#if CC_ALG == NCC
+		resp_qs.create(the_table->get_table_id(),new_row->get_primary_key(), new_row);
+		#endif
 #if SIM_FULL_ROW
 		new_row->set_value(0, &primary_key,sizeof(uint64_t));
 

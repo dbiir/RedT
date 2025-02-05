@@ -334,7 +334,7 @@ def ycsb_scaling():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
     nnodes = [4,8,12,16]
-    # nnodes = [12]
+    # nnodes = [2]
     tapir=['false']
     early=['false']
     algos = ['NO_WAIT']
@@ -358,15 +358,16 @@ def ycsb_scaling():
 def ycsb_scaling_early():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
-    nnodes = [4,8,12,16]
+    # nnodes = [4,8,12,16]
     # nnodes = [9,12]
-    # nnodes = [3,6,9]
+    nnodes = [3]
     tapir=['false']
     early=['true']
-    algos = ['NO_WAIT']
+    algos = ['NCC']
     # algos = ['CALVIN']
     # base_table_size=262144*10
-    base_table_size=1048576
+    base_table_size=104857
+    # base_table_size=1048576
     # base_table_size=2097152*8
     txn_write_perc = [0.8]
     tup_write_perc = [0.5]

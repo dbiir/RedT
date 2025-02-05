@@ -15,15 +15,24 @@
 #include "row_ncc.h"
 #include "mem_alloc.h"
 #include "helper.h"
+#include "table.h"
 
 void Row_ncc::init(row_t * row) {
     _row = row;
     latch = (pthread_mutex_t *) mem_allocator.alloc(sizeof(pthread_mutex_t));
     pthread_mutex_init(latch, NULL);
+    versions.clear();
+    // 初始化一个version
+    NCCVersion* version = new NCCVersion();
+    version->tw = NCCTimeStamp();
+    version->tr = NCCTimeStamp();
+    version->row = row;
+    version->status = NCC_COMMIT;
+    versions.push_back(version);
 }
 
-RC Row_ncc::non_blocking_execute(NCCTimeStamp ts, access_t type, row_t * row, Access *access) {
-    RC rc = RCOK;
+RC Row_ncc::non_blocking_execute(NCCTimeStamp ts, access_t type, row_t * row, Access *access, TxnManager * txn) {
+    RC rc = WAIT;
     pthread_mutex_lock(latch);
     Response *resp;
     if (type == RD) {        
@@ -43,12 +52,14 @@ RC Row_ncc::non_blocking_execute(NCCTimeStamp ts, access_t type, row_t * row, Ac
         resp = new Response(new_version->tw, new_version->tr, row, NCCRespType::NCC_DONE);
     }
     pthread_mutex_unlock(latch);
-    //todo: access需要再改改
-    //todo: 这里改成，将读写集塞到resp_qs中，也把resp塞到access里
-    NCCQueueEntry* qe = new NCCQueueEntry(resp, access, ts, NCCStatus::NCC_UNDECIDED);
+
+    NCCQueueEntry* qe = new NCCQueueEntry(resp, access, ts, NCCStatus::NCC_UNDECIDED, row);
     access->ncc_qe = qe;
-    resp_qs.insert(row->get_primary_key(), qe);
-    resp_qs.RespTimeingControl(row->get_primary_key(), row);
+    access->txn = txn;
+    resp_qs.insert(row->get_table()->get_table_id(),row->get_primary_key(), qe, row);
+    DEBUG_T("NCC: txn %ld access %ld insert into resp_qs\n", txn->get_txn_id(), row->get_primary_key());
+    resp_qs.RespTimeingControl(row->get_table()->get_table_id(), row->get_primary_key(), row);
+    // resp_qs.RespTimeingControl();
     
     return rc;
 }

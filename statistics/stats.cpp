@@ -493,6 +493,8 @@ void Stats_thd::clear() {
   ano_4_trans_read_skew = 0;
   ano_unknown = 0;
 
+  ncc_resp_time = 0;
+
   client_client_latency.clear();
     last_start_commit_latency.clear();
     first_start_commit_latency.clear();
@@ -1366,6 +1368,9 @@ void Stats_thd::print(FILE * outf, bool prog) {
           ano_2_trans_write_skew_1, ano_2_trans_write_skew_2, ano_3_trans_write_skew_1,
           ano_3_trans_write_skew_2, ano_2_trans_read_skew, ano_3_trans_read_skew_1,
           ano_3_trans_read_skew_2, ano_4_trans_read_skew, ano_unknown);
+  fprintf(outf,
+          ",ncc_resp_time = %f"
+          ,ncc_resp_time / BILLION);
   fprintf(outf,
           ",preqlen_over_cnt=%ld"
           ",lock_retry_cnt=%ld"

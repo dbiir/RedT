@@ -34,6 +34,7 @@
 #include "mem_alloc.h"
 #include "manager.h"
 #include "wl.h"
+#include "ncc.h"
 
 #define SIM_FULL_ROW true
 
@@ -87,6 +88,10 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_null *) mem_allocator.align_alloc(sizeof(Row_null));
 #elif CC_ALG == SI
     manager = (Row_si *) mem_allocator.align_alloc(sizeof(Row_si));
+#elif CC_ALG == NCC
+	manager = new Row_ncc();
+	// manager = (Row_ncc *) mem_allocator.align_alloc(sizeof(Row_ncc));
+	// resp_qs.create(row->get_primary_key(), row);
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -293,10 +298,10 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	uint64_t init_time = get_sys_clock();
 	NCCTimeStamp ts = txn->get_ncc_timestamp();
 	INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-	rc = this->manager->non_blocking_execute(ts, type, this, access);
+	rc = this->manager->non_blocking_execute(ts, type, this, access, txn);
 	uint64_t copy_time = get_sys_clock();
 	access->data = this;
-	access->txn = txn;
+	// access->txn = txn;
   	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 

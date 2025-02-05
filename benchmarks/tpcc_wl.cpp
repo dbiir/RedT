@@ -28,6 +28,7 @@
 #include "txn.h"
 #include "mem_alloc.h"
 #include "tpcc_const.h"
+#include "ncc.h"
 
 RC TPCCWorkload::init() {
 	Workload::init();
@@ -249,6 +250,9 @@ void TPCCWorkload::init_tab_item(int id) {
 		uint64_t row_id;
 		t_item->get_new_row(row, 0, row_id);
 		row->set_primary_key(i);
+		#if CC_ALG == NCC
+		resp_qs.create(t_item->get_table_id(), row->get_primary_key(), row);
+		#endif
 		row->set_value(I_ID, i);
 		row->set_value(I_IM_ID, URand(1L,10000L));
 		char name[24];
@@ -272,7 +276,9 @@ void TPCCWorkload::init_tab_wh() {
 		uint64_t row_id;
 		t_warehouse->get_new_row(row, 0, row_id);
 		row->set_primary_key(wid);
-
+		#if CC_ALG == NCC
+		resp_qs.create(t_warehouse->get_table_id(), row->get_primary_key(), row);
+		#endif
 		row->set_value(W_ID, wid);
 		char name[10];
 		MakeAlphaString(6, 10, name);
@@ -307,7 +313,9 @@ void TPCCWorkload::init_tab_dist(uint64_t wid) {
 		uint64_t row_id;
 		t_district->get_new_row(row, 0, row_id);
 		row->set_primary_key(did);
-
+		#if CC_ALG == NCC
+		resp_qs.create(t_district->get_table_id(),row->get_primary_key(), row);
+		#endif
 		row->set_value(D_ID, did);
 		row->set_value(D_W_ID, wid);
 		char name[10];
@@ -343,6 +351,9 @@ void TPCCWorkload::init_tab_stock(int id, uint64_t wid) {
 		uint64_t row_id;
 		t_stock->get_new_row(row, 0, row_id);
 		row->set_primary_key(sid);
+		#if CC_ALG == NCC
+		resp_qs.create(t_stock->get_table_id(), row->get_primary_key(), row);
+		#endif
 		row->set_value(S_I_ID, sid);
 		row->set_value(S_W_ID, wid);
 		row->set_value(S_QUANTITY, URand(10, 100));
@@ -388,7 +399,9 @@ void TPCCWorkload::init_tab_cust(int id, uint64_t did, uint64_t wid) {
 		uint64_t row_id;
 		t_customer->get_new_row(row, 0, row_id);
 		row->set_primary_key(cid);
-
+		#if CC_ALG == NCC
+		resp_qs.create(t_customer->get_table_id(), row->get_primary_key(), row);
+		#endif
 		row->set_value(C_ID, cid);
 		row->set_value(C_D_ID, did);
 		row->set_value(C_W_ID, wid);
@@ -458,6 +471,9 @@ void TPCCWorkload::init_tab_hist(uint64_t c_id, uint64_t d_id, uint64_t w_id) {
 	uint64_t row_id;
 	t_history->get_new_row(row, 0, row_id);
 	row->set_primary_key(0);
+	#if CC_ALG == NCC
+	resp_qs.create(t_history->get_table_id(),row->get_primary_key(), row);
+	#endif
 	row->set_value(H_C_ID, c_id);
 	row->set_value(H_C_D_ID, d_id);
 	row->set_value(H_D_ID, d_id);
@@ -480,6 +496,9 @@ void TPCCWorkload::init_tab_order(int id, uint64_t did, uint64_t wid) {
 		uint64_t row_id;
 		t_order->get_new_row(row, 0, row_id);
 		row->set_primary_key(oid);
+		#if CC_ALG == NCC
+		resp_qs.create(t_order->get_table_id(),row->get_primary_key(), row);
+		#endif
 		uint64_t o_ol_cnt = 1;
 		uint64_t cid = get_permutation();
 		row->set_value(O_ID, oid);

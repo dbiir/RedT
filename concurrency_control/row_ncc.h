@@ -56,7 +56,7 @@ public:
     void init(row_t * row);
     // RC access(TxnManager * txn, access_t type, row_t * row);
     RC async_commit_or_abort_on_row(TxnManager * txn,bool is_commit);
-    RC non_blocking_execute(NCCTimeStamp ts, access_t type, row_t * row, Access *access);
+    RC non_blocking_execute(NCCTimeStamp ts, access_t type, row_t * row, Access *access, TxnManager * txn);
 private:
     
     pthread_mutex_t * latch;
