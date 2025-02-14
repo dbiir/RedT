@@ -333,11 +333,11 @@ def ycsb_early_dcs():
 def ycsb_scaling():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
-    nnodes = [4,8,12,16]
-    # nnodes = [12]
+    # nnodes = [4,8,12,16]
+    nnodes = [4]
     tapir=['false']
     early=['false']
-    algos = ['NO_WAIT']
+    algos = ['PSI']
     # algos = ['CALVIN']
     # base_table_size=262144*10
     base_table_size=1048576
@@ -453,9 +453,6 @@ def tpcc_scaling_early():
     nnodes = [4,8,12,16]
     tapir=['false']
     early=['true']
-    # nnodes = [16,20]
-    # nnodes = [4,8,12,16,20]
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN']
     # algos=['NO_WAIT']
     algos=['SI']
     npercpay=[0.489]
@@ -539,7 +536,7 @@ experiment_map = {
     'tpcc_scaling':tpcc_scaling,
     'tpcc_scaling_n':tpcc_scaling_n,
     'tpcc_scaling_p':tpcc_scaling_p,
-    'tpcc_scaling_early':tpcc_scaling,
+    'tpcc_scaling_early':tpcc_scaling_early,
     'tpcc_scaling_n_early':tpcc_scaling_n_early,
     'tpcc_scaling_p_early':tpcc_scaling_p_early
 }

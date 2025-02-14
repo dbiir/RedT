@@ -50,6 +50,12 @@ void REDLOG(const char *format, ...);
     fflush(stdout); \
   }
 
+#define DEBUG_P(...) \
+  if(DEBUG_PSI) { \
+    fprintf(stdout,__VA_ARGS__); \
+    fflush(stdout); \
+  }
+
 #define DEBUG_R(...) \
   if(DEBUG_RACE && warmup_done) { \
     fprintf(stdout,__VA_ARGS__); \

@@ -93,6 +93,24 @@ public:
   void release() {}
 };
 
+class MiddleMessage : public Message {
+public:
+  void copy_from_buf(char * buf);
+  void copy_to_buf(char * buf);
+  void copy_from_txn(TxnManager * txn);
+  void copy_to_txn(TxnManager * txn);
+  uint64_t get_size();
+  void init() {}
+  void release() {}
+
+  uint64_t pid;
+  RC rc;
+  // only for PSI
+
+  std::set<uint64_t> reads_before;
+  std::set<uint64_t> writes_after;
+};
+
 class FinishMessage : public Message {
 public:
   void copy_from_buf(char * buf);
@@ -112,6 +130,10 @@ public:
 #if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == SI || CC_ALG == WSI || \
     CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
     CC_ALG == DLI_MVCC || CC_ALG == SILO
+  uint64_t commit_timestamp;
+#endif
+#if CC_ALG == PSI
+  uint64_t start_timestamp;
   uint64_t commit_timestamp;
 #endif
 };
@@ -183,9 +205,14 @@ public:
   void release() {}
 
   RC rc;
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == PSI
   uint64_t lower;
   uint64_t upper;
+#endif
+#if CC_ALG == PSI
+  uint64_t cts_lower;
+  std::set<uint64_t> reads_before;
+  std::set<uint64_t> writes_after;
 #endif
 #if CC_ALG == SILO
   uint64_t max_tid;

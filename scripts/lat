@@ -1,7 +1,7 @@
-SI 
+PSI 
 abort_time txn_manager_time txn_validate_time txn_cleanup_time txn_total_process_time
-0.098866
-0.016014
-2.16287768982e+12
-18053.091425
-1838248.61673
+959.063221
+0.0
+1250.115254
+1223.47859
+0.0

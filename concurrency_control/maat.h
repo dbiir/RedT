@@ -52,7 +52,10 @@ struct TimeTableEntry{
     state = MAAT_RUNNING;
     next = NULL;
     prev = NULL;
+    cts = 0;
   }
+  // for PSI
+  uint64_t cts;
 };
 
 struct TimeTableNode {
@@ -73,8 +76,10 @@ public:
 	void release(uint64_t thd_id, uint64_t key);
   uint64_t get_lower(uint64_t thd_id, uint64_t key);
   uint64_t get_upper(uint64_t thd_id, uint64_t key);
+  uint64_t get_cts(uint64_t thd_id, uint64_t key);
   void set_lower(uint64_t thd_id, uint64_t key, uint64_t value);
   void set_upper(uint64_t thd_id, uint64_t key, uint64_t value);
+  void set_cts(uint64_t thd_id, uint64_t key, uint64_t value);
   MAATState get_state(uint64_t thd_id, uint64_t key);
   void set_state(uint64_t thd_id, uint64_t key, MAATState value);
 private:

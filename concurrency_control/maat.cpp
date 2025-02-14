@@ -22,7 +22,7 @@
 #include "mem_alloc.h"
 #include "row_maat.h"
 
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT || CC_ALG == PSI
 void Maat::init() { sem_init(&_semaphore, 0, 1); }
 
 RC Maat::validate(TxnManager * txn) {
@@ -271,6 +271,20 @@ uint64_t TimeTable::get_upper(uint64_t thd_id, uint64_t key) {
   return value;
 }
 
+uint64_t TimeTable::get_cts(uint64_t thd_id, uint64_t key) {
+  uint64_t idx = hash(key);
+  uint64_t value = 0;
+  uint64_t mtx_wait_starttime = get_sys_clock();
+  pthread_mutex_lock(&table[idx].mtx);
+  INC_STATS(thd_id,mtx[43],get_sys_clock() - mtx_wait_starttime);
+  TimeTableEntry* entry = find(key);
+  if(entry) {
+    value = entry->cts;
+  }
+  pthread_mutex_unlock(&table[idx].mtx);
+  return value;
+}
+
 
 void TimeTable::set_lower(uint64_t thd_id, uint64_t key, uint64_t value) {
   uint64_t idx = hash(key);
@@ -292,6 +306,18 @@ void TimeTable::set_upper(uint64_t thd_id, uint64_t key, uint64_t value) {
   TimeTableEntry* entry = find(key);
   if(entry) {
     entry->upper = value;
+  }
+  pthread_mutex_unlock(&table[idx].mtx);
+}
+
+void TimeTable::set_cts(uint64_t thd_id, uint64_t key, uint64_t value) {
+  uint64_t idx = hash(key);
+  uint64_t mtx_wait_starttime = get_sys_clock();
+  pthread_mutex_lock(&table[idx].mtx);
+  INC_STATS(thd_id,mtx[42],get_sys_clock() - mtx_wait_starttime);
+  TimeTableEntry* entry = find(key);
+  if(entry) {
+    entry->cts = value;
   }
   pthread_mutex_unlock(&table[idx].mtx);
 }

@@ -28,7 +28,6 @@
 #include "client_query.h"
 #include "client_txn.h"
 #include "logger.h"
-#include "maat.h"
 #include "manager.h"
 #include "mem_alloc.h"
 #include "msg_queue.h"
@@ -44,6 +43,7 @@
 #include "sequencer.h"
 #include "logger.h"
 #include "maat.h"
+#include "psi.h"
 #include "src/allocator_master.hh"
 #include "lib.hh"
 #include <boost/lockfree/queue.hpp>
@@ -60,6 +60,7 @@ Query_queue query_queue;
 Client_query_queue client_query_queue;
 OptCC occ_man;
 Maat maat_man;
+psi psi_man;
 Transport tport_man;
 Workload * m_wl;
 TxnManPool txn_man_pool;
@@ -77,6 +78,7 @@ Client_txn client_man;
 Sequencer seq_man;
 Logger logger;
 TimeTable time_table;
+anti_dependency_table ad_table;
 
 si si_man;
 // QTcpQueue tcp_queue;

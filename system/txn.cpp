@@ -35,6 +35,7 @@
 #include "msg_queue.h"
 #include "occ.h"
 #include "si.h"
+#include "psi.h"
 #include "pool.h"
 #include "message.h"
 #include "ycsb_query.h"
@@ -335,6 +336,10 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 	uncommitted_writes_y = new std::set<uint64_t>();
 	uncommitted_reads = new std::set<uint64_t>();
 #endif
+#if CC_ALG == PSI
+	reads_before = new std::set<uint64_t>();
+	writes_after = new std::set<uint64_t>();
+#endif
 #if CC_ALG == CALVIN
 	phase = CALVIN_RW_ANALYSIS;
 	locking_done = false;
@@ -405,6 +410,10 @@ void TxnManager::reset() {
 	uncommitted_writes_y->clear();
 	uncommitted_reads->clear();
 #endif
+#if CC_ALG == PSI
+	reads_before->clear();
+	writes_after->clear();
+#endif
 #if CC_ALG == CALVIN
 	phase = CALVIN_RW_ANALYSIS;
 	locking_done = false;
@@ -472,7 +481,7 @@ RC TxnManager::commit(yield_func_t &yield, uint64_t cor_id) {
     txn_state = STARTCOMMIT;    
 #endif
 	release_locks(yield, RCOK, cor_id);
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT || CC_ALG == PSI
 	time_table.release(get_thd_id(),get_txn_id());
 #endif
 	commit_stats();
@@ -591,7 +600,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	INC_STATS(get_thd_id(), trans_process_time, process_time_span);
   	INC_STATS(get_thd_id(), trans_process_count, 1);
 	RC rc = RCOK;
-	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
+	DEBUG_T("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
 	// printf("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
 
 #if USE_REPLICA
@@ -614,7 +623,7 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 #endif
 
 	if(is_multi_part()) {
-		if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT) {
+		if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT || CC_ALG == PSI) {
 			// send prepare messages
 			send_prepare_messages();
 			rc = WAIT_REM;
@@ -692,77 +701,27 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 #endif
 void TxnManager::send_prepare_messages() {
 #if USE_REPLICA
-#if USE_TAPIR
-	uint64_t tar_nodes[g_node_cnt];
-	uint64_t tar_nodes_cnt = 0;
-	rsp_cnt = 0;
-	fin_rsp_cnt = 0;
-	log_rsp_cnt = 0;
-	log_fin_rsp_cnt = 0;
-	for(int i = 0; i < g_node_cnt; i++) {
-		ir_log_rsp_cnt[i] = 0;
-	}
-	for(int i = 0; i < query->partitions_touched.size(); i++){
-		uint64_t part_id = query->partitions_touched[i];
-		ir_log_rsp_cnt[i] = 3;
-		uint64_t l_node = GET_NODE_ID(part_id);
-		uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
-		uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
-		bool exist = false;
-		if(l_node == g_node_id || f1 == g_node_id || f2 == g_node_id) {
-			ir_log_rsp_cnt[i]--;
-		}
-		if(l_node != g_node_id){
-			bool exist = false;
-			for(int j=0;j<tar_nodes_cnt;j++){
-				if(tar_nodes[j] == l_node) {exist = true;break;}
-			}
-			rsp_cnt += 1;
-			//every part in different node
-			// if(g_part_cnt == g_node_cnt) assert(!exist);
-			if(!exist){
-				tar_nodes[tar_nodes_cnt++] = l_node;
-			}
-		}
-		if(f1 != g_node_id){
-			bool exist = false;
-			for(int j=0;j<tar_nodes_cnt;j++){
-				if(tar_nodes[j] == f1) {exist = true;break;}
-			}
-			//every part in different node
-			// if(g_part_cnt == g_node_cnt) assert(!exist);
-			if(!exist){
-				tar_nodes[tar_nodes_cnt++] = f1;
-			}
-		}
-		if(f2 != g_node_id){
-			bool exist = false;
-			for(int j=0;j<tar_nodes_cnt;j++){
-				if(tar_nodes[j] == f2) {exist = true;break;}
-			}
-			//every part in different node
-			// if(g_part_cnt == g_node_cnt) assert(!exist);
-			if(!exist){
-				tar_nodes[tar_nodes_cnt++] = f2;
-			}
-		}
-	}
-	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),tar_nodes_cnt);
-	for(int i=0;i<tar_nodes_cnt;i++){
-#if TAPIR_DEBUG
-		printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
-#endif
-		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
-	}
-#else
 	uint64_t tar_nodes[g_node_cnt];
 	rsp_cnt = 0;
 	fin_rsp_cnt = 0;
 	log_rsp_cnt = 0;
 	log_fin_rsp_cnt = 0;
 	// printf("%d:%d start prepare modified: %d\n", g_node_id, get_txn_id(),query->partitions_modified.size());
-	for(int i=0;i<query->partitions_modified.size();i++){
-		uint64_t part_id = query->partitions_modified[i];
+	Array<uint64_t> partitions_need_send;
+	#if CC_ALG == PSI
+	partitions_need_send.init(query->partitions_touched.size());
+	for (int i = 0; i < query->partitions_touched.size(); i++) {
+		partitions_need_send.add(query->partitions_touched[i]);
+	}
+	#else
+	partitions_need_send.init(query->partitions_modified.size());
+	for (int i = 0; i < query->partitions_modified.size(); i++) {
+		partitions_need_send.add(query->partitions_modified[i]);
+	}
+	#endif
+
+	for(int i=0;i<partitions_need_send.size();i++){
+		uint64_t part_id = partitions_need_send[i];
 		uint64_t l_node = GET_NODE_ID(part_id);
 		if(l_node != g_node_id){
 			bool exist = false;
@@ -776,6 +735,7 @@ void TxnManager::send_prepare_messages() {
 			}
 		}
 	}
+	
 	if(rsp_cnt > 0){
 		total_num_rts_prep += 3;
 	}else{
@@ -783,10 +743,9 @@ void TxnManager::send_prepare_messages() {
 	}
 	// printf("%d:%d start prepare rsp_cnt: %d\n", g_node_id, get_txn_id(),rsp_cnt);
 	for(int i=0;i<rsp_cnt;i++){
-		// printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
+		DEBUG_T("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
 	}
-#endif
 #else
 	rsp_cnt = query->partitions_touched.size() - 1;
 	DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
@@ -809,6 +768,38 @@ void TxnManager::send_colog_messages() {
 	}
 }
 
+bool TxnManager::send_middle_messages(bool &has_local) {
+	bool no_need_middle = false;
+	// 遍历所有的reads_before和writes_after，把消息发送到里面的事务所在节点上
+	for (auto txn_id : *reads_before) {
+		uint64_t l_node = GET_TXN_NODE_ID(txn_id);
+		if(l_node != g_node_id){
+			psi_send_nodes.insert(l_node);
+		} else {
+			has_local = true;
+		}
+	}
+	for (auto txn_id : *writes_after) {
+		uint64_t l_node = GET_TXN_NODE_ID(txn_id);
+		if(l_node != g_node_id){
+			psi_send_nodes.insert(l_node);
+		} else {
+			has_local = true;
+		}
+	}
+	if (psi_send_nodes.size() == 0) {
+		DEBUG_T("%ld No MIDDLE messages to send\n",get_txn_id());
+		no_need_middle = true;
+		return no_need_middle;
+	}
+	for (uint64_t node: psi_send_nodes) {
+		DEBUG_T("%ld Send MIDDLE messages to %d\n",get_txn_id(),node);
+		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RMIDDLE), node);
+	}
+	no_need_middle = false;
+	return no_need_middle;
+}
+
 void TxnManager::send_finish_messages() {
 	// if(IS_LOCAL(get_txn_id())) {
 	// 	INC_STATS(get_thd_id(), trans_logging_count, 1);
@@ -819,12 +810,12 @@ void TxnManager::send_finish_messages() {
 	// printf("xxx txn %lu send rfin, rc = %d\n", get_txn_id(), get_rc());
 	fin_rsp_cnt = query->partitions_touched.size() - 1;
 	assert(IS_LOCAL(get_txn_id()));
-	DEBUG_T("%ld Send FINISH messages to %d\n",get_txn_id(),fin_rsp_cnt);
+	// DEBUG_T("%ld Send FINISH messages to %d\n",get_txn_id(),fin_rsp_cnt);
 	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
 		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) {
 			continue;
     	}
-		// printf("%d:%d send finish to %d\n", g_node_id, get_txn_id(), GET_NODE_ID(query->partitions_touched[i]));
+		DEBUG_T("%d:%d send finish to %d\n", g_node_id, get_txn_id(), GET_NODE_ID(query->partitions_touched[i]));
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN),
 											GET_NODE_ID(query->partitions_touched[i]));
 	}
@@ -836,74 +827,7 @@ void TxnManager::send_finish_messages() {
 	}
 	uint64_t tar_nodes[g_node_cnt];
 	uint64_t tar_nodes_cnt = 0;
-#if TAPIR_REPLICA
-	// for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
-	// 	uint64_t part_id = query->partitions_touched[i];
-	// 	uint64_t l_node = GET_NODE_ID(part_id);
-	// 	if(l_node == g_node_id) {
-    // 	} else {
-	// 		// rsp_cnt++;
-	// 		//every part in different node
-	// 		// if(g_part_cnt == g_node_cnt) assert(!exist);
-	// 		tar_nodes[tar_nodes_cnt++] = l_node;
-	// 	}
-	// }
-	DEBUG("%ld Send FINISH messages to %d\n",get_txn_id(),rsp_cnt);
-	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
-		uint64_t part_id = query->partitions_touched[i];
-		uint64_t l_node = GET_NODE_ID(part_id);
-		// uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
-		// uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
-		// ir_log_rsp_cnt[i] = 3;
-		if(l_node == g_node_id) {
-			// ir_log_rsp_cnt[i]--;
-		} else {
-			// bool exist = false;
-			// for(int j=0;j<tar_nodes_cnt;j++){
-			// 	if(tar_nodes[j] == l_node) {exist = true;break;}
-			// }
-			//every part in different node
-			// if(g_part_cnt == g_node_cnt) assert(!exist);
-			// if(!exist){
-				tar_nodes[tar_nodes_cnt++] = l_node;
-			// }
-			// tar_nodes[tar_nodes_cnt++] = l_node;
-		}
-    	// } else {
-		// 	bool exist = false;
-		// 	for(int j=0;j<tar_nodes_cnt;j++){
-		// 		if(tar_nodes[j] == l_node) {exist = true;break;}
-		// 	}
-		// 	//every part in different node
-		// 	// if(g_part_cnt == g_node_cnt) assert(!exist);
-		// 	if(!exist){
-		// 		tar_nodes[tar_nodes_cnt++] = l_node;
-		// 	}
-		// }
-	// 	if(f1 != g_node_id){
-	// 		bool exist = false;
-	// 		for(int j=0;j<tar_nodes_cnt;j++){
-	// 			if(tar_nodes[j] == f1) {exist = true;break;}
-	// 		}
-	// 		//every part in different node
-	// 		// if(g_part_cnt == g_node_cnt) assert(!exist);
-	// 		if(!exist){
-	// 			tar_nodes[tar_nodes_cnt++] = f1;
-	// 		}
-	// 	}else {ir_log_rsp_cnt[i]--;}
-	// 	if(f2 != g_node_id){
-	// 		bool exist = false;
-	// 		for(int j=0;j<tar_nodes_cnt;j++){
-	// 			if(tar_nodes[j] == f2) {exist = true;break;}
-	// 		}
-	// 		//every part in different node
-	// 		// if(g_part_cnt == g_node_cnt) assert(!exist);
-	// 		if(!exist){
-	// 			tar_nodes[tar_nodes_cnt++] = f2;
-	// 		}
-	// 	}else {ir_log_rsp_cnt[i]--;}
-	}
-#else 
+
 	for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
 		uint64_t part_id = query->partitions_touched[i];
 		uint64_t l_node = GET_NODE_ID(part_id);
@@ -948,11 +872,9 @@ void TxnManager::send_finish_messages() {
 		}
 	}
 
-
-#endif
 	for(int i = 0; i < tar_nodes_cnt; i++) {
 	#if TAPIR_DEBUG
-			printf("%d:%d send finish to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
+		printf("%d:%d send finish to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
 	#endif
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RFIN), tar_nodes[i]);
 	}
@@ -1264,6 +1186,9 @@ void TxnManager::cleanup(yield_func_t &yield, RC rc, uint64_t cor_id) {
 #if CC_ALG == OCC && MODE == NORMAL_MODE
 	occ_man.finish(rc,this);
 #endif
+#if CC_ALG == PSI 	
+	psi_man.finish(rc,this);
+#endif
 	ts_t starttime = get_sys_clock();
 	uint64_t row_cnt = txn->accesses.get_count();
 	assert(txn->accesses.get_count() == txn->row_cnt);
@@ -1521,7 +1446,9 @@ void TxnManager::log_replica(RemReqType req_type,uint64_t ret_nid) {
 	else if(req_type == RFIN_LOG) log_fin_rsp_cnt = 2;
 	else assert(false);
 
+	DEBUG_T("%d:%ld send log to %ld\n", g_node_id, get_txn_id(), f1);
 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,req_type),f1);
+	DEBUG_T("%d:%ld send log to %ld\n", g_node_id, get_txn_id(), f2);
 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,req_type),f2);
 
 	txn_stats.log_start_time = get_sys_clock();
@@ -1547,10 +1474,23 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 			rc = maat_man.find_bound(this);
 		}
 	}
+	if (CC_ALG == PSI && rc == RCOK) {
+		rc = psi_man.validate(this);
+		if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
+			rc = psi_man.find_bound(this);
+		}
+	}
 	
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);
 	INC_STATS(get_thd_id(),trans_validate_time,get_sys_clock() - starttime);
     INC_STATS(get_thd_id(),trans_validate_count, 1);
+	return rc;
+}
+
+RC TxnManager::handle_conflict(yield_func_t &yield, uint64_t cor_id) {
+	RC rc = RCOK;
+	assert(CC_ALG == PSI);
+	rc = psi_man.handle_conflict_txn_4b(this);
 	return rc;
 }
 

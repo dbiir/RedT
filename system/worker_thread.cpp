@@ -76,6 +76,9 @@ void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) 
 			case RPREPARE:
         rc = process_rprepare(yield, msg, cor_id);
 				break;
+      case RMIDDLE:
+        rc = process_rmiddle(yield, msg, cor_id);
+        break;
 			case RFWD:
         rc = process_rfwd(yield, msg, cor_id);
 				break;
@@ -112,6 +115,9 @@ void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) 
 			case RACK_PREP:
         rc = process_rack_prep(yield, msg, cor_id);
 				break;
+      case RACK_MIDDLE:
+        rc = process_rack_middle(yield, msg, cor_id);
+        break;
 			case RACK_FIN:
         rc = process_rack_rfin(msg);
 				break;
@@ -480,8 +486,12 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
   assert(CC_ALG != CALVIN);
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()), "RFIN local: %ld %ld/%d\n", msg->get_txn_id(),
              msg->get_txn_id() % g_node_cnt, g_node_id);
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT 
   txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
+#endif
+#if CC_ALG == PSI
+  txn_man->set_commit_timestamp(((FinishMessage*)msg)->commit_timestamp);
+  txn_man->set_start_timestamp(((FinishMessage*)msg)->start_timestamp);
 #endif
   txn_man->abort_cnt = msg->current_abort_cnt;
   txn_man->set_rc(((FinishMessage*)msg)->rc);
@@ -508,7 +518,7 @@ RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_i
 //now commit 
   txn_man->commit(yield, cor_id);
   //if(!txn_man->query->readonly() || CC_ALG == OCC)
-  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT || CC_ALG == SI)
+  if (!((FinishMessage*)msg)->readonly || CC_ALG == MAAT || CC_ALG == OCC || USE_TAPIR || CC_ALG == NO_WAIT || CC_ALG == SI || CC_ALG == PSI)
 #if TAPIR_DEBUG
     printf("%d:%d send commit finish ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
 #endif
@@ -649,6 +659,7 @@ RC WorkerThread::process_rack_fin_log(yield_func_t &yield, Message * msg, uint64
         txn_man->reset();
         txn_man->reset_query();
       }  
+      DEBUG_T("%d:%d send rack fin to %d\n", g_node_id, msg->get_txn_id(), txn_man->get_return_node());
       msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man, RACK_FIN), txn_man->get_return_node());      
       // release_txn_man();
     }    
@@ -704,6 +715,30 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   if(((AckMessage*)msg)->rc != RCOK) {
     time_table.set_state(get_thd_id(),msg->get_txn_id(),MAAT_ABORTED);
   }
+#endif
+
+#if CC_ALG == PSI
+  // Integrate bounds
+  uint64_t lower = ((AckMessage*)msg)->lower;
+  uint64_t upper = ((AckMessage*)msg)->upper;
+  uint64_t cts = ((AckMessage*)msg)->cts_lower;
+  if(lower > time_table.get_lower(get_thd_id(),msg->get_txn_id())) {
+    time_table.set_lower(get_thd_id(),msg->get_txn_id(),lower);
+  }
+  if(upper < time_table.get_upper(get_thd_id(),msg->get_txn_id())) {
+    time_table.set_upper(get_thd_id(),msg->get_txn_id(),upper);
+  }
+  if (cts > time_table.get_cts(get_thd_id(), msg->get_txn_id())) {
+    time_table.set_cts(get_thd_id(), msg->get_txn_id(), cts);
+  }
+  DEBUG_T("%ld bound set: [%ld,%ld] -> [%ld,%ld]\n", msg->get_txn_id(), lower, upper,
+        time_table.get_lower(get_thd_id(), msg->get_txn_id()),
+        time_table.get_upper(get_thd_id(), msg->get_txn_id()));
+  if(((AckMessage*)msg)->rc != RCOK) {
+    time_table.set_state(get_thd_id(),msg->get_txn_id(),MAAT_ABORTED);
+  }
+  txn_man->reads_before->insert(((AckMessage*)msg)->reads_before.begin(), ((AckMessage*)msg)->reads_before.end());
+  txn_man->writes_after->insert(((AckMessage*)msg)->writes_after.begin(), ((AckMessage*)msg)->writes_after.end());
 #endif
 
 #if CC_ALG == WOOKONG
@@ -764,6 +799,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #endif
 #endif
   // Done waiting
+  DEBUG_T("%d:%d get all rack prepare ack\n", g_node_id, txn_man->get_txn_id());
   if(txn_man->get_rc() == RCOK) {
     rc = txn_man->validate(yield, cor_id);
   }
@@ -806,25 +842,68 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #if !EARLY_PREPARE
     txn_man->send_finish_messages();
     txn_man->abort(yield, cor_id);
-#else
-    // if(!txn_man->aborted) {
-    //   txn_man->send_finish_messages();
-    //   if(txn_man->get_local_log()){
-    //     txn_man->log_replica(RFIN_LOG, g_node_id); 
-    //     rc = WAIT_REM;
-    //     return rc;
-    //   }else
-    //     txn_man->abort(yield, cor_id);
-    // }
 #endif
   } else {
-#if CO_LOG
-    txn_man->send_colog_messages();
-    rc = WAIT_REM;
-    return rc;
-#endif
-    txn_man->send_finish_messages();
-#if USE_REPLICA
+    #if CO_LOG
+      txn_man->send_colog_messages();
+      rc = WAIT_REM;
+      return rc;
+    #endif
+    #if CC_ALG == PSI
+      bool has_local;
+      bool no_need_middle = true;
+      no_need_middle = txn_man->send_middle_messages(has_local);
+      if (!no_need_middle) {
+        if (has_local) {
+          txn_man->handle_conflict(yield, cor_id);
+        }
+        rc = WAIT_REM;
+        return rc;
+      } else {
+        txn_man->send_finish_messages();
+        #if USE_REPLICA
+          if(txn_man->get_local_log()){
+            txn_man->log_replica(RFIN_LOG, g_node_id); 
+            rc = WAIT_REM;
+            return rc;
+          }else{
+            txn_man->commit(yield, cor_id);
+          }
+        #else
+          txn_man->commit(yield, cor_id);
+        #endif
+      }
+    #else
+      txn_man->send_finish_messages();
+      #if USE_REPLICA
+          if(txn_man->get_local_log()){
+            txn_man->log_replica(RFIN_LOG, g_node_id); 
+            rc = WAIT_REM;
+            return rc;
+          }else{
+            txn_man->commit(yield, cor_id);
+          }
+      #else
+          // if(txn_man->query->partitions_touched.size() != 0)
+            txn_man->commit(yield, cor_id);
+      #endif
+    #endif
+  }
+  return rc;
+}
+
+RC WorkerThread::process_rack_middle(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+  DEBUG_T("RACK_MIDDLE %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
+  RC rc = RCOK;
+  int responses_left = 0;
+
+  responses_left = txn_man->received_response(((AckMessage*)msg)->rc);
+
+  assert(responses_left >= 0);
+  if (responses_left > 0) return WAIT;
+  // Done waiting
+  txn_man->send_finish_messages();
+  #if USE_REPLICA
     if(txn_man->get_local_log()){
       txn_man->log_replica(RFIN_LOG, g_node_id); 
       rc = WAIT_REM;
@@ -832,12 +911,9 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
     }else{
       txn_man->commit(yield, cor_id);
     }
-#else
-    // if(txn_man->query->partitions_touched.size() != 0)
-      txn_man->commit(yield, cor_id);
-#endif
-// #endif
-  }
+  #else
+    txn_man->commit(yield, cor_id);
+  #endif
   return rc;
 }
 
@@ -868,6 +944,7 @@ RC WorkerThread::process_rack_co_log(yield_func_t &yield, Message * msg, uint64_
 #endif
   return rc;
 }
+
 RC WorkerThread::process_rack_rfin(Message * msg) {
   DEBUG_T("RFIN_ACK %ld from %d\n",msg->get_txn_id(), msg->return_node_id);
 
@@ -954,7 +1031,7 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
   }
 
   if (responses_left > 0) {
-    // printf("worker_thread.cpp:953 SI wait remote %ld cnt %ld\n",txn_man->get_txn_id(),responses_left);
+    DEBUG_T("worker_thread.cpp:953 SI wait remote %ld cnt %ld\n",txn_man->get_txn_id(),responses_left);
     return WAIT;
   }
   //Done Waiting
@@ -1093,6 +1170,20 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
 #endif
 }
 
+RC WorkerThread::process_rmiddle(yield_func_t &yield, Message * msg, uint64_t cor_id) {
+    DEBUG_T("RMIDDLE %ld\n",msg->get_txn_id());
+    RC rc = RCOK;
+    txn_man->abort_cnt = msg->current_abort_cnt;
+    assert(CC_ALG == PSI);
+    #if CC_ALG == PSI
+      rc = txn_man->handle_conflict(yield, cor_id);
+    #endif
+    DEBUG_T("RMIDDLE %ld from %ld\n",msg->get_txn_id(),msg->return_node_id);
+    msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man, RACK_MIDDLE), msg->return_node_id);
+    return rc;
+    
+}
+
 RC WorkerThread::process_rco_log(yield_func_t &yield, Message * msg, uint64_t cor_id) {
     // printf("rco log %ld, return_id %ld \n",msg->get_txn_id(), msg->return_node_id);
     RC rc = RCOK;
@@ -1211,6 +1302,13 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   assert(time_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
   assert(time_table.get_state(get_thd_id(),txn_man->get_txn_id()) == MAAT_RUNNING);
   #endif
+#endif
+#if CC_ALG == PSI
+  time_table.init(get_thd_id(),txn_man->get_txn_id());
+  assert(time_table.get_lower(get_thd_id(),txn_man->get_txn_id()) == 0);
+  assert(time_table.get_upper(get_thd_id(),txn_man->get_txn_id()) == UINT64_MAX);
+  assert(time_table.get_cts(get_thd_id(),txn_man->get_txn_id()) == 0);
+  assert(time_table.get_state(get_thd_id(),txn_man->get_txn_id()) == MAAT_RUNNING);
 #endif
 
   rc = init_phase();

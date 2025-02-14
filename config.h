@@ -83,9 +83,9 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 4
-#define NODE_CNT 8
-#define THREAD_CNT 30
+#define CENTER_CNT 3
+#define NODE_CNT 4
+#define THREAD_CNT 12
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -93,7 +93,7 @@
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
 #define CLIENT_NODE_CNT 1
-#define CLIENT_THREAD_CNT 4
+#define CLIENT_THREAD_CNT 1
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
@@ -126,7 +126,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 240
+#define MAX_TXN_IN_FLIGHT 48
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -166,7 +166,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 0UL
+#define NETWORK_DELAY 100000000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -181,7 +181,7 @@
 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG SI
+#define CC_ALG PSI
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -190,9 +190,9 @@
 #define USE_TAPIR false
 #define MAJORITY true
 #define INTER_DC_CONTROL true
-#define EARLY_PREPARE true
+#define EARLY_PREPARE false
 
-#define TAPIR_DEBUG false
+#define TAPIR_DEBUG true
 #define TAPIR_REPLICA false
 
 #define CO_LOG true
@@ -324,7 +324,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 8388608
+#define SYNTH_TABLE_SIZE 4194304
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.8
 #define TUP_WRITE_PERC 0.5
@@ -450,7 +450,8 @@ enum PPSTxnType {
 #define DEBUG_SYNTH         false
 #define DEBUG_ASSERT        false
 #define DEBUG_DISTR false
-#define DEBUG_TXN false
+#define DEBUG_TXN true
+#define DEBUG_PSI true
 #define DEBUG_ALLOC false
 #define DEBUG_RACE false
 #define DEBUG_TIMELINE        false
@@ -496,6 +497,7 @@ enum PPSTxnType {
 #define MAAT      11
 #define WDL           12
 #define SI    13
+#define PSI   14
 // #define WOOKONG     13
 // #define TICTOC     14
 // #define FOCC       15

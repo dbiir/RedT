@@ -24,6 +24,7 @@
 #include "transport/message.h"
 #include "worker_thread.h"
 #include "routine.h"
+#include <set>
 #include <unordered_map>
 //#include "wl.h"
 
@@ -37,6 +38,7 @@ class INDEX;
 class TxnQEntry;
 class YCSBQuery;
 class TPCCQuery;
+class PSIVersion;
 //class r_query;
 
 enum TxnState {START,INIT,EXEC,PREP,FIN,DONE};
@@ -49,6 +51,11 @@ public:
 	row_t * 	data;
 	row_t * 	orig_data;
 	uint64_t    version;
+
+	// for PSI
+	#if CC_ALG == PSI
+	PSIVersion* pversion; // 当时读取的版本
+	#endif
 	void cleanup();
 };
 
@@ -221,7 +228,8 @@ public:
 #endif
 	bool aborted;
 	uint64_t return_id;
-	RC        validate(yield_func_t &yield, uint64_t cor_id);
+	RC validate(yield_func_t &yield, uint64_t cor_id);
+	RC handle_conflict(yield_func_t &yield, uint64_t cor_id);
 	void log_replica(RemReqType req_type, uint64_t ret_nid);
 	uint64_t get_return_node();
 	void            cleanup(yield_func_t &yield, RC rc, uint64_t cor_id);
@@ -236,6 +244,7 @@ public:
 	uint64_t get_write_set_size() {return txn->write_cnt;}
 	uint64_t get_read_set_size() {return txn->row_cnt - txn->write_cnt;}
 	
+	Access*  get_access(uint64_t idx) {return txn->accesses[idx];}
 	access_t get_access_type(uint64_t access_id) {return txn->accesses[access_id]->type;}
 	uint64_t get_access_version(uint64_t access_id) { return txn->accesses[access_id]->version; }
 	row_t * get_access_original_row(uint64_t access_id) {return txn->accesses[access_id]->orig_row;}
@@ -244,7 +253,17 @@ public:
 	uint64_t get_batch_id() {return txn->batch_id;}
 	void set_batch_id(uint64_t batch_id) {txn->batch_id = batch_id;}
 
-		// For MaaT
+	// For PSI
+	// uint64_t startTimeLB;
+	// uint64_t startTimeUB;
+	// uint64_t get_start_timestampLB() {return startTimeLB;}
+	// uint64_t get_start_timestampUB() {return startTimeUB;}
+	// void set_start_timestampLB(uint64_t start_timestamp) {startTimeLB = start_timestamp;}
+	// void set_start_timestampUB(uint64_t start_timestamp) {startTimeUB = start_timestamp;}
+	std::set<uint64_t> * reads_before;
+	std::set<uint64_t> * writes_after;
+
+	// For MaaT
 	uint64_t commit_timestamp;
 	uint64_t get_commit_timestamp() {return commit_timestamp;}
 	void set_commit_timestamp(uint64_t timestamp) {commit_timestamp = timestamp;}
@@ -299,6 +318,7 @@ public:
 	//void send_rfin_messages(RC rc) {assert(false);}
 	void send_finish_messages();
 	void send_colog_messages();
+	bool send_middle_messages(bool &has_local);
 	void send_prepare_messages();
 
 	TxnStats txn_stats;
@@ -333,6 +353,8 @@ protected:
 	int log_rsp_cnt;
 	int log_fin_rsp_cnt;
 	bool local_log;
+
+	std::set<uint64_t> psi_send_nodes;
 #if USE_TAPIR
 	int ir_log_rsp_cnt[NODE_CNT];
 #endif

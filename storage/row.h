@@ -51,6 +51,7 @@ class Row_mvcc;
 class Row_ts;
 class Row_occ;
 class Row_maat;
+class Row_psi;
 class Row_specex;
 class Row_null;
 class Row_si;
@@ -129,6 +130,8 @@ public:
 		Row_null * manager;
 	#elif CC_ALG == SI
     	Row_si * manager;
+	#elif CC_ALG == PSI
+		Row_psi * manager;
 	#endif
 	int tuple_size;
 	table_t * table;

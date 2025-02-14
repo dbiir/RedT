@@ -25,6 +25,7 @@
 #include "mem_alloc.h"
 #include "row_lock.h"
 #include "row_maat.h"
+#include "row_psi.h"
 #include "row_mvcc.h"
 #include "row_occ.h"
 #include "row_ts.h"
@@ -86,6 +87,8 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_null *) mem_allocator.align_alloc(sizeof(Row_null));
 #elif CC_ALG == SI
     manager = (Row_si *) mem_allocator.align_alloc(sizeof(Row_si));
+#elif CC_ALG == PSI
+	manager = (Row_psi *) mem_allocator.align_alloc(sizeof(Row_psi));
 #endif
 
 #if CC_ALG != HSTORE && CC_ALG != HSTORE_SPEC
@@ -256,22 +259,41 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	goto end;
 #endif
 #if CC_ALG == MAAT
-  uint64_t init_time = get_sys_clock();
-  DEBUG_M("row_t::get_row MAAT alloc \n");
+	uint64_t init_time = get_sys_clock();
+	DEBUG_M("row_t::get_row MAAT alloc \n");
 	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
 	txn->cur_row->init(get_table(), get_part_id());
-  INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
+	INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
-  rc = this->manager->access(type,txn);
+	rc = this->manager->access(type,txn);
 
-  uint64_t copy_time = get_sys_clock();
-  txn->cur_row->copy(this);
+	uint64_t copy_time = get_sys_clock();
+	txn->cur_row->copy(this);
 	access->data = txn->cur_row;
 	//assert(rc == RCOK);
-  INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
 	goto end;
 #endif
+#if CC_ALG == PSI
+	uint64_t init_time = get_sys_clock();
+	DEBUG_M("row_t::get_row PSI alloc \n");
+	txn->cur_row = (row_t *) mem_allocator.alloc(row_t::get_row_size(tuple_size));
+	txn->cur_row->init(get_table(), get_part_id());
+	INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
 
+	PSIVersion* version = NULL;
+	rc = this->manager->access(type, txn, version);
+
+	uint64_t copy_time = get_sys_clock();
+	txn->cur_row->copy(this);
+	access->data = txn->cur_row;
+	access->pversion = version;
+	assert(rc != RCOK || version != NULL);
+	access->orig_row = this;
+	//assert(rc == RCOK);
+	INC_STATS(txn->get_thd_id(), trans_cur_row_copy_time, get_sys_clock() - copy_time);
+	goto end;
+#endif
 
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT
   	uint64_t init_time = get_sys_clock();
@@ -470,6 +492,11 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		assert(rc == RCOK);
 	}
 	return 0;
+// #elif CC_ALG == PSI
+// 	if (type == XP) {
+// 		this->manager->
+// 	}
+// 	return 0;
 #elif CC_ALG == OCC
 	assert (row != NULL);
 	if (type == WR) manager->write(row, txn->get_end_timestamp());
@@ -487,13 +514,20 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 	}
 
 		row->free_row();
-	DEBUG_M("row_t::return_row Maat free \n");
+	DEBUG_M("row_t::return_row CNULL free \n");
 		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
 	return 0;
 #elif CC_ALG == MAAT
 	if (row != NULL) {
 		row->free_row();
 	    DEBUG_M("row_t::return_row Maat free \n");
+		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
+    }
+	return 0;
+#elif CC_ALG == PSI
+	if (row != NULL) {
+		row->free_row();
+	    DEBUG_M("row_t::return_row psi free \n");
 		mem_allocator.free(row, row_t::get_row_size(ROW_DEFAULT_SIZE));
     }
 	return 0;

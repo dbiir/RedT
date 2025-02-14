@@ -22,6 +22,7 @@
 #include "log_thread.h"
 #include "logger.h"
 #include "maat.h"
+#include "psi.h"
 #include "manager.h"
 #include "math.h"
 #include "msg_queue.h"
@@ -40,7 +41,6 @@
 #include "ycsb_query.h"
 #include "da.h"
 #include "si.h"
-#include "maat.h"
 #include "client_query.h"
 #include "lib.hh"
 #include "qps/rc_recv_manager.hh"
@@ -219,6 +219,20 @@ int main(int argc, char *argv[]) {
 	printf("Initializing MaaT manager... ");
 	fflush(stdout);
 	maat_man.init();
+	printf("Done\n");
+#endif
+#if CC_ALG == PSI
+	printf("Initializing Time Table... ");
+	fflush(stdout);
+	time_table.init();
+	printf("Done\n");
+	printf("Initializing anti dependency table... ");
+	fflush(stdout);
+	ad_table.init();
+	printf("Done\n");
+	printf("Initializing PSI manager... ");
+	fflush(stdout);
+	psi_man.init();
 	printf("Done\n");
 #endif
 #if LOGGING

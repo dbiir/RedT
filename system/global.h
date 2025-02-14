@@ -63,6 +63,7 @@ class Manager;
 class Query_queue;
 class OptCC;
 class Maat;
+class psi;
 class si;
 class Transport;
 class Remote_query;
@@ -87,6 +88,7 @@ class WkdbTimeTable;
 class DAQuery;
 class DABlockQueue;
 class Workload;
+class anti_dependency_table;
 // class QTcpQueue;
 // class TcpTimestamp;
 
@@ -108,6 +110,7 @@ extern Query_queue query_queue;
 extern Client_query_queue client_query_queue;
 extern OptCC occ_man;
 extern Maat maat_man;
+extern psi psi_man;
 extern Transport tport_man;
 extern Workload * m_wl;
 extern TxnManPool txn_man_pool;
@@ -127,6 +130,7 @@ extern Logger logger;
 extern TimeTable time_table;
 extern InOutTable inout_table;
 extern WkdbTimeTable wkdb_time_table;
+extern anti_dependency_table ad_table;
 
 extern si si_man;
 // extern QTcpQueue tcp_queue;
@@ -314,23 +318,25 @@ enum RemReqType {
     RULK,
     CL_QRY,
     CL_QRY_O,//one server but use the msg queue
-    RQRY,
+    RQRY, //5
     RQRY_CONT,
     RFIN,
     RLK_RSP,
     RULK_RSP,
-    RQRY_RSP,
+    RQRY_RSP,//10
     RACK,
     RACK_PREP,
+    RACK_MIDDLE,
     RLOG,
-    RACK_LOG,
+    RACK_LOG, //15
     RFIN_LOG,
-    RACK_FIN_LOG,
+    RACK_FIN_LOG, //17
     RACK_FIN,
     RTXN,
-    RTXN_CONT,
+    RTXN_CONT, //20
     RINIT,
     RPREPARE,
+    RMIDDLE,
     RPASS,
     RFWD,
     RDONE,
@@ -412,6 +418,7 @@ enum RecordStatus {COMMITED = 0, ABORTED, PENDING};
   (id >= g_node_cnt + g_client_node_cnt && \
    id < g_node_cnt + g_client_node_cnt + g_repl_cnt * g_node_cnt)
 #define ISCLIENTN(id) (id >= g_node_cnt && id < g_node_cnt + g_client_node_cnt)
+#define GET_TXN_NODE_ID(tid) (tid % g_node_cnt)
 #define IS_LOCAL(tid) (tid % g_node_cnt == g_node_id || CC_ALG == CALVIN)
 #define IS_REMOTE(tid) (tid % g_node_cnt != g_node_id || CC_ALG == CALVIN)
 #define IS_LOCAL_KEY(key) (key % g_node_cnt == g_node_id)

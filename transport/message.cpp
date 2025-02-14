@@ -1173,8 +1173,14 @@ void PrepareMessage::copy_to_buf(char * buf) {
 uint64_t AckMessage::get_size() {
   uint64_t size = Message::mget_size();
   size += sizeof(RC);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == PSI
   size += sizeof(uint64_t) * 2;
+#endif
+#if CC_ALG == PSI 
+  size += sizeof(uint64_t);
+  size += sizeof(uint64_t) * 2;
+  size += sizeof(uint64_t) * reads_before.size();
+  size += sizeof(uint64_t) * writes_after.size();
 #endif
 #if CC_ALG == SILO
   size += sizeof(uint64_t);
@@ -1190,9 +1196,14 @@ void AckMessage::copy_from_txn(TxnManager * txn) {
   Message::mcopy_from_txn(txn);
   //rc = query->rc;
   rc = txn->get_rc();
-#if CC_ALG == MAAT
+#if CC_ALG == MAAT || CC_ALG == PSI
   lower = time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
   upper = time_table.get_upper(txn->get_thd_id(),txn->get_txn_id());
+#endif
+#if CC_ALG == PSI
+  cts_lower = time_table.get_cts(txn->get_thd_id(),txn->get_txn_id());
+  reads_before.insert(txn->reads_before->begin(), txn->reads_before->end());
+  writes_after.insert(txn->writes_after->begin(), txn->writes_after->end());
 #endif
 #if CC_ALG == WOOKONG
   lower = wkdb_time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
@@ -1216,9 +1227,12 @@ void AckMessage::copy_to_txn(TxnManager * txn) {
   Message::mcopy_to_txn(txn);
   //query->rc = rc;
 #if WORKLOAD == PPS && CC_ALG == CALVIN
-
   PPSQuery* pps_query = (PPSQuery*)(txn->query);
   pps_query->part_keys.append(part_keys);
+#endif
+#if CC_ALG == PSI 
+  // txn->reads_before.insert(reads_before);
+  // txn->writes_after.insert(writes_after);
 #endif
 }
 
@@ -1226,9 +1240,25 @@ void AckMessage::copy_from_buf(char * buf) {
   Message::mcopy_from_buf(buf);
   uint64_t ptr = Message::mget_size();
   COPY_VAL(rc,buf,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == PSI
   COPY_VAL(lower,buf,ptr);
   COPY_VAL(upper,buf,ptr);
+#endif
+#if CC_ALG == PSI
+  COPY_VAL(cts_lower,buf,ptr);
+  size_t size;
+  COPY_VAL(size,buf,ptr);
+  for (uint64_t i = 0; i < size; i++) {
+    uint64_t item;
+    COPY_VAL(item,buf,ptr);
+    reads_before.insert(item);
+  }
+  COPY_VAL(size,buf,ptr);
+  for (uint64_t i = 0; i < size; i++) {
+    uint64_t item;
+    COPY_VAL(item,buf,ptr);
+    writes_after.insert(item);
+  }
 #endif
 #if CC_ALG == SILO
   COPY_VAL(max_tid,buf,ptr);
@@ -1251,9 +1281,24 @@ void AckMessage::copy_to_buf(char * buf) {
   Message::mcopy_to_buf(buf);
   uint64_t ptr = Message::mget_size();
   COPY_BUF(buf,rc,ptr);
-#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3
+#if CC_ALG == MAAT || CC_ALG == WOOKONG || CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == PSI
   COPY_BUF(buf,lower,ptr);
   COPY_BUF(buf,upper,ptr);
+#endif
+#if CC_ALG == PSI
+  COPY_BUF(buf,cts_lower,ptr);
+  size_t size = reads_before.size();
+  COPY_BUF(buf,size,ptr);
+  for (auto it = reads_before.begin(); it != reads_before.end(); it++) {
+    uint64_t item = *it;
+    COPY_BUF(buf,item,ptr);
+  }
+  size = writes_after.size();
+  COPY_BUF(buf,size,ptr);
+  for (auto it = writes_after.begin(); it != writes_after.end(); it++) {
+    uint64_t item = *it;
+    COPY_BUF(buf,item,ptr);
+  }
 #endif
 #if CC_ALG == SILO
   COPY_BUF(buf,max_tid,ptr);
@@ -1315,6 +1360,89 @@ void QueryResponseMessage::copy_to_buf(char * buf) {
  assert(ptr == get_size());
 }
 
+
+/************************/
+
+uint64_t MiddleMessage::get_size() {
+  uint64_t size = Message::mget_size();
+  size += sizeof(uint64_t);
+  size += sizeof(RC);
+  size += sizeof(bool);
+#if CC_ALG == PSI
+  size += sizeof(uint64_t);
+  size += sizeof(uint64_t) * reads_before.size();
+
+  size += sizeof(uint64_t);
+  size += sizeof(uint64_t) * writes_after.size();
+#endif
+  return size;
+}
+
+void MiddleMessage::copy_from_txn(TxnManager * txn) {
+  Message::mcopy_from_txn(txn);
+  rc = txn->get_rc();
+#if CC_ALG == PSI
+  reads_before.insert(txn->reads_before->begin(), txn->reads_before->end());
+  writes_after.insert(txn->writes_after->begin(), txn->writes_after->end());
+#endif
+}
+
+void MiddleMessage::copy_to_txn(TxnManager * txn) {
+  Message::mcopy_to_txn(txn);
+
+#if CC_ALG == PSI
+  // txn->reads_before.insert(reads_before);
+  // txn->writes_after.insert(writes_after);
+#endif
+}
+
+void MiddleMessage::copy_from_buf(char * buf) {
+  Message::mcopy_from_buf(buf);
+  uint64_t ptr = Message::mget_size();
+  COPY_VAL(pid,buf,ptr);
+  COPY_VAL(rc,buf,ptr);
+#if CC_ALG == PSI
+  size_t size;
+  COPY_VAL(size,buf,ptr);
+  for (uint64_t i = 0; i < size; i++) {
+    uint64_t item;
+    COPY_VAL(item,buf,ptr);
+    reads_before.insert(item);
+  }
+  COPY_VAL(size,buf,ptr);
+  for (uint64_t i = 0; i < size; i++) {
+    uint64_t item;
+    COPY_VAL(item,buf,ptr);
+    writes_after.insert(item);
+  }
+#endif
+ assert(ptr == get_size());
+}
+
+void MiddleMessage::copy_to_buf(char * buf) {
+  Message::mcopy_to_buf(buf);
+  uint64_t ptr = Message::mget_size();
+  COPY_BUF(buf,pid,ptr);
+  COPY_BUF(buf,rc,ptr);
+#if CC_ALG == PSI
+  size_t size = reads_before.size();
+  COPY_BUF(buf,size,ptr);
+  for (auto it = reads_before.begin(); it != reads_before.end(); it++) {
+    uint64_t item = *it;
+    COPY_BUF(buf,item,ptr);
+  }
+  size = writes_after.size();
+  COPY_BUF(buf,size,ptr);
+  for (auto it = writes_after.begin(); it != writes_after.end(); it++) {
+    uint64_t item = *it;
+    COPY_BUF(buf,item,ptr);
+  }
+#endif
+
+ assert(ptr == get_size());
+}
+
+
 /************************/
 
 uint64_t FinishMessage::get_size() {
@@ -1326,6 +1454,9 @@ uint64_t FinishMessage::get_size() {
     CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
     CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC || CC_ALG == SILO
   size += sizeof(uint64_t);
+#endif
+#if CC_ALG == PSI
+  size += sizeof(uint64_t) * 2;
 #endif
   return size;
 }
@@ -1340,6 +1471,10 @@ void FinishMessage::copy_from_txn(TxnManager * txn) {
     CC_ALG == DLI_MVCC || CC_ALG == SILO 
   commit_timestamp = txn->get_commit_timestamp();
 #endif
+#if CC_ALG == PSI
+  commit_timestamp = txn->get_commit_timestamp();
+  start_timestamp = txn->get_start_timestamp();
+#endif
 }
 
 void FinishMessage::copy_to_txn(TxnManager * txn) {
@@ -1349,6 +1484,10 @@ void FinishMessage::copy_to_txn(TxnManager * txn) {
     CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
     CC_ALG == DLI_MVCC || CC_ALG == SILO
   txn->commit_timestamp = commit_timestamp;
+#endif
+#if CC_ALG == PSI
+  txn->commit_timestamp = commit_timestamp;
+  txn->set_start_timestamp(start_timestamp);
 #endif
 }
 
@@ -1363,6 +1502,10 @@ void FinishMessage::copy_from_buf(char * buf) {
     CC_ALG == DLI_MVCC || CC_ALG == SILO
   COPY_VAL(commit_timestamp,buf,ptr);
 #endif
+#if CC_ALG == PSI
+  COPY_VAL(commit_timestamp,buf,ptr);
+  COPY_VAL(start_timestamp,buf,ptr);
+#endif
  assert(ptr == get_size());
 }
 
@@ -1376,6 +1519,10 @@ void FinishMessage::copy_to_buf(char * buf) {
     CC_ALG == DTA || CC_ALG == DLI_DTA || CC_ALG == DLI_DTA2 || CC_ALG == DLI_DTA3 || CC_ALG == DLI_MVCC_OCC || \
     CC_ALG == DLI_MVCC || CC_ALG == SILO
   COPY_BUF(buf,commit_timestamp,ptr);
+#endif
+#if CC_ALG == PSI
+  COPY_BUF(buf,commit_timestamp,ptr);
+  COPY_BUF(buf,start_timestamp,ptr);
 #endif
 
  assert(ptr == get_size());
