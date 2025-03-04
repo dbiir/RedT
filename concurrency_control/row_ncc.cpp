@@ -57,10 +57,11 @@ RC Row_ncc::non_blocking_execute(NCCTimeStamp ts, access_t type, row_t * row, Ac
     access->ncc_qe = qe;
     access->txn = txn;
     resp_qs.insert(row->get_table()->get_table_id(),row->get_primary_key(), qe, row);
-    DEBUG_T("NCC: txn %ld access %ld insert into resp_qs\n", txn->get_txn_id(), row->get_primary_key());
+    DEBUG_T("NCC: txn %ld access %ld insert into resp_qs, tr %lu, tw %lu\n", txn->get_txn_id(), row->get_primary_key(), qe->resp->tr.time, qe->resp->tw.time);
     resp_qs.RespTimeingControl(row->get_table()->get_table_id(), row->get_primary_key(), row);
     // resp_qs.RespTimeingControl();
     
+    if (!OPEN_TIME_CONTROL) return RCOK;
     return rc;
 }
 
@@ -75,12 +76,12 @@ RC Row_ncc::async_commit_or_abort_on_row(TxnManager * txn, bool is_commit) {
                 version->status = NCC_COMMIT;
             } else {
                 remove_list.push_back(i);
-                // version->status = NCC_ABORT;
+                version->status = NCC_ABORT;
             }
         }
     }
-    for (uint64_t i = remove_list.size(); i >= 0; i--) {
-        versions.erase(versions.begin() + remove_list[i]);
+    for (int i = remove_list.size() - 1; i >= 0; i--) {
+        // versions.erase(versions.begin() + remove_list[i]);
     }
     pthread_mutex_unlock(latch);
     return RCOK;

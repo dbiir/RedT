@@ -54,6 +54,7 @@ void * run_co_thread(void *);
 void * run_nco_thread(void *);
 WorkerThread * worker_thds;
 WorkerNumThread * worker_num_thds;
+RespQsThread* resp_qs_thds;
 InputThread * input_thds;
 OutputThread * output_thds;
 AbortThread * abort_thds;
@@ -246,6 +247,9 @@ int main(int argc, char *argv[]) {
 #if USE_WORK_NUM_THREAD
         all_thd_cnt += 1; 
 #endif
+#if CC_ALG == NCC
+	all_thd_cnt += NCC_THREAD_CNT;
+#endif
 #if LOGGING
 		all_thd_cnt += 1; // logger thread
 #endif
@@ -272,6 +276,9 @@ int main(int argc, char *argv[]) {
 	worker_thds = new WorkerThread[wthd_cnt];
 #if USE_WORK_NUM_THREAD
     worker_num_thds = new WorkerNumThread[1];
+#endif
+#if CC_ALG == NCC
+	resp_qs_thds = new RespQsThread[NCC_THREAD_CNT];
 #endif
 	input_thds = new InputThread[rthd_cnt];
 	output_thds = new OutputThread[sthd_cnt];
@@ -393,6 +400,12 @@ int main(int argc, char *argv[]) {
 #if USE_WORK_NUM_THREAD
 	worker_num_thds[0].init(id,g_node_id,m_wl);
 	pthread_create(&p_thds[id++], &attr, run_thread, (void *)&worker_num_thds[0]);
+#endif
+#if CC_ALG == NCC
+	for (int i = 0; i < NCC_THREAD_CNT; i++) {
+		resp_qs_thds[i].init(id,g_node_id,m_wl);
+		pthread_create(&p_thds[id++], NULL, run_thread, (void *)&resp_qs_thds[i]);
+	}
 #endif
 	for (uint64_t i = 0; i < all_thd_cnt; i++) pthread_join(p_thds[i], NULL);
 

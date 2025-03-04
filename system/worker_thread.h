@@ -99,4 +99,12 @@ public:
     void setup();
 
 };
+
+class RespQsThread : public Thread {
+public:
+    RC run();
+    void setup();
+
+};
+
 #endif

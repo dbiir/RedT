@@ -346,6 +346,10 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 #if CC_ALG == WOUND_WAIT
 	txn_state = RUNNING;
 #endif
+#if CC_ALG == NCC
+	set_MaxTw(0);
+	set_MinTr(UINT64_MAX);
+#endif
 	registed_ = false;
 	txn_ready = true;
 	twopl_wait_start = 0;
@@ -404,6 +408,10 @@ void TxnManager::reset() {
 	locking_done = false;
 	calvin_locked_rows.clear();
 #endif
+#if CC_ALG == NCC
+	set_MaxTw(0);
+	set_MinTr(UINT64_MAX);
+#endif
 	assert(txn);
 	assert(query);
 	txn->reset(get_thd_id());
@@ -461,7 +469,7 @@ RC TxnManager::commit(yield_func_t &yield, uint64_t cor_id) {
 // 	if(aborted) return Abort;
 // #endif
 	assert(!aborted);
-	DEBUG("Commit %ld\n",get_txn_id());
+	DEBUG_T("Commit %ld\n",get_txn_id());
 #if CC_ALG == WOUND_WAIT
     txn_state = STARTCOMMIT;    
 #endif
@@ -1194,7 +1202,7 @@ void TxnManager::log_replica(RemReqType req_type,uint64_t ret_nid) {
 
 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,req_type),f1);
 	msg_queue.enqueue(get_thd_id(),Message::create_message(this,req_type),f2);
-	DEBUG_T("TxnManager::log_replica %ld %ld %ld %ld\n",get_txn_id(),part_id,f1,f2);
+	DEBUG_T("TxnManager::log_replica %ld req type %d %ld %ld %ld\n",get_txn_id(),req_type,part_id,f1,f2);
 	txn_stats.log_start_time = get_sys_clock();
 }
 
@@ -1202,7 +1210,7 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 #if MODE != NORMAL_MODE
 	return RCOK;
 #endif
-	if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != SI) {
+	if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != SI && CC_ALG != NCC) {
 		return RCOK;
 	}
 	RC rc = RCOK;
@@ -1217,6 +1225,9 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 		if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
 			rc = maat_man.find_bound(this);
 		}
+	}
+	if (CC_ALG == NCC && rc == RCOK) {
+		rc = ncc_man.validate(this);
 	}
 	
 	INC_STATS(get_thd_id(),txn_validate_time,get_sys_clock() - starttime);

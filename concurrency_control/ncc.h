@@ -104,16 +104,26 @@ class ResponseQueues {
 public:
     std::unordered_map<std::pair<uint64_t,uint64_t>, NCCQueue*, pair_hash::hash_pair<uint64_t, uint64_t>, pair_equal::equal<uint64_t, uint64_t>> qs;
 
+    std::vector<std::vector<NCCQueue*>> v_qs;
+    int next_insert_vector = 0;
+
     // 帮忙给每个key加一个锁
     pthread_mutex_t* mutx;
     std::unordered_map<uint64_t, pthread_mutex_t*> locks;
     ResponseQueues() {
         mutx = (pthread_mutex_t *) mem_allocator.alloc(sizeof(pthread_mutex_t));
         pthread_mutex_init(mutx, NULL);
+        next_insert_vector = 0;
+        v_qs.resize(NCC_THREAD_CNT);
+        // for (int i = 0; i < NCC_THREAD_CNT; i++) {
+        //     v_qs[i].resize(NCC_THREAD_CNT);
+        // }
     }
     void create(uint64_t table_id, uint64_t key, row_t* row);
     void RespTimeingControl() ;
+    void RespTimeingControl(uint64_t thd_id);
     void RespTimeingControl(uint64_t table_id, uint64_t key, row_t * row); 
+    void RespTimeingControlInner(NCCQueue *q, row_t * row);
     bool TxnCanSend(TxnManager* txn);
     void insert(uint64_t table_id, uint64_t key, NCCQueueEntry* qe, row_t* row);
 };
@@ -125,7 +135,7 @@ public:
     RC validate(TxnManager * txn); 
     bool safe_guard_check(TxnManager * txn, NCCTimeStamp &commitT);
 private:
-    void get_rw_set(TxnManager * txn, std::vector<NCCTimeStamp> &Trs, std::vector<NCCTimeStamp> &Tws);
+    void get_rw_set(TxnManager * txn, std::vector<Response *> &resps) ;
 };
 
 #endif

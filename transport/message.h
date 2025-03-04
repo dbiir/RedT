@@ -114,6 +114,9 @@ public:
     CC_ALG == DLI_MVCC || CC_ALG == SILO
   uint64_t commit_timestamp;
 #endif
+#if CC_ALG == NCC
+  NCCTimeStamp commit_timestamp;
+#endif
 };
 
 class LogMessage : public Message {
@@ -399,6 +402,9 @@ public:
 #endif
 #if MODE==QRY_ONLY_MODE
   uint64_t max_access;
+#endif
+#if CC_ALG == NCC
+  NCCTimeStamp ncc_timestamp;
 #endif
 };
 

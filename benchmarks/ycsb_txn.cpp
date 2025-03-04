@@ -210,6 +210,7 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	for(int i = 0; i < g_node_cnt; i++) {
 		if(i != g_node_id && remote_node[i].size() > 0) {//send message to all masters
 			remote_next_node_id = i;
+			DEBUG_T("(%ld) send remote subtxn to %d\n",txn->txn_id,i);
 			msg_queue.enqueue(get_thd_id(),Message::create_message(this,RQRY),i);
 		}
 	}
@@ -233,18 +234,18 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	uint64_t starttime = get_sys_clock();
 
 	while(rc == RCOK && !is_done()) {
-#if CC_ALG == WOUND_WAIT
-		if (txn_state == WOUNDED) {
-			rc = Abort;
-			break;
-		}  
-#endif
+		#if CC_ALG == WOUND_WAIT
+			if (txn_state == WOUNDED) {
+				rc = Abort;
+				break;
+			}  
+		#endif
 		rc = run_txn_state(yield, cor_id);
 	}
-#if CC_ALG == WOUND_WAIT
-	if (txn_state == WOUNDED) 
-		rc = Abort;
-#endif
+	#if CC_ALG == WOUND_WAIT
+		if (txn_state == WOUNDED) 
+			rc = Abort;
+	#endif
 
     if(rc == Abort) total_num_atomic_retry++;
 	uint64_t curr_time = get_sys_clock();
@@ -254,21 +255,21 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 	// printf("xxx txn %lu exe, rc = %d, local_write %d\n", get_txn_id(), rc, has_local_write());
 	// ! NCC肯定需要等待paxos协议
-	return WAIT;
-#if 0
-	#if EARLY_PREPARE
-		if(rc == RCOK && has_local_write()){
-			//send log message
-			log_replica(RLOG, GET_NODE_ID(get_txn_id()));
-			return WAIT;
-		}
-	#endif
-
+	#if OPEN_TIME_CONTROL
+		return WAIT;
+	#else 
+		#if EARLY_PREPARE
+			if(rc == RCOK && 
+				(CC_ALG == NCC || has_local_write())){
+				//send log message
+				log_replica(RLOG, GET_NODE_ID(get_txn_id()));
+				return WAIT;
+			}
+		#endif
 		if(!IS_LOCAL(get_txn_id())){
 			if(rc == Abort) rc = abort(yield, cor_id);
 			return rc;
 		}
-
 		if(rc == Abort){
 			rc = start_abort(yield, cor_id);
 		}else{
@@ -277,15 +278,14 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 				return WAIT;
 			}
 			if(is_done()){
-	#if CC_ALG == WOUND_WAIT
-				txn_state = STARTCOMMIT;
-	#endif
-				rc = start_commit(yield, cor_id);
+					#if CC_ALG == WOUND_WAIT
+						txn_state = STARTCOMMIT;
+					#endif
+					rc = start_commit(yield, cor_id);
+				}
 			}
-		}
-
-		return rc;
-#endif
+			return rc;
+	#endif
 }
 
 RC YCSBTxnManager::run_txn_post_wait() {

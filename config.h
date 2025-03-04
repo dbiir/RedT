@@ -83,9 +83,9 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 3
-#define NODE_CNT 3
-#define THREAD_CNT 12
+#define CENTER_CNT 4
+#define NODE_CNT 8
+#define THREAD_CNT 30
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -93,7 +93,7 @@
 // PART_CNT should be at least NODE_CNT
 #define PART_CNT NODE_CNT
 #define CLIENT_NODE_CNT 1
-#define CLIENT_THREAD_CNT 1
+#define CLIENT_THREAD_CNT 4
 #define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1
 #define CLIENT_RUNTIME false
@@ -126,7 +126,7 @@
 #define TIME_ENABLE         true //STATS_ENABLE
 
 #define FIN_BY_TIME true
-#define MAX_TXN_IN_FLIGHT 36
+#define MAX_TXN_IN_FLIGHT 240
 
 #define SERVER_GENERATE_QUERIES false
 
@@ -298,6 +298,9 @@
 #define DSLR_MAX_RETRY_TIME 50
 // [RDMA_CICADA]
 #define CICADA_MAX_RETRY_TIME 50
+// [ncc]
+#define NCC_THREAD_CNT 4
+#define OPEN_TIME_CONTROL false
 /***********************************************/
 // Logging
 /***********************************************/
@@ -325,7 +328,7 @@
 #define DATA_PERC 100
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
-#define SYNTH_TABLE_SIZE 314571
+#define SYNTH_TABLE_SIZE 8388608
 #define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.8
 #define TUP_WRITE_PERC 0.5
@@ -340,7 +343,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 1.0
+#define CROSS_DC_TXN_PERC 1
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.

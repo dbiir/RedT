@@ -315,6 +315,10 @@ public:
     time = 0;
     cid = 0;
   }
+  NCCTimeStamp(uint64_t time, uint64_t cid) {
+    this->time = time;
+    this->cid = cid;
+  }
   // 帮忙写一个重载，用来比较大小
   // bool operator<(const NCCTimeStamp &other) {
   //   return true;

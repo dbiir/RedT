@@ -62,7 +62,7 @@ def ycsb_early_cross_dc():
     wl = 'YCSB'
     nnodes = [8]
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['true']
     base_table_size=1048576
@@ -71,8 +71,8 @@ def ycsb_early_cross_dc():
     load = [240]
     tcnt = [30]  #THREAD_CNT
     skew = [0.2]
-    # cross_dc_perc = [1] 
-    cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+    cross_dc_perc = [1] 
+    # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
 
 
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT","CROSS_DC_TXN_PERC"]
@@ -83,7 +83,7 @@ def ycsb_cross_dc():
     wl = 'YCSB'
     nnodes = [8]
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['false']
     base_table_size=1048576
@@ -104,7 +104,7 @@ def ycsb_network_delay():
     wl = 'YCSB'
     nnodes = [8]
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['false']
     base_table_size=1048576
@@ -128,7 +128,7 @@ def ycsb_early_network_delay():
     wl = 'YCSB'
     nnodes = [8]
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['true']
     base_table_size=1048576
@@ -152,7 +152,7 @@ def ycsb_skew():
     nnodes = [8]
 
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['false']
     # base_table_size=1048576*10
@@ -176,7 +176,7 @@ def ycsb_early_skew():
     nnodes = [8]
 
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['true']
     # base_table_size=1048576*10
@@ -202,7 +202,7 @@ def ycsb_writes():
     nnodes = [8]
 
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['false']
     base_table_size=1048576
@@ -222,7 +222,7 @@ def ycsb_early_writes():
     nnodes = [8]
 
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['true']
     base_table_size=1048576
@@ -242,7 +242,7 @@ def ycsb_partitions():
     # nnodes = [15]
     nnodes = [16]
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['false']
     # load = [10000,12000]
@@ -266,7 +266,7 @@ def ycsb_early_partitions():
     # nnodes = [15]
     nnodes = [16]
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['true']
     load = [200]
@@ -289,7 +289,7 @@ def ycsb_dcs():
     # nnodes = [15]
     nnodes = [16]
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['false']
     # load = [10000,12000]
@@ -312,7 +312,7 @@ def ycsb_early_dcs():
     # nnodes = [15]
     nnodes = [16]
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     tapir=['false']
     early=['true']
     # load = [10000,12000]
@@ -358,9 +358,9 @@ def ycsb_scaling():
 def ycsb_scaling_early():
     wl = 'YCSB'
     #nnodes = [1,2,4,8,16,32,64]
-    # nnodes = [4,8,12,16]
+    nnodes = [4,8,12,16]
     # nnodes = [9,12]
-    nnodes = [3]
+    # nnodes = [3]
     tapir=['false']
     early=['true']
     algos = ['NCC']
@@ -388,7 +388,7 @@ def tpcc_scaling():
     tapir=['false']
     early=['false']
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     npercpay=[0.489]
     # npercpay=[1.0]
     wh=16
@@ -412,7 +412,7 @@ def tpcc_scaling_n():
     # nnodes = [4,8,12,16,20]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN']
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     npercpay=[0.0]
     # npercpay=[1.0]
     wh=16
@@ -434,7 +434,7 @@ def tpcc_scaling_p():
     early=['false']
     # nnodes = [3,6,9,12,15]
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
 
     npercpay=[1.0]
     # npercpay=[1.0]
@@ -458,7 +458,7 @@ def tpcc_scaling_early():
     # nnodes = [4,8,12,16,20]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN']
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     npercpay=[0.489]
     # npercpay=[1.0]
     wh=16
@@ -482,7 +482,7 @@ def tpcc_scaling_n_early():
     # nnodes = [4,8,12,16,20]
     # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN']
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
     npercpay=[0.0]
     # npercpay=[1.0]
     wh=16
@@ -503,7 +503,7 @@ def tpcc_scaling_p_early():
     early=['true']
     # nnodes = [3,6,9,12,15]
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['NCC']
 
     npercpay=[1.0]
     # npercpay=[1.0]

@@ -519,6 +519,8 @@ uint64_t row_t::return_row(RC rc, access_t type, TxnManager *txn, row_t *row) {
 		this->copy(row);
 	}
 	return 0;
+#elif CC_ALG == NCC
+	return 0;
 #else
 	assert(false);
 #endif

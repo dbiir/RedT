@@ -268,6 +268,14 @@ public:
 	NCCTimeStamp get_MaxTw() {return MaxTw;}
 	void set_MinTr(NCCTimeStamp ts) {MinTr = ts;}
 	void set_MaxTw(NCCTimeStamp ts) {MaxTw = ts;}
+	void set_MinTr(uint64_t ts) {
+		MinTr.time = ts;
+		MinTr.cid = g_node_id;
+	}
+	void set_MaxTw(uint64_t ts) {
+		MaxTw.time = ts;
+		MaxTw.cid = g_node_id;
+	}
 	NCCTimeStamp ncc_commit_timestamp;
 	NCCTimeStamp get_ncc_commit_timestamp() {return ncc_commit_timestamp;}
 	void set_ncc_commit_timestamp(NCCTimeStamp ts) {ncc_commit_timestamp = ts;}
