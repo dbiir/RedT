@@ -123,6 +123,7 @@ RC Row_rdma_redt::read_only_get(uint64_t snapshot, uint64_t &idx, TxnManager * t
     RC rc = RCOK;
     uint64_t loc = g_node_id;
     
+    uint64_t newest_version_ts = row->commit_ts[row->newest_index];
     for (int i = row->newest_index; i > row->newest_index - HIS_CHAIN_NUM; i--) {
         int index = i % HIS_CHAIN_NUM;
         if (row->commit_ts[index] <= snapshot) {
@@ -130,6 +131,7 @@ RC Row_rdma_redt::read_only_get(uint64_t snapshot, uint64_t &idx, TxnManager * t
             #if DEBUG_PRINTF
             printf("row_rdma_redt.cpp:130 txn %ld get version %ld\n", txn->get_txn_id(),idx);
             #endif
+            INC_STATS_ARR(txn->get_thd_id(),read_staleness, newest_version_ts - row->commit_ts[index]);
             return RCOK;
         } else {
             // printf("row_rdma_redt.cpp:133 txn %ld search version %ld commit_ts %ld\n", txn->get_txn_id(),idx,row->commit_ts[index]);

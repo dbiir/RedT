@@ -61,6 +61,7 @@ void Stats_thd::init(uint64_t thd_id) {
 	last_start_commit_latency.init(g_max_txn_per_part,ArrIncr);
 	first_start_commit_latency.init(g_max_txn_per_part,ArrIncr);
 	start_abort_commit_latency.init(g_max_txn_per_part,ArrIncr);
+  read_staleness.init(g_max_txn_per_part*10,ArrIncr);
 
     clear();
 
@@ -441,9 +442,10 @@ void Stats_thd::clear() {
   trans_wait_for_commit_rsp_count = 0;
 
   client_client_latency.clear();
-    last_start_commit_latency.clear();
-    first_start_commit_latency.clear();
-    start_abort_commit_latency.clear();
+  last_start_commit_latency.clear();
+  first_start_commit_latency.clear();
+  start_abort_commit_latency.clear();
+  read_staleness.clear();
 }
 
 void Stats_thd::print_client(FILE * outf, bool prog) {
@@ -1357,6 +1359,51 @@ void Stats_thd::print(FILE * outf, bool prog) {
   //       (double)start_abort_commit_latency.get_idx(start_abort_commit_latency.cnt - 1) / BILLION,
   //       (double)start_abort_commit_latency.get_avg() / BILLION, start_abort_commit_latency.cnt);
   // }
+  read_staleness.quicksort(0,read_staleness.cnt-1);
+  fprintf(outf,
+          ",staleness100=%f"
+          ",staleness200=%f"
+          ",staleness300=%f"
+          ",staleness400=%f"
+          ",staleness500=%f"
+          ",staleness600=%f"
+          ",staleness700=%f"
+          ",staleness800=%f"
+          ",staleness900=%f"
+          ",staleness1000=%f"
+          ",staleness1100=%f"
+          ",staleness1200=%f"
+          ",staleness1300=%f"
+          ",staleness1400=%f"
+          ",staleness1500=%f"
+          ",staleness1600=%f"
+          ",staleness1700=%f"
+          ",staleness1800=%f"
+          ",staleness1900=%f"
+          ",staleness2000=%f"
+          ",staleness_last=%f",
+            (double)read_staleness.get_latency(100*MILLION),
+            (double)read_staleness.get_latency(200*MILLION),
+            (double)read_staleness.get_latency(300*MILLION),
+            (double)read_staleness.get_latency(400*MILLION),
+            (double)read_staleness.get_latency(500*MILLION),
+            (double)read_staleness.get_latency(600*MILLION),
+            (double)read_staleness.get_latency(700*MILLION),
+            (double)read_staleness.get_latency(800*MILLION),
+            (double)read_staleness.get_latency(900*MILLION),
+            (double)read_staleness.get_latency(1000*MILLION),
+            (double)read_staleness.get_latency(1100*MILLION),
+            (double)read_staleness.get_latency(1200*MILLION),
+            (double)read_staleness.get_latency(1300*MILLION),
+            (double)read_staleness.get_latency(1400*MILLION),
+            (double)read_staleness.get_latency(1500*MILLION),
+            (double)read_staleness.get_latency(1600*MILLION),
+            (double)read_staleness.get_latency(1700*MILLION),
+            (double)read_staleness.get_latency(1800*MILLION),
+            (double)read_staleness.get_latency(1900*MILLION),
+            (double)read_staleness.get_latency(2000*MILLION), 
+            (double)read_staleness.get_idx(read_staleness.cnt-1));
+
 
   //first_start_commit_latency.print(outf);
 

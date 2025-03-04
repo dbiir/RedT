@@ -25,12 +25,12 @@ sh set_group_delay.sh 0 4
 # sleep 10
 
 
-# TAPIR
-cd ../../TAPIR/scripts 
-python run_experiments.py -e -c vcloud ycsb_tapir_skew -l 20 0
-sleep 10
-
-
-# # mdcc
-# cd ../../MDCC/scripts 
+## TAPIR
+# cd ../../TAPIR/scripts 
 # python run_experiments.py -e -c vcloud ycsb_tapir_skew -l 20 0
+# sleep 10
+
+
+# mdcc
+cd ../../MDCC/scripts 
+python run_experiments.py -e -c vcloud ycsb_tapir_skew -l 20 0

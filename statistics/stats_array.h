@@ -34,6 +34,7 @@ class StatsArr {
       uint64_t get_idx(uint64_t idx);
       uint64_t get_percentile(uint64_t ile);
       uint64_t get_avg();
+      uint64_t get_latency(uint64_t latency);
 
       uint64_t * arr;
       uint64_t size;

@@ -122,3 +122,12 @@ uint64_t StatsArr::get_avg() {
   if (cnt > 0) return sum / cnt;
   return 0;
 }
+
+// 根据延迟给出百分比
+uint64_t StatsArr::get_latency(uint64_t latency) {
+  for (int i = 0; i < cnt; i++) {
+    if (arr[i] > latency) {
+      return i * 100 / cnt;
+    }
+  }
+}

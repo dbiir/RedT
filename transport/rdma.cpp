@@ -344,7 +344,10 @@ void Rdma::init(){
 		pthread_join(client_thread[i],NULL);
 	}
 
-  	char* rheader = rdma_global_buffer + rdma_index_size;
+  	char* rheader = rdma_global_buffer + rdma_index_size + sizeof(uint64_t);
 	r2::AllocatorMaster<>::init(rheader,rdma_buffer_size-rdma_index_size);
 
+	// ------------ index ------------
+	// hlc timestamp
+	// ------------- row -------------
 }

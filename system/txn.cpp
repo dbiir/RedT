@@ -1510,12 +1510,14 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t key, 
 		#if WORKLOAD == YCSB
 		assert(test_row->get_primary_key() == key);
 		#endif
+		uint64_t newest_version_ts = test_row->commit_ts[test_row->newest_index];
 		for (int i = test_row->newest_index; i > test_row->newest_index - HIS_CHAIN_NUM; i--) {
         	int index = i % HIS_CHAIN_NUM;
 			if (test_row->commit_ts[index] <= get_start_timestamp()) {
 				#if DEBUG_PRINTF
 				printf("txn.cpp:1500 txn %ld get version %ld\n", get_txn_id(), index);
 				#endif
+				INC_STATS_ARR(get_thd_id(),read_staleness, newest_version_ts - test_row->commit_ts[index]);
 				rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc,test_row->get_part_id());
 				return RCOK;
 			} else {
@@ -1637,12 +1639,14 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t key, 
 		#if WORKLOAD == YCSB
 		assert(test_row->get_primary_key() == key);
 		#endif
+		uint64_t newest_version_ts = test_row->commit_ts[test_row->newest_index];
 		for (int i = test_row->newest_index; i > test_row->newest_index - HIS_CHAIN_NUM; i--) {
         	int index = i % HIS_CHAIN_NUM;
 			if (test_row->commit_ts[index] <= get_start_timestamp()) {
 				#if DEBUG_PRINTF
 				printf("txn.cpp:1643 txn %ld get version %ld\n", get_txn_id(), index);
 				#endif
+				if (enable_read_only_optimization) INC_STATS_ARR(get_thd_id(),read_staleness, newest_version_ts - test_row->commit_ts[index]);
 				rc = preserve_access(row_local,m_item,test_row,type,test_row->get_primary_key(),loc,test_row->get_part_id());
 				++num_locks;
 				return RCOK;
@@ -1819,6 +1823,44 @@ void TxnManager::release_locks(yield_func_t &yield, RC rc, uint64_t cor_id) {
 	if(rc == Abort) printf("---thd %lu txn %lu, Abort end.\n",get_thd_id(), get_txn_id());
 	else if(rc == RCOK) printf("---thd %lu txn %lu, Commit end.\n",get_thd_id(), get_txn_id());
 #endif
+}
+
+RC TxnManager::get_hlc_ts(yield_func_t &yield, uint64_t cor_id) {
+	RC rc = RCOK;
+	uint64_t offset = rdma_index_size;
+	char* hlc_byte = rdma_global_buffer + rdma_index_size;
+	uint64_t result = *(uint64_t*) hlc_byte;
+	uint64_t ts;
+	rc = cas_remote_content(yield, g_node_id, offset, result, result + 1, &ts, cor_id);
+	return rc;
+}
+
+RC TxnManager::update_hlc_ts(yield_func_t &yield, uint64_t cts, uint64_t cor_id) {
+	RC rc = RCOK;
+	uint64_t offset = rdma_index_size;
+	char* hlc_byte = rdma_global_buffer + rdma_index_size;
+	uint64_t result = *(uint64_t*) hlc_byte;
+	uint64_t target = result > cts ? result + 1 : cts + 1;
+	uint64_t ts;
+	rc = cas_remote_content(yield, g_node_id, offset, result, target, &ts, cor_id);
+	return rc;
+}
+
+RC TxnManager::update_remote_ts(yield_func_t &yield, uint64_t target_server, uint64_t cts, uint64_t cor_id) {
+	RC rc = RCOK;
+	uint64_t offset = rdma_index_size;
+	uint64_t operate_size = sizeof(uint64_t);
+	uint64_t thd_id = get_thd_id() + cor_id * g_thread_cnt;
+	char *local_buf = Rdma::get_row_client_memory(thd_id);
+	rc = read_remote_content(yield, target_server, offset, operate_size, local_buf, cor_id);
+	if (rc != RCOK) return rc;
+
+	uint64_t remote_ts = *(uint64_t*) local_buf;
+	
+	uint64_t target = remote_ts > cts ? remote_ts + 1 : cts + 1;
+	uint64_t ts;
+	rc = cas_remote_content(yield, target_server, offset, remote_ts, target, &ts, cor_id);
+	return rc;
 }
 
 RC TxnManager::read_remote_index(yield_func_t &yield, uint64_t target_server,uint64_t remote_offset,uint64_t key, itemid_t * &item, uint64_t cor_id){

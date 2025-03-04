@@ -301,6 +301,11 @@ RC YCSBTxnManager::send_remote_one_side_request(yield_func_t &yield, ycsb_reques
     uint64_t version = 0;
 	// DEBUG_T("Txn %ld one-sided op.\n", get_txn_id());
 	rc = get_remote_row(yield, req->acctype, req->key, loc, m_item, row_local, cor_id);
+
+	#if TEST_HLC
+	// ! 增加测试HLC的部分
+	update_remote_ts(yield,loc,0,cor_id);
+	#endif
 	// mem_allocator.free(m_item, sizeof(itemid_t));
 	return rc;
 }

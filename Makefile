@@ -3,7 +3,7 @@ CC=g++
 #CFLAGS=-Wall -Werror -std=c++11 -g3 -ggdb -O0 -fno-strict-aliasing -fno-omit-frame-pointer -D_GLIBCXX_USE_CXX11_ABI=0
 
 # CFLAGS=-w -std=c++1y -g3 -ggdb -O0 -fno-strict-aliasing -fno-omit-frame-pointer -I/usr/local/include -I/home/u2021000884/include -L/usr/local/lib -L/home/u2021000884/lib -D_GLIBCXX_USE_CXX11_ABI=0 #-fsanitize=address
-CFLAGS=-w -std=c++1y -g3 -ggdb -O0 -fno-strict-aliasing -I/home/u2021000884/include -L/home/u2021000884/lib -D_GLIBCXX_USE_CXX11_ABI=0
+CFLAGS=-w -std=c++1y -g3 -ggdb -O0 -fno-strict-aliasing -I/home/u2021000884/local/include -I/home/u2021000884/libboost-deneva/include -L/home/u2021000884/local/lib -L/home/u2021000884/local/lib64 -L/home/u2021000884/libboost-deneva/lib -D_GLIBCXX_USE_CXX11_ABI=0
 # CFLAGS += -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer
 NNMSG=./nanomsg-0.5-beta
 RALLOC = ./rlib/lib

@@ -81,7 +81,6 @@ RC IndexRdma::init(uint64_t bucket_cnt) {
 RC IndexRdma::init(uint64_t bucket_cnt) {
 
 	// uint64_t index_size = (g_synth_table_size/g_node_cnt)*(sizeof(IndexInfo)+1);
-
 	index_info = (IndexInfo*)rdma_global_buffer;
 
 	// printf("%d",index_info[0].key);

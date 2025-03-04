@@ -107,7 +107,7 @@ void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) 
         rc = process_rack_prep(yield, msg, cor_id);
 				break;
 			case RACK_FIN:
-        rc = process_rack_rfin(msg);
+        rc = process_rack_rfin(yield, msg, cor_id);
 				break;
 			case RTXN_CONT:
         rc = process_rtxn_cont(yield, msg, cor_id);
@@ -765,7 +765,11 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 RC WorkerThread::process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG_T("RFIN %ld from %ld\n",msg->get_txn_id(), msg->get_return_id());
   assert(CC_ALG != CALVIN );
-  
+  #if TEST_HLC
+  // ! 增加测试HLC的部分
+  txn_man->update_hlc_ts(yield,0,cor_id);
+  #endif
+
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()), "RFIN local: %ld %ld/%d\n", msg->get_txn_id(),
              msg->get_txn_id() % g_node_cnt, g_node_id);
 #if CC_ALG == MAAT || USE_REPLICA
@@ -806,6 +810,11 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   RC rc = RCOK;
   uint64_t center_from = GET_CENTER_ID(msg->return_node_id);
   msg->copy_to_txn(txn_man);
+
+  #if TEST_HLC
+  // ! 增加测试HLC的部分
+  txn_man->update_hlc_ts(yield,0,cor_id);
+  #endif
 
 #if CC_ALG == MAAT
   // Integrate bounds
@@ -854,6 +863,10 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   
   // Done waiting
   txn_man->set_commit_timestamp(get_next_ts());
+  #if TEST_HLC
+  // ! 增加测试HLC的部分
+  txn_man->get_hlc_ts(yield,cor_id);
+  #endif
 
   uint64_t curr_time = get_sys_clock();
   INC_STATS(get_thd_id(),trans_wait_for_rsp_time, curr_time - txn_man->txn_stats.wait_for_rsp_time);
@@ -892,9 +905,13 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   return rc;
 }
 
-RC WorkerThread::process_rack_rfin(Message * msg) {
+RC WorkerThread::process_rack_rfin(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG_T("RFIN_ACK %ld from %ld\n",msg->get_txn_id(), msg->get_return_id());
   RC rc = RCOK;
+  #if TEST_HLC
+  // ! 增加测试HLC的部分
+  txn_man->update_hlc_ts(yield,0,cor_id);
+  #endif
   // txn_man->txn_stats.current_states = FINISH_PHASE;
   // if(txn_man->abort_cnt > 0) printf("acnt:%lu\n",txn_man->abort_cnt);
   uint64_t center_from = GET_CENTER_ID(msg->return_node_id);
@@ -951,6 +968,10 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
 RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t cor_id) {
   DEBUG_T("RQRY_RSP %ld from %ld\n",msg->get_txn_id(),msg->get_return_id());
   assert(IS_LOCAL(msg->get_txn_id()));
+  #if TEST_HLC
+  // ! 增加测试HLC的部分
+  txn_man->update_hlc_ts(yield,0,cor_id);
+  #endif
 #if PARAL_SUBTXN == true
   if (!txn_man->query || txn_man->abort_cnt != msg->current_abort_cnt ||
     (txn_man->query->partitions_touched.size() == 0)) return RCOK;
@@ -987,6 +1008,10 @@ RC WorkerThread::process_rqry_rsp(yield_func_t &yield, Message * msg, uint64_t c
 
 RC WorkerThread::process_rqry(yield_func_t &yield, Message * msg, uint64_t cor_id) { 
   DEBUG_T("RQRY %ld from %ld\n",msg->get_txn_id(), msg->get_return_id());
+  #if TEST_HLC
+  // ! 增加测试HLC的部分
+  txn_man->update_hlc_ts(yield,0,cor_id);
+  #endif
 #if ONE_NODE_RECIEVE == 1 && defined(NO_REMOTE) && LESS_DIS_NUM == 10
 #else
   M_ASSERT_V(!IS_LOCAL(msg->get_txn_id()), "RQRY local: %ld %ld/%d\n", msg->get_txn_id(),
@@ -1087,6 +1112,10 @@ RC WorkerThread::process_rtxn_cont(yield_func_t &yield, Message * msg, uint64_t 
 RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t cor_id) {
     DEBUG("RPREP %ld\n",msg->get_txn_id());
     RC rc = RCOK;
+    #if TEST_HLC
+    // ! 增加测试HLC的部分
+    txn_man->update_hlc_ts(yield,0,cor_id);
+    #endif
 
     // Validate transaction
     rc  = txn_man->validate(yield, cor_id);
@@ -1312,9 +1341,13 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
   #endif
   }
 
-#if USE_REPLICA
-      txn_man->set_start_timestamp(get_next_ts());
-#endif
+  #if USE_REPLICA
+    txn_man->set_start_timestamp(get_next_ts());
+    #if TEST_HLC
+    // ! 增加测试HLC的部分
+    txn_man->get_hlc_ts(yield,cor_id);
+    #endif
+  #endif
 
 #if CC_ALG == MVCC
     txn_table.update_min_ts(get_thd_id(),txn_id,0,txn_man->get_timestamp());
@@ -1398,6 +1431,10 @@ RC WorkerThread::process_rtxn( yield_func_t &yield, Message * msg, uint64_t cor_
 
     //commit phase: now commit or abort
     txn_man->set_commit_timestamp(get_next_ts());
+    #if TEST_HLC
+    // ! 增加测试HLC的部分
+    txn_man->get_hlc_ts(yield,cor_id);
+    #endif
     txn_man->send_finish_messages();
     // assert(txn_man->get_rsp_cnt() == 0 && !txn_man->need_extra_wait());
 

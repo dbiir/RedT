@@ -360,6 +360,7 @@ public:
   StatsArr first_start_commit_latency;
   StatsArr last_start_commit_latency;
   StatsArr start_abort_commit_latency;
+  StatsArr read_staleness;
 
   // stats accumulated
   double lat_work_queue_time;

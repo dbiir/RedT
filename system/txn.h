@@ -248,6 +248,10 @@ public:
  	RC check_log_in_remote_buffer(yield_func_t &yield, uint64_t target_server, uint64_t remote_offset, uint64_t *result_offset, uint64_t cor_id);
  	RC write_remote_log(yield_func_t &yield, uint64_t target_server, uint64_t operate_size, uint64_t remote_offset, char *write_content, uint64_t cor_id, int num = 1, bool outstanding = false);
 #endif
+	// For HLC
+	RC get_hlc_ts(yield_func_t &yield, uint64_t cor_id);
+	RC update_hlc_ts(yield_func_t &yield, uint64_t cts, uint64_t cor_id);
+	RC update_remote_ts(yield_func_t &yield, uint64_t target_server, uint64_t cts, uint64_t cor_id);
 
 	// For check timeout
 	bool is_time_out() {
