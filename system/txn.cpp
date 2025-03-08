@@ -606,18 +606,18 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 #if USE_REPLICA
 	send_prepare_messages();
 	txn_state = 1;
-#if !USE_TAPIR
-	if(has_local_write()){
-		log_replica(RLOG, g_node_id);
-	}
-	if(rsp_cnt != 0 || log_rsp_cnt!=0){
-		return WAIT_REM;
-	}
-#else
-	// printf("%d query_partitions_modified size: %d\n", get_txn_id(), query->partitions_modified.size());
-	if(query->partitions_touched.size() != 0)
-		return WAIT_REM;	
-#endif
+	#if !USE_TAPIR
+		if(has_local_write()){
+			log_replica(RLOG, g_node_id);
+		}
+		if(rsp_cnt != 0 || log_rsp_cnt!=0){
+			return WAIT_REM;
+		}
+	#else
+		// printf("%d query_partitions_modified size: %d\n", get_txn_id(), query->partitions_modified.size());
+		if(query->partitions_touched.size() != 0)
+			return WAIT_REM;	
+	#endif
 	assert(query->readonly());
 	assert(query->partitions_modified.size() == 0);	
 #endif
@@ -638,16 +638,16 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 				INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
 				start_fin_time = get_sys_clock();
 			}
-#if CO_LOG
-			send_colog_messages();
-			rc = WAIT_REM;
-			return rc;
-#endif
+			#if CO_LOG
+				send_colog_messages();
+				rc = WAIT_REM;
+				return rc;
+			#endif
 			send_finish_messages();
 			txn_state = 2;
-		#if !USE_TAPIR
-			// rsp_cnt = 0;
-		#endif
+			#if !USE_TAPIR
+				// rsp_cnt = 0;
+			#endif
 			rc = commit(yield, cor_id);
 		}
 	} 
@@ -683,11 +683,6 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 		else {
 			txn->rc = Abort;
 			DEBUG("%ld start_abort\n",get_txn_id());
-// #if CO_LOG
-// 			send_colog_messages();
-// 			rc = WAIT_REM;
-// 			return rc;
-// #endif
 			if(query->partitions_touched.size() > 1) {
 				send_finish_messages();
 				abort(yield, cor_id);
@@ -762,10 +757,16 @@ void TxnManager::send_colog_messages() {
 	uint64_t next_node = g_node_id;
 	for(uint64_t i = 1; i <= 2; i++) {
 		next_node = (g_node_id + i) % g_node_cnt;
-		// printf("%d:%d send finish to %d\n", g_node_id, get_txn_id(), next_node);
+		DEBUG_T("%d:%d send colog to %d\n", g_node_id, get_txn_id(), next_node);
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RCO_LOG),
 											next_node);
 	}
+}
+
+void TxnManager::send_colog_and_middle_messages() {
+	send_colog_messages();
+	bool has_local = false;
+	send_middle_messages(has_local);
 }
 
 bool TxnManager::send_middle_messages(bool &has_local) {
@@ -793,6 +794,8 @@ bool TxnManager::send_middle_messages(bool &has_local) {
 		return no_need_middle;
 	}
 	for (uint64_t node: psi_send_nodes) {
+		rsp_cnt ++;
+		num_msgs_prep = num_msgs_prep +2;
 		DEBUG_T("%ld Send MIDDLE messages to %d\n",get_txn_id(),node);
 		msg_queue.enqueue(get_thd_id(), Message::create_message(this, RMIDDLE), node);
 	}
@@ -1458,7 +1461,7 @@ RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
 #if MODE != NORMAL_MODE
 	return RCOK;
 #endif
-	if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != SI) {
+	if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != SI && CC_ALG != PSI) {
 		return RCOK;
 	}
 	RC rc = RCOK;

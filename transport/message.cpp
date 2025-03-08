@@ -205,6 +205,12 @@ Message * Message::create_message(RemReqType rtype) {
     case CL_RSP:
       msg = new ClientResponseMessage;
       break;
+    case RMIDDLE:
+      msg = new MiddleMessage;
+      break;
+    case RACK_MIDDLE:
+      msg = new AckMessage;
+      break;
     default:
       assert(false);
   }
@@ -418,6 +424,18 @@ void Message::release_message(Message * msg) {
       delete m_msg;
       break;
                  }
+    case RMIDDLE: {
+      MiddleMessage * m_msg = (MiddleMessage*)msg;
+      m_msg->release();
+      delete m_msg;
+      break;
+    }
+    case RACK_MIDDLE: {
+      AckMessage * m_msg = (AckMessage*)msg;
+      m_msg->release();
+      delete m_msg;
+      break;
+    }
     default: {
       assert(false);
     }
@@ -1367,7 +1385,7 @@ uint64_t MiddleMessage::get_size() {
   uint64_t size = Message::mget_size();
   size += sizeof(uint64_t);
   size += sizeof(RC);
-  size += sizeof(bool);
+  // size += sizeof(bool);
 #if CC_ALG == PSI
   size += sizeof(uint64_t);
   size += sizeof(uint64_t) * reads_before.size();

@@ -318,6 +318,7 @@ public:
 	//void send_rfin_messages(RC rc) {assert(false);}
 	void send_finish_messages();
 	void send_colog_messages();
+	void send_colog_and_middle_messages();
 	bool send_middle_messages(bool &has_local);
 	void send_prepare_messages();
 

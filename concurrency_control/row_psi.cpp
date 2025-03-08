@@ -93,6 +93,8 @@ RC Row_psi::read(TxnManager * txn, PSIVersion * &target_version) {
     time_table.set_cts(txn->get_thd_id(), txn->get_txn_id(), newc);
 
     target_version->visitor_list->insert(txn->get_txn_id());
+
+    DEBUG_P("READ %ld -- %ld Success, get version %p \n", txn->get_txn_id(), _row->get_primary_key(), target_version);
     
   }
 
@@ -170,10 +172,11 @@ RC Row_psi::commit(access_t type, TxnManager * txn, row_t * data, PSIVersion * o
   if (wlock == txn->get_txn_id()) {
     wlock = 0;
   }
-  orig_version->visitor_list->erase(txn->get_txn_id());
-  uint64_t lower = time_table.get_lower(txn->get_thd_id(), txn->get_txn_id());
-  orig_version->sid = lower > orig_version->sid ? lower : orig_version->sid;
-
+  if (orig_version != NULL) {
+    orig_version->visitor_list->erase(txn->get_txn_id());
+    uint64_t lower = time_table.get_lower(txn->get_thd_id(), txn->get_txn_id());
+    orig_version->sid = lower > orig_version->sid ? lower : orig_version->sid;
+  }
 
   ATOM_CAS(psi_avail,false,true);
 
@@ -186,7 +189,9 @@ RC Row_psi::abort(access_t type, TxnManager * txn, PSIVersion * orig_version) {
   }
   INC_STATS(txn->get_thd_id(),mtx[32],get_sys_clock() - mtx_wait_starttime);
   DEBUG_P("PSI Abort %ld: %d -- %ld\n",txn->get_txn_id(),type,_row->get_primary_key());
-  orig_version->visitor_list->erase(txn->get_txn_id());
+  if (orig_version != NULL) {
+    orig_version->visitor_list->erase(txn->get_txn_id());
+  }
   if (wlock == txn->get_txn_id()) {
     wlock = 0;
   }

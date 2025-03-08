@@ -46,7 +46,7 @@ RC psi::validate_4a(TxnManager * txn) {
   for (int i = 0; i < txn->get_access_cnt(); i++) {
     Access * access = txn->get_access(i);
     if (access->type == WR) {
-      RC rc = access->orig_row->manager->prewrite(txn, access->pversion);
+      rc = access->orig_row->manager->prewrite(txn, access->pversion);
       if (rc == Abort) {
         rc = Abort;
         goto VALIDATE_END;
@@ -62,7 +62,7 @@ RC psi::validate_4a(TxnManager * txn) {
   //local time_table
   lower = time_table.get_lower(txn->get_thd_id(),txn->get_txn_id());
   upper = time_table.get_upper(txn->get_thd_id(),txn->get_txn_id());
-  DEBUG("PSI Validate Start %ld: [%lu,%lu]\n",txn->get_txn_id(),lower,upper);
+  DEBUG_P("PSI Validate Start %ld: [%lu,%lu], reads_before size %ld\n",txn->get_txn_id(),lower,upper,txn->reads_before->size());
   if (lower > upper) {
     // Abort
     time_table.set_state(txn->get_thd_id(),txn->get_txn_id(),MAAT_ABORTED);
@@ -95,7 +95,7 @@ VALIDATE_END:
   INC_STATS(txn->get_thd_id(),maat_validate_time,timespan);
   txn->txn_stats.cc_time += timespan;
   txn->txn_stats.cc_time_short += timespan;
-  DEBUG("PSI Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
+  DEBUG_P("PSI Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
   //  printf("PSI Validate End %ld: %d [%lu,%lu]\n",txn->get_txn_id(),rc==RCOK,lower,upper);
   // sem_post(&_semaphore);
   return rc;
@@ -116,7 +116,7 @@ RC psi::find_bound(TxnManager * txn) {
   }
   uint64_t cts = time_table.get_cts(txn->get_thd_id(),txn->get_txn_id());
   txn->set_commit_timestamp(cts + 1);
-  DEBUG("PSI Bound %ld: %d [%lu,%lu] %lu\n", txn->get_txn_id(), rc, lower, upper,
+  DEBUG_P("PSI Bound %ld: %d [%lu,%lu] %lu\n", txn->get_txn_id(), rc, lower, upper,
         txn->commit_timestamp);
   return rc;
 }
@@ -144,7 +144,7 @@ RC psi::handle_conflict_txn_4b(TxnManager * txn) {
       uint64_t upper = time_table.get_upper(txn->get_thd_id(),txn_id);
       if (upper >= txn->get_commit_timestamp()) {
         time_table.set_upper(txn->get_thd_id(),txn_id,txn->get_commit_timestamp()-1);
-        DEBUG("PSI forward val set upper %ld: %lu\n",txn_id,txn->get_commit_timestamp()-1);
+        DEBUG_P("PSI forward val set upper %ld: %lu\n",txn_id,txn->get_commit_timestamp()-1);
       }
     }
   }
@@ -156,7 +156,7 @@ RC psi::handle_conflict_txn_4b(TxnManager * txn) {
       uint64_t cts = time_table.get_cts(txn->get_thd_id(),txn_id);
       if (cts <= txn->get_start_timestamp()) {
         time_table.set_cts(txn->get_thd_id(),txn_id,txn->get_start_timestamp()+1);
-        DEBUG("PSI forward val set cts %ld: %lu\n",txn_id,txn->get_start_timestamp()+1);
+        DEBUG_P("PSI forward val set cts %ld: %lu\n",txn_id,txn->get_start_timestamp()+1);
       }
     }
   }
