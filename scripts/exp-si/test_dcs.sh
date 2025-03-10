@@ -25,8 +25,11 @@ sh set_group_delay.sh 0 8
 # sleep 10
 
 # tapir
-cd ../../TAPIR/scripts 
-python run_experiments.py -e -c vcloud ycsb_tapir_dcs -l 20 80
-sleep 10
+# cd ../../TAPIR/scripts 
+# python run_experiments.py -e -c vcloud ycsb_tapir_dcs -l 20 80
+# sleep 10
+#psi
+cd ../../PSI/scripts
+python run_experiments.py -e -c vcloud ycsb_dcs -l 20 80
 
 sh clean_group_delay.sh

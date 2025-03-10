@@ -90,6 +90,7 @@ SHORTNAMES = {
     "REPLICA_CNT":"RN",
 #    "SYNTH_TABLE_SIZE":"TBL",
     "ISOLATION_LEVEL":"LVL",
+    "HIS_CHAIN_NUM":"VA",
 }
 
 stat_map = OrderedDict([

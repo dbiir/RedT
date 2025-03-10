@@ -1,4 +1,4 @@
-set -x
+# set -x
 
 PHASE=5
 Latency="trans_total_run_time
@@ -222,14 +222,14 @@ ArgsType() {
         args=("${COROUTINE[@]}")
     elif [[ "${TEST_TYPE}" == 'ycsb_version_array' ]]
     then
-        args=("${VA[@]}")
+        args=("${SKEW[@]}")
     fi   
 }
 
 ArgsType1() {
     if [[ "${TEST_TYPE}" == 'ycsb_version_array' ]]
     then
-        args1=("${SKEW[@]}")
+        args1=("${VA[@]}")
     else 
         args1=("${CC[@]}")
     fi   
@@ -283,7 +283,7 @@ FileName() {
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _CO-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_version_array' ]]
     then 
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _VA-${arg}_ | grep _SKEW-${arg1}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep _VA-${arg1}_ | grep _SKEW-${arg}_ | grep ^${i}_)
     fi
 }
 

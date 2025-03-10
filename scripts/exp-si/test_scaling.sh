@@ -56,10 +56,19 @@ sh set_group_delay.sh 0 4
 
 
 # TAPIR
-cd ../../TAPIR/scripts 
-python run_experiments.py -e -c vcloud ycsb_scaling -l 20 0
-sleep 10
-# python run_experiments.py -e -c vcloud tpcc_scaling_n -l 20 0
+# cd ../../TAPIR/scripts 
+# python run_experiments.py -e -c vcloud ycsb_scaling -l 20 0
 # sleep 10
+# # python run_experiments.py -e -c vcloud tpcc_scaling_n -l 20 0
+# # sleep 10
+# python run_experiments.py -e -c vcloud tpcc_scaling_p -l 20 0
+# sleep 10
+
+# PSI
+cd ../../PSI/scripts
+# python run_experiments.py -e -c vcloud ycsb_scaling -l 20 0
+# sleep 10
+python run_experiments.py -e -c vcloud tpcc_scaling_n -l 20 0
+sleep 10
 python run_experiments.py -e -c vcloud tpcc_scaling_p -l 20 0
 sleep 10

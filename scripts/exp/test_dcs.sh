@@ -17,9 +17,9 @@ sh set_group_delay.sh 0 8
 
 # 优化后的RedT
 # cd ../../RedT-RO/scripts 
-cd ../../RedTR/scripts 
-python run_experiments.py -e -c vcloud ycsb_dcs -l 20 80
-sleep 10
+# cd ../../RedTR/scripts 
+# python run_experiments.py -e -c vcloud ycsb_dcs -l 20 80
+# sleep 10
 
 # # tapir
 # cd ../../TAPIR/scripts 
@@ -32,5 +32,13 @@ sleep 10
 # sleep 10
 # python run_experiments.py -e -c vcloud ycsb_dcs -l 20 80
 # sleep 10
+
+# NCC
+cd ../../NCC/scripts
+python run_experiments.py -e -c vcloud ycsb_early_dcs -l 20 80
+
+#calvin
+# cd ../../Calvin/scripts
+# python run_experiments.py -e -c vcloud ycsb_dcs -l 20 80
 
 sh clean_group_delay.sh

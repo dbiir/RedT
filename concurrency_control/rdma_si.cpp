@@ -10,7 +10,7 @@
 #include "log_rdma.h"
 
 #if CC_ALG == RDMA_SI
-RC RDMA_si::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnManager * txnMng,uint64_t cor_id) {
+RC RDMA_si::write_and_unlock(yield_func_t &yield,RC rc,row_t * row, row_t * data, TxnManager * txnMng,uint64_t cor_id) {
 	//row->copy(data);  //copy access->data to access->orig_row
     //no need for last step:data = orig_row in local situation
     uint64_t lock_type;
@@ -19,14 +19,16 @@ RC RDMA_si::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnM
     uint64_t off = (char*)row - rdma_global_buffer;
 
     // 调整版本链
-    uint64_t index = ++row->newest_index;
-    row->commit_ts[index%HIS_CHAIN_NUM] = txnMng->get_commit_timestamp();
-    row->wts = txnMng->get_commit_timestamp();
+    if (rc == RCOK) {
+        uint64_t index = ++row->newest_index;
+        row->commit_ts[index%HIS_CHAIN_NUM] = txnMng->get_commit_timestamp();
+        row->wts = txnMng->get_commit_timestamp();
+        #if READ_OPTIMIZATION && WORKLOAD != TPCC
+        set_watermark(row->get_part_id(),txnMng->get_commit_timestamp());
+        #endif
+    }
     // memcpy(row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
     // 调整时间戳
-    #if READ_OPTIMIZATION && WORKLOAD != TPCC
-    set_watermark(row->get_part_id(),txnMng->get_commit_timestamp());
-    #endif
     row->_tid_word = 0;
 #if DEBUG_PRINTF
     printf("---thd %lu, local unlock write succ, lock location: %u; %lu, txn: %lu\n", txnMng->get_thd_id(), g_node_id, row->get_primary_key(), txnMng->get_txn_id());
@@ -52,15 +54,16 @@ RC RDMA_si::remote_write_and_unlock(yield_func_t &yield,RC rc, TxnManager * txnM
     assert(test_row->get_primary_key() == access->key);
 
     // 调整版本链
-    uint64_t index = ++test_row->newest_index;
-    test_row->commit_ts[index%HIS_CHAIN_NUM] = txnMng->get_commit_timestamp();
-    test_row->wts = txnMng->get_commit_timestamp();
-    // memcpy(test_row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
-    // 调整远程的时间戳
-    // set_watermark(test_row->get_part_id(),txnMng->get_commit_timestamp());
-    #if READ_OPTIMIZATION && WORKLOAD != TPCC
-    set_remote_watermark(yield,test_row->get_part_id(),loc,txnMng->get_commit_timestamp(),txnMng->get_thd_id(),cor_id);
-    #endif
+    if (rc == RCOK) {
+        uint64_t index = ++test_row->newest_index;
+        test_row->commit_ts[index%HIS_CHAIN_NUM] = txnMng->get_commit_timestamp();
+        test_row->wts = txnMng->get_commit_timestamp();
+        // memcpy(test_row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
+        // 调整远程的时间戳
+        #if READ_OPTIMIZATION && WORKLOAD != TPCC
+        set_remote_watermark(yield,test_row->get_part_id(),loc,txnMng->get_commit_timestamp(),txnMng->get_thd_id(),cor_id);
+        #endif
+    }
 
     test_row->_tid_word = 0;
     rc = txnMng->write_remote_row(yield, loc, row_t::get_row_size(test_row->tuple_size), off,(char*)test_row, cor_id);
@@ -169,7 +172,7 @@ RC RDMA_si::finish(yield_func_t &yield,RC rc, TxnManager * txnMng,uint64_t cor_i
         //local
         if(txn->accesses[txnMng->write_set[i]]->location == g_node_id){
             Access * access = txn->accesses[ txnMng->write_set[i] ];
-            write_and_unlock(yield,access->orig_row, access->data, txnMng,cor_id); 
+            write_and_unlock(yield,rc,access->orig_row, access->data, txnMng,cor_id); 
         }else{
         //remote
             Access * access = txn->accesses[ txnMng->write_set[i] ];

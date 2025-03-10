@@ -56,23 +56,24 @@
 // #elif RDMA_SIT == SIT_ALL
   #define RDMA_ONE_SIDE true
   #define RDMA_TWO_SIDE false
-  #define USE_COROUTINE false
+  #define USE_COROUTINE true
   #define USE_DBPAOR false
 // #endif
 /************RDMA TYPE**************/
 #define CHANGE_TCP_ONLY 0
 #define CHANGE_MSG_QUEUE 1
 
-#define HIS_CHAIN_NUM 50
+#define HIS_CHAIN_NUM 4
 #define USE_CAS
 // #define USE_COROUTINE false
 #define MAX_SEND_SIZE 1
 
-#define CENTER_MASTER true  //hg-network without replica stage 2
+#define ONLY_RDMA_ONE_SIDE true
+#define CENTER_MASTER false  //hg-network without replica stage 2
 #define PARAL_SUBTXN true  //hg-network without replica stage 3
-#define USE_REPLICA true
+#define USE_REPLICA false
 #define THOMAS_WRITE true  //if false, wait and sort
-#define INTER_DC_CONTROL true
+#define INTER_DC_CONTROL false
 #define RDMA_DBPAOR false //concurrent logging
 #define AGENT_COORDINATOR false
 #define REPLICA_CC false
@@ -127,9 +128,9 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define CENTER_CNT 4
+#define CENTER_CNT 1
 #define NODE_CNT 8
-#define THREAD_CNT 30
+#define THREAD_CNT 8
 #define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1
 #define COROUTINE_CNT 4
@@ -209,7 +210,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 10000UL
+#define NETWORK_DELAY 0UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -352,7 +353,7 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 8388608
-#define ZIPF_THETA 0.7
+#define ZIPF_THETA 0.2
 #define TXN_WRITE_PERC 0.8
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
@@ -463,7 +464,7 @@ enum PPSTxnType {
 #endif
 
 // [RDMA_RED_T || [RDMA_SI]
-#define READ_OPTIMIZATION true
+#define READ_OPTIMIZATION false
 
 #define HOT_VALUE 10000
 #define MOCC_MAX_RETRY_COUNT 5
@@ -613,7 +614,7 @@ enum PPSTxnType {
 #define RECOVERY_MANAGER false
 #define RECOVERY_TXN_MECHANISM false
 
-#define TEST_HLC true
+#define TEST_HLC false
 
 #endif
   
