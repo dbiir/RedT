@@ -289,6 +289,11 @@ for exp in exps:
         ccnt.append(e[-1])
     ccnt = sorted(list(set(ccnt)))
 
+    version_array = []
+    for e in experiments:
+        version_array.append(e[4])
+    version_array = sorted(list(set(version_array)))
+
     cmd = ''
     os.chdir('./scripts')
     if 'ycsb_skew' in exp:
@@ -333,27 +338,29 @@ for exp in exps:
         cmd='sh result.sh -a ycsb_dcs -n {} -c {} -t {} -D {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in dc]))
     elif 'ycsb_coroutine' in exp:
         cmd='sh result.sh -a ycsb_coroutine -n {} -c {} -t {} -CO {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in cocnt]))
+    elif 'ycsb_version_array' in exp:
+        cmd='sh result-version.sh -a ycsb_version_array -n {} -c {} -t {} --VA {} -s {}'.format(str(cn[0]), ','.join([str(x) for x in al]), strnow, ','.join([str(x) for x in version_array]), ','.join([str(x) for x in sk]))
     print(cmd)
     os.system(cmd)
-    pprint(cmd)
+    # print(cmd)
 
-    cmd=''
-    os.chdir('../draw')
-    if exp == 'ycsb_skew':
-       cmd='./deneva-plot.sh -a ycsb_skew -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
-    elif exp == 'ycsb_cross_dc':
-       cmd='./deneva-plot.sh -a ycsb_cross_dc -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
-    elif exp == 'ycsb_writes':
-       cmd='./deneva-plot.sh -a ycsb_writes -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
-    elif 'ycsb_scaling' in exp:
-       cmd='./deneva-plot.sh -a ycsb_scaling -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
-    elif 'tpcc_scaling' in exp:
-       cmd='./deneva-plot.sh -a tpcc_scaling2 -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
-    elif 'ycsb_stress' in exp:
-       cmd='./deneva-plot.sh -a ycsb_stress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
-    elif 'tpcc_stress' in exp:
-       cmd='./deneva-plot.sh -a tpcc_stress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
-    elif 'tpcc_cstress' in exp:
-       cmd='./deneva-plot-his.sh -a tpcc_cstress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
-    print(cmd)
-    os.system(cmd)
+    # cmd=''
+    # os.chdir('../draw')
+    # if exp == 'ycsb_skew':
+    #    cmd='./deneva-plot.sh -a ycsb_skew -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    # elif exp == 'ycsb_cross_dc':
+    #    cmd='./deneva-plot.sh -a ycsb_cross_dc -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    # elif exp == 'ycsb_writes':
+    #    cmd='./deneva-plot.sh -a ycsb_writes -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    # elif 'ycsb_scaling' in exp:
+    #    cmd='./deneva-plot.sh -a ycsb_scaling -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    # elif 'tpcc_scaling' in exp:
+    #    cmd='./deneva-plot.sh -a tpcc_scaling2 -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    # elif 'ycsb_stress' in exp:
+    #    cmd='./deneva-plot.sh -a ycsb_stress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    # elif 'tpcc_stress' in exp:
+    #    cmd='./deneva-plot.sh -a tpcc_stress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    # elif 'tpcc_cstress' in exp:
+    #    cmd='./deneva-plot-his.sh -a tpcc_cstress -c {} -t {}'.format(','.join([str(x) for x in al]), strnow)
+    # print(cmd)
+    # os.system(cmd)

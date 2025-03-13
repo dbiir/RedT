@@ -20,8 +20,17 @@ RC RDMA_si::write_and_unlock(yield_func_t &yield,row_t * row, row_t * data, TxnM
 
     // 调整版本链
     uint64_t index = ++row->newest_index;
-    row->commit_ts[index%HIS_CHAIN_NUM] = txnMng->get_commit_timestamp();
+    row->mvcc[index%HIS_CHAIN_NUM].commit_ts =txnMng->get_commit_timestamp();
+    // row->commit_ts[index%HIS_CHAIN_NUM] = txnMng->get_commit_timestamp();
     row->wts = txnMng->get_commit_timestamp();
+    #if TEST_V
+        uint64_t standard_v = row->v1 + 1;
+        row->v1 = standard_v;
+        row->v2 = standard_v;
+        for (int i = 0; i < HIS_CHAIN_NUM; i++) {
+            row->mvcc[i].v = standard_v;
+        }
+    #endif
     // memcpy(row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
     // 调整时间戳
     #if READ_OPTIMIZATION && WORKLOAD != TPCC
@@ -53,8 +62,17 @@ RC RDMA_si::remote_write_and_unlock(yield_func_t &yield,RC rc, TxnManager * txnM
 
     // 调整版本链
     uint64_t index = ++test_row->newest_index;
-    test_row->commit_ts[index%HIS_CHAIN_NUM] = txnMng->get_commit_timestamp();
+    test_row->mvcc[index%HIS_CHAIN_NUM].commit_ts =txnMng->get_commit_timestamp();
+    // test_row->commit_ts[index%HIS_CHAIN_NUM] = txnMng->get_commit_timestamp();
     test_row->wts = txnMng->get_commit_timestamp();
+    #if TEST_V
+        uint64_t standard_v = test_row->v1 + 1;
+        test_row->v1 = standard_v;
+        test_row->v2 = standard_v;
+        for (int i = 0; i < HIS_CHAIN_NUM; i++) {
+            test_row->mvcc[i].v = standard_v;
+        }
+    #endif
     // memcpy(test_row->datas[index%HIS_CHAIN_NUM], data->data, ROW_DEFAULT_SIZE);
     // 调整远程的时间戳
     // set_watermark(test_row->get_part_id(),txnMng->get_commit_timestamp());

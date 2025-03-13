@@ -26,6 +26,10 @@ sh set_group_delay.sh 0 4
 # sleep 10
 
 # TAPIR
-cd ../../TAPIR/scripts 
-python run_experiments.py -e -c vcloud ycsb_tapir_partitions -l 20 80
-sleep 10
+# cd ../../TAPIR/scripts 
+# python run_experiments.py -e -c vcloud ycsb_tapir_partitions -l 20 80
+# sleep 10
+
+# PSI
+cd ../../PSI/scripts
+python run_experiments.py -e -c vcloud ycsb_partitions -l 20 80

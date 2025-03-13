@@ -1,3 +1,5 @@
+sh clean_group_delay.sh
+sh set_group_delay.sh 0 4
 # # RedT
 # cd ../../RedTR/scripts 
 # python run_experiments.py -e -c vcloud ycsb_writes_no_ro -l 20 0 
@@ -22,11 +24,16 @@
 # sleep 10
 
 # TAPIR
-cd ../../TAPIR/scripts 
-python run_experiments.py -e -c vcloud ycsb_tapir_writes -l 20 0 
-sleep 10
+# cd ../../TAPIR/scripts 
+# python run_experiments.py -e -c vcloud ycsb_tapir_writes -l 20 0 
+# sleep 10
 
 # # MDCC
 # # cd ../../MDCC/scripts 
 # # python run_experiments.py -e -c vcloud ycsb_tapir_writes -l 20 0 
 # # sleep 10
+
+# PSI
+cd ../../PSI/scripts
+python run_experiments.py -e -c vcloud ycsb_writes -l 20 0
+# sh clean_group_delay.sh

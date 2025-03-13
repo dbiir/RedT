@@ -1,10 +1,10 @@
 sh clean_group_delay.sh
-sh set_group_delay.sh 0 3
+sh set_group_delay.sh 0 4
 
 # RedT
-cd /../../../RedT/scripts 
-python run_experiments.py -e -c vcloud ycsb_scaling -l 20 0
-sleep 10
+# cd /../../../RedT/scripts 
+# python run_experiments.py -e -c vcloud ycsb_scaling -l 20 0
+# sleep 10
 # python run_experiments.py -e -c vcloud tpcc_scaling_n -l 20 0
 # sleep 10
 # python run_experiments.py -e -c vcloud tpcc_scaling_p -l 20 0
@@ -52,3 +52,19 @@ sleep 10
 # sleep 10
 # python run_experiments.py -e -c vcloud tpcc_scaling_p -l 20 0
 # sleep 10
+
+#ncc
+# cd ../../NCC/scripts
+# python run_experiments.py -e -c vcloud ycsb_scaling_early -l 20 0
+# sleep 10
+# python run_experiments.py -e -c vcloud tpcc_scaling_n_early -l 20 0
+sleep 10/
+# python run_experiments.py -e -c vcloud tpcc_scaling_p_early -l 20 0
+
+#calvin
+# cd ../../Calvin/scripts
+# python run_experiments.py -e -c vcloud ycsb_scaling -l 20 0
+# sleep 10
+# python run_experiments.py -e -c vcloud tpcc_scaling_n -l 20 0
+# sleep 10
+# python run_experiments.py -e -c vcloud tpcc_scaling_p -l 20 0

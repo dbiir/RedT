@@ -100,10 +100,19 @@ RC row_t::init(table_t *host_table, uint64_t part_id, uint64_t row_id) {
 	wts = 0;
 	newest_index = 0;
 	for (int i = 0; i < HIS_CHAIN_NUM; i++) {
-		commit_ts[i] = UINT64_MAX;
+		mvcc[i].commit_ts = UINT64_MAX;
 		// memset(datas[i], 0, ROW_DEFAULT_SIZE);
 	}
-	commit_ts[newest_index] = 0;
+	mvcc[newest_index].commit_ts = 0;
+	#if TEST_V
+		for (int i = 0; i < HIS_CHAIN_NUM; i++) {
+			mvcc[i].v = 0;
+		}
+		mvcc[newest_index].v = 0;
+		v1 = 0;
+		v2 = 0;
+	#endif
+	
 	// memcpy(datas[newest_index], data, ROW_DEFAULT_SIZE);
 #endif
 

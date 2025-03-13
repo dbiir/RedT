@@ -57,7 +57,7 @@ RC Row_rdma_si::read(yield_func_t &yield, access_t type, TxnManager * txn, row_t
     uint64_t idx = 0;
     for (int i = row->newest_index; i > row->newest_index - HIS_CHAIN_NUM; i--) {
         int index = i % HIS_CHAIN_NUM;
-        if (row->commit_ts[index] <= txn->get_start_timestamp()) {
+        if (row->mvcc[index].commit_ts <= txn->get_start_timestamp()) {
             idx = index;
             #if DEBUG_PRINTF
             printf("row_rdma_si.cpp:67 txn %ld get version %ld\n", txn->get_txn_id(),idx);
@@ -65,7 +65,7 @@ RC Row_rdma_si::read(yield_func_t &yield, access_t type, TxnManager * txn, row_t
             return RCOK;
         } else {
             #if DEBUG_PRINTF
-            // printf("row_rdma_si.cpp:67 txn %ld search version %ld commit_ts %ld\n", txn->get_txn_id(),idx,row->commit_ts[index]);
+            // printf("row_rdma_si.cpp:67 txn %ld search version %ld commit_ts %ld\n", txn->get_txn_id(),idx,row->mvcc[index].commit_ts);
             #endif
         }
     }

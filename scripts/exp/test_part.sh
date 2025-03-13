@@ -3,8 +3,8 @@ sh set_group_delay.sh 0 4
 # sh reset_group_delay.sh 20 80
 
 # RedT
-cd /../../../RedT/scripts 
-python run_experiments.py -e -c vcloud ycsb_partitions -l 20 80
+# cd /../../../RedT/scripts 
+# python run_experiments.py -e -c vcloud ycsb_partitions -l 20 80
 # sleep 10
 
 # Multiple-2pc
@@ -28,3 +28,12 @@ python run_experiments.py -e -c vcloud ycsb_partitions -l 20 80
 # cd /../../../TAPIR/scripts 
 # python run_experiments.py -e -c vcloud ycsb_tapir_partitions -l 20 80
 # sleep 10
+
+# NCC
+cd ../../NCC/scripts
+python run_experiments.py -e -c vcloud ycsb_early_partitions -l 20 80
+# sleep 10
+
+#calvin
+# cd ../../Calvin/scripts
+# python run_experiments.py -e -c vcloud ycsb_partitions -l 20 80

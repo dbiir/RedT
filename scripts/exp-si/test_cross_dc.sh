@@ -1,3 +1,5 @@
+sh clean_group_delay.sh
+sh set_group_delay.sh 0 4
 # RedT
 # 优化后的RedT
 # cd ../../RedTR/scripts 
@@ -13,6 +15,10 @@
 # sleep 10
 
 # TAPIR
-cd ../../TAPIR/scripts 
-python run_experiments.py -e -c vcloud ycsb_tapir_cross_dc -l 20 0
-sleep 10
+# cd ../../TAPIR/scripts 
+# python run_experiments.py -e -c vcloud ycsb_tapir_cross_dc -l 20 0
+# sleep 10
+
+#psi
+cd ../../PSI/scripts
+python run_experiments.py -e -c vcloud ycsb_cross_dc -l 20 0

@@ -63,7 +63,7 @@
 #define CHANGE_TCP_ONLY 0
 #define CHANGE_MSG_QUEUE 1
 
-#define HIS_CHAIN_NUM 4
+#define HIS_CHAIN_NUM 10
 #define USE_CAS
 // #define USE_COROUTINE false
 #define MAX_SEND_SIZE 1
@@ -75,7 +75,7 @@
 #define INTER_DC_CONTROL true
 #define RDMA_DBPAOR false //concurrent logging
 #define AGENT_COORDINATOR false
-#define REPLICA_CC true
+#define REPLICA_CC false
 
 #if USE_REPLICA
 #define ASYNC_REDO_THREAD_CNT 1
@@ -229,7 +229,7 @@
 // WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HSTORE, OCC, VLL, RDMA_NO_WAIT
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG RDMA_RED_T
+#define CC_ALG RDMA_SI
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -353,7 +353,7 @@
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 8388608
 #define ZIPF_THETA 0.2
-#define TXN_WRITE_PERC 1.0
+#define TXN_WRITE_PERC 0.8
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
@@ -613,5 +613,6 @@ enum PPSTxnType {
 #define RECOVERY_MANAGER false
 #define RECOVERY_TXN_MECHANISM false
 
+#define TEST_V true
 #endif
   

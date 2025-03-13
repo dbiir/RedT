@@ -1631,15 +1631,29 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t key, 
 		assert(type == RD);
 		row_t * test_row = NULL;
 		#if DEBUG_PRINTF
-		printf("txn.cpp:1633 txn %ld try to read remote row %ld\n", get_txn_id(), key);
+			printf("txn.cpp:1633 txn %ld try to read remote row %ld\n", get_txn_id(), key);
 		#endif
+	RE_READ:
 		rc = read_remote_row(yield, loc, m_item->offset, test_row, cor_id, key);
 		#if WORKLOAD == YCSB
-		assert(test_row->get_primary_key() == key);
+			assert(test_row->get_primary_key() == key);
+		#endif
+		#if TEST_V
+			uint64_t standard_v = test_row->v1;
+			if (standard_v != test_row->v2) {
+				printf("txn.cpp:1640 txn %ld read remote row %ld failed, v1 %ld, v2 %ld\n", get_txn_id(), key, test_row->v1, test_row->v2);
+				goto RE_READ;
+			}
+			for (int i = 0; i < HIS_CHAIN_NUM; i++) {
+				if (test_row->mvcc[i].v != standard_v) {
+					printf("txn.cpp:1645 txn %ld read remote row %ld failed, v1 %ld, v2 %ld, v %ld\n", get_txn_id(), key, test_row->v1, test_row->v2, test_row->mvcc[i].v);
+					goto RE_READ;
+				}
+			}
 		#endif
 		for (int i = test_row->newest_index; i > test_row->newest_index - HIS_CHAIN_NUM; i--) {
         	int index = i % HIS_CHAIN_NUM;
-			if (test_row->commit_ts[index] <= get_start_timestamp()) {
+			if (test_row->mvcc[index].commit_ts <= get_start_timestamp()) {
 				#if DEBUG_PRINTF
 				printf("txn.cpp:1643 txn %ld get version %ld\n", get_txn_id(), index);
 				#endif
@@ -1648,7 +1662,7 @@ RC TxnManager::get_remote_row(yield_func_t &yield, access_t type, uint64_t key, 
 				return RCOK;
 			} else {
 				#if DEBUG_PRINTF
-				// printf("txn.cpp:1649 txn %ld search version %ld commit_ts %ld\n", get_txn_id(),index,test_row->commit_ts[index]);
+				// printf("txn.cpp:1649 txn %ld search version %ld commit_ts %ld\n", get_txn_id(),index,test_row->mvcc[index].commit_ts);
 				#endif
 			}
 		}

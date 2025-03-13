@@ -58,16 +58,13 @@ class Row_rdma_2pl;
 class Row_rdma_redt;
 class Row_rdma_si;
 
-//struct RdmaMVHis;
 
-struct RdmaMVHis {
-    uint64_t mutex;//lock
-    uint64_t rts;
-    uint64_t start_ts;
-    uint64_t end_ts;
-    uint64_t txn_id;
-    //RTS、start_ts、end_ts、txn-id：
-	char data[ROW_DEFAULT_SIZE];
+struct RdmaMV {
+	#if TEST_V
+		volatile uint64_t v;
+	#endif
+    uint64_t commit_ts;
+	// char data[ROW_DEFAULT_SIZE];
 };
 
 class row_t {
@@ -152,11 +149,18 @@ public:
 		Row_rdma_redt * manager;
 	#elif CC_ALG == RDMA_SI
 		volatile uint64_t _tid_word;  // si的锁
+		#if TEST_V
+		volatile uint64_t v1;
+		#endif
 		volatile uint64_t wts; //commit timestamp of the latest transaction that writes this item
 
 		volatile int64_t newest_index;
-		volatile uint64_t commit_ts[HIS_CHAIN_NUM]; // MVCC版本的提交时间戳
+		volatile RdmaMV mvcc[HIS_CHAIN_NUM]; // MVCC版本
+		// volatile uint64_t commit_ts[HIS_CHAIN_NUM]; // MVCC版本的提交时间戳
 		// char datas[HIS_CHAIN_NUM][ROW_DEFAULT_SIZE]; // MVCC版本
+		#if TEST_V
+		volatile uint64_t v2;
+		#endif
 
 		Row_rdma_si * manager;
 	#elif CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == CALVIN || CC_ALG == WOUND_WAIT
