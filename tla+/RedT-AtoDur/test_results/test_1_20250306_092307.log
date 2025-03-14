@@ -1,0 +1,40 @@
+=== Test #1 Configuration: N=1 M=5 C=1 FAILEDPOINT1=FALSE FAILEDPOINT2=FALSE ===
+Start Time: 2025年 3月 6日 星期四 09时23分07秒 CST
+Configuration File: test_results/test_1_20250306_092307.cfg
+----------------------------------------
+TLC2 Version 2.20 of Day Month 20?? (rev: bacd9d2)
+Running breadth-first search Model-Checking with fp 88 and seed 8515379253014956695 with 8 workers on 8 cores with 7282MB heap and 64MB offheap memory [pid: 6875] (Mac OS X 14.0 x86_64, Oracle Corporation 21.0.4 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedtAtomicty/redtatom.tla
+Warning: symbols were renamed.
+!! WARNING: The PlusCal algorithm in module redtatom has changed since its last translation.
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1178373903684185493/Naturals.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedtAtomicty/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1178373903684185493/Sequences.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedtAtomicty/tla2tools.jar!/tla2sany/StandardModules/Sequences.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1178373903684185493/FiniteSets.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedtAtomicty/tla2tools.jar!/tla2sany/StandardModules/FiniteSets.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1178373903684185493/TLC.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedtAtomicty/tla2tools.jar!/tla2sany/StandardModules/TLC.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1178373903684185493/_TLCTrace.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedtAtomicty/tla2tools.jar!/tla2sany/StandardModules/_TLCTrace.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1178373903684185493/TLCExt.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedtAtomicty/tla2tools.jar!/tla2sany/StandardModules/TLCExt.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1178373903684185493/Integers.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedtAtomicty/tla2tools.jar!/tla2sany/StandardModules/Integers.tla)
+Semantic processing of module Naturals
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module TLC
+Semantic processing of module Integers
+Semantic processing of module TLCExt
+Semantic processing of module _TLCTrace
+Semantic processing of module redtatom
+Starting... (2025-03-06 09:23:09)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2025-03-06 09:23:11.
+Progress(19) at 2025-03-06 09:23:14: 87,378 states generated (87,378 s/min), 22,878 distinct states found (22,878 ds/min), 5,398 states left on queue.
+Progress(44) at 2025-03-06 09:24:14: 5,705,086 states generated (5,617,708 s/min), 1,230,815 distinct states found (1,207,937 ds/min), 89,793 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 8.8E-7
+  based on the actual fingerprints:  val = 2.2E-7
+10049041 states generated, 2009808 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 71.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 5 and the 95th percentile is 2).
+Finished in 01min 52s at (2025-03-06 09:25:01)
+----------------------------------------
+End Time: 2025年 3月 6日 星期四 09时25分01秒 CST

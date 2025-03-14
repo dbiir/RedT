@@ -1,0 +1,37 @@
+=== Test #2 Configuration: KEY = {k1, k2} CLIENT = {c1, c2} REPLICA_COUNT = 3 QUORUM_SIZE = 2  MAX_TXN_PER_CLIENT = 1 MAX_OPS_PER_TXN = 2 ===
+Start Time: 2025年 3月 6日 星期四 16时13分33秒 CST
+Configuration File: test_results/test_2_20250306_161333.cfg
+----------------------------------------
+TLC2 Version 2.20 of Day Month 20?? (rev: bacd9d2)
+Running breadth-first search Model-Checking with fp 119 and seed -5320324718752613776 with 8 workers on 8 cores with 7282MB heap and 64MB offheap memory [pid: 62137] (Mac OS X 14.0 x86_64, Oracle Corporation 21.0.4 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedT-SI/RedTSI.tla
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1101387380868567047/Integers.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedT-SI/tla2tools.jar!/tla2sany/StandardModules/Integers.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1101387380868567047/FiniteSets.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedT-SI/tla2tools.jar!/tla2sany/StandardModules/FiniteSets.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1101387380868567047/Sequences.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedT-SI/tla2tools.jar!/tla2sany/StandardModules/Sequences.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1101387380868567047/TLC.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedT-SI/tla2tools.jar!/tla2sany/StandardModules/TLC.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1101387380868567047/_TLCTrace.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedT-SI/tla2tools.jar!/tla2sany/StandardModules/_TLCTrace.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1101387380868567047/Naturals.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedT-SI/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
+Parsing file /private/var/folders/2b/j1zw6hdn1nq5m9n30xph0gqh0000gn/T/tlc-1101387380868567047/TLCExt.tla (jar:file:/Users/yqekzb/Library/CloudStorage/Dropbox/TLA/RedT-SI/tla2tools.jar!/tla2sany/StandardModules/TLCExt.tla)
+Semantic processing of module Naturals
+Semantic processing of module Integers
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module TLC
+Semantic processing of module TLCExt
+Semantic processing of module _TLCTrace
+Semantic processing of module RedTSI
+Starting... (2025-03-06 16:13:33)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2025-03-06 16:13:34.
+Progress(12) at 2025-03-06 16:13:37: 212,346 states generated (212,346 s/min), 75,993 distinct states found (75,993 ds/min), 42,162 states left on queue.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 3.0E-7
+  based on the actual fingerprints:  val = 2.0E-8
+5519237 states generated, 1291512 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 19.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 14 and the 95th percentile is 5).
+Finished in 29s at (2025-03-06 16:14:02)
+----------------------------------------
+End Time: 2025年 3月 6日 星期四 16时14分03秒 CST

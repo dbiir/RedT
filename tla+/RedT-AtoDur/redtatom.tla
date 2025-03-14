@@ -1,0 +1,2690 @@
+------------------------------- MODULE redtatom -------------------------------
+EXTENDS Naturals, Sequences, FiniteSets, TLC
+CONSTANTS N
+CONSTANTS M
+CONSTANTS C
+CONSTANTS FAILEDPOINT1
+CONSTANTS FAILEDPOINT2
+CONSTANTS FailedC
+CONSTANTS FailedN
+
+(* --algorithm RedT
+  variables
+    Replicas = [item \in 1..N |-> [rep \in 1..M |-> {[value |-> 0]}]],
+    Transactions = [tid \in 1..C |-> 
+                      LET accessSet == {item \in 1..N : TRUE} IN
+                      [access |-> accessSet,
+                       newValue |-> tid,
+                       coordinator_id |-> tid]],
+    Messages = {},
+    CoordinatorMessages = {},
+    TransactionStatusCoor = [c \in (1+(N * M))..(C+(N * M)) |-> [tid \in 1..C |-> [status |-> "NotStarted"]]],  \*  只跟踪单个事务的状态
+    TransactionStatus = [rep \in 1..(N * M) |-> [tid \in 1..C |-> [status |-> "NotStarted"]]], \*  只跟踪单个事务的状态
+    \* CurrentTransaction = [c \in (1+(N * M))..(C+(N * M)) |-> 0], \*  保留，但可能用处不大
+    SuccessCounts = [c \in (1+(N * M))..(C+(N * M)) |-> [item \in 1..N |-> 0]]; \*  保留，用于统计成功/失败
+    FailureCounts = [c \in (1+(N * M))..(C+(N * M)) |-> [item \in 1..N |-> 0]]; \*  保留，用于统计成功/失败
+    ReadResults = [c \in (1+(N * M))..(C+(N * M))  |-> [tid \in 1..C |-> [item \in 1..N |-> {}]]]; 
+    ReadConsistency = [c \in (1+(N * M))..(C+(N * M))  |-> TRUE]; \*  
+    DoneCounts = [c \in (1+(N * M))..(C+(N * M)) |-> [item \in 1..N |-> 0]]; \*  保留，用于统计 Fin 消息
+    NodeStatus = [nid \in (1+(N * M))..(C+(N * M)) \cup (1..(N * M)) |-> "Active"];
+    FailedCounts = [nid \in 1..(C+(N*M)) |-> 0];
+    CommitCounts = [c \in (1+(N * M))..(C+(N * M)) |-> 0]; \*  保留，用于统计 Commit Report
+    AbortCounts = [c \in (1+(N * M))..(C+(N * M)) |-> 0]; \*  保留，用于统计 Abort Report
+    SystemTerminated = FALSE;
+    MessageLimit = N*M;
+
+  define
+    ConsistentFinishedTransactions == TRUE  \*  总是返回 TRUE，忽略数据一致性
+    NoConflictingTransactionStatus == TRUE \*  总是返回 TRUE，忽略事务状态冲突
+    MessageConstraint == 
+      /\ Cardinality(Messages) <= MessageLimit
+      /\ Cardinality(CoordinatorMessages) <= MessageLimit
+    \*   持久性
+    Durability ==
+    \A tid \in 1..C :
+        \A cid \in (1+(N * M))..(C+(N * M)) :
+        LET
+            ActiveReplicas(item) == {rep \in 1..(N * M) : 
+            /\ NodeStatus[rep] = "Active"
+            /\ rep >= ((item-1) * M + 1)  \* 该数据项的副本范围开始
+            /\ rep <= (item * M)}         \* 该数据项的副本范围结束
+            UpdatedReplicas(item) == {rep \in ActiveReplicas(item) : 
+            Replicas[item][((rep-1) % M) + 1].value = tid}
+        IN
+        TransactionStatusCoor[cid][tid].status = "FinCommit" =>
+            \A item \in Transactions[tid].access :
+            Cardinality(UpdatedReplicas(item)) > M \div 2
+    \* 原子性
+    Atomicity ==
+    \A tid \in 1..C :
+        \A cid \in (1+(N * M))..(C+(N * M)) :
+        LET
+            \* 获取某个数据项的所有活跃副本
+            ActiveReplicas(item) == {rep \in 1..(N * M) : 
+            /\ NodeStatus[rep] = "Active"
+            /\ rep >= ((item-1) * M + 1)  
+            /\ rep <= (item * M)}
+            \* 获取某个数据项上状态为Committed的副本数
+            CommittedCount(item) == Cardinality({rep \in ActiveReplicas(item) : 
+            TransactionStatus[rep][tid].status = "Committed"})
+            \* 获取某个数据项上状态为Aborted的副本数
+            AbortedCount(item) == Cardinality({rep \in ActiveReplicas(item) : 
+            TransactionStatus[rep][tid].status = "Aborted"})
+        IN
+        \/ TransactionStatusCoor[cid][tid].status = "FinCommit" =>
+            \A item \in Transactions[tid].access :
+            CommittedCount(item) > M \div 2
+        \/ TransactionStatusCoor[cid][tid].status = "FinAbort" =>
+            \A item \in Transactions[tid].access :
+            AbortedCount(item) > M \div 2
+        
+  end define;
+
+  procedure NNodeFail(id)
+  variables msg = {}, type = "", fail_occur = FALSE;
+  begin
+    ProcSetNodeFail:
+    if FailedN /= 0 /\ id = FailedN /\ FailedCounts[id] < 1 then  \* 修改了故障次数判断条件为 < 1，即最多故障一次
+      fail_occur := CHOOSE fail \in {TRUE, FALSE} : TRUE;
+      if fail_occur = TRUE then
+        NodeStatus[id] := "Failed";
+        FailedCounts[id] := FailedCounts[id] + 1;
+        TransactionStatus[id] := [tid \in 1..C |-> [status |-> "NotStarted", CommitTS |-> 0]]; \* 只重置单个事务状态
+        \* print ToString(id) \o "Node " \o ToString(id) \o " Failed at Time " \o ToString(CurrentTime);  \*  添加故障发生时间打印 (可选)
+      end if;
+    end if;
+    ProcSetNodeFailB:
+    return;
+  end procedure;
+
+  procedure CNodeFail(id)
+  variables msg = {}, type = "";
+  begin
+    ProcSetCNodeFail:
+    TransactionStatusCoor[id] :=
+      [ tid \in 1..C  \* 只重置单个事务状态
+      |-> [status |-> "Recover", CommitTS |-> 0]];
+    SuccessCounts[id] := [item \in 1..N |-> 0];
+    FailureCounts[id] := [item \in 1..N |-> 0];
+    DoneCounts[id] := [item \in 1..N |-> 0];
+    CommitCounts[id] := 0;
+    AbortCounts[id] := 0;
+    return;
+  end procedure;
+
+
+  \* 简化后的 CalculateACKCounts
+  procedure CalculateACKCounts(t, msg, cid)
+  variables countsUpdated = FALSE;
+  begin
+    ProcCalculateCounts:
+    if msg.type = "Process-ack" then
+      if msg.status = "Success" then
+        SuccessCounts[cid][msg.item] := SuccessCounts[cid][msg.item] + 1;
+      elsif msg.status = "Failed" then
+        FailureCounts[cid][msg.item] := FailureCounts[cid][msg.item] + 1;
+      end if;
+    end if;
+    ProcCalculateCountsB:
+    if msg.type = "Report" then
+      if msg.status = "Success" then
+        SuccessCounts[cid][msg.item] := SuccessCounts[cid][msg.item] + 1;
+      elsif msg.status = "Failed" then
+        FailureCounts[cid][msg.item] := FailureCounts[cid][msg.item] + 1;
+      elsif msg.status = "Committed" then
+        CommitCounts[cid] := CommitCounts[cid] + 1;
+      elsif msg.status = "Aborted" then
+        AbortCounts[cid] := AbortCounts[cid] + 1;
+      end if;
+    end if;
+    ProcCalculateCountsC:
+    \* print "Coordinator " \o ToString(cid) \o " gather transaction " \o ToString(t) \o " status " \o ToString(SuccessCounts[cid]) \o " " \o ToString(FailureCounts[cid]);
+    return;
+  end procedure;
+
+  procedure WaitForACK(txnId, cid, mtype, quorom, minority)
+  variables msg = {};
+  begin 
+    WaitForACKs:
+    while (\E i5 \in Transactions[txnId].access : SuccessCounts[cid][i5] + FailureCounts[cid][i5] < M) /\
+          (\E m \in Messages : m.coordinator_id = cid /\ m.transaction = txnId)  do
+      if \E m_ack \in CoordinatorMessages : m_ack.coordinator_id = cid /\ m_ack.transaction = txnId /\ m_ack.type = mtype then
+        msg := CHOOSE m_ack \in CoordinatorMessages : m_ack.coordinator_id = cid /\ m_ack.transaction = txnId /\ m_ack.type = mtype;
+        CoordinatorMessages := CoordinatorMessages \ {msg};
+        call CalculateACKCounts(txnId, msg, cid);
+      end if;
+    end while;
+
+    \* **决策阶段**
+    ProcExecutorDecide:
+    if CommitCounts[cid] > 0 then
+      decision := "Commit";
+    elsif AbortCounts[cid] > 0 then
+      decision := "Abort";
+    elsif \E i5 \in Transactions[txnId].access : 
+            \/ FailureCounts[cid][i5] > minority 
+            \/ SuccessCounts[cid][i5] <= quorom then 
+      \* 任何数据项失败数超过minority或成功数不足quorom，都abort
+      decision := "Abort";
+    else 
+      \* 所有数据项的成功数都超过quorom，才commit
+      decision := "Commit";
+    end if;
+    ProcExecutorDecide2:
+    return;
+  end procedure;
+
+  procedure SendDecision(txnId, cid, decision)
+  variables i7 = 0, j7 = 0;
+  begin
+    ProcExecutorSendDecideOuterLoop:
+    if decision = "Commit" then
+      TransactionStatusCoor[cid][txnId] := [status |-> "Committed", CommitTS |-> commitTimestamp];
+      ProcExecutorSendCommitOuterLoop:
+      while i7 < N do
+        i7 := i7 + 1;
+        if i7 \in Transactions[txnId].access then
+          j7 := 0;
+          ProcExecutorSendCommitInnerLoop:
+          while j7 < M do
+            j7 := j7 + 1;
+            targetReplica := ((i7 - 1) * M) + j7;
+            s_msg := [item |-> i7, replica |-> j7, transaction |-> txnId, type |-> "Commit", timestamp |-> commitTimestamp, coordinator_id |-> Transactions[txnId].coordinator_id, targetReplica |-> targetReplica];
+            Messages := Messages \cup {s_msg};
+          end while;
+        end if;
+      end while;
+    elsif decision = "Abort" then
+      TransactionStatusCoor[cid][txnId].status := "Aborted";
+      ProcExecutorSendAbortOuterLoop:
+      while i7 < N do
+        i7 := i7 + 1;
+        if i7 \in Transactions[txnId].access then
+          j7 := 0;
+          ProcExecutorSendAbortInnerLoop:
+          while j7 < M do
+            j7 := j7 + 1;
+            targetReplica := ((i7 - 1) * M) + j7;
+            s_msg := [item |-> i7, replica |-> j7, transaction |-> txnId, type |-> "Abort", timestamp |-> commitTimestamp, coordinator_id |-> Transactions[txnId].coordinator_id, targetReplica |-> targetReplica];
+            Messages := Messages \cup {s_msg};
+          end while;
+        end if;
+      end while;
+    end if;
+    ProcExecutorSendDecideOuterLoopEnd:
+    return;
+  end procedure;
+
+  \*  简化后的 ExecuteTransaction 过程
+  procedure ExecuteTransaction(txnId)
+  variables i1 = 0, j1 = 0, targetReplica = 0, s_msg = {}, cid = 0, decision = "Pending", i7 = 0, j7 = 0, commitTimestamp = 0, msg = {};
+  begin
+  ProcExecuteTransaction:
+    cid := Transactions[txnId].coordinator_id;
+
+    \* 初始化协调器状态
+    \* CurrentTransaction[cid] := txnId;
+    TransactionStatusCoor[cid][txnId].status := "Pending";
+    SuccessCounts[cid] := [item \in 1..N |-> 0];
+    FailureCounts[cid] := [item \in 1..N |-> 0];
+    \* ReadResults[cid] := [tid \in 1..C |-> [item \in 1..N |-> {}]];
+    \* ReadConsistency[cid] := TRUE;
+    DoneCounts[cid] := [item \in 1..N |-> 0];
+    CommitCounts[cid] := 0;
+    AbortCounts[cid] := 0;
+
+    \* **第一阶段: 发送 Read/Write 请求 (简化)**
+    ProcExecutorSendRequestsOuterLoop:
+    while i1 < N do
+      i1 := i1 + 1;
+      if i1 \in Transactions[txnId].access then
+        j1 := 0;
+        ProcExecutorSendRequestsInnerLoop:
+        while j1 < M do
+          j1 := j1 + 1;
+          targetReplica := ((i1 - 1) * M) + j1;
+          s_msg := [item |-> i1,
+                    replica |-> j1,
+                    transaction |-> txnId,
+                    type |-> "Access",
+                    coordinator_id |-> cid,
+                    targetReplica |-> targetReplica];
+          Messages := Messages \cup {s_msg};
+        end while;
+      end if;
+    end while;
+
+    \* **等待并处理 Process-ack 消息 (简化)**
+    call WaitForACK(txnId, cid, "Process-ack", (3*M) \div 4, M \div 4);
+
+    \* **故障点 1: 决策后，发送 Commit/Abort 前**
+    FailurePoint1:
+    if FAILEDPOINT1 then  \*  修改为 TRUE 启用故障点
+      if id = FailedC + (N * M) then
+        call CNodeFail(cid);
+        FailurePoint11:
+        call CoordinatorRecover(cid);
+        FailurePoint12:
+        call WaitForACK(txnId, cid, "Report", M \div 2, M \div 2);
+      end if;
+    end if;
+
+    \* **第二阶段: 发送 Commit/Abort 指令 (简化)**
+    ProcExecutorSendDecideOuterLoop:
+    call SendDecision(txnId, cid, decision);
+
+    \* **故障点 2: 发送 Commit/Abort 指令后，等待 Fin 消息期间**
+    FailurePoint2:
+    if FAILEDPOINT2 then \* 修改为 TRUE 启用故障点
+      if id = FailedC + (N * M) then
+        call CNodeFail(cid);
+        FailurePoint21:
+        call CoordinatorRecover(cid);
+        FailurePoint22:
+        call WaitForACK(txnId, cid, "Report", M \div 2, M \div 2);
+        FailurePoint23:
+        call SendDecision(txnId, cid, decision);
+      end if;
+    end if;
+
+    \* **等待并处理 Fin 消息 (简化)**
+    WaitForFins:
+    while (\E i6 \in Transactions[txnId].access : DoneCounts[cid][i6] < (3*M) \div 4) /\  \* 简化 quorum 参数
+      (\E m \in Messages : m.coordinator_id = cid /\ m.transaction = txnId)  do
+      if \E m_fin \in CoordinatorMessages : m_fin.coordinator_id = cid /\ m_fin.transaction = txnId /\ m_fin.type = "Fin" then
+        msg := CHOOSE m_fin \in CoordinatorMessages : m_fin.coordinator_id = cid /\ m_fin.transaction = txnId /\ m_fin.type = "Fin";
+        CoordinatorMessages := CoordinatorMessages \ {msg};
+        DoneCounts[cid][msg.item] := DoneCounts[cid][msg.item] + 1;
+      end if;
+    end while;
+
+    \* **最终完成事务**
+    ProcExecutorFinA:
+    if decision = "Commit" then
+        TransactionStatusCoor[cid][txnId].status := "FinCommit";
+    else 
+        ProcExecutorFinB:
+        TransactionStatusCoor[cid][txnId].status := "FinAbort";
+    end if;
+    ProcExecutorFinC:
+    \* CurrentTransaction[cid] := 0;
+    \* print "Transaction " \o ToString(txnId) \o " Finished with decision " \o decision;
+
+    return;
+  end procedure;
+
+
+  \*  简化后的 HandleAccess 过程
+  procedure HandleAccess(msg, id)
+  variables i = 0, j = 0, t = 0, res_msg = {}, operation_status;
+  begin
+    ProcHandleRead:
+    i := msg.item;
+    j := msg.replica;
+    t := msg.transaction;
+
+    operation_status := CHOOSE status_result \in {"Success", "Failed"} : TRUE;
+    TransactionStatus[id][t] := [status |-> operation_status];  \*  直接设置状态为 Success 或 Failed
+    \*  随机模拟消息丢失
+    \* msgLost := CHOOSE lost \in {TRUE, FALSE} : TRUE;
+    \* if msgLost = FALSE then
+    res_msg := [item |-> i, replica |-> j, transaction |-> t, type |-> "Process-ack", status |-> operation_status, value |-> Replicas[i][j].value, coordinator_id |-> msg.coordinator_id];  \* value 和 wts 使用 dummy 值
+    CoordinatorMessages := CoordinatorMessages \cup {res_msg};
+    \* end if;
+
+    ProcHandleReadB:
+    return;
+  end procedure;
+
+  \*  简化后的 HandleInquire 过程
+  procedure HandleInquire(msg, id)
+  variables i = 0, j = 0, t = 0, res_msg = {};
+  begin
+    ProcHandleInquire:
+    i := msg.item;
+    j := msg.replica;
+    t := msg.transaction;
+    operation_status := TransactionStatus[id][t].status;
+    res_msg := [item |-> i, replica |-> j, transaction |-> t, type |-> "Report", status |-> operation_status, value |-> Replicas[i][j].value,  coordinator_id |-> msg.coordinator_id]; \* value 和 wts 使用 dummy 值
+    CoordinatorMessages := CoordinatorMessages \cup {res_msg};
+    ProcHandleWriteB:
+    return;
+  end procedure;
+
+  \*  简化后的 HandleCommit 过程
+  procedure HandleCommit(msg, id)
+  variables i = 0, j = 0, t = 0, idx = 0, res_msg = {};
+  begin
+    ProcHandleCommit:
+    i := msg.item;
+    j := msg.replica;
+    t := msg.transaction;
+    TransactionStatus[id][t] := [status |-> "Committed"]; \*  直接设置状态为 Committed
+    Replicas[i][j] := [value |-> Transactions[t].newValue];
+    res_msg := [item |-> i, replica |-> j, transaction |-> t, type |-> "Fin", coordinator_id |-> msg.coordinator_id];
+    CoordinatorMessages := CoordinatorMessages \cup {res_msg};
+    ProcHandleCommitB:
+    return;
+  end procedure;
+
+  \*  简化后的 HandleAbort 过程
+  procedure HandleAbort(msg, id)
+  variables i = 0, j = 0, t = 0, res_msg = {};
+  begin
+    ProcHandleAbort:
+    i := msg.item;
+    j := msg.replica;
+    t := msg.transaction;
+    TransactionStatus[id][t].status := "Aborted"; \*  直接设置状态为 Aborted
+    res_msg := [item |-> i, replica |-> j, transaction |-> t, type |-> "Fin", coordinator_id |-> msg.coordinator_id];
+    CoordinatorMessages := CoordinatorMessages \cup {res_msg};
+    ProcHandleAbortB:
+    return;
+  end procedure;
+
+  \*  以下 Procedure (CoordinatorRecover, ReplicaRecover, NodeFail, ReplicaReceiveRequest) 都被简化或保持不变，以适应简化模型
+
+  procedure CoordinatorRecover(id)
+  variables s_msg = {}, i8 = 0, j8 = 0, t = 0;
+  begin
+    ProcCoordinatorRecover:
+    NodeStatus[id] := "Recover";
+    t := 1; \*  固定恢复事务 tid=1
+    \* CurrentTransaction[id] := t;
+    ProcCoordinatorRecoverOuterLoop:
+    while i8 < N do
+      i8 := i8 + 1;
+      if i8 \in Transactions[t].access then
+        j8 := 0;
+        ProcCoordinatorRecoverInnerLoop:
+        while j8 < M do
+          j8 := j8 + 1;
+          targetReplica := ((i8 - 1) * M) + j8;
+          s_msg := [item |-> i8, replica |-> j8, transaction |-> t, type |-> "Inquire", timestamp |-> 0, coordinator_id |-> Transactions[t].coordinator_id, targetReplica |-> targetReplica];
+          Messages := Messages \cup {s_msg};
+        end while;
+        end if;
+    end while;
+    ProcCoordinatorRecoverB:
+    return;
+  end procedure;
+
+  procedure ReplicaReceiveRequest(id)
+  variables msg = {}, type = "";
+  begin
+    ProcRepRecReq:
+    if \E m \in Messages : m.targetReplica = id /\ m.type /= "SyncAck" then
+      msg := CHOOSE m \in Messages : m.targetReplica = id /\ m.type /= "SyncAck";
+      Messages := Messages \ {msg};
+      if NodeStatus[id] = "Failed" then
+        ProcRepRecReqD:
+        return;
+      end if;
+      ProcRepRecReqB:
+      if msg.type = "Access" then
+        call HandleAccess(msg, id)
+      elsif msg.type = "Commit" then
+        call HandleCommit(msg, id)
+      elsif msg.type = "Abort" then
+        call HandleAbort(msg, id)
+      elsif msg.type = "Inquire" then
+        call HandleInquire(msg, id)
+      end if;
+    end if;
+    ProcRepRecReqC:
+    return;
+  end procedure;
+
+
+  process Main = 1
+  variable cid = 0;
+  begin
+    MainProcess:
+      cid := Transactions[1].coordinator_id; \* 获取事务 1 的协调器 ID
+      call ExecuteTransaction(1);  \*  只执行单个事务 (tid=1)
+      MainTerminate:
+        SystemTerminated := TRUE; \*  事务完成后，结束模拟
+  end process;
+
+
+  process Replica \in 1..(N * M)
+  variable id = self;
+  begin
+    ReplicaMain:
+    while SystemTerminated = FALSE do
+      call ReplicaReceiveRequest(id);
+      ReplicaMainB:
+      call NNodeFail(id);
+    end while;
+  end process;
+end algorithm; *)
+\* BEGIN TRANSLATION (chksum(pcal) = "5ad380df" /\ chksum(tla) = "acf055fd")
+\* Label ProcExecutorSendDecideOuterLoop of procedure SendDecision at line 150 col 5 changed to ProcExecutorSendDecideOuterLoop_
+\* Process variable cid of process Main at line 408 col 12 changed to cid_
+\* Process variable id of process Replica at line 419 col 12 changed to id_
+\* Procedure variable msg of procedure NNodeFail at line 53 col 13 changed to msg_
+\* Procedure variable type of procedure NNodeFail at line 53 col 23 changed to type_
+\* Procedure variable msg of procedure CNodeFail at line 70 col 13 changed to msg_C
+\* Procedure variable type of procedure CNodeFail at line 70 col 23 changed to type_C
+\* Procedure variable msg of procedure WaitForACK at line 115 col 13 changed to msg_W
+\* Procedure variable i7 of procedure SendDecision at line 147 col 13 changed to i7_
+\* Procedure variable j7 of procedure SendDecision at line 147 col 21 changed to j7_
+\* Procedure variable s_msg of procedure ExecuteTransaction at line 189 col 48 changed to s_msg_
+\* Procedure variable cid of procedure ExecuteTransaction at line 189 col 60 changed to cid_E
+\* Procedure variable decision of procedure ExecuteTransaction at line 189 col 69 changed to decision_
+\* Procedure variable msg of procedure ExecuteTransaction at line 189 col 128 changed to msg_E
+\* Procedure variable i of procedure HandleAccess at line 288 col 13 changed to i_
+\* Procedure variable j of procedure HandleAccess at line 288 col 20 changed to j_
+\* Procedure variable t of procedure HandleAccess at line 288 col 27 changed to t_
+\* Procedure variable res_msg of procedure HandleAccess at line 288 col 34 changed to res_msg_
+\* Procedure variable i of procedure HandleInquire at line 310 col 13 changed to i_H
+\* Procedure variable j of procedure HandleInquire at line 310 col 20 changed to j_H
+\* Procedure variable t of procedure HandleInquire at line 310 col 27 changed to t_H
+\* Procedure variable res_msg of procedure HandleInquire at line 310 col 34 changed to res_msg_H
+\* Procedure variable i of procedure HandleCommit at line 325 col 13 changed to i_Ha
+\* Procedure variable j of procedure HandleCommit at line 325 col 20 changed to j_Ha
+\* Procedure variable t of procedure HandleCommit at line 325 col 27 changed to t_Ha
+\* Procedure variable res_msg of procedure HandleCommit at line 325 col 43 changed to res_msg_Ha
+\* Procedure variable t of procedure HandleAbort at line 340 col 27 changed to t_Han
+\* Procedure variable t of procedure CoordinatorRecover at line 356 col 41 changed to t_C
+\* Procedure variable msg of procedure ReplicaReceiveRequest at line 381 col 13 changed to msg_R
+\* Parameter id of procedure NNodeFail at line 52 col 23 changed to id_N
+\* Parameter id of procedure CNodeFail at line 69 col 23 changed to id_C
+\* Parameter msg of procedure CalculateACKCounts at line 86 col 35 changed to msg_Ca
+\* Parameter cid of procedure CalculateACKCounts at line 86 col 40 changed to cid_C
+\* Parameter txnId of procedure WaitForACK at line 114 col 24 changed to txnId_
+\* Parameter cid of procedure WaitForACK at line 114 col 31 changed to cid_W
+\* Parameter txnId of procedure SendDecision at line 146 col 26 changed to txnId_S
+\* Parameter msg of procedure HandleAccess at line 287 col 26 changed to msg_H
+\* Parameter id of procedure HandleAccess at line 287 col 31 changed to id_H
+\* Parameter msg of procedure HandleInquire at line 309 col 27 changed to msg_Ha
+\* Parameter id of procedure HandleInquire at line 309 col 32 changed to id_Ha
+\* Parameter msg of procedure HandleCommit at line 324 col 26 changed to msg_Han
+\* Parameter id of procedure HandleCommit at line 324 col 31 changed to id_Han
+\* Parameter id of procedure HandleAbort at line 339 col 30 changed to id_Hand
+\* Parameter id of procedure CoordinatorRecover at line 355 col 32 changed to id_Co
+CONSTANT defaultInitValue
+VARIABLES pc, Transactions, Messages, CoordinatorMessages, 
+          TransactionStatusCoor, TransactionStatus, SuccessCounts, 
+          FailureCounts, DoneCounts, NodeStatus, FailedCounts, CommitCounts, 
+          AbortCounts, SystemTerminated, stack
+
+(* define statement *)
+ConsistentFinishedTransactions == TRUE
+NoConflictingTransactionStatus == TRUE
+Atomicity ==
+  \A tid \in 1..1 :
+    \A cid \in (1+(N * M))..(C+(N * M)) :
+      LET
+        ActiveReplicas == {rep \in 1..(N * M) : NodeStatus[rep] = "Active"}
+        CommittedCount == Cardinality({rep \in ActiveReplicas :
+                          TransactionStatus[rep][tid].status = "Committed"})
+        AbortedCount == Cardinality({rep \in ActiveReplicas :
+                          TransactionStatus[rep][tid].status = "Aborted"})
+        TotalActive == Cardinality(ActiveReplicas)
+      IN
+      TransactionStatusCoor[cid][tid].status = "Finished" =>
+        \/ CommittedCount >= (3 * TotalActive) \div 4
+        \/ AbortedCount >= (3 * TotalActive) \div 4
+
+VARIABLES id_N, msg_, type_, fail_occur, id_C, msg_C, type_C, t, msg_Ca, 
+          cid_C, countsUpdated, txnId_, cid_W, mtype, quorom, minority, msg_W, 
+          txnId_S, cid, decision, i7_, j7_, txnId, i1, j1, targetReplica, 
+          s_msg_, cid_E, decision_, i7, j7, commitTimestamp, msg_E, msg_H, 
+          id_H, i_, j_, t_, res_msg_, operation_status, msg_Ha, id_Ha, i_H, 
+          j_H, t_H, res_msg_H, msg_Han, id_Han, i_Ha, j_Ha, t_Ha, idx, 
+          res_msg_Ha, msg, id_Hand, i, j, t_Han, res_msg, id_Co, s_msg, i8, 
+          j8, t_C, id, msg_R, type, cid_, id_
+
+vars == << pc, Transactions, Messages, CoordinatorMessages, 
+           TransactionStatusCoor, TransactionStatus, SuccessCounts, 
+           FailureCounts, DoneCounts, NodeStatus, FailedCounts, CommitCounts, 
+           AbortCounts, SystemTerminated, stack, id_N, msg_, type_, 
+           fail_occur, id_C, msg_C, type_C, t, msg_Ca, cid_C, countsUpdated, 
+           txnId_, cid_W, mtype, quorom, minority, msg_W, txnId_S, cid, 
+           decision, i7_, j7_, txnId, i1, j1, targetReplica, s_msg_, cid_E, 
+           decision_, i7, j7, commitTimestamp, msg_E, msg_H, id_H, i_, j_, t_, 
+           res_msg_, operation_status, msg_Ha, id_Ha, i_H, j_H, t_H, 
+           res_msg_H, msg_Han, id_Han, i_Ha, j_Ha, t_Ha, idx, res_msg_Ha, msg, 
+           id_Hand, i, j, t_Han, res_msg, id_Co, s_msg, i8, j8, t_C, id, 
+           msg_R, type, cid_, id_ >>
+
+ProcSet == {1} \cup (1..(N * M))
+
+Init == (* Global variables *)
+        /\ Transactions = [tid \in 1..1 |->
+                             LET accessSet == {item \in 1..N : TRUE} IN
+                             [access |-> accessSet,
+                              coordinator_id |-> CHOOSE c \in (1+(N * M))..(C+(N * M)) : (c % C) = (c % C) ]]
+        /\ Messages = {}
+        /\ CoordinatorMessages = {}
+        /\ TransactionStatusCoor = [c \in (1+(N * M))..(C+(N * M)) |-> [tid \in 1..1 |-> [status |-> "NotStarted"]]]
+        /\ TransactionStatus = [rep \in 1..(N * M) |-> [tid \in 1..1 |-> [status |-> "NotStarted"]]]
+        /\ SuccessCounts = [c \in (1+(N * M))..(C+(N * M)) |-> [item \in 1..N |-> 0]]
+        /\ FailureCounts = [c \in (1+(N * M))..(C+(N * M)) |-> [item \in 1..N |-> 0]]
+        /\ DoneCounts = [c \in (1+(N * M))..(C+(N * M)) |-> [item \in 1..N |-> 0]]
+        /\ NodeStatus = [nid \in (1+(N * M))..(C+(N * M)) \cup (1..(N * M)) |-> "Active"]
+        /\ FailedCounts = [nid \in 1..(C+(N*M)) |-> 0]
+        /\ CommitCounts = [c \in (1+(N * M))..(C+(N * M)) |-> 0]
+        /\ AbortCounts = [c \in (1+(N * M))..(C+(N * M)) |-> 0]
+        /\ SystemTerminated = FALSE
+        (* Procedure NNodeFail *)
+        /\ id_N = [ self \in ProcSet |-> defaultInitValue]
+        /\ msg_ = [ self \in ProcSet |-> {}]
+        /\ type_ = [ self \in ProcSet |-> ""]
+        /\ fail_occur = [ self \in ProcSet |-> FALSE]
+        (* Procedure CNodeFail *)
+        /\ id_C = [ self \in ProcSet |-> defaultInitValue]
+        /\ msg_C = [ self \in ProcSet |-> {}]
+        /\ type_C = [ self \in ProcSet |-> ""]
+        (* Procedure CalculateACKCounts *)
+        /\ t = [ self \in ProcSet |-> defaultInitValue]
+        /\ msg_Ca = [ self \in ProcSet |-> defaultInitValue]
+        /\ cid_C = [ self \in ProcSet |-> defaultInitValue]
+        /\ countsUpdated = [ self \in ProcSet |-> FALSE]
+        (* Procedure WaitForACK *)
+        /\ txnId_ = [ self \in ProcSet |-> defaultInitValue]
+        /\ cid_W = [ self \in ProcSet |-> defaultInitValue]
+        /\ mtype = [ self \in ProcSet |-> defaultInitValue]
+        /\ quorom = [ self \in ProcSet |-> defaultInitValue]
+        /\ minority = [ self \in ProcSet |-> defaultInitValue]
+        /\ msg_W = [ self \in ProcSet |-> {}]
+        (* Procedure SendDecision *)
+        /\ txnId_S = [ self \in ProcSet |-> defaultInitValue]
+        /\ cid = [ self \in ProcSet |-> defaultInitValue]
+        /\ decision = [ self \in ProcSet |-> defaultInitValue]
+        /\ i7_ = [ self \in ProcSet |-> 0]
+        /\ j7_ = [ self \in ProcSet |-> 0]
+        (* Procedure ExecuteTransaction *)
+        /\ txnId = [ self \in ProcSet |-> defaultInitValue]
+        /\ i1 = [ self \in ProcSet |-> 0]
+        /\ j1 = [ self \in ProcSet |-> 0]
+        /\ targetReplica = [ self \in ProcSet |-> 0]
+        /\ s_msg_ = [ self \in ProcSet |-> {}]
+        /\ cid_E = [ self \in ProcSet |-> 0]
+        /\ decision_ = [ self \in ProcSet |-> "Pending"]
+        /\ i7 = [ self \in ProcSet |-> 0]
+        /\ j7 = [ self \in ProcSet |-> 0]
+        /\ commitTimestamp = [ self \in ProcSet |-> 0]
+        /\ msg_E = [ self \in ProcSet |-> {}]
+        (* Procedure HandleAccess *)
+        /\ msg_H = [ self \in ProcSet |-> defaultInitValue]
+        /\ id_H = [ self \in ProcSet |-> defaultInitValue]
+        /\ i_ = [ self \in ProcSet |-> 0]
+        /\ j_ = [ self \in ProcSet |-> 0]
+        /\ t_ = [ self \in ProcSet |-> 0]
+        /\ res_msg_ = [ self \in ProcSet |-> {}]
+        /\ operation_status = [ self \in ProcSet |-> defaultInitValue]
+        (* Procedure HandleInquire *)
+        /\ msg_Ha = [ self \in ProcSet |-> defaultInitValue]
+        /\ id_Ha = [ self \in ProcSet |-> defaultInitValue]
+        /\ i_H = [ self \in ProcSet |-> 0]
+        /\ j_H = [ self \in ProcSet |-> 0]
+        /\ t_H = [ self \in ProcSet |-> 0]
+        /\ res_msg_H = [ self \in ProcSet |-> {}]
+        (* Procedure HandleCommit *)
+        /\ msg_Han = [ self \in ProcSet |-> defaultInitValue]
+        /\ id_Han = [ self \in ProcSet |-> defaultInitValue]
+        /\ i_Ha = [ self \in ProcSet |-> 0]
+        /\ j_Ha = [ self \in ProcSet |-> 0]
+        /\ t_Ha = [ self \in ProcSet |-> 0]
+        /\ idx = [ self \in ProcSet |-> 0]
+        /\ res_msg_Ha = [ self \in ProcSet |-> {}]
+        (* Procedure HandleAbort *)
+        /\ msg = [ self \in ProcSet |-> defaultInitValue]
+        /\ id_Hand = [ self \in ProcSet |-> defaultInitValue]
+        /\ i = [ self \in ProcSet |-> 0]
+        /\ j = [ self \in ProcSet |-> 0]
+        /\ t_Han = [ self \in ProcSet |-> 0]
+        /\ res_msg = [ self \in ProcSet |-> {}]
+        (* Procedure CoordinatorRecover *)
+        /\ id_Co = [ self \in ProcSet |-> defaultInitValue]
+        /\ s_msg = [ self \in ProcSet |-> {}]
+        /\ i8 = [ self \in ProcSet |-> 0]
+        /\ j8 = [ self \in ProcSet |-> 0]
+        /\ t_C = [ self \in ProcSet |-> 0]
+        (* Procedure ReplicaReceiveRequest *)
+        /\ id = [ self \in ProcSet |-> defaultInitValue]
+        /\ msg_R = [ self \in ProcSet |-> {}]
+        /\ type = [ self \in ProcSet |-> ""]
+        (* Process Main *)
+        /\ cid_ = 0
+        (* Process Replica *)
+        /\ id_ = [self \in 1..(N * M) |-> self]
+        /\ stack = [self \in ProcSet |-> << >>]
+        /\ pc = [self \in ProcSet |-> CASE self = 1 -> "MainProcess"
+                                        [] self \in 1..(N * M) -> "ReplicaMain"]
+
+ProcSetNodeFail(self) == /\ pc[self] = "ProcSetNodeFail"
+                         /\ IF FailedN /= 0 /\ id_N[self] = FailedN /\ FailedCounts[id_N[self]] < 1
+                               THEN /\ fail_occur' = [fail_occur EXCEPT ![self] = CHOOSE fail \in {TRUE, FALSE} : TRUE]
+                                    /\ IF fail_occur'[self] = TRUE
+                                          THEN /\ NodeStatus' = [NodeStatus EXCEPT ![id_N[self]] = "Failed"]
+                                               /\ FailedCounts' = [FailedCounts EXCEPT ![id_N[self]] = FailedCounts[id_N[self]] + 1]
+                                               /\ TransactionStatus' = [TransactionStatus EXCEPT ![id_N[self]] = [tid \in 1..1 |-> [status |-> "NotStarted", CommitTS |-> 0]]]
+                                          ELSE /\ TRUE
+                                               /\ UNCHANGED << TransactionStatus, 
+                                                               NodeStatus, 
+                                                               FailedCounts >>
+                               ELSE /\ TRUE
+                                    /\ UNCHANGED << TransactionStatus, 
+                                                    NodeStatus, FailedCounts, 
+                                                    fail_occur >>
+                         /\ pc' = [pc EXCEPT ![self] = "ProcSetNodeFailB"]
+                         /\ UNCHANGED << Transactions, Messages, 
+                                         CoordinatorMessages, 
+                                         TransactionStatusCoor, SuccessCounts, 
+                                         FailureCounts, DoneCounts, 
+                                         CommitCounts, AbortCounts, 
+                                         SystemTerminated, stack, id_N, msg_, 
+                                         type_, id_C, msg_C, type_C, t, msg_Ca, 
+                                         cid_C, countsUpdated, txnId_, cid_W, 
+                                         mtype, quorom, minority, msg_W, 
+                                         txnId_S, cid, decision, i7_, j7_, 
+                                         txnId, i1, j1, targetReplica, s_msg_, 
+                                         cid_E, decision_, i7, j7, 
+                                         commitTimestamp, msg_E, msg_H, id_H, 
+                                         i_, j_, t_, res_msg_, 
+                                         operation_status, msg_Ha, id_Ha, i_H, 
+                                         j_H, t_H, res_msg_H, msg_Han, id_Han, 
+                                         i_Ha, j_Ha, t_Ha, idx, res_msg_Ha, 
+                                         msg, id_Hand, i, j, t_Han, res_msg, 
+                                         id_Co, s_msg, i8, j8, t_C, id, msg_R, 
+                                         type, cid_, id_ >>
+
+ProcSetNodeFailB(self) == /\ pc[self] = "ProcSetNodeFailB"
+                          /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                          /\ msg_' = [msg_ EXCEPT ![self] = Head(stack[self]).msg_]
+                          /\ type_' = [type_ EXCEPT ![self] = Head(stack[self]).type_]
+                          /\ fail_occur' = [fail_occur EXCEPT ![self] = Head(stack[self]).fail_occur]
+                          /\ id_N' = [id_N EXCEPT ![self] = Head(stack[self]).id_N]
+                          /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                          /\ UNCHANGED << Transactions, Messages, 
+                                          CoordinatorMessages, 
+                                          TransactionStatusCoor, 
+                                          TransactionStatus, SuccessCounts, 
+                                          FailureCounts, DoneCounts, 
+                                          NodeStatus, FailedCounts, 
+                                          CommitCounts, AbortCounts, 
+                                          SystemTerminated, id_C, msg_C, 
+                                          type_C, t, msg_Ca, cid_C, 
+                                          countsUpdated, txnId_, cid_W, mtype, 
+                                          quorom, minority, msg_W, txnId_S, 
+                                          cid, decision, i7_, j7_, txnId, i1, 
+                                          j1, targetReplica, s_msg_, cid_E, 
+                                          decision_, i7, j7, commitTimestamp, 
+                                          msg_E, msg_H, id_H, i_, j_, t_, 
+                                          res_msg_, operation_status, msg_Ha, 
+                                          id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                          msg_Han, id_Han, i_Ha, j_Ha, t_Ha, 
+                                          idx, res_msg_Ha, msg, id_Hand, i, j, 
+                                          t_Han, res_msg, id_Co, s_msg, i8, j8, 
+                                          t_C, id, msg_R, type, cid_, id_ >>
+
+NNodeFail(self) == ProcSetNodeFail(self) \/ ProcSetNodeFailB(self)
+
+ProcSetCNodeFail(self) == /\ pc[self] = "ProcSetCNodeFail"
+                          /\ TransactionStatusCoor' = [TransactionStatusCoor EXCEPT ![id_C[self]] = [ tid \in 1..1
+                                                                                                    |-> [status |-> "Recover", CommitTS |-> 0]]]
+                          /\ SuccessCounts' = [SuccessCounts EXCEPT ![id_C[self]] = [item \in 1..N |-> 0]]
+                          /\ FailureCounts' = [FailureCounts EXCEPT ![id_C[self]] = [item \in 1..N |-> 0]]
+                          /\ DoneCounts' = [DoneCounts EXCEPT ![id_C[self]] = [item \in 1..N |-> 0]]
+                          /\ CommitCounts' = [CommitCounts EXCEPT ![id_C[self]] = 0]
+                          /\ AbortCounts' = [AbortCounts EXCEPT ![id_C[self]] = 0]
+                          /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                          /\ msg_C' = [msg_C EXCEPT ![self] = Head(stack[self]).msg_C]
+                          /\ type_C' = [type_C EXCEPT ![self] = Head(stack[self]).type_C]
+                          /\ id_C' = [id_C EXCEPT ![self] = Head(stack[self]).id_C]
+                          /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                          /\ UNCHANGED << Transactions, Messages, 
+                                          CoordinatorMessages, 
+                                          TransactionStatus, NodeStatus, 
+                                          FailedCounts, SystemTerminated, id_N, 
+                                          msg_, type_, fail_occur, t, msg_Ca, 
+                                          cid_C, countsUpdated, txnId_, cid_W, 
+                                          mtype, quorom, minority, msg_W, 
+                                          txnId_S, cid, decision, i7_, j7_, 
+                                          txnId, i1, j1, targetReplica, s_msg_, 
+                                          cid_E, decision_, i7, j7, 
+                                          commitTimestamp, msg_E, msg_H, id_H, 
+                                          i_, j_, t_, res_msg_, 
+                                          operation_status, msg_Ha, id_Ha, i_H, 
+                                          j_H, t_H, res_msg_H, msg_Han, id_Han, 
+                                          i_Ha, j_Ha, t_Ha, idx, res_msg_Ha, 
+                                          msg, id_Hand, i, j, t_Han, res_msg, 
+                                          id_Co, s_msg, i8, j8, t_C, id, msg_R, 
+                                          type, cid_, id_ >>
+
+CNodeFail(self) == ProcSetCNodeFail(self)
+
+ProcCalculateCounts(self) == /\ pc[self] = "ProcCalculateCounts"
+                             /\ IF msg_Ca[self].type = "Process-ack"
+                                   THEN /\ IF msg_Ca[self].status = "Success"
+                                              THEN /\ SuccessCounts' = [SuccessCounts EXCEPT ![cid_C[self]][msg_Ca[self].item] = SuccessCounts[cid_C[self]][msg_Ca[self].item] + 1]
+                                                   /\ UNCHANGED FailureCounts
+                                              ELSE /\ IF msg_Ca[self].status = "Failed"
+                                                         THEN /\ FailureCounts' = [FailureCounts EXCEPT ![cid_C[self]][msg_Ca[self].item] = FailureCounts[cid_C[self]][msg_Ca[self].item] + 1]
+                                                         ELSE /\ TRUE
+                                                              /\ UNCHANGED FailureCounts
+                                                   /\ UNCHANGED SuccessCounts
+                                   ELSE /\ TRUE
+                                        /\ UNCHANGED << SuccessCounts, 
+                                                        FailureCounts >>
+                             /\ pc' = [pc EXCEPT ![self] = "ProcCalculateCountsB"]
+                             /\ UNCHANGED << Transactions, Messages, 
+                                             CoordinatorMessages, 
+                                             TransactionStatusCoor, 
+                                             TransactionStatus, DoneCounts, 
+                                             NodeStatus, FailedCounts, 
+                                             CommitCounts, AbortCounts, 
+                                             SystemTerminated, stack, id_N, 
+                                             msg_, type_, fail_occur, id_C, 
+                                             msg_C, type_C, t, msg_Ca, cid_C, 
+                                             countsUpdated, txnId_, cid_W, 
+                                             mtype, quorom, minority, msg_W, 
+                                             txnId_S, cid, decision, i7_, j7_, 
+                                             txnId, i1, j1, targetReplica, 
+                                             s_msg_, cid_E, decision_, i7, j7, 
+                                             commitTimestamp, msg_E, msg_H, 
+                                             id_H, i_, j_, t_, res_msg_, 
+                                             operation_status, msg_Ha, id_Ha, 
+                                             i_H, j_H, t_H, res_msg_H, msg_Han, 
+                                             id_Han, i_Ha, j_Ha, t_Ha, idx, 
+                                             res_msg_Ha, msg, id_Hand, i, j, 
+                                             t_Han, res_msg, id_Co, s_msg, i8, 
+                                             j8, t_C, id, msg_R, type, cid_, 
+                                             id_ >>
+
+ProcCalculateCountsB(self) == /\ pc[self] = "ProcCalculateCountsB"
+                              /\ IF msg_Ca[self].type = "Report"
+                                    THEN /\ IF msg_Ca[self].status = "Success"
+                                               THEN /\ SuccessCounts' = [SuccessCounts EXCEPT ![cid_C[self]][msg_Ca[self].item] = SuccessCounts[cid_C[self]][msg_Ca[self].item] + 1]
+                                                    /\ UNCHANGED << FailureCounts, 
+                                                                    CommitCounts, 
+                                                                    AbortCounts >>
+                                               ELSE /\ IF msg_Ca[self].status = "Failed"
+                                                          THEN /\ FailureCounts' = [FailureCounts EXCEPT ![cid_C[self]][msg_Ca[self].item] = FailureCounts[cid_C[self]][msg_Ca[self].item] + 1]
+                                                               /\ UNCHANGED << CommitCounts, 
+                                                                               AbortCounts >>
+                                                          ELSE /\ IF msg_Ca[self].status = "Committed"
+                                                                     THEN /\ CommitCounts' = [CommitCounts EXCEPT ![cid_C[self]] = CommitCounts[cid_C[self]] + 1]
+                                                                          /\ UNCHANGED AbortCounts
+                                                                     ELSE /\ IF msg_Ca[self].status = "Aborted"
+                                                                                THEN /\ AbortCounts' = [AbortCounts EXCEPT ![cid_C[self]] = AbortCounts[cid_C[self]] + 1]
+                                                                                ELSE /\ TRUE
+                                                                                     /\ UNCHANGED AbortCounts
+                                                                          /\ UNCHANGED CommitCounts
+                                                               /\ UNCHANGED FailureCounts
+                                                    /\ UNCHANGED SuccessCounts
+                                    ELSE /\ TRUE
+                                         /\ UNCHANGED << SuccessCounts, 
+                                                         FailureCounts, 
+                                                         CommitCounts, 
+                                                         AbortCounts >>
+                              /\ pc' = [pc EXCEPT ![self] = "ProcCalculateCountsC"]
+                              /\ UNCHANGED << Transactions, Messages, 
+                                              CoordinatorMessages, 
+                                              TransactionStatusCoor, 
+                                              TransactionStatus, DoneCounts, 
+                                              NodeStatus, FailedCounts, 
+                                              SystemTerminated, stack, id_N, 
+                                              msg_, type_, fail_occur, id_C, 
+                                              msg_C, type_C, t, msg_Ca, cid_C, 
+                                              countsUpdated, txnId_, cid_W, 
+                                              mtype, quorom, minority, msg_W, 
+                                              txnId_S, cid, decision, i7_, j7_, 
+                                              txnId, i1, j1, targetReplica, 
+                                              s_msg_, cid_E, decision_, i7, j7, 
+                                              commitTimestamp, msg_E, msg_H, 
+                                              id_H, i_, j_, t_, res_msg_, 
+                                              operation_status, msg_Ha, id_Ha, 
+                                              i_H, j_H, t_H, res_msg_H, 
+                                              msg_Han, id_Han, i_Ha, j_Ha, 
+                                              t_Ha, idx, res_msg_Ha, msg, 
+                                              id_Hand, i, j, t_Han, res_msg, 
+                                              id_Co, s_msg, i8, j8, t_C, id, 
+                                              msg_R, type, cid_, id_ >>
+
+ProcCalculateCountsC(self) == /\ pc[self] = "ProcCalculateCountsC"
+                              /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                              /\ countsUpdated' = [countsUpdated EXCEPT ![self] = Head(stack[self]).countsUpdated]
+                              /\ t' = [t EXCEPT ![self] = Head(stack[self]).t]
+                              /\ msg_Ca' = [msg_Ca EXCEPT ![self] = Head(stack[self]).msg_Ca]
+                              /\ cid_C' = [cid_C EXCEPT ![self] = Head(stack[self]).cid_C]
+                              /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                              /\ UNCHANGED << Transactions, Messages, 
+                                              CoordinatorMessages, 
+                                              TransactionStatusCoor, 
+                                              TransactionStatus, SuccessCounts, 
+                                              FailureCounts, DoneCounts, 
+                                              NodeStatus, FailedCounts, 
+                                              CommitCounts, AbortCounts, 
+                                              SystemTerminated, id_N, msg_, 
+                                              type_, fail_occur, id_C, msg_C, 
+                                              type_C, txnId_, cid_W, mtype, 
+                                              quorom, minority, msg_W, txnId_S, 
+                                              cid, decision, i7_, j7_, txnId, 
+                                              i1, j1, targetReplica, s_msg_, 
+                                              cid_E, decision_, i7, j7, 
+                                              commitTimestamp, msg_E, msg_H, 
+                                              id_H, i_, j_, t_, res_msg_, 
+                                              operation_status, msg_Ha, id_Ha, 
+                                              i_H, j_H, t_H, res_msg_H, 
+                                              msg_Han, id_Han, i_Ha, j_Ha, 
+                                              t_Ha, idx, res_msg_Ha, msg, 
+                                              id_Hand, i, j, t_Han, res_msg, 
+                                              id_Co, s_msg, i8, j8, t_C, id, 
+                                              msg_R, type, cid_, id_ >>
+
+CalculateACKCounts(self) == ProcCalculateCounts(self)
+                               \/ ProcCalculateCountsB(self)
+                               \/ ProcCalculateCountsC(self)
+
+WaitForACKs(self) == /\ pc[self] = "WaitForACKs"
+                     /\ IF (\E i5 \in Transactions[txnId_[self]].access : SuccessCounts[cid_W[self]][i5] + FailureCounts[cid_W[self]][i5] < M) /\
+                           (\E m \in Messages : m.coordinator_id = cid_W[self] /\ m.transaction = txnId_[self])
+                           THEN /\ IF \E m_ack \in CoordinatorMessages : m_ack.coordinator_id = cid_W[self] /\ m_ack.transaction = txnId_[self] /\ m_ack.type = mtype[self]
+                                      THEN /\ msg_W' = [msg_W EXCEPT ![self] = CHOOSE m_ack \in CoordinatorMessages : m_ack.coordinator_id = cid_W[self] /\ m_ack.transaction = txnId_[self] /\ m_ack.type = mtype[self]]
+                                           /\ CoordinatorMessages' = CoordinatorMessages \ {msg_W'[self]}
+                                           /\ /\ cid_C' = [cid_C EXCEPT ![self] = cid_W[self]]
+                                              /\ msg_Ca' = [msg_Ca EXCEPT ![self] = msg_W'[self]]
+                                              /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "CalculateACKCounts",
+                                                                                       pc        |->  "WaitForACKs",
+                                                                                       countsUpdated |->  countsUpdated[self],
+                                                                                       t         |->  t[self],
+                                                                                       msg_Ca    |->  msg_Ca[self],
+                                                                                       cid_C     |->  cid_C[self] ] >>
+                                                                                   \o stack[self]]
+                                              /\ t' = [t EXCEPT ![self] = txnId_[self]]
+                                           /\ countsUpdated' = [countsUpdated EXCEPT ![self] = FALSE]
+                                           /\ pc' = [pc EXCEPT ![self] = "ProcCalculateCounts"]
+                                      ELSE /\ pc' = [pc EXCEPT ![self] = "WaitForACKs"]
+                                           /\ UNCHANGED << CoordinatorMessages, 
+                                                           stack, t, msg_Ca, 
+                                                           cid_C, 
+                                                           countsUpdated, 
+                                                           msg_W >>
+                           ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorDecide"]
+                                /\ UNCHANGED << CoordinatorMessages, stack, t, 
+                                                msg_Ca, cid_C, countsUpdated, 
+                                                msg_W >>
+                     /\ UNCHANGED << Transactions, Messages, 
+                                     TransactionStatusCoor, TransactionStatus, 
+                                     SuccessCounts, FailureCounts, DoneCounts, 
+                                     NodeStatus, FailedCounts, CommitCounts, 
+                                     AbortCounts, SystemTerminated, id_N, msg_, 
+                                     type_, fail_occur, id_C, msg_C, type_C, 
+                                     txnId_, cid_W, mtype, quorom, minority, 
+                                     txnId_S, cid, decision, i7_, j7_, txnId, 
+                                     i1, j1, targetReplica, s_msg_, cid_E, 
+                                     decision_, i7, j7, commitTimestamp, msg_E, 
+                                     msg_H, id_H, i_, j_, t_, res_msg_, 
+                                     operation_status, msg_Ha, id_Ha, i_H, j_H, 
+                                     t_H, res_msg_H, msg_Han, id_Han, i_Ha, 
+                                     j_Ha, t_Ha, idx, res_msg_Ha, msg, id_Hand, 
+                                     i, j, t_Han, res_msg, id_Co, s_msg, i8, 
+                                     j8, t_C, id, msg_R, type, cid_, id_ >>
+
+ProcExecutorDecide(self) == /\ pc[self] = "ProcExecutorDecide"
+                            /\ IF CommitCounts[cid_W[self]] > 0
+                                  THEN /\ decision' = [decision EXCEPT ![self] = "Commit"]
+                                  ELSE /\ IF AbortCounts[cid_W[self]] > 0
+                                             THEN /\ decision' = [decision EXCEPT ![self] = "Abort"]
+                                             ELSE /\ IF \E i5 \in Transactions[txnId_[self]].access :
+                                                          \/ FailureCounts[cid_W[self]][i5] > minority[self]
+                                                          \/ SuccessCounts[cid_W[self]][i5] <= quorom[self]
+                                                        THEN /\ decision' = [decision EXCEPT ![self] = "Abort"]
+                                                        ELSE /\ decision' = [decision EXCEPT ![self] = "Commit"]
+                            /\ pc' = [pc EXCEPT ![self] = "ProcExecutorDecide2"]
+                            /\ UNCHANGED << Transactions, Messages, 
+                                            CoordinatorMessages, 
+                                            TransactionStatusCoor, 
+                                            TransactionStatus, SuccessCounts, 
+                                            FailureCounts, DoneCounts, 
+                                            NodeStatus, FailedCounts, 
+                                            CommitCounts, AbortCounts, 
+                                            SystemTerminated, stack, id_N, 
+                                            msg_, type_, fail_occur, id_C, 
+                                            msg_C, type_C, t, msg_Ca, cid_C, 
+                                            countsUpdated, txnId_, cid_W, 
+                                            mtype, quorom, minority, msg_W, 
+                                            txnId_S, cid, i7_, j7_, txnId, i1, 
+                                            j1, targetReplica, s_msg_, cid_E, 
+                                            decision_, i7, j7, commitTimestamp, 
+                                            msg_E, msg_H, id_H, i_, j_, t_, 
+                                            res_msg_, operation_status, msg_Ha, 
+                                            id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                            msg_Han, id_Han, i_Ha, j_Ha, t_Ha, 
+                                            idx, res_msg_Ha, msg, id_Hand, i, 
+                                            j, t_Han, res_msg, id_Co, s_msg, 
+                                            i8, j8, t_C, id, msg_R, type, cid_, 
+                                            id_ >>
+
+ProcExecutorDecide2(self) == /\ pc[self] = "ProcExecutorDecide2"
+                             /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                             /\ msg_W' = [msg_W EXCEPT ![self] = Head(stack[self]).msg_W]
+                             /\ txnId_' = [txnId_ EXCEPT ![self] = Head(stack[self]).txnId_]
+                             /\ cid_W' = [cid_W EXCEPT ![self] = Head(stack[self]).cid_W]
+                             /\ mtype' = [mtype EXCEPT ![self] = Head(stack[self]).mtype]
+                             /\ quorom' = [quorom EXCEPT ![self] = Head(stack[self]).quorom]
+                             /\ minority' = [minority EXCEPT ![self] = Head(stack[self]).minority]
+                             /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                             /\ UNCHANGED << Transactions, Messages, 
+                                             CoordinatorMessages, 
+                                             TransactionStatusCoor, 
+                                             TransactionStatus, SuccessCounts, 
+                                             FailureCounts, DoneCounts, 
+                                             NodeStatus, FailedCounts, 
+                                             CommitCounts, AbortCounts, 
+                                             SystemTerminated, id_N, msg_, 
+                                             type_, fail_occur, id_C, msg_C, 
+                                             type_C, t, msg_Ca, cid_C, 
+                                             countsUpdated, txnId_S, cid, 
+                                             decision, i7_, j7_, txnId, i1, j1, 
+                                             targetReplica, s_msg_, cid_E, 
+                                             decision_, i7, j7, 
+                                             commitTimestamp, msg_E, msg_H, 
+                                             id_H, i_, j_, t_, res_msg_, 
+                                             operation_status, msg_Ha, id_Ha, 
+                                             i_H, j_H, t_H, res_msg_H, msg_Han, 
+                                             id_Han, i_Ha, j_Ha, t_Ha, idx, 
+                                             res_msg_Ha, msg, id_Hand, i, j, 
+                                             t_Han, res_msg, id_Co, s_msg, i8, 
+                                             j8, t_C, id, msg_R, type, cid_, 
+                                             id_ >>
+
+WaitForACK(self) == WaitForACKs(self) \/ ProcExecutorDecide(self)
+                       \/ ProcExecutorDecide2(self)
+
+ProcExecutorSendDecideOuterLoop_(self) == /\ pc[self] = "ProcExecutorSendDecideOuterLoop_"
+                                          /\ IF decision[self] = "Commit"
+                                                THEN /\ TransactionStatusCoor' = [TransactionStatusCoor EXCEPT ![cid[self]][txnId_S[self]] = [status |-> "Committed", CommitTS |-> commitTimestamp[self]]]
+                                                     /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendCommitOuterLoop"]
+                                                ELSE /\ IF decision[self] = "Abort"
+                                                           THEN /\ TransactionStatusCoor' = [TransactionStatusCoor EXCEPT ![cid[self]][txnId_S[self]].status = "Aborted"]
+                                                                /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendAbortOuterLoop"]
+                                                           ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendDecideOuterLoopEnd"]
+                                                                /\ UNCHANGED TransactionStatusCoor
+                                          /\ UNCHANGED << Transactions, 
+                                                          Messages, 
+                                                          CoordinatorMessages, 
+                                                          TransactionStatus, 
+                                                          SuccessCounts, 
+                                                          FailureCounts, 
+                                                          DoneCounts, 
+                                                          NodeStatus, 
+                                                          FailedCounts, 
+                                                          CommitCounts, 
+                                                          AbortCounts, 
+                                                          SystemTerminated, 
+                                                          stack, id_N, msg_, 
+                                                          type_, fail_occur, 
+                                                          id_C, msg_C, type_C, 
+                                                          t, msg_Ca, cid_C, 
+                                                          countsUpdated, 
+                                                          txnId_, cid_W, mtype, 
+                                                          quorom, minority, 
+                                                          msg_W, txnId_S, cid, 
+                                                          decision, i7_, j7_, 
+                                                          txnId, i1, j1, 
+                                                          targetReplica, 
+                                                          s_msg_, cid_E, 
+                                                          decision_, i7, j7, 
+                                                          commitTimestamp, 
+                                                          msg_E, msg_H, id_H, 
+                                                          i_, j_, t_, res_msg_, 
+                                                          operation_status, 
+                                                          msg_Ha, id_Ha, i_H, 
+                                                          j_H, t_H, res_msg_H, 
+                                                          msg_Han, id_Han, 
+                                                          i_Ha, j_Ha, t_Ha, 
+                                                          idx, res_msg_Ha, msg, 
+                                                          id_Hand, i, j, t_Han, 
+                                                          res_msg, id_Co, 
+                                                          s_msg, i8, j8, t_C, 
+                                                          id, msg_R, type, 
+                                                          cid_, id_ >>
+
+ProcExecutorSendCommitOuterLoop(self) == /\ pc[self] = "ProcExecutorSendCommitOuterLoop"
+                                         /\ IF i7_[self] < N
+                                               THEN /\ i7_' = [i7_ EXCEPT ![self] = i7_[self] + 1]
+                                                    /\ IF i7_'[self] \in Transactions[txnId_S[self]].access
+                                                          THEN /\ j7_' = [j7_ EXCEPT ![self] = 0]
+                                                               /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendCommitInnerLoop"]
+                                                          ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendCommitOuterLoop"]
+                                                               /\ j7_' = j7_
+                                               ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendDecideOuterLoopEnd"]
+                                                    /\ UNCHANGED << i7_, j7_ >>
+                                         /\ UNCHANGED << Transactions, 
+                                                         Messages, 
+                                                         CoordinatorMessages, 
+                                                         TransactionStatusCoor, 
+                                                         TransactionStatus, 
+                                                         SuccessCounts, 
+                                                         FailureCounts, 
+                                                         DoneCounts, 
+                                                         NodeStatus, 
+                                                         FailedCounts, 
+                                                         CommitCounts, 
+                                                         AbortCounts, 
+                                                         SystemTerminated, 
+                                                         stack, id_N, msg_, 
+                                                         type_, fail_occur, 
+                                                         id_C, msg_C, type_C, 
+                                                         t, msg_Ca, cid_C, 
+                                                         countsUpdated, txnId_, 
+                                                         cid_W, mtype, quorom, 
+                                                         minority, msg_W, 
+                                                         txnId_S, cid, 
+                                                         decision, txnId, i1, 
+                                                         j1, targetReplica, 
+                                                         s_msg_, cid_E, 
+                                                         decision_, i7, j7, 
+                                                         commitTimestamp, 
+                                                         msg_E, msg_H, id_H, 
+                                                         i_, j_, t_, res_msg_, 
+                                                         operation_status, 
+                                                         msg_Ha, id_Ha, i_H, 
+                                                         j_H, t_H, res_msg_H, 
+                                                         msg_Han, id_Han, i_Ha, 
+                                                         j_Ha, t_Ha, idx, 
+                                                         res_msg_Ha, msg, 
+                                                         id_Hand, i, j, t_Han, 
+                                                         res_msg, id_Co, s_msg, 
+                                                         i8, j8, t_C, id, 
+                                                         msg_R, type, cid_, 
+                                                         id_ >>
+
+ProcExecutorSendCommitInnerLoop(self) == /\ pc[self] = "ProcExecutorSendCommitInnerLoop"
+                                         /\ IF j7_[self] < M
+                                               THEN /\ j7_' = [j7_ EXCEPT ![self] = j7_[self] + 1]
+                                                    /\ targetReplica' = [targetReplica EXCEPT ![self] = ((i7_[self] - 1) * M) + j7_'[self]]
+                                                    /\ s_msg' = [s_msg EXCEPT ![self] = [item |-> i7_[self], replica |-> j7_'[self], transaction |-> txnId_S[self], type |-> "Commit", timestamp |-> commitTimestamp[self], coordinator_id |-> Transactions[txnId_S[self]].coordinator_id, targetReplica |-> targetReplica'[self]]]
+                                                    /\ Messages' = (Messages \cup {s_msg'[self]})
+                                                    /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendCommitInnerLoop"]
+                                               ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendCommitOuterLoop"]
+                                                    /\ UNCHANGED << Messages, 
+                                                                    j7_, 
+                                                                    targetReplica, 
+                                                                    s_msg >>
+                                         /\ UNCHANGED << Transactions, 
+                                                         CoordinatorMessages, 
+                                                         TransactionStatusCoor, 
+                                                         TransactionStatus, 
+                                                         SuccessCounts, 
+                                                         FailureCounts, 
+                                                         DoneCounts, 
+                                                         NodeStatus, 
+                                                         FailedCounts, 
+                                                         CommitCounts, 
+                                                         AbortCounts, 
+                                                         SystemTerminated, 
+                                                         stack, id_N, msg_, 
+                                                         type_, fail_occur, 
+                                                         id_C, msg_C, type_C, 
+                                                         t, msg_Ca, cid_C, 
+                                                         countsUpdated, txnId_, 
+                                                         cid_W, mtype, quorom, 
+                                                         minority, msg_W, 
+                                                         txnId_S, cid, 
+                                                         decision, i7_, txnId, 
+                                                         i1, j1, s_msg_, cid_E, 
+                                                         decision_, i7, j7, 
+                                                         commitTimestamp, 
+                                                         msg_E, msg_H, id_H, 
+                                                         i_, j_, t_, res_msg_, 
+                                                         operation_status, 
+                                                         msg_Ha, id_Ha, i_H, 
+                                                         j_H, t_H, res_msg_H, 
+                                                         msg_Han, id_Han, i_Ha, 
+                                                         j_Ha, t_Ha, idx, 
+                                                         res_msg_Ha, msg, 
+                                                         id_Hand, i, j, t_Han, 
+                                                         res_msg, id_Co, i8, 
+                                                         j8, t_C, id, msg_R, 
+                                                         type, cid_, id_ >>
+
+ProcExecutorSendAbortOuterLoop(self) == /\ pc[self] = "ProcExecutorSendAbortOuterLoop"
+                                        /\ IF i7_[self] < N
+                                              THEN /\ i7_' = [i7_ EXCEPT ![self] = i7_[self] + 1]
+                                                   /\ IF i7_'[self] \in Transactions[txnId_S[self]].access
+                                                         THEN /\ j7_' = [j7_ EXCEPT ![self] = 0]
+                                                              /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendAbortInnerLoop"]
+                                                         ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendAbortOuterLoop"]
+                                                              /\ j7_' = j7_
+                                              ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendDecideOuterLoopEnd"]
+                                                   /\ UNCHANGED << i7_, j7_ >>
+                                        /\ UNCHANGED << Transactions, Messages, 
+                                                        CoordinatorMessages, 
+                                                        TransactionStatusCoor, 
+                                                        TransactionStatus, 
+                                                        SuccessCounts, 
+                                                        FailureCounts, 
+                                                        DoneCounts, NodeStatus, 
+                                                        FailedCounts, 
+                                                        CommitCounts, 
+                                                        AbortCounts, 
+                                                        SystemTerminated, 
+                                                        stack, id_N, msg_, 
+                                                        type_, fail_occur, 
+                                                        id_C, msg_C, type_C, t, 
+                                                        msg_Ca, cid_C, 
+                                                        countsUpdated, txnId_, 
+                                                        cid_W, mtype, quorom, 
+                                                        minority, msg_W, 
+                                                        txnId_S, cid, decision, 
+                                                        txnId, i1, j1, 
+                                                        targetReplica, s_msg_, 
+                                                        cid_E, decision_, i7, 
+                                                        j7, commitTimestamp, 
+                                                        msg_E, msg_H, id_H, i_, 
+                                                        j_, t_, res_msg_, 
+                                                        operation_status, 
+                                                        msg_Ha, id_Ha, i_H, 
+                                                        j_H, t_H, res_msg_H, 
+                                                        msg_Han, id_Han, i_Ha, 
+                                                        j_Ha, t_Ha, idx, 
+                                                        res_msg_Ha, msg, 
+                                                        id_Hand, i, j, t_Han, 
+                                                        res_msg, id_Co, s_msg, 
+                                                        i8, j8, t_C, id, msg_R, 
+                                                        type, cid_, id_ >>
+
+ProcExecutorSendAbortInnerLoop(self) == /\ pc[self] = "ProcExecutorSendAbortInnerLoop"
+                                        /\ IF j7_[self] < M
+                                              THEN /\ j7_' = [j7_ EXCEPT ![self] = j7_[self] + 1]
+                                                   /\ targetReplica' = [targetReplica EXCEPT ![self] = ((i7_[self] - 1) * M) + j7_'[self]]
+                                                   /\ s_msg' = [s_msg EXCEPT ![self] = [item |-> i7_[self], replica |-> j7_'[self], transaction |-> txnId_S[self], type |-> "Abort", timestamp |-> commitTimestamp[self], coordinator_id |-> Transactions[txnId_S[self]].coordinator_id, targetReplica |-> targetReplica'[self]]]
+                                                   /\ Messages' = (Messages \cup {s_msg'[self]})
+                                                   /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendAbortInnerLoop"]
+                                              ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendAbortOuterLoop"]
+                                                   /\ UNCHANGED << Messages, 
+                                                                   j7_, 
+                                                                   targetReplica, 
+                                                                   s_msg >>
+                                        /\ UNCHANGED << Transactions, 
+                                                        CoordinatorMessages, 
+                                                        TransactionStatusCoor, 
+                                                        TransactionStatus, 
+                                                        SuccessCounts, 
+                                                        FailureCounts, 
+                                                        DoneCounts, NodeStatus, 
+                                                        FailedCounts, 
+                                                        CommitCounts, 
+                                                        AbortCounts, 
+                                                        SystemTerminated, 
+                                                        stack, id_N, msg_, 
+                                                        type_, fail_occur, 
+                                                        id_C, msg_C, type_C, t, 
+                                                        msg_Ca, cid_C, 
+                                                        countsUpdated, txnId_, 
+                                                        cid_W, mtype, quorom, 
+                                                        minority, msg_W, 
+                                                        txnId_S, cid, decision, 
+                                                        i7_, txnId, i1, j1, 
+                                                        s_msg_, cid_E, 
+                                                        decision_, i7, j7, 
+                                                        commitTimestamp, msg_E, 
+                                                        msg_H, id_H, i_, j_, 
+                                                        t_, res_msg_, 
+                                                        operation_status, 
+                                                        msg_Ha, id_Ha, i_H, 
+                                                        j_H, t_H, res_msg_H, 
+                                                        msg_Han, id_Han, i_Ha, 
+                                                        j_Ha, t_Ha, idx, 
+                                                        res_msg_Ha, msg, 
+                                                        id_Hand, i, j, t_Han, 
+                                                        res_msg, id_Co, i8, j8, 
+                                                        t_C, id, msg_R, type, 
+                                                        cid_, id_ >>
+
+ProcExecutorSendDecideOuterLoopEnd(self) == /\ pc[self] = "ProcExecutorSendDecideOuterLoopEnd"
+                                            /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                                            /\ i7_' = [i7_ EXCEPT ![self] = Head(stack[self]).i7_]
+                                            /\ j7_' = [j7_ EXCEPT ![self] = Head(stack[self]).j7_]
+                                            /\ txnId_S' = [txnId_S EXCEPT ![self] = Head(stack[self]).txnId_S]
+                                            /\ cid' = [cid EXCEPT ![self] = Head(stack[self]).cid]
+                                            /\ decision' = [decision EXCEPT ![self] = Head(stack[self]).decision]
+                                            /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                                            /\ UNCHANGED << Transactions, 
+                                                            Messages, 
+                                                            CoordinatorMessages, 
+                                                            TransactionStatusCoor, 
+                                                            TransactionStatus, 
+                                                            SuccessCounts, 
+                                                            FailureCounts, 
+                                                            DoneCounts, 
+                                                            NodeStatus, 
+                                                            FailedCounts, 
+                                                            CommitCounts, 
+                                                            AbortCounts, 
+                                                            SystemTerminated, 
+                                                            id_N, msg_, type_, 
+                                                            fail_occur, id_C, 
+                                                            msg_C, type_C, t, 
+                                                            msg_Ca, cid_C, 
+                                                            countsUpdated, 
+                                                            txnId_, cid_W, 
+                                                            mtype, quorom, 
+                                                            minority, msg_W, 
+                                                            txnId, i1, j1, 
+                                                            targetReplica, 
+                                                            s_msg_, cid_E, 
+                                                            decision_, i7, j7, 
+                                                            commitTimestamp, 
+                                                            msg_E, msg_H, id_H, 
+                                                            i_, j_, t_, 
+                                                            res_msg_, 
+                                                            operation_status, 
+                                                            msg_Ha, id_Ha, i_H, 
+                                                            j_H, t_H, 
+                                                            res_msg_H, msg_Han, 
+                                                            id_Han, i_Ha, j_Ha, 
+                                                            t_Ha, idx, 
+                                                            res_msg_Ha, msg, 
+                                                            id_Hand, i, j, 
+                                                            t_Han, res_msg, 
+                                                            id_Co, s_msg, i8, 
+                                                            j8, t_C, id, msg_R, 
+                                                            type, cid_, id_ >>
+
+SendDecision(self) == ProcExecutorSendDecideOuterLoop_(self)
+                         \/ ProcExecutorSendCommitOuterLoop(self)
+                         \/ ProcExecutorSendCommitInnerLoop(self)
+                         \/ ProcExecutorSendAbortOuterLoop(self)
+                         \/ ProcExecutorSendAbortInnerLoop(self)
+                         \/ ProcExecutorSendDecideOuterLoopEnd(self)
+
+ProcExecuteTransaction(self) == /\ pc[self] = "ProcExecuteTransaction"
+                                /\ cid_E' = [cid_E EXCEPT ![self] = Transactions[txnId[self]].coordinator_id]
+                                /\ TransactionStatusCoor' = [TransactionStatusCoor EXCEPT ![cid_E'[self]][txnId[self]].status = "Pending"]
+                                /\ SuccessCounts' = [SuccessCounts EXCEPT ![cid_E'[self]] = [item \in 1..N |-> 0]]
+                                /\ FailureCounts' = [FailureCounts EXCEPT ![cid_E'[self]] = [item \in 1..N |-> 0]]
+                                /\ DoneCounts' = [DoneCounts EXCEPT ![cid_E'[self]] = [item \in 1..N |-> 0]]
+                                /\ CommitCounts' = [CommitCounts EXCEPT ![cid_E'[self]] = 0]
+                                /\ AbortCounts' = [AbortCounts EXCEPT ![cid_E'[self]] = 0]
+                                /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendRequestsOuterLoop"]
+                                /\ UNCHANGED << Transactions, Messages, 
+                                                CoordinatorMessages, 
+                                                TransactionStatus, NodeStatus, 
+                                                FailedCounts, SystemTerminated, 
+                                                stack, id_N, msg_, type_, 
+                                                fail_occur, id_C, msg_C, 
+                                                type_C, t, msg_Ca, cid_C, 
+                                                countsUpdated, txnId_, cid_W, 
+                                                mtype, quorom, minority, msg_W, 
+                                                txnId_S, cid, decision, i7_, 
+                                                j7_, txnId, i1, j1, 
+                                                targetReplica, s_msg_, 
+                                                decision_, i7, j7, 
+                                                commitTimestamp, msg_E, msg_H, 
+                                                id_H, i_, j_, t_, res_msg_, 
+                                                operation_status, msg_Ha, 
+                                                id_Ha, i_H, j_H, t_H, 
+                                                res_msg_H, msg_Han, id_Han, 
+                                                i_Ha, j_Ha, t_Ha, idx, 
+                                                res_msg_Ha, msg, id_Hand, i, j, 
+                                                t_Han, res_msg, id_Co, s_msg, 
+                                                i8, j8, t_C, id, msg_R, type, 
+                                                cid_, id_ >>
+
+ProcExecutorSendRequestsOuterLoop(self) == /\ pc[self] = "ProcExecutorSendRequestsOuterLoop"
+                                           /\ IF i1[self] < N
+                                                 THEN /\ i1' = [i1 EXCEPT ![self] = i1[self] + 1]
+                                                      /\ IF i1'[self] \in Transactions[txnId[self]].access
+                                                            THEN /\ j1' = [j1 EXCEPT ![self] = 0]
+                                                                 /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendRequestsInnerLoop"]
+                                                            ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendRequestsOuterLoop"]
+                                                                 /\ j1' = j1
+                                                      /\ UNCHANGED << stack, 
+                                                                      txnId_, 
+                                                                      cid_W, 
+                                                                      mtype, 
+                                                                      quorom, 
+                                                                      minority, 
+                                                                      msg_W >>
+                                                 ELSE /\ /\ cid_W' = [cid_W EXCEPT ![self] = cid_E[self]]
+                                                         /\ minority' = [minority EXCEPT ![self] = M \div 4]
+                                                         /\ mtype' = [mtype EXCEPT ![self] = "Process-ack"]
+                                                         /\ quorom' = [quorom EXCEPT ![self] = (3*M) \div 4]
+                                                         /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "WaitForACK",
+                                                                                                  pc        |->  "FailurePoint1",
+                                                                                                  msg_W     |->  msg_W[self],
+                                                                                                  txnId_    |->  txnId_[self],
+                                                                                                  cid_W     |->  cid_W[self],
+                                                                                                  mtype     |->  mtype[self],
+                                                                                                  quorom    |->  quorom[self],
+                                                                                                  minority  |->  minority[self] ] >>
+                                                                                              \o stack[self]]
+                                                         /\ txnId_' = [txnId_ EXCEPT ![self] = txnId[self]]
+                                                      /\ msg_W' = [msg_W EXCEPT ![self] = {}]
+                                                      /\ pc' = [pc EXCEPT ![self] = "WaitForACKs"]
+                                                      /\ UNCHANGED << i1, j1 >>
+                                           /\ UNCHANGED << Transactions, 
+                                                           Messages, 
+                                                           CoordinatorMessages, 
+                                                           TransactionStatusCoor, 
+                                                           TransactionStatus, 
+                                                           SuccessCounts, 
+                                                           FailureCounts, 
+                                                           DoneCounts, 
+                                                           NodeStatus, 
+                                                           FailedCounts, 
+                                                           CommitCounts, 
+                                                           AbortCounts, 
+                                                           SystemTerminated, 
+                                                           id_N, msg_, type_, 
+                                                           fail_occur, id_C, 
+                                                           msg_C, type_C, t, 
+                                                           msg_Ca, cid_C, 
+                                                           countsUpdated, 
+                                                           txnId_S, cid, 
+                                                           decision, i7_, j7_, 
+                                                           txnId, 
+                                                           targetReplica, 
+                                                           s_msg_, cid_E, 
+                                                           decision_, i7, j7, 
+                                                           commitTimestamp, 
+                                                           msg_E, msg_H, id_H, 
+                                                           i_, j_, t_, 
+                                                           res_msg_, 
+                                                           operation_status, 
+                                                           msg_Ha, id_Ha, i_H, 
+                                                           j_H, t_H, res_msg_H, 
+                                                           msg_Han, id_Han, 
+                                                           i_Ha, j_Ha, t_Ha, 
+                                                           idx, res_msg_Ha, 
+                                                           msg, id_Hand, i, j, 
+                                                           t_Han, res_msg, 
+                                                           id_Co, s_msg, i8, 
+                                                           j8, t_C, id, msg_R, 
+                                                           type, cid_, id_ >>
+
+ProcExecutorSendRequestsInnerLoop(self) == /\ pc[self] = "ProcExecutorSendRequestsInnerLoop"
+                                           /\ IF j1[self] < M
+                                                 THEN /\ j1' = [j1 EXCEPT ![self] = j1[self] + 1]
+                                                      /\ targetReplica' = [targetReplica EXCEPT ![self] = ((i1[self] - 1) * M) + j1'[self]]
+                                                      /\ s_msg_' = [s_msg_ EXCEPT ![self] = [item |-> i1[self],
+                                                                                             replica |-> j1'[self],
+                                                                                             transaction |-> txnId[self],
+                                                                                             type |-> "Access",
+                                                                                             coordinator_id |-> cid_E[self],
+                                                                                             targetReplica |-> targetReplica'[self]]]
+                                                      /\ Messages' = (Messages \cup {s_msg_'[self]})
+                                                      /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendRequestsInnerLoop"]
+                                                 ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendRequestsOuterLoop"]
+                                                      /\ UNCHANGED << Messages, 
+                                                                      j1, 
+                                                                      targetReplica, 
+                                                                      s_msg_ >>
+                                           /\ UNCHANGED << Transactions, 
+                                                           CoordinatorMessages, 
+                                                           TransactionStatusCoor, 
+                                                           TransactionStatus, 
+                                                           SuccessCounts, 
+                                                           FailureCounts, 
+                                                           DoneCounts, 
+                                                           NodeStatus, 
+                                                           FailedCounts, 
+                                                           CommitCounts, 
+                                                           AbortCounts, 
+                                                           SystemTerminated, 
+                                                           stack, id_N, msg_, 
+                                                           type_, fail_occur, 
+                                                           id_C, msg_C, type_C, 
+                                                           t, msg_Ca, cid_C, 
+                                                           countsUpdated, 
+                                                           txnId_, cid_W, 
+                                                           mtype, quorom, 
+                                                           minority, msg_W, 
+                                                           txnId_S, cid, 
+                                                           decision, i7_, j7_, 
+                                                           txnId, i1, cid_E, 
+                                                           decision_, i7, j7, 
+                                                           commitTimestamp, 
+                                                           msg_E, msg_H, id_H, 
+                                                           i_, j_, t_, 
+                                                           res_msg_, 
+                                                           operation_status, 
+                                                           msg_Ha, id_Ha, i_H, 
+                                                           j_H, t_H, res_msg_H, 
+                                                           msg_Han, id_Han, 
+                                                           i_Ha, j_Ha, t_Ha, 
+                                                           idx, res_msg_Ha, 
+                                                           msg, id_Hand, i, j, 
+                                                           t_Han, res_msg, 
+                                                           id_Co, s_msg, i8, 
+                                                           j8, t_C, id, msg_R, 
+                                                           type, cid_, id_ >>
+
+FailurePoint1(self) == /\ pc[self] = "FailurePoint1"
+                       /\ IF FAILEDPOINT1
+                             THEN /\ IF id[self] = FailedC + (N * M)
+                                        THEN /\ /\ id_C' = [id_C EXCEPT ![self] = cid_E[self]]
+                                                /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "CNodeFail",
+                                                                                         pc        |->  "FailurePoint11",
+                                                                                         msg_C     |->  msg_C[self],
+                                                                                         type_C    |->  type_C[self],
+                                                                                         id_C      |->  id_C[self] ] >>
+                                                                                     \o stack[self]]
+                                             /\ msg_C' = [msg_C EXCEPT ![self] = {}]
+                                             /\ type_C' = [type_C EXCEPT ![self] = ""]
+                                             /\ pc' = [pc EXCEPT ![self] = "ProcSetCNodeFail"]
+                                        ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendDecideOuterLoop"]
+                                             /\ UNCHANGED << stack, id_C, 
+                                                             msg_C, type_C >>
+                             ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendDecideOuterLoop"]
+                                  /\ UNCHANGED << stack, id_C, msg_C, type_C >>
+                       /\ UNCHANGED << Transactions, Messages, 
+                                       CoordinatorMessages, 
+                                       TransactionStatusCoor, 
+                                       TransactionStatus, SuccessCounts, 
+                                       FailureCounts, DoneCounts, NodeStatus, 
+                                       FailedCounts, CommitCounts, AbortCounts, 
+                                       SystemTerminated, id_N, msg_, type_, 
+                                       fail_occur, t, msg_Ca, cid_C, 
+                                       countsUpdated, txnId_, cid_W, mtype, 
+                                       quorom, minority, msg_W, txnId_S, cid, 
+                                       decision, i7_, j7_, txnId, i1, j1, 
+                                       targetReplica, s_msg_, cid_E, decision_, 
+                                       i7, j7, commitTimestamp, msg_E, msg_H, 
+                                       id_H, i_, j_, t_, res_msg_, 
+                                       operation_status, msg_Ha, id_Ha, i_H, 
+                                       j_H, t_H, res_msg_H, msg_Han, id_Han, 
+                                       i_Ha, j_Ha, t_Ha, idx, res_msg_Ha, msg, 
+                                       id_Hand, i, j, t_Han, res_msg, id_Co, 
+                                       s_msg, i8, j8, t_C, id, msg_R, type, 
+                                       cid_, id_ >>
+
+FailurePoint11(self) == /\ pc[self] = "FailurePoint11"
+                        /\ /\ id_Co' = [id_Co EXCEPT ![self] = cid_E[self]]
+                           /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "CoordinatorRecover",
+                                                                    pc        |->  "FailurePoint12",
+                                                                    s_msg     |->  s_msg[self],
+                                                                    i8        |->  i8[self],
+                                                                    j8        |->  j8[self],
+                                                                    t_C       |->  t_C[self],
+                                                                    id_Co     |->  id_Co[self] ] >>
+                                                                \o stack[self]]
+                        /\ s_msg' = [s_msg EXCEPT ![self] = {}]
+                        /\ i8' = [i8 EXCEPT ![self] = 0]
+                        /\ j8' = [j8 EXCEPT ![self] = 0]
+                        /\ t_C' = [t_C EXCEPT ![self] = 0]
+                        /\ pc' = [pc EXCEPT ![self] = "ProcCoordinatorRecover"]
+                        /\ UNCHANGED << Transactions, Messages, 
+                                        CoordinatorMessages, 
+                                        TransactionStatusCoor, 
+                                        TransactionStatus, SuccessCounts, 
+                                        FailureCounts, DoneCounts, NodeStatus, 
+                                        FailedCounts, CommitCounts, 
+                                        AbortCounts, SystemTerminated, id_N, 
+                                        msg_, type_, fail_occur, id_C, msg_C, 
+                                        type_C, t, msg_Ca, cid_C, 
+                                        countsUpdated, txnId_, cid_W, mtype, 
+                                        quorom, minority, msg_W, txnId_S, cid, 
+                                        decision, i7_, j7_, txnId, i1, j1, 
+                                        targetReplica, s_msg_, cid_E, 
+                                        decision_, i7, j7, commitTimestamp, 
+                                        msg_E, msg_H, id_H, i_, j_, t_, 
+                                        res_msg_, operation_status, msg_Ha, 
+                                        id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                        msg_Han, id_Han, i_Ha, j_Ha, t_Ha, idx, 
+                                        res_msg_Ha, msg, id_Hand, i, j, t_Han, 
+                                        res_msg, id, msg_R, type, cid_, id_ >>
+
+FailurePoint12(self) == /\ pc[self] = "FailurePoint12"
+                        /\ /\ cid_W' = [cid_W EXCEPT ![self] = cid_E[self]]
+                           /\ minority' = [minority EXCEPT ![self] = M \div 2]
+                           /\ mtype' = [mtype EXCEPT ![self] = "Report"]
+                           /\ quorom' = [quorom EXCEPT ![self] = M \div 2]
+                           /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "WaitForACK",
+                                                                    pc        |->  "ProcExecutorSendDecideOuterLoop",
+                                                                    msg_W     |->  msg_W[self],
+                                                                    txnId_    |->  txnId_[self],
+                                                                    cid_W     |->  cid_W[self],
+                                                                    mtype     |->  mtype[self],
+                                                                    quorom    |->  quorom[self],
+                                                                    minority  |->  minority[self] ] >>
+                                                                \o stack[self]]
+                           /\ txnId_' = [txnId_ EXCEPT ![self] = txnId[self]]
+                        /\ msg_W' = [msg_W EXCEPT ![self] = {}]
+                        /\ pc' = [pc EXCEPT ![self] = "WaitForACKs"]
+                        /\ UNCHANGED << Transactions, Messages, 
+                                        CoordinatorMessages, 
+                                        TransactionStatusCoor, 
+                                        TransactionStatus, SuccessCounts, 
+                                        FailureCounts, DoneCounts, NodeStatus, 
+                                        FailedCounts, CommitCounts, 
+                                        AbortCounts, SystemTerminated, id_N, 
+                                        msg_, type_, fail_occur, id_C, msg_C, 
+                                        type_C, t, msg_Ca, cid_C, 
+                                        countsUpdated, txnId_S, cid, decision, 
+                                        i7_, j7_, txnId, i1, j1, targetReplica, 
+                                        s_msg_, cid_E, decision_, i7, j7, 
+                                        commitTimestamp, msg_E, msg_H, id_H, 
+                                        i_, j_, t_, res_msg_, operation_status, 
+                                        msg_Ha, id_Ha, i_H, j_H, t_H, 
+                                        res_msg_H, msg_Han, id_Han, i_Ha, j_Ha, 
+                                        t_Ha, idx, res_msg_Ha, msg, id_Hand, i, 
+                                        j, t_Han, res_msg, id_Co, s_msg, i8, 
+                                        j8, t_C, id, msg_R, type, cid_, id_ >>
+
+ProcExecutorSendDecideOuterLoop(self) == /\ pc[self] = "ProcExecutorSendDecideOuterLoop"
+                                         /\ /\ cid' = [cid EXCEPT ![self] = cid_E[self]]
+                                            /\ decision' = [decision EXCEPT ![self] = decision_[self]]
+                                            /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "SendDecision",
+                                                                                     pc        |->  "FailurePoint2",
+                                                                                     i7_       |->  i7_[self],
+                                                                                     j7_       |->  j7_[self],
+                                                                                     txnId_S   |->  txnId_S[self],
+                                                                                     cid       |->  cid[self],
+                                                                                     decision  |->  decision[self] ] >>
+                                                                                 \o stack[self]]
+                                            /\ txnId_S' = [txnId_S EXCEPT ![self] = txnId[self]]
+                                         /\ i7_' = [i7_ EXCEPT ![self] = 0]
+                                         /\ j7_' = [j7_ EXCEPT ![self] = 0]
+                                         /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendDecideOuterLoop_"]
+                                         /\ UNCHANGED << Transactions, 
+                                                         Messages, 
+                                                         CoordinatorMessages, 
+                                                         TransactionStatusCoor, 
+                                                         TransactionStatus, 
+                                                         SuccessCounts, 
+                                                         FailureCounts, 
+                                                         DoneCounts, 
+                                                         NodeStatus, 
+                                                         FailedCounts, 
+                                                         CommitCounts, 
+                                                         AbortCounts, 
+                                                         SystemTerminated, 
+                                                         id_N, msg_, type_, 
+                                                         fail_occur, id_C, 
+                                                         msg_C, type_C, t, 
+                                                         msg_Ca, cid_C, 
+                                                         countsUpdated, txnId_, 
+                                                         cid_W, mtype, quorom, 
+                                                         minority, msg_W, 
+                                                         txnId, i1, j1, 
+                                                         targetReplica, s_msg_, 
+                                                         cid_E, decision_, i7, 
+                                                         j7, commitTimestamp, 
+                                                         msg_E, msg_H, id_H, 
+                                                         i_, j_, t_, res_msg_, 
+                                                         operation_status, 
+                                                         msg_Ha, id_Ha, i_H, 
+                                                         j_H, t_H, res_msg_H, 
+                                                         msg_Han, id_Han, i_Ha, 
+                                                         j_Ha, t_Ha, idx, 
+                                                         res_msg_Ha, msg, 
+                                                         id_Hand, i, j, t_Han, 
+                                                         res_msg, id_Co, s_msg, 
+                                                         i8, j8, t_C, id, 
+                                                         msg_R, type, cid_, 
+                                                         id_ >>
+
+FailurePoint2(self) == /\ pc[self] = "FailurePoint2"
+                       /\ IF FAILEDPOINT2
+                             THEN /\ IF id[self] = FailedC + (N * M)
+                                        THEN /\ /\ id_C' = [id_C EXCEPT ![self] = cid_E[self]]
+                                                /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "CNodeFail",
+                                                                                         pc        |->  "FailurePoint21",
+                                                                                         msg_C     |->  msg_C[self],
+                                                                                         type_C    |->  type_C[self],
+                                                                                         id_C      |->  id_C[self] ] >>
+                                                                                     \o stack[self]]
+                                             /\ msg_C' = [msg_C EXCEPT ![self] = {}]
+                                             /\ type_C' = [type_C EXCEPT ![self] = ""]
+                                             /\ pc' = [pc EXCEPT ![self] = "ProcSetCNodeFail"]
+                                        ELSE /\ pc' = [pc EXCEPT ![self] = "WaitForFins"]
+                                             /\ UNCHANGED << stack, id_C, 
+                                                             msg_C, type_C >>
+                             ELSE /\ pc' = [pc EXCEPT ![self] = "WaitForFins"]
+                                  /\ UNCHANGED << stack, id_C, msg_C, type_C >>
+                       /\ UNCHANGED << Transactions, Messages, 
+                                       CoordinatorMessages, 
+                                       TransactionStatusCoor, 
+                                       TransactionStatus, SuccessCounts, 
+                                       FailureCounts, DoneCounts, NodeStatus, 
+                                       FailedCounts, CommitCounts, AbortCounts, 
+                                       SystemTerminated, id_N, msg_, type_, 
+                                       fail_occur, t, msg_Ca, cid_C, 
+                                       countsUpdated, txnId_, cid_W, mtype, 
+                                       quorom, minority, msg_W, txnId_S, cid, 
+                                       decision, i7_, j7_, txnId, i1, j1, 
+                                       targetReplica, s_msg_, cid_E, decision_, 
+                                       i7, j7, commitTimestamp, msg_E, msg_H, 
+                                       id_H, i_, j_, t_, res_msg_, 
+                                       operation_status, msg_Ha, id_Ha, i_H, 
+                                       j_H, t_H, res_msg_H, msg_Han, id_Han, 
+                                       i_Ha, j_Ha, t_Ha, idx, res_msg_Ha, msg, 
+                                       id_Hand, i, j, t_Han, res_msg, id_Co, 
+                                       s_msg, i8, j8, t_C, id, msg_R, type, 
+                                       cid_, id_ >>
+
+FailurePoint21(self) == /\ pc[self] = "FailurePoint21"
+                        /\ /\ id_Co' = [id_Co EXCEPT ![self] = cid_E[self]]
+                           /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "CoordinatorRecover",
+                                                                    pc        |->  "FailurePoint22",
+                                                                    s_msg     |->  s_msg[self],
+                                                                    i8        |->  i8[self],
+                                                                    j8        |->  j8[self],
+                                                                    t_C       |->  t_C[self],
+                                                                    id_Co     |->  id_Co[self] ] >>
+                                                                \o stack[self]]
+                        /\ s_msg' = [s_msg EXCEPT ![self] = {}]
+                        /\ i8' = [i8 EXCEPT ![self] = 0]
+                        /\ j8' = [j8 EXCEPT ![self] = 0]
+                        /\ t_C' = [t_C EXCEPT ![self] = 0]
+                        /\ pc' = [pc EXCEPT ![self] = "ProcCoordinatorRecover"]
+                        /\ UNCHANGED << Transactions, Messages, 
+                                        CoordinatorMessages, 
+                                        TransactionStatusCoor, 
+                                        TransactionStatus, SuccessCounts, 
+                                        FailureCounts, DoneCounts, NodeStatus, 
+                                        FailedCounts, CommitCounts, 
+                                        AbortCounts, SystemTerminated, id_N, 
+                                        msg_, type_, fail_occur, id_C, msg_C, 
+                                        type_C, t, msg_Ca, cid_C, 
+                                        countsUpdated, txnId_, cid_W, mtype, 
+                                        quorom, minority, msg_W, txnId_S, cid, 
+                                        decision, i7_, j7_, txnId, i1, j1, 
+                                        targetReplica, s_msg_, cid_E, 
+                                        decision_, i7, j7, commitTimestamp, 
+                                        msg_E, msg_H, id_H, i_, j_, t_, 
+                                        res_msg_, operation_status, msg_Ha, 
+                                        id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                        msg_Han, id_Han, i_Ha, j_Ha, t_Ha, idx, 
+                                        res_msg_Ha, msg, id_Hand, i, j, t_Han, 
+                                        res_msg, id, msg_R, type, cid_, id_ >>
+
+FailurePoint22(self) == /\ pc[self] = "FailurePoint22"
+                        /\ /\ cid_W' = [cid_W EXCEPT ![self] = cid_E[self]]
+                           /\ minority' = [minority EXCEPT ![self] = M \div 2]
+                           /\ mtype' = [mtype EXCEPT ![self] = "Report"]
+                           /\ quorom' = [quorom EXCEPT ![self] = M \div 2]
+                           /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "WaitForACK",
+                                                                    pc        |->  "FailurePoint23",
+                                                                    msg_W     |->  msg_W[self],
+                                                                    txnId_    |->  txnId_[self],
+                                                                    cid_W     |->  cid_W[self],
+                                                                    mtype     |->  mtype[self],
+                                                                    quorom    |->  quorom[self],
+                                                                    minority  |->  minority[self] ] >>
+                                                                \o stack[self]]
+                           /\ txnId_' = [txnId_ EXCEPT ![self] = txnId[self]]
+                        /\ msg_W' = [msg_W EXCEPT ![self] = {}]
+                        /\ pc' = [pc EXCEPT ![self] = "WaitForACKs"]
+                        /\ UNCHANGED << Transactions, Messages, 
+                                        CoordinatorMessages, 
+                                        TransactionStatusCoor, 
+                                        TransactionStatus, SuccessCounts, 
+                                        FailureCounts, DoneCounts, NodeStatus, 
+                                        FailedCounts, CommitCounts, 
+                                        AbortCounts, SystemTerminated, id_N, 
+                                        msg_, type_, fail_occur, id_C, msg_C, 
+                                        type_C, t, msg_Ca, cid_C, 
+                                        countsUpdated, txnId_S, cid, decision, 
+                                        i7_, j7_, txnId, i1, j1, targetReplica, 
+                                        s_msg_, cid_E, decision_, i7, j7, 
+                                        commitTimestamp, msg_E, msg_H, id_H, 
+                                        i_, j_, t_, res_msg_, operation_status, 
+                                        msg_Ha, id_Ha, i_H, j_H, t_H, 
+                                        res_msg_H, msg_Han, id_Han, i_Ha, j_Ha, 
+                                        t_Ha, idx, res_msg_Ha, msg, id_Hand, i, 
+                                        j, t_Han, res_msg, id_Co, s_msg, i8, 
+                                        j8, t_C, id, msg_R, type, cid_, id_ >>
+
+FailurePoint23(self) == /\ pc[self] = "FailurePoint23"
+                        /\ /\ cid' = [cid EXCEPT ![self] = cid_E[self]]
+                           /\ decision' = [decision EXCEPT ![self] = decision_[self]]
+                           /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "SendDecision",
+                                                                    pc        |->  "WaitForFins",
+                                                                    i7_       |->  i7_[self],
+                                                                    j7_       |->  j7_[self],
+                                                                    txnId_S   |->  txnId_S[self],
+                                                                    cid       |->  cid[self],
+                                                                    decision  |->  decision[self] ] >>
+                                                                \o stack[self]]
+                           /\ txnId_S' = [txnId_S EXCEPT ![self] = txnId[self]]
+                        /\ i7_' = [i7_ EXCEPT ![self] = 0]
+                        /\ j7_' = [j7_ EXCEPT ![self] = 0]
+                        /\ pc' = [pc EXCEPT ![self] = "ProcExecutorSendDecideOuterLoop_"]
+                        /\ UNCHANGED << Transactions, Messages, 
+                                        CoordinatorMessages, 
+                                        TransactionStatusCoor, 
+                                        TransactionStatus, SuccessCounts, 
+                                        FailureCounts, DoneCounts, NodeStatus, 
+                                        FailedCounts, CommitCounts, 
+                                        AbortCounts, SystemTerminated, id_N, 
+                                        msg_, type_, fail_occur, id_C, msg_C, 
+                                        type_C, t, msg_Ca, cid_C, 
+                                        countsUpdated, txnId_, cid_W, mtype, 
+                                        quorom, minority, msg_W, txnId, i1, j1, 
+                                        targetReplica, s_msg_, cid_E, 
+                                        decision_, i7, j7, commitTimestamp, 
+                                        msg_E, msg_H, id_H, i_, j_, t_, 
+                                        res_msg_, operation_status, msg_Ha, 
+                                        id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                        msg_Han, id_Han, i_Ha, j_Ha, t_Ha, idx, 
+                                        res_msg_Ha, msg, id_Hand, i, j, t_Han, 
+                                        res_msg, id_Co, s_msg, i8, j8, t_C, id, 
+                                        msg_R, type, cid_, id_ >>
+
+WaitForFins(self) == /\ pc[self] = "WaitForFins"
+                     /\ IF     (\E i6 \in Transactions[txnId[self]].access : DoneCounts[cid_E[self]][i6] < (3*M) \div 4) /\
+                           (\E m \in Messages : m.coordinator_id = cid_E[self] /\ m.transaction = txnId[self])
+                           THEN /\ IF \E m_fin \in CoordinatorMessages : m_fin.coordinator_id = cid_E[self] /\ m_fin.transaction = txnId[self] /\ m_fin.type = "Fin"
+                                      THEN /\ msg_E' = [msg_E EXCEPT ![self] = CHOOSE m_fin \in CoordinatorMessages : m_fin.coordinator_id = cid_E[self] /\ m_fin.transaction = txnId[self] /\ m_fin.type = "Fin"]
+                                           /\ CoordinatorMessages' = CoordinatorMessages \ {msg_E'[self]}
+                                           /\ DoneCounts' = [DoneCounts EXCEPT ![cid_E[self]][msg_E'[self].item] = DoneCounts[cid_E[self]][msg_E'[self].item] + 1]
+                                      ELSE /\ TRUE
+                                           /\ UNCHANGED << CoordinatorMessages, 
+                                                           DoneCounts, msg_E >>
+                                /\ pc' = [pc EXCEPT ![self] = "WaitForFins"]
+                           ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorFinA"]
+                                /\ UNCHANGED << CoordinatorMessages, 
+                                                DoneCounts, msg_E >>
+                     /\ UNCHANGED << Transactions, Messages, 
+                                     TransactionStatusCoor, TransactionStatus, 
+                                     SuccessCounts, FailureCounts, NodeStatus, 
+                                     FailedCounts, CommitCounts, AbortCounts, 
+                                     SystemTerminated, stack, id_N, msg_, 
+                                     type_, fail_occur, id_C, msg_C, type_C, t, 
+                                     msg_Ca, cid_C, countsUpdated, txnId_, 
+                                     cid_W, mtype, quorom, minority, msg_W, 
+                                     txnId_S, cid, decision, i7_, j7_, txnId, 
+                                     i1, j1, targetReplica, s_msg_, cid_E, 
+                                     decision_, i7, j7, commitTimestamp, msg_H, 
+                                     id_H, i_, j_, t_, res_msg_, 
+                                     operation_status, msg_Ha, id_Ha, i_H, j_H, 
+                                     t_H, res_msg_H, msg_Han, id_Han, i_Ha, 
+                                     j_Ha, t_Ha, idx, res_msg_Ha, msg, id_Hand, 
+                                     i, j, t_Han, res_msg, id_Co, s_msg, i8, 
+                                     j8, t_C, id, msg_R, type, cid_, id_ >>
+
+ProcExecutorFinA(self) == /\ pc[self] = "ProcExecutorFinA"
+                          /\ IF decision_[self] = "Commit"
+                                THEN /\ TransactionStatusCoor' = [TransactionStatusCoor EXCEPT ![cid_E[self]][txnId[self]].status = "FinCommit"]
+                                     /\ pc' = [pc EXCEPT ![self] = "ProcExecutorFinC"]
+                                ELSE /\ pc' = [pc EXCEPT ![self] = "ProcExecutorFinB"]
+                                     /\ UNCHANGED TransactionStatusCoor
+                          /\ UNCHANGED << Transactions, Messages, 
+                                          CoordinatorMessages, 
+                                          TransactionStatus, SuccessCounts, 
+                                          FailureCounts, DoneCounts, 
+                                          NodeStatus, FailedCounts, 
+                                          CommitCounts, AbortCounts, 
+                                          SystemTerminated, stack, id_N, msg_, 
+                                          type_, fail_occur, id_C, msg_C, 
+                                          type_C, t, msg_Ca, cid_C, 
+                                          countsUpdated, txnId_, cid_W, mtype, 
+                                          quorom, minority, msg_W, txnId_S, 
+                                          cid, decision, i7_, j7_, txnId, i1, 
+                                          j1, targetReplica, s_msg_, cid_E, 
+                                          decision_, i7, j7, commitTimestamp, 
+                                          msg_E, msg_H, id_H, i_, j_, t_, 
+                                          res_msg_, operation_status, msg_Ha, 
+                                          id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                          msg_Han, id_Han, i_Ha, j_Ha, t_Ha, 
+                                          idx, res_msg_Ha, msg, id_Hand, i, j, 
+                                          t_Han, res_msg, id_Co, s_msg, i8, j8, 
+                                          t_C, id, msg_R, type, cid_, id_ >>
+
+ProcExecutorFinB(self) == /\ pc[self] = "ProcExecutorFinB"
+                          /\ TransactionStatusCoor' = [TransactionStatusCoor EXCEPT ![cid_E[self]][txnId[self]].status = "FinAbort"]
+                          /\ pc' = [pc EXCEPT ![self] = "ProcExecutorFinC"]
+                          /\ UNCHANGED << Transactions, Messages, 
+                                          CoordinatorMessages, 
+                                          TransactionStatus, SuccessCounts, 
+                                          FailureCounts, DoneCounts, 
+                                          NodeStatus, FailedCounts, 
+                                          CommitCounts, AbortCounts, 
+                                          SystemTerminated, stack, id_N, msg_, 
+                                          type_, fail_occur, id_C, msg_C, 
+                                          type_C, t, msg_Ca, cid_C, 
+                                          countsUpdated, txnId_, cid_W, mtype, 
+                                          quorom, minority, msg_W, txnId_S, 
+                                          cid, decision, i7_, j7_, txnId, i1, 
+                                          j1, targetReplica, s_msg_, cid_E, 
+                                          decision_, i7, j7, commitTimestamp, 
+                                          msg_E, msg_H, id_H, i_, j_, t_, 
+                                          res_msg_, operation_status, msg_Ha, 
+                                          id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                          msg_Han, id_Han, i_Ha, j_Ha, t_Ha, 
+                                          idx, res_msg_Ha, msg, id_Hand, i, j, 
+                                          t_Han, res_msg, id_Co, s_msg, i8, j8, 
+                                          t_C, id, msg_R, type, cid_, id_ >>
+
+ProcExecutorFinC(self) == /\ pc[self] = "ProcExecutorFinC"
+                          /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                          /\ i1' = [i1 EXCEPT ![self] = Head(stack[self]).i1]
+                          /\ j1' = [j1 EXCEPT ![self] = Head(stack[self]).j1]
+                          /\ targetReplica' = [targetReplica EXCEPT ![self] = Head(stack[self]).targetReplica]
+                          /\ s_msg_' = [s_msg_ EXCEPT ![self] = Head(stack[self]).s_msg_]
+                          /\ cid_E' = [cid_E EXCEPT ![self] = Head(stack[self]).cid_E]
+                          /\ decision_' = [decision_ EXCEPT ![self] = Head(stack[self]).decision_]
+                          /\ i7' = [i7 EXCEPT ![self] = Head(stack[self]).i7]
+                          /\ j7' = [j7 EXCEPT ![self] = Head(stack[self]).j7]
+                          /\ commitTimestamp' = [commitTimestamp EXCEPT ![self] = Head(stack[self]).commitTimestamp]
+                          /\ msg_E' = [msg_E EXCEPT ![self] = Head(stack[self]).msg_E]
+                          /\ txnId' = [txnId EXCEPT ![self] = Head(stack[self]).txnId]
+                          /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                          /\ UNCHANGED << Transactions, Messages, 
+                                          CoordinatorMessages, 
+                                          TransactionStatusCoor, 
+                                          TransactionStatus, SuccessCounts, 
+                                          FailureCounts, DoneCounts, 
+                                          NodeStatus, FailedCounts, 
+                                          CommitCounts, AbortCounts, 
+                                          SystemTerminated, id_N, msg_, type_, 
+                                          fail_occur, id_C, msg_C, type_C, t, 
+                                          msg_Ca, cid_C, countsUpdated, txnId_, 
+                                          cid_W, mtype, quorom, minority, 
+                                          msg_W, txnId_S, cid, decision, i7_, 
+                                          j7_, msg_H, id_H, i_, j_, t_, 
+                                          res_msg_, operation_status, msg_Ha, 
+                                          id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                          msg_Han, id_Han, i_Ha, j_Ha, t_Ha, 
+                                          idx, res_msg_Ha, msg, id_Hand, i, j, 
+                                          t_Han, res_msg, id_Co, s_msg, i8, j8, 
+                                          t_C, id, msg_R, type, cid_, id_ >>
+
+ExecuteTransaction(self) == ProcExecuteTransaction(self)
+                               \/ ProcExecutorSendRequestsOuterLoop(self)
+                               \/ ProcExecutorSendRequestsInnerLoop(self)
+                               \/ FailurePoint1(self)
+                               \/ FailurePoint11(self)
+                               \/ FailurePoint12(self)
+                               \/ ProcExecutorSendDecideOuterLoop(self)
+                               \/ FailurePoint2(self)
+                               \/ FailurePoint21(self)
+                               \/ FailurePoint22(self)
+                               \/ FailurePoint23(self) \/ WaitForFins(self)
+                               \/ ProcExecutorFinA(self)
+                               \/ ProcExecutorFinB(self)
+                               \/ ProcExecutorFinC(self)
+
+ProcHandleRead(self) == /\ pc[self] = "ProcHandleRead"
+                        /\ i_' = [i_ EXCEPT ![self] = msg_H[self].item]
+                        /\ j_' = [j_ EXCEPT ![self] = msg_H[self].replica]
+                        /\ t_' = [t_ EXCEPT ![self] = msg_H[self].transaction]
+                        /\ operation_status' = [operation_status EXCEPT ![self] = CHOOSE status_result \in {"Success", "Failed"} : TRUE]
+                        /\ TransactionStatus' = [TransactionStatus EXCEPT ![id_H[self]][t_'[self]] = [status |-> operation_status'[self]]]
+                        /\ res_msg_' = [res_msg_ EXCEPT ![self] = [item |-> i_'[self], replica |-> j_'[self], transaction |-> t_'[self], type |-> "Process-ack", status |-> operation_status'[self], value |-> "dummy_value", coordinator_id |-> msg_H[self].coordinator_id]]
+                        /\ CoordinatorMessages' = (CoordinatorMessages \cup {res_msg_'[self]})
+                        /\ pc' = [pc EXCEPT ![self] = "ProcHandleReadB"]
+                        /\ UNCHANGED << Transactions, Messages, 
+                                        TransactionStatusCoor, SuccessCounts, 
+                                        FailureCounts, DoneCounts, NodeStatus, 
+                                        FailedCounts, CommitCounts, 
+                                        AbortCounts, SystemTerminated, stack, 
+                                        id_N, msg_, type_, fail_occur, id_C, 
+                                        msg_C, type_C, t, msg_Ca, cid_C, 
+                                        countsUpdated, txnId_, cid_W, mtype, 
+                                        quorom, minority, msg_W, txnId_S, cid, 
+                                        decision, i7_, j7_, txnId, i1, j1, 
+                                        targetReplica, s_msg_, cid_E, 
+                                        decision_, i7, j7, commitTimestamp, 
+                                        msg_E, msg_H, id_H, msg_Ha, id_Ha, i_H, 
+                                        j_H, t_H, res_msg_H, msg_Han, id_Han, 
+                                        i_Ha, j_Ha, t_Ha, idx, res_msg_Ha, msg, 
+                                        id_Hand, i, j, t_Han, res_msg, id_Co, 
+                                        s_msg, i8, j8, t_C, id, msg_R, type, 
+                                        cid_, id_ >>
+
+ProcHandleReadB(self) == /\ pc[self] = "ProcHandleReadB"
+                         /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                         /\ i_' = [i_ EXCEPT ![self] = Head(stack[self]).i_]
+                         /\ j_' = [j_ EXCEPT ![self] = Head(stack[self]).j_]
+                         /\ t_' = [t_ EXCEPT ![self] = Head(stack[self]).t_]
+                         /\ res_msg_' = [res_msg_ EXCEPT ![self] = Head(stack[self]).res_msg_]
+                         /\ operation_status' = [operation_status EXCEPT ![self] = Head(stack[self]).operation_status]
+                         /\ msg_H' = [msg_H EXCEPT ![self] = Head(stack[self]).msg_H]
+                         /\ id_H' = [id_H EXCEPT ![self] = Head(stack[self]).id_H]
+                         /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                         /\ UNCHANGED << Transactions, Messages, 
+                                         CoordinatorMessages, 
+                                         TransactionStatusCoor, 
+                                         TransactionStatus, SuccessCounts, 
+                                         FailureCounts, DoneCounts, NodeStatus, 
+                                         FailedCounts, CommitCounts, 
+                                         AbortCounts, SystemTerminated, id_N, 
+                                         msg_, type_, fail_occur, id_C, msg_C, 
+                                         type_C, t, msg_Ca, cid_C, 
+                                         countsUpdated, txnId_, cid_W, mtype, 
+                                         quorom, minority, msg_W, txnId_S, cid, 
+                                         decision, i7_, j7_, txnId, i1, j1, 
+                                         targetReplica, s_msg_, cid_E, 
+                                         decision_, i7, j7, commitTimestamp, 
+                                         msg_E, msg_Ha, id_Ha, i_H, j_H, t_H, 
+                                         res_msg_H, msg_Han, id_Han, i_Ha, 
+                                         j_Ha, t_Ha, idx, res_msg_Ha, msg, 
+                                         id_Hand, i, j, t_Han, res_msg, id_Co, 
+                                         s_msg, i8, j8, t_C, id, msg_R, type, 
+                                         cid_, id_ >>
+
+HandleAccess(self) == ProcHandleRead(self) \/ ProcHandleReadB(self)
+
+ProcHandleInquire(self) == /\ pc[self] = "ProcHandleInquire"
+                           /\ i_H' = [i_H EXCEPT ![self] = msg_Ha[self].item]
+                           /\ j_H' = [j_H EXCEPT ![self] = msg_Ha[self].replica]
+                           /\ t_H' = [t_H EXCEPT ![self] = msg_Ha[self].transaction]
+                           /\ operation_status' = [operation_status EXCEPT ![self] = TransactionStatus[id_Ha[self]][t_H'[self]].status]
+                           /\ res_msg_H' = [res_msg_H EXCEPT ![self] = [item |-> i_H'[self], replica |-> j_H'[self], transaction |-> t_H'[self], type |-> "Report", status |-> operation_status'[self], value |-> "dummy_value",  coordinator_id |-> msg_Ha[self].coordinator_id]]
+                           /\ CoordinatorMessages' = (CoordinatorMessages \cup {res_msg_H'[self]})
+                           /\ pc' = [pc EXCEPT ![self] = "ProcHandleWriteB"]
+                           /\ UNCHANGED << Transactions, Messages, 
+                                           TransactionStatusCoor, 
+                                           TransactionStatus, SuccessCounts, 
+                                           FailureCounts, DoneCounts, 
+                                           NodeStatus, FailedCounts, 
+                                           CommitCounts, AbortCounts, 
+                                           SystemTerminated, stack, id_N, msg_, 
+                                           type_, fail_occur, id_C, msg_C, 
+                                           type_C, t, msg_Ca, cid_C, 
+                                           countsUpdated, txnId_, cid_W, mtype, 
+                                           quorom, minority, msg_W, txnId_S, 
+                                           cid, decision, i7_, j7_, txnId, i1, 
+                                           j1, targetReplica, s_msg_, cid_E, 
+                                           decision_, i7, j7, commitTimestamp, 
+                                           msg_E, msg_H, id_H, i_, j_, t_, 
+                                           res_msg_, msg_Ha, id_Ha, msg_Han, 
+                                           id_Han, i_Ha, j_Ha, t_Ha, idx, 
+                                           res_msg_Ha, msg, id_Hand, i, j, 
+                                           t_Han, res_msg, id_Co, s_msg, i8, 
+                                           j8, t_C, id, msg_R, type, cid_, id_ >>
+
+ProcHandleWriteB(self) == /\ pc[self] = "ProcHandleWriteB"
+                          /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                          /\ i_H' = [i_H EXCEPT ![self] = Head(stack[self]).i_H]
+                          /\ j_H' = [j_H EXCEPT ![self] = Head(stack[self]).j_H]
+                          /\ t_H' = [t_H EXCEPT ![self] = Head(stack[self]).t_H]
+                          /\ res_msg_H' = [res_msg_H EXCEPT ![self] = Head(stack[self]).res_msg_H]
+                          /\ msg_Ha' = [msg_Ha EXCEPT ![self] = Head(stack[self]).msg_Ha]
+                          /\ id_Ha' = [id_Ha EXCEPT ![self] = Head(stack[self]).id_Ha]
+                          /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                          /\ UNCHANGED << Transactions, Messages, 
+                                          CoordinatorMessages, 
+                                          TransactionStatusCoor, 
+                                          TransactionStatus, SuccessCounts, 
+                                          FailureCounts, DoneCounts, 
+                                          NodeStatus, FailedCounts, 
+                                          CommitCounts, AbortCounts, 
+                                          SystemTerminated, id_N, msg_, type_, 
+                                          fail_occur, id_C, msg_C, type_C, t, 
+                                          msg_Ca, cid_C, countsUpdated, txnId_, 
+                                          cid_W, mtype, quorom, minority, 
+                                          msg_W, txnId_S, cid, decision, i7_, 
+                                          j7_, txnId, i1, j1, targetReplica, 
+                                          s_msg_, cid_E, decision_, i7, j7, 
+                                          commitTimestamp, msg_E, msg_H, id_H, 
+                                          i_, j_, t_, res_msg_, 
+                                          operation_status, msg_Han, id_Han, 
+                                          i_Ha, j_Ha, t_Ha, idx, res_msg_Ha, 
+                                          msg, id_Hand, i, j, t_Han, res_msg, 
+                                          id_Co, s_msg, i8, j8, t_C, id, msg_R, 
+                                          type, cid_, id_ >>
+
+HandleInquire(self) == ProcHandleInquire(self) \/ ProcHandleWriteB(self)
+
+ProcHandleCommit(self) == /\ pc[self] = "ProcHandleCommit"
+                          /\ i_Ha' = [i_Ha EXCEPT ![self] = msg_Han[self].item]
+                          /\ j_Ha' = [j_Ha EXCEPT ![self] = msg_Han[self].replica]
+                          /\ t_Ha' = [t_Ha EXCEPT ![self] = msg_Han[self].transaction]
+                          /\ TransactionStatus' = [TransactionStatus EXCEPT ![id_Han[self]][t_Ha'[self]] = [status |-> "Committed"]]
+                          /\ res_msg_Ha' = [res_msg_Ha EXCEPT ![self] = [item |-> i_Ha'[self], replica |-> j_Ha'[self], transaction |-> t_Ha'[self], type |-> "Fin", coordinator_id |-> msg_Han[self].coordinator_id]]
+                          /\ CoordinatorMessages' = (CoordinatorMessages \cup {res_msg_Ha'[self]})
+                          /\ pc' = [pc EXCEPT ![self] = "ProcHandleCommitB"]
+                          /\ UNCHANGED << Transactions, Messages, 
+                                          TransactionStatusCoor, SuccessCounts, 
+                                          FailureCounts, DoneCounts, 
+                                          NodeStatus, FailedCounts, 
+                                          CommitCounts, AbortCounts, 
+                                          SystemTerminated, stack, id_N, msg_, 
+                                          type_, fail_occur, id_C, msg_C, 
+                                          type_C, t, msg_Ca, cid_C, 
+                                          countsUpdated, txnId_, cid_W, mtype, 
+                                          quorom, minority, msg_W, txnId_S, 
+                                          cid, decision, i7_, j7_, txnId, i1, 
+                                          j1, targetReplica, s_msg_, cid_E, 
+                                          decision_, i7, j7, commitTimestamp, 
+                                          msg_E, msg_H, id_H, i_, j_, t_, 
+                                          res_msg_, operation_status, msg_Ha, 
+                                          id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                          msg_Han, id_Han, idx, msg, id_Hand, 
+                                          i, j, t_Han, res_msg, id_Co, s_msg, 
+                                          i8, j8, t_C, id, msg_R, type, cid_, 
+                                          id_ >>
+
+ProcHandleCommitB(self) == /\ pc[self] = "ProcHandleCommitB"
+                           /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                           /\ i_Ha' = [i_Ha EXCEPT ![self] = Head(stack[self]).i_Ha]
+                           /\ j_Ha' = [j_Ha EXCEPT ![self] = Head(stack[self]).j_Ha]
+                           /\ t_Ha' = [t_Ha EXCEPT ![self] = Head(stack[self]).t_Ha]
+                           /\ idx' = [idx EXCEPT ![self] = Head(stack[self]).idx]
+                           /\ res_msg_Ha' = [res_msg_Ha EXCEPT ![self] = Head(stack[self]).res_msg_Ha]
+                           /\ msg_Han' = [msg_Han EXCEPT ![self] = Head(stack[self]).msg_Han]
+                           /\ id_Han' = [id_Han EXCEPT ![self] = Head(stack[self]).id_Han]
+                           /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                           /\ UNCHANGED << Transactions, Messages, 
+                                           CoordinatorMessages, 
+                                           TransactionStatusCoor, 
+                                           TransactionStatus, SuccessCounts, 
+                                           FailureCounts, DoneCounts, 
+                                           NodeStatus, FailedCounts, 
+                                           CommitCounts, AbortCounts, 
+                                           SystemTerminated, id_N, msg_, type_, 
+                                           fail_occur, id_C, msg_C, type_C, t, 
+                                           msg_Ca, cid_C, countsUpdated, 
+                                           txnId_, cid_W, mtype, quorom, 
+                                           minority, msg_W, txnId_S, cid, 
+                                           decision, i7_, j7_, txnId, i1, j1, 
+                                           targetReplica, s_msg_, cid_E, 
+                                           decision_, i7, j7, commitTimestamp, 
+                                           msg_E, msg_H, id_H, i_, j_, t_, 
+                                           res_msg_, operation_status, msg_Ha, 
+                                           id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                           msg, id_Hand, i, j, t_Han, res_msg, 
+                                           id_Co, s_msg, i8, j8, t_C, id, 
+                                           msg_R, type, cid_, id_ >>
+
+HandleCommit(self) == ProcHandleCommit(self) \/ ProcHandleCommitB(self)
+
+ProcHandleAbort(self) == /\ pc[self] = "ProcHandleAbort"
+                         /\ i' = [i EXCEPT ![self] = msg[self].item]
+                         /\ j' = [j EXCEPT ![self] = msg[self].replica]
+                         /\ t_Han' = [t_Han EXCEPT ![self] = msg[self].transaction]
+                         /\ TransactionStatus' = [TransactionStatus EXCEPT ![id_Hand[self]][t_Han'[self]].status = "Aborted"]
+                         /\ res_msg' = [res_msg EXCEPT ![self] = [item |-> i'[self], replica |-> j'[self], transaction |-> t_Han'[self], type |-> "Fin", coordinator_id |-> msg[self].coordinator_id]]
+                         /\ CoordinatorMessages' = (CoordinatorMessages \cup {res_msg'[self]})
+                         /\ pc' = [pc EXCEPT ![self] = "ProcHandleAbortB"]
+                         /\ UNCHANGED << Transactions, Messages, 
+                                         TransactionStatusCoor, SuccessCounts, 
+                                         FailureCounts, DoneCounts, NodeStatus, 
+                                         FailedCounts, CommitCounts, 
+                                         AbortCounts, SystemTerminated, stack, 
+                                         id_N, msg_, type_, fail_occur, id_C, 
+                                         msg_C, type_C, t, msg_Ca, cid_C, 
+                                         countsUpdated, txnId_, cid_W, mtype, 
+                                         quorom, minority, msg_W, txnId_S, cid, 
+                                         decision, i7_, j7_, txnId, i1, j1, 
+                                         targetReplica, s_msg_, cid_E, 
+                                         decision_, i7, j7, commitTimestamp, 
+                                         msg_E, msg_H, id_H, i_, j_, t_, 
+                                         res_msg_, operation_status, msg_Ha, 
+                                         id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                         msg_Han, id_Han, i_Ha, j_Ha, t_Ha, 
+                                         idx, res_msg_Ha, msg, id_Hand, id_Co, 
+                                         s_msg, i8, j8, t_C, id, msg_R, type, 
+                                         cid_, id_ >>
+
+ProcHandleAbortB(self) == /\ pc[self] = "ProcHandleAbortB"
+                          /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                          /\ i' = [i EXCEPT ![self] = Head(stack[self]).i]
+                          /\ j' = [j EXCEPT ![self] = Head(stack[self]).j]
+                          /\ t_Han' = [t_Han EXCEPT ![self] = Head(stack[self]).t_Han]
+                          /\ res_msg' = [res_msg EXCEPT ![self] = Head(stack[self]).res_msg]
+                          /\ msg' = [msg EXCEPT ![self] = Head(stack[self]).msg]
+                          /\ id_Hand' = [id_Hand EXCEPT ![self] = Head(stack[self]).id_Hand]
+                          /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                          /\ UNCHANGED << Transactions, Messages, 
+                                          CoordinatorMessages, 
+                                          TransactionStatusCoor, 
+                                          TransactionStatus, SuccessCounts, 
+                                          FailureCounts, DoneCounts, 
+                                          NodeStatus, FailedCounts, 
+                                          CommitCounts, AbortCounts, 
+                                          SystemTerminated, id_N, msg_, type_, 
+                                          fail_occur, id_C, msg_C, type_C, t, 
+                                          msg_Ca, cid_C, countsUpdated, txnId_, 
+                                          cid_W, mtype, quorom, minority, 
+                                          msg_W, txnId_S, cid, decision, i7_, 
+                                          j7_, txnId, i1, j1, targetReplica, 
+                                          s_msg_, cid_E, decision_, i7, j7, 
+                                          commitTimestamp, msg_E, msg_H, id_H, 
+                                          i_, j_, t_, res_msg_, 
+                                          operation_status, msg_Ha, id_Ha, i_H, 
+                                          j_H, t_H, res_msg_H, msg_Han, id_Han, 
+                                          i_Ha, j_Ha, t_Ha, idx, res_msg_Ha, 
+                                          id_Co, s_msg, i8, j8, t_C, id, msg_R, 
+                                          type, cid_, id_ >>
+
+HandleAbort(self) == ProcHandleAbort(self) \/ ProcHandleAbortB(self)
+
+ProcCoordinatorRecover(self) == /\ pc[self] = "ProcCoordinatorRecover"
+                                /\ NodeStatus' = [NodeStatus EXCEPT ![id_Co[self]] = "Recover"]
+                                /\ t_C' = [t_C EXCEPT ![self] = 1]
+                                /\ pc' = [pc EXCEPT ![self] = "ProcCoordinatorRecoverOuterLoop"]
+                                /\ UNCHANGED << Transactions, Messages, 
+                                                CoordinatorMessages, 
+                                                TransactionStatusCoor, 
+                                                TransactionStatus, 
+                                                SuccessCounts, FailureCounts, 
+                                                DoneCounts, FailedCounts, 
+                                                CommitCounts, AbortCounts, 
+                                                SystemTerminated, stack, id_N, 
+                                                msg_, type_, fail_occur, id_C, 
+                                                msg_C, type_C, t, msg_Ca, 
+                                                cid_C, countsUpdated, txnId_, 
+                                                cid_W, mtype, quorom, minority, 
+                                                msg_W, txnId_S, cid, decision, 
+                                                i7_, j7_, txnId, i1, j1, 
+                                                targetReplica, s_msg_, cid_E, 
+                                                decision_, i7, j7, 
+                                                commitTimestamp, msg_E, msg_H, 
+                                                id_H, i_, j_, t_, res_msg_, 
+                                                operation_status, msg_Ha, 
+                                                id_Ha, i_H, j_H, t_H, 
+                                                res_msg_H, msg_Han, id_Han, 
+                                                i_Ha, j_Ha, t_Ha, idx, 
+                                                res_msg_Ha, msg, id_Hand, i, j, 
+                                                t_Han, res_msg, id_Co, s_msg, 
+                                                i8, j8, id, msg_R, type, cid_, 
+                                                id_ >>
+
+ProcCoordinatorRecoverOuterLoop(self) == /\ pc[self] = "ProcCoordinatorRecoverOuterLoop"
+                                         /\ IF i8[self] < N
+                                               THEN /\ i8' = [i8 EXCEPT ![self] = i8[self] + 1]
+                                                    /\ IF i8'[self] \in Transactions[t_C[self]].access
+                                                          THEN /\ j8' = [j8 EXCEPT ![self] = 0]
+                                                               /\ pc' = [pc EXCEPT ![self] = "ProcCoordinatorRecoverInnerLoop"]
+                                                          ELSE /\ pc' = [pc EXCEPT ![self] = "ProcCoordinatorRecoverOuterLoop"]
+                                                               /\ j8' = j8
+                                               ELSE /\ pc' = [pc EXCEPT ![self] = "ProcCoordinatorRecoverB"]
+                                                    /\ UNCHANGED << i8, j8 >>
+                                         /\ UNCHANGED << Transactions, 
+                                                         Messages, 
+                                                         CoordinatorMessages, 
+                                                         TransactionStatusCoor, 
+                                                         TransactionStatus, 
+                                                         SuccessCounts, 
+                                                         FailureCounts, 
+                                                         DoneCounts, 
+                                                         NodeStatus, 
+                                                         FailedCounts, 
+                                                         CommitCounts, 
+                                                         AbortCounts, 
+                                                         SystemTerminated, 
+                                                         stack, id_N, msg_, 
+                                                         type_, fail_occur, 
+                                                         id_C, msg_C, type_C, 
+                                                         t, msg_Ca, cid_C, 
+                                                         countsUpdated, txnId_, 
+                                                         cid_W, mtype, quorom, 
+                                                         minority, msg_W, 
+                                                         txnId_S, cid, 
+                                                         decision, i7_, j7_, 
+                                                         txnId, i1, j1, 
+                                                         targetReplica, s_msg_, 
+                                                         cid_E, decision_, i7, 
+                                                         j7, commitTimestamp, 
+                                                         msg_E, msg_H, id_H, 
+                                                         i_, j_, t_, res_msg_, 
+                                                         operation_status, 
+                                                         msg_Ha, id_Ha, i_H, 
+                                                         j_H, t_H, res_msg_H, 
+                                                         msg_Han, id_Han, i_Ha, 
+                                                         j_Ha, t_Ha, idx, 
+                                                         res_msg_Ha, msg, 
+                                                         id_Hand, i, j, t_Han, 
+                                                         res_msg, id_Co, s_msg, 
+                                                         t_C, id, msg_R, type, 
+                                                         cid_, id_ >>
+
+ProcCoordinatorRecoverInnerLoop(self) == /\ pc[self] = "ProcCoordinatorRecoverInnerLoop"
+                                         /\ IF j8[self] < M
+                                               THEN /\ j8' = [j8 EXCEPT ![self] = j8[self] + 1]
+                                                    /\ targetReplica' = [targetReplica EXCEPT ![self] = ((i8[self] - 1) * M) + j8'[self]]
+                                                    /\ s_msg' = [s_msg EXCEPT ![self] = [item |-> i8[self], replica |-> j8'[self], transaction |-> t_C[self], type |-> "Inquire", timestamp |-> 0, coordinator_id |-> Transactions[t_C[self]].coordinator_id, targetReplica |-> targetReplica'[self]]]
+                                                    /\ Messages' = (Messages \cup {s_msg'[self]})
+                                                    /\ pc' = [pc EXCEPT ![self] = "ProcCoordinatorRecoverInnerLoop"]
+                                               ELSE /\ pc' = [pc EXCEPT ![self] = "ProcCoordinatorRecoverOuterLoop"]
+                                                    /\ UNCHANGED << Messages, 
+                                                                    targetReplica, 
+                                                                    s_msg, j8 >>
+                                         /\ UNCHANGED << Transactions, 
+                                                         CoordinatorMessages, 
+                                                         TransactionStatusCoor, 
+                                                         TransactionStatus, 
+                                                         SuccessCounts, 
+                                                         FailureCounts, 
+                                                         DoneCounts, 
+                                                         NodeStatus, 
+                                                         FailedCounts, 
+                                                         CommitCounts, 
+                                                         AbortCounts, 
+                                                         SystemTerminated, 
+                                                         stack, id_N, msg_, 
+                                                         type_, fail_occur, 
+                                                         id_C, msg_C, type_C, 
+                                                         t, msg_Ca, cid_C, 
+                                                         countsUpdated, txnId_, 
+                                                         cid_W, mtype, quorom, 
+                                                         minority, msg_W, 
+                                                         txnId_S, cid, 
+                                                         decision, i7_, j7_, 
+                                                         txnId, i1, j1, s_msg_, 
+                                                         cid_E, decision_, i7, 
+                                                         j7, commitTimestamp, 
+                                                         msg_E, msg_H, id_H, 
+                                                         i_, j_, t_, res_msg_, 
+                                                         operation_status, 
+                                                         msg_Ha, id_Ha, i_H, 
+                                                         j_H, t_H, res_msg_H, 
+                                                         msg_Han, id_Han, i_Ha, 
+                                                         j_Ha, t_Ha, idx, 
+                                                         res_msg_Ha, msg, 
+                                                         id_Hand, i, j, t_Han, 
+                                                         res_msg, id_Co, i8, 
+                                                         t_C, id, msg_R, type, 
+                                                         cid_, id_ >>
+
+ProcCoordinatorRecoverB(self) == /\ pc[self] = "ProcCoordinatorRecoverB"
+                                 /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                                 /\ s_msg' = [s_msg EXCEPT ![self] = Head(stack[self]).s_msg]
+                                 /\ i8' = [i8 EXCEPT ![self] = Head(stack[self]).i8]
+                                 /\ j8' = [j8 EXCEPT ![self] = Head(stack[self]).j8]
+                                 /\ t_C' = [t_C EXCEPT ![self] = Head(stack[self]).t_C]
+                                 /\ id_Co' = [id_Co EXCEPT ![self] = Head(stack[self]).id_Co]
+                                 /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                                 /\ UNCHANGED << Transactions, Messages, 
+                                                 CoordinatorMessages, 
+                                                 TransactionStatusCoor, 
+                                                 TransactionStatus, 
+                                                 SuccessCounts, FailureCounts, 
+                                                 DoneCounts, NodeStatus, 
+                                                 FailedCounts, CommitCounts, 
+                                                 AbortCounts, SystemTerminated, 
+                                                 id_N, msg_, type_, fail_occur, 
+                                                 id_C, msg_C, type_C, t, 
+                                                 msg_Ca, cid_C, countsUpdated, 
+                                                 txnId_, cid_W, mtype, quorom, 
+                                                 minority, msg_W, txnId_S, cid, 
+                                                 decision, i7_, j7_, txnId, i1, 
+                                                 j1, targetReplica, s_msg_, 
+                                                 cid_E, decision_, i7, j7, 
+                                                 commitTimestamp, msg_E, msg_H, 
+                                                 id_H, i_, j_, t_, res_msg_, 
+                                                 operation_status, msg_Ha, 
+                                                 id_Ha, i_H, j_H, t_H, 
+                                                 res_msg_H, msg_Han, id_Han, 
+                                                 i_Ha, j_Ha, t_Ha, idx, 
+                                                 res_msg_Ha, msg, id_Hand, i, 
+                                                 j, t_Han, res_msg, id, msg_R, 
+                                                 type, cid_, id_ >>
+
+CoordinatorRecover(self) == ProcCoordinatorRecover(self)
+                               \/ ProcCoordinatorRecoverOuterLoop(self)
+                               \/ ProcCoordinatorRecoverInnerLoop(self)
+                               \/ ProcCoordinatorRecoverB(self)
+
+ProcRepRecReq(self) == /\ pc[self] = "ProcRepRecReq"
+                       /\ IF \E m \in Messages : m.targetReplica = id[self] /\ m.type /= "SyncAck"
+                             THEN /\ msg_R' = [msg_R EXCEPT ![self] = CHOOSE m \in Messages : m.targetReplica = id[self] /\ m.type /= "SyncAck"]
+                                  /\ Messages' = Messages \ {msg_R'[self]}
+                                  /\ IF NodeStatus[id[self]] = "Failed"
+                                        THEN /\ pc' = [pc EXCEPT ![self] = "ProcRepRecReqD"]
+                                        ELSE /\ pc' = [pc EXCEPT ![self] = "ProcRepRecReqB"]
+                             ELSE /\ pc' = [pc EXCEPT ![self] = "ProcRepRecReqC"]
+                                  /\ UNCHANGED << Messages, msg_R >>
+                       /\ UNCHANGED << Transactions, CoordinatorMessages, 
+                                       TransactionStatusCoor, 
+                                       TransactionStatus, SuccessCounts, 
+                                       FailureCounts, DoneCounts, NodeStatus, 
+                                       FailedCounts, CommitCounts, AbortCounts, 
+                                       SystemTerminated, stack, id_N, msg_, 
+                                       type_, fail_occur, id_C, msg_C, type_C, 
+                                       t, msg_Ca, cid_C, countsUpdated, txnId_, 
+                                       cid_W, mtype, quorom, minority, msg_W, 
+                                       txnId_S, cid, decision, i7_, j7_, txnId, 
+                                       i1, j1, targetReplica, s_msg_, cid_E, 
+                                       decision_, i7, j7, commitTimestamp, 
+                                       msg_E, msg_H, id_H, i_, j_, t_, 
+                                       res_msg_, operation_status, msg_Ha, 
+                                       id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                       msg_Han, id_Han, i_Ha, j_Ha, t_Ha, idx, 
+                                       res_msg_Ha, msg, id_Hand, i, j, t_Han, 
+                                       res_msg, id_Co, s_msg, i8, j8, t_C, id, 
+                                       type, cid_, id_ >>
+
+ProcRepRecReqB(self) == /\ pc[self] = "ProcRepRecReqB"
+                        /\ IF msg_R[self].type = "Access"
+                              THEN /\ /\ id_H' = [id_H EXCEPT ![self] = id[self]]
+                                      /\ msg_H' = [msg_H EXCEPT ![self] = msg_R[self]]
+                                      /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "HandleAccess",
+                                                                               pc        |->  "ProcRepRecReqC",
+                                                                               i_        |->  i_[self],
+                                                                               j_        |->  j_[self],
+                                                                               t_        |->  t_[self],
+                                                                               res_msg_  |->  res_msg_[self],
+                                                                               operation_status |->  operation_status[self],
+                                                                               msg_H     |->  msg_H[self],
+                                                                               id_H      |->  id_H[self] ] >>
+                                                                           \o stack[self]]
+                                   /\ i_' = [i_ EXCEPT ![self] = 0]
+                                   /\ j_' = [j_ EXCEPT ![self] = 0]
+                                   /\ t_' = [t_ EXCEPT ![self] = 0]
+                                   /\ res_msg_' = [res_msg_ EXCEPT ![self] = {}]
+                                   /\ operation_status' = [operation_status EXCEPT ![self] = defaultInitValue]
+                                   /\ pc' = [pc EXCEPT ![self] = "ProcHandleRead"]
+                                   /\ UNCHANGED << msg_Ha, id_Ha, i_H, j_H, 
+                                                   t_H, res_msg_H, msg_Han, 
+                                                   id_Han, i_Ha, j_Ha, t_Ha, 
+                                                   idx, res_msg_Ha, msg, 
+                                                   id_Hand, i, j, t_Han, 
+                                                   res_msg >>
+                              ELSE /\ IF msg_R[self].type = "Commit"
+                                         THEN /\ /\ id_Han' = [id_Han EXCEPT ![self] = id[self]]
+                                                 /\ msg_Han' = [msg_Han EXCEPT ![self] = msg_R[self]]
+                                                 /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "HandleCommit",
+                                                                                          pc        |->  "ProcRepRecReqC",
+                                                                                          i_Ha      |->  i_Ha[self],
+                                                                                          j_Ha      |->  j_Ha[self],
+                                                                                          t_Ha      |->  t_Ha[self],
+                                                                                          idx       |->  idx[self],
+                                                                                          res_msg_Ha |->  res_msg_Ha[self],
+                                                                                          msg_Han   |->  msg_Han[self],
+                                                                                          id_Han    |->  id_Han[self] ] >>
+                                                                                      \o stack[self]]
+                                              /\ i_Ha' = [i_Ha EXCEPT ![self] = 0]
+                                              /\ j_Ha' = [j_Ha EXCEPT ![self] = 0]
+                                              /\ t_Ha' = [t_Ha EXCEPT ![self] = 0]
+                                              /\ idx' = [idx EXCEPT ![self] = 0]
+                                              /\ res_msg_Ha' = [res_msg_Ha EXCEPT ![self] = {}]
+                                              /\ pc' = [pc EXCEPT ![self] = "ProcHandleCommit"]
+                                              /\ UNCHANGED << msg_Ha, id_Ha, 
+                                                              i_H, j_H, t_H, 
+                                                              res_msg_H, msg, 
+                                                              id_Hand, i, j, 
+                                                              t_Han, res_msg >>
+                                         ELSE /\ IF msg_R[self].type = "Abort"
+                                                    THEN /\ /\ id_Hand' = [id_Hand EXCEPT ![self] = id[self]]
+                                                            /\ msg' = [msg EXCEPT ![self] = msg_R[self]]
+                                                            /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "HandleAbort",
+                                                                                                     pc        |->  "ProcRepRecReqC",
+                                                                                                     i         |->  i[self],
+                                                                                                     j         |->  j[self],
+                                                                                                     t_Han     |->  t_Han[self],
+                                                                                                     res_msg   |->  res_msg[self],
+                                                                                                     msg       |->  msg[self],
+                                                                                                     id_Hand   |->  id_Hand[self] ] >>
+                                                                                                 \o stack[self]]
+                                                         /\ i' = [i EXCEPT ![self] = 0]
+                                                         /\ j' = [j EXCEPT ![self] = 0]
+                                                         /\ t_Han' = [t_Han EXCEPT ![self] = 0]
+                                                         /\ res_msg' = [res_msg EXCEPT ![self] = {}]
+                                                         /\ pc' = [pc EXCEPT ![self] = "ProcHandleAbort"]
+                                                         /\ UNCHANGED << msg_Ha, 
+                                                                         id_Ha, 
+                                                                         i_H, 
+                                                                         j_H, 
+                                                                         t_H, 
+                                                                         res_msg_H >>
+                                                    ELSE /\ IF msg_R[self].type = "Inquire"
+                                                               THEN /\ /\ id_Ha' = [id_Ha EXCEPT ![self] = id[self]]
+                                                                       /\ msg_Ha' = [msg_Ha EXCEPT ![self] = msg_R[self]]
+                                                                       /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "HandleInquire",
+                                                                                                                pc        |->  "ProcRepRecReqC",
+                                                                                                                i_H       |->  i_H[self],
+                                                                                                                j_H       |->  j_H[self],
+                                                                                                                t_H       |->  t_H[self],
+                                                                                                                res_msg_H |->  res_msg_H[self],
+                                                                                                                msg_Ha    |->  msg_Ha[self],
+                                                                                                                id_Ha     |->  id_Ha[self] ] >>
+                                                                                                            \o stack[self]]
+                                                                    /\ i_H' = [i_H EXCEPT ![self] = 0]
+                                                                    /\ j_H' = [j_H EXCEPT ![self] = 0]
+                                                                    /\ t_H' = [t_H EXCEPT ![self] = 0]
+                                                                    /\ res_msg_H' = [res_msg_H EXCEPT ![self] = {}]
+                                                                    /\ pc' = [pc EXCEPT ![self] = "ProcHandleInquire"]
+                                                               ELSE /\ pc' = [pc EXCEPT ![self] = "ProcRepRecReqC"]
+                                                                    /\ UNCHANGED << stack, 
+                                                                                    msg_Ha, 
+                                                                                    id_Ha, 
+                                                                                    i_H, 
+                                                                                    j_H, 
+                                                                                    t_H, 
+                                                                                    res_msg_H >>
+                                                         /\ UNCHANGED << msg, 
+                                                                         id_Hand, 
+                                                                         i, j, 
+                                                                         t_Han, 
+                                                                         res_msg >>
+                                              /\ UNCHANGED << msg_Han, id_Han, 
+                                                              i_Ha, j_Ha, t_Ha, 
+                                                              idx, res_msg_Ha >>
+                                   /\ UNCHANGED << msg_H, id_H, i_, j_, t_, 
+                                                   res_msg_, operation_status >>
+                        /\ UNCHANGED << Transactions, Messages, 
+                                        CoordinatorMessages, 
+                                        TransactionStatusCoor, 
+                                        TransactionStatus, SuccessCounts, 
+                                        FailureCounts, DoneCounts, NodeStatus, 
+                                        FailedCounts, CommitCounts, 
+                                        AbortCounts, SystemTerminated, id_N, 
+                                        msg_, type_, fail_occur, id_C, msg_C, 
+                                        type_C, t, msg_Ca, cid_C, 
+                                        countsUpdated, txnId_, cid_W, mtype, 
+                                        quorom, minority, msg_W, txnId_S, cid, 
+                                        decision, i7_, j7_, txnId, i1, j1, 
+                                        targetReplica, s_msg_, cid_E, 
+                                        decision_, i7, j7, commitTimestamp, 
+                                        msg_E, id_Co, s_msg, i8, j8, t_C, id, 
+                                        msg_R, type, cid_, id_ >>
+
+ProcRepRecReqD(self) == /\ pc[self] = "ProcRepRecReqD"
+                        /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                        /\ msg_R' = [msg_R EXCEPT ![self] = Head(stack[self]).msg_R]
+                        /\ type' = [type EXCEPT ![self] = Head(stack[self]).type]
+                        /\ id' = [id EXCEPT ![self] = Head(stack[self]).id]
+                        /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                        /\ UNCHANGED << Transactions, Messages, 
+                                        CoordinatorMessages, 
+                                        TransactionStatusCoor, 
+                                        TransactionStatus, SuccessCounts, 
+                                        FailureCounts, DoneCounts, NodeStatus, 
+                                        FailedCounts, CommitCounts, 
+                                        AbortCounts, SystemTerminated, id_N, 
+                                        msg_, type_, fail_occur, id_C, msg_C, 
+                                        type_C, t, msg_Ca, cid_C, 
+                                        countsUpdated, txnId_, cid_W, mtype, 
+                                        quorom, minority, msg_W, txnId_S, cid, 
+                                        decision, i7_, j7_, txnId, i1, j1, 
+                                        targetReplica, s_msg_, cid_E, 
+                                        decision_, i7, j7, commitTimestamp, 
+                                        msg_E, msg_H, id_H, i_, j_, t_, 
+                                        res_msg_, operation_status, msg_Ha, 
+                                        id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                        msg_Han, id_Han, i_Ha, j_Ha, t_Ha, idx, 
+                                        res_msg_Ha, msg, id_Hand, i, j, t_Han, 
+                                        res_msg, id_Co, s_msg, i8, j8, t_C, 
+                                        cid_, id_ >>
+
+ProcRepRecReqC(self) == /\ pc[self] = "ProcRepRecReqC"
+                        /\ pc' = [pc EXCEPT ![self] = Head(stack[self]).pc]
+                        /\ msg_R' = [msg_R EXCEPT ![self] = Head(stack[self]).msg_R]
+                        /\ type' = [type EXCEPT ![self] = Head(stack[self]).type]
+                        /\ id' = [id EXCEPT ![self] = Head(stack[self]).id]
+                        /\ stack' = [stack EXCEPT ![self] = Tail(stack[self])]
+                        /\ UNCHANGED << Transactions, Messages, 
+                                        CoordinatorMessages, 
+                                        TransactionStatusCoor, 
+                                        TransactionStatus, SuccessCounts, 
+                                        FailureCounts, DoneCounts, NodeStatus, 
+                                        FailedCounts, CommitCounts, 
+                                        AbortCounts, SystemTerminated, id_N, 
+                                        msg_, type_, fail_occur, id_C, msg_C, 
+                                        type_C, t, msg_Ca, cid_C, 
+                                        countsUpdated, txnId_, cid_W, mtype, 
+                                        quorom, minority, msg_W, txnId_S, cid, 
+                                        decision, i7_, j7_, txnId, i1, j1, 
+                                        targetReplica, s_msg_, cid_E, 
+                                        decision_, i7, j7, commitTimestamp, 
+                                        msg_E, msg_H, id_H, i_, j_, t_, 
+                                        res_msg_, operation_status, msg_Ha, 
+                                        id_Ha, i_H, j_H, t_H, res_msg_H, 
+                                        msg_Han, id_Han, i_Ha, j_Ha, t_Ha, idx, 
+                                        res_msg_Ha, msg, id_Hand, i, j, t_Han, 
+                                        res_msg, id_Co, s_msg, i8, j8, t_C, 
+                                        cid_, id_ >>
+
+ReplicaReceiveRequest(self) == ProcRepRecReq(self) \/ ProcRepRecReqB(self)
+                                  \/ ProcRepRecReqD(self)
+                                  \/ ProcRepRecReqC(self)
+
+MainProcess == /\ pc[1] = "MainProcess"
+               /\ cid_' = Transactions[1].coordinator_id
+               /\ /\ stack' = [stack EXCEPT ![1] = << [ procedure |->  "ExecuteTransaction",
+                                                        pc        |->  "MainTerminate",
+                                                        i1        |->  i1[1],
+                                                        j1        |->  j1[1],
+                                                        targetReplica |->  targetReplica[1],
+                                                        s_msg_    |->  s_msg_[1],
+                                                        cid_E     |->  cid_E[1],
+                                                        decision_ |->  decision_[1],
+                                                        i7        |->  i7[1],
+                                                        j7        |->  j7[1],
+                                                        commitTimestamp |->  commitTimestamp[1],
+                                                        msg_E     |->  msg_E[1],
+                                                        txnId     |->  txnId[1] ] >>
+                                                    \o stack[1]]
+                  /\ txnId' = [txnId EXCEPT ![1] = 1]
+               /\ i1' = [i1 EXCEPT ![1] = 0]
+               /\ j1' = [j1 EXCEPT ![1] = 0]
+               /\ targetReplica' = [targetReplica EXCEPT ![1] = 0]
+               /\ s_msg_' = [s_msg_ EXCEPT ![1] = {}]
+               /\ cid_E' = [cid_E EXCEPT ![1] = 0]
+               /\ decision_' = [decision_ EXCEPT ![1] = "Pending"]
+               /\ i7' = [i7 EXCEPT ![1] = 0]
+               /\ j7' = [j7 EXCEPT ![1] = 0]
+               /\ commitTimestamp' = [commitTimestamp EXCEPT ![1] = 0]
+               /\ msg_E' = [msg_E EXCEPT ![1] = {}]
+               /\ pc' = [pc EXCEPT ![1] = "ProcExecuteTransaction"]
+               /\ UNCHANGED << Transactions, Messages, CoordinatorMessages, 
+                               TransactionStatusCoor, TransactionStatus, 
+                               SuccessCounts, FailureCounts, DoneCounts, 
+                               NodeStatus, FailedCounts, CommitCounts, 
+                               AbortCounts, SystemTerminated, id_N, msg_, 
+                               type_, fail_occur, id_C, msg_C, type_C, t, 
+                               msg_Ca, cid_C, countsUpdated, txnId_, cid_W, 
+                               mtype, quorom, minority, msg_W, txnId_S, cid, 
+                               decision, i7_, j7_, msg_H, id_H, i_, j_, t_, 
+                               res_msg_, operation_status, msg_Ha, id_Ha, i_H, 
+                               j_H, t_H, res_msg_H, msg_Han, id_Han, i_Ha, 
+                               j_Ha, t_Ha, idx, res_msg_Ha, msg, id_Hand, i, j, 
+                               t_Han, res_msg, id_Co, s_msg, i8, j8, t_C, id, 
+                               msg_R, type, id_ >>
+
+MainTerminate == /\ pc[1] = "MainTerminate"
+                 /\ SystemTerminated' = TRUE
+                 /\ pc' = [pc EXCEPT ![1] = "Done"]
+                 /\ UNCHANGED << Transactions, Messages, CoordinatorMessages, 
+                                 TransactionStatusCoor, TransactionStatus, 
+                                 SuccessCounts, FailureCounts, DoneCounts, 
+                                 NodeStatus, FailedCounts, CommitCounts, 
+                                 AbortCounts, stack, id_N, msg_, type_, 
+                                 fail_occur, id_C, msg_C, type_C, t, msg_Ca, 
+                                 cid_C, countsUpdated, txnId_, cid_W, mtype, 
+                                 quorom, minority, msg_W, txnId_S, cid, 
+                                 decision, i7_, j7_, txnId, i1, j1, 
+                                 targetReplica, s_msg_, cid_E, decision_, i7, 
+                                 j7, commitTimestamp, msg_E, msg_H, id_H, i_, 
+                                 j_, t_, res_msg_, operation_status, msg_Ha, 
+                                 id_Ha, i_H, j_H, t_H, res_msg_H, msg_Han, 
+                                 id_Han, i_Ha, j_Ha, t_Ha, idx, res_msg_Ha, 
+                                 msg, id_Hand, i, j, t_Han, res_msg, id_Co, 
+                                 s_msg, i8, j8, t_C, id, msg_R, type, cid_, 
+                                 id_ >>
+
+Main == MainProcess \/ MainTerminate
+
+ReplicaMain(self) == /\ pc[self] = "ReplicaMain"
+                     /\ IF SystemTerminated = FALSE
+                           THEN /\ /\ id' = [id EXCEPT ![self] = id_[self]]
+                                   /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "ReplicaReceiveRequest",
+                                                                            pc        |->  "ReplicaMainB",
+                                                                            msg_R     |->  msg_R[self],
+                                                                            type      |->  type[self],
+                                                                            id        |->  id[self] ] >>
+                                                                        \o stack[self]]
+                                /\ msg_R' = [msg_R EXCEPT ![self] = {}]
+                                /\ type' = [type EXCEPT ![self] = ""]
+                                /\ pc' = [pc EXCEPT ![self] = "ProcRepRecReq"]
+                           ELSE /\ pc' = [pc EXCEPT ![self] = "Done"]
+                                /\ UNCHANGED << stack, id, msg_R, type >>
+                     /\ UNCHANGED << Transactions, Messages, 
+                                     CoordinatorMessages, 
+                                     TransactionStatusCoor, TransactionStatus, 
+                                     SuccessCounts, FailureCounts, DoneCounts, 
+                                     NodeStatus, FailedCounts, CommitCounts, 
+                                     AbortCounts, SystemTerminated, id_N, msg_, 
+                                     type_, fail_occur, id_C, msg_C, type_C, t, 
+                                     msg_Ca, cid_C, countsUpdated, txnId_, 
+                                     cid_W, mtype, quorom, minority, msg_W, 
+                                     txnId_S, cid, decision, i7_, j7_, txnId, 
+                                     i1, j1, targetReplica, s_msg_, cid_E, 
+                                     decision_, i7, j7, commitTimestamp, msg_E, 
+                                     msg_H, id_H, i_, j_, t_, res_msg_, 
+                                     operation_status, msg_Ha, id_Ha, i_H, j_H, 
+                                     t_H, res_msg_H, msg_Han, id_Han, i_Ha, 
+                                     j_Ha, t_Ha, idx, res_msg_Ha, msg, id_Hand, 
+                                     i, j, t_Han, res_msg, id_Co, s_msg, i8, 
+                                     j8, t_C, cid_, id_ >>
+
+ReplicaMainB(self) == /\ pc[self] = "ReplicaMainB"
+                      /\ /\ id_N' = [id_N EXCEPT ![self] = id_[self]]
+                         /\ stack' = [stack EXCEPT ![self] = << [ procedure |->  "NNodeFail",
+                                                                  pc        |->  "ReplicaMain",
+                                                                  msg_      |->  msg_[self],
+                                                                  type_     |->  type_[self],
+                                                                  fail_occur |->  fail_occur[self],
+                                                                  id_N      |->  id_N[self] ] >>
+                                                              \o stack[self]]
+                      /\ msg_' = [msg_ EXCEPT ![self] = {}]
+                      /\ type_' = [type_ EXCEPT ![self] = ""]
+                      /\ fail_occur' = [fail_occur EXCEPT ![self] = FALSE]
+                      /\ pc' = [pc EXCEPT ![self] = "ProcSetNodeFail"]
+                      /\ UNCHANGED << Transactions, Messages, 
+                                      CoordinatorMessages, 
+                                      TransactionStatusCoor, TransactionStatus, 
+                                      SuccessCounts, FailureCounts, DoneCounts, 
+                                      NodeStatus, FailedCounts, CommitCounts, 
+                                      AbortCounts, SystemTerminated, id_C, 
+                                      msg_C, type_C, t, msg_Ca, cid_C, 
+                                      countsUpdated, txnId_, cid_W, mtype, 
+                                      quorom, minority, msg_W, txnId_S, cid, 
+                                      decision, i7_, j7_, txnId, i1, j1, 
+                                      targetReplica, s_msg_, cid_E, decision_, 
+                                      i7, j7, commitTimestamp, msg_E, msg_H, 
+                                      id_H, i_, j_, t_, res_msg_, 
+                                      operation_status, msg_Ha, id_Ha, i_H, 
+                                      j_H, t_H, res_msg_H, msg_Han, id_Han, 
+                                      i_Ha, j_Ha, t_Ha, idx, res_msg_Ha, msg, 
+                                      id_Hand, i, j, t_Han, res_msg, id_Co, 
+                                      s_msg, i8, j8, t_C, id, msg_R, type, 
+                                      cid_, id_ >>
+
+Replica(self) == ReplicaMain(self) \/ ReplicaMainB(self)
+
+(* Allow infinite stuttering to prevent deadlock on termination. *)
+Terminating == /\ \A self \in ProcSet: pc[self] = "Done"
+               /\ UNCHANGED vars
+
+Next == Main
+           \/ (\E self \in ProcSet:  \/ NNodeFail(self) \/ CNodeFail(self)
+                                     \/ CalculateACKCounts(self)
+                                     \/ WaitForACK(self) \/ SendDecision(self)
+                                     \/ ExecuteTransaction(self)
+                                     \/ HandleAccess(self) \/ HandleInquire(self)
+                                     \/ HandleCommit(self) \/ HandleAbort(self)
+                                     \/ CoordinatorRecover(self)
+                                     \/ ReplicaReceiveRequest(self))
+           \/ (\E self \in 1..(N * M): Replica(self))
+           \/ Terminating
+
+Spec == Init /\ [][Next]_vars
+
+Termination == <>(\A self \in ProcSet: pc[self] = "Done")
+
+\* END TRANSLATION 
+==================
