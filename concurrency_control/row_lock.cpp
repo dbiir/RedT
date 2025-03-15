@@ -120,9 +120,9 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
     }
 #endif
 
-#if TWOPL_LITE
-	  conflict = owner_cnt > 0;
-#endif
+    #if TWOPL_LITE
+        conflict = owner_cnt > 0;
+    #endif
 	if (CC_ALG == WAIT_DIE && !conflict) {
 		if (waiters_head && txn->get_timestamp() < waiters_head->txn->get_timestamp()) {
 			conflict = true;
@@ -219,7 +219,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
                 rc = Abort;
             }
         } 
-#if CC_ALG == WOUND_WAIT
+        #if CC_ALG == WOUND_WAIT
         else if (CC_ALG == WOUND_WAIT) {
             /////////////////////WOUND_WAIT///////////////////////////
             //  - T is the txn currently running
@@ -333,7 +333,7 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
                 assert(false);
             }
         }
-#endif
+        #endif
         else if (CC_ALG == CALVIN){
             LockEntry * entry = get_entry();
             entry->start_ts = get_sys_clock();
@@ -359,16 +359,16 @@ RC Row_lock::lock_get(lock_t type, TxnManager * txn, uint64_t* &txnids, int &txn
     else {  //no conflict
     lock:
         DEBUG("1lock (%ld,%ld): owners %d, own type %d, req type %d, key %ld %lx\n", txn->get_txn_id(), txn->get_batch_id(), owner_cnt, lock_type, type, _row->get_primary_key(), (uint64_t)_row);
-#if DEBUG_TIMELINE
-        printf("LOCK %ld %ld\n",entry->txn->get_txn_id(),entry->start_ts);
-#endif
-#if CC_ALG != NO_WAIT
-        LockEntry * entry = get_entry();
-        entry->type = type;
-        entry->start_ts = get_sys_clock();
-        entry->txn = txn;
-        STACK_PUSH(owners[hash(txn->get_txn_id())], entry);
-#endif
+        #if DEBUG_TIMELINE
+            printf("LOCK %ld %ld\n",entry->txn->get_txn_id(),entry->start_ts);
+        #endif
+        #if CC_ALG != NO_WAIT
+            LockEntry * entry = get_entry();
+            entry->type = type;
+            entry->start_ts = get_sys_clock();
+            entry->txn = txn;
+            STACK_PUSH(owners[hash(txn->get_txn_id())], entry);
+        #endif
         if(owner_cnt > 0) {
             assert(type == DLOCK_SH);
             INC_STATS(txn->get_thd_id(),twopl_sh_bypass_cnt,1);

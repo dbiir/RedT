@@ -231,43 +231,43 @@ ArgsType() {
 FileName() {
     if [[ "${TEST_TYPE}" == 'ycsb_skew' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _SKEW-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _SKEW-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_skew' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _SKEW-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _SKEW-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_cross_dc' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_cross_dc' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _CROSS_DC_TXN_PERC-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_network_delay' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _NDLY-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_network_delay' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _NDLY-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_early_network_delay' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _NDLY-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _NDLY-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_scaling' || "${TEST_TYPE}" == 'ycsb_scaling_tcp' || "${TEST_TYPE}" == 'ycsb_scaling_two_sided' || "${TEST_TYPE}" == 'ycsb_scaling_one_sided' || "${TEST_TYPE}" == 'ycsb_scaling_coroutine' || "${TEST_TYPE}" == 'ycsb_scaling_dbpa' || "${TEST_TYPE}" == 'ycsb_scaling_all' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_writes' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _TWR-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _TWR-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_tapir_writes' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc} | grep _TWR-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _TWR-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'tpcc_scaling' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _N-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'ycsb_stress' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc}_TIF-${arg}_ | grep _SKEW-${SKEW[0]}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}__TIF-${arg}_ | grep _SKEW-${SKEW[0]}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'tpcc_stress' ]]
     then
-        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep ${cc}_TIF-${arg}_ | grep ^${i}_)
+        f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}__TIF-${arg}_ | grep ^${i}_)
     elif [[ "${TEST_TYPE}" == 'tpcc_stress_ctx' ]]
     then
         f=$(ls ${RESULT_PATH} | grep -v .cfg | grep [0-9]_${cc}_ | grep _CT-${CT}_TIF-${arg}_ | grep ^${i}_)

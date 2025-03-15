@@ -287,11 +287,10 @@ void Transaction::release_accesses(uint64_t thd_id) {
 void Transaction::release_inserts(uint64_t thd_id) {
 	for(uint64_t i = 0; i < insert_rows.size(); i++) {
 	row_t * row = insert_rows[i];
-#if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != MDCC
-		DEBUG_M("TxnManager::cleanup row->manager free\n");
-		mem_allocator.free(row->manager, 0);
-#endif
-
+		#if CC_ALG != MAAT && CC_ALG != OCC && CC_ALG != MDCC
+			DEBUG_M("TxnManager::cleanup row->manager free\n");
+			mem_allocator.free(row->manager, 0);
+		#endif
 		row->free_row();
 		DEBUG_M("Transaction::release insert_rows free\n")
         // mem_allocator.free(row,row_t::get_row_size(ROW_DEFAULT_SIZE));
@@ -595,223 +594,165 @@ RC TxnManager::start_commit(yield_func_t &yield, uint64_t cor_id) {
 	DEBUG("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
 	// printf("%ld start_commit RO?%d\n",get_txn_id(),query->readonly());
 
-#if USE_REPLICA
-	send_prepare_messages();
-	txn_state = 1;
-#if !USE_TAPIR
-	if(has_local_write()){
-		log_replica(RLOG, g_node_id);
-	}
-	if(rsp_cnt != 0 || log_rsp_cnt!=0){
-		return WAIT_REM;
-	}
-#else
-#if CC_ALG == MDCC
-	//try get lock for the local row
-    for(int i=0;i<get_access_cnt();i++){
-		Access* acc = txn->accesses[i];
-		row_t* orig_row = acc->orig_row;
-		access_t type = acc->type;
-		RC row_rc = orig_row->get_row(yield, type, this, acc, cor_id);
-		if(rc == RCOK) rc = row_rc;    
-    }
-    set_rc(rc);
-	assert(lock_status == LOCK_EMPTY);
-	if(rc == Abort) lock_status = LOCK_FIRST_FAIL;
-	else lock_status = LOCK_FIRST_SUCCESS;
-#endif
-#if CC_ALG == SI
-	rc = validate(yield, cor_id);
-	set_rc(rc);
-	assert(lock_status == LOCK_EMPTY);
-	if(rc == Abort) lock_status = LOCK_FIRST_FAIL;
-	else lock_status = LOCK_FIRST_SUCCESS;
-#endif
-	// printf("%d query_partitions_modified size: %d\n", get_txn_id(), query->partitions_modified.size());
-	if(query->partitions_touched.size() != 0)
-		return WAIT_REM;	
-#endif
-	assert(query->readonly());
-	assert(query->partitions_modified.size() == 0);	
-#endif
-
-	// if(is_multi_part()) {
-	// 	if (!query->readonly() || CC_ALG == OCC || CC_ALG == MAAT) {
-	// 		// send prepare messages
-	// 		send_prepare_messages();
-	// 		rc = WAIT_REM;
-	// 	} else {
-	// 		uint64_t finish_start_time = get_sys_clock();
-	// 		txn_stats.finish_start_time = finish_start_time;
-	// 		uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-	// 		// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    //   		// INC_STATS(get_thd_id(), trans_prepare_count, 1);
-	// 		if(IS_LOCAL(get_txn_id())) {
-	// 			INC_STATS(get_thd_id(), trans_logging_count, 1);
-	// 			INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
-	// 			start_fin_time = get_sys_clock();
-	// 		}
-	// 		send_finish_messages();
-	// 		txn_state = 2;
-	// 	#if !USE_TAPIR
-	// 		// rsp_cnt = 0;
-	// 	#endif
-	// 		rc = commit(yield, cor_id);
-	// 	}
-	// } 
-	// else { // is not multi-part 
-	// 	rc = validate(yield, cor_id);
-	// 	// rc = RCOK;
-	// 	uint64_t finish_start_time = get_sys_clock();
-	// 	txn_stats.finish_start_time = finish_start_time;
-	// 	if(IS_LOCAL(get_txn_id())) {
-	// 		INC_STATS(get_thd_id(), trans_logging_count, 1);
-	// 		INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
-	// 		start_fin_time = get_sys_clock();
-	// 	}
-	// 	uint64_t prepare_timespan  = finish_start_time - txn_stats.prepare_start_time;
-	// 	// INC_STATS(get_thd_id(), trans_prepare_time, prepare_timespan);
-    // 	// INC_STATS(get_thd_id(), trans_prepare_count, 1);
-	// 	if(CC_ALG == SI) {
-    //         si_man.gene_finish_ts(this);
-    //     }
-	// 	if(rc == RCOK){ 
-	// 		// printf("commit transaction\n");
-	// 		// if(IS_LOCAL(get_txn_id())) {
-	// 		// 	INC_STATS(get_thd_id(), trans_logging_count, 1);
-	// 		// 	INC_STATS(get_thd_id(), trans_logging_time, get_sys_clock() - start_logging_time);
-	// 		// 	start_fin_time = get_sys_clock();
-	// 		// }
-	// 	#if USE_TAPIR
-	// 		send_finish_messages();
-	// 		txn_state = 2;
-	// 	#endif
-	// 		rc = commit(yield, cor_id);
-	// 	}		
-	// 	else {
-	// 		txn->rc = Abort;
-	// 		DEBUG("%ld start_abort\n",get_txn_id());
-	// 		if(query->partitions_touched.size() > 1) {
-	// 			send_finish_messages();
-	// 			abort(yield, cor_id);
-	// 			rc = Abort;
-	// 		}
-	// 		rc = abort(yield, cor_id);
-	// 	}
-	// }
+	#if USE_REPLICA
+		send_prepare_messages();
+		txn_state = 1;
+		#if !USE_TAPIR
+			if(has_local_write()){
+				log_replica(RLOG, g_node_id);
+			}
+			if(rsp_cnt != 0 || log_rsp_cnt!=0){
+				return WAIT_REM;
+			}
+		#else
+			#if CC_ALG == MDCC
+				//try get lock for the local row
+				for(int i=0;i<get_access_cnt();i++){
+					Access* acc = txn->accesses[i];
+					row_t* orig_row = acc->orig_row;
+					access_t type = acc->type;
+					RC row_rc = orig_row->get_row(yield, type, this, acc, cor_id);
+					if(rc == RCOK) rc = row_rc;    
+				}
+				set_rc(rc);
+				assert(lock_status == LOCK_EMPTY);
+				if(rc == Abort) lock_status = LOCK_FIRST_FAIL;
+				else lock_status = LOCK_FIRST_SUCCESS;
+			#endif
+			#if CC_ALG == SI
+				for(int i=0;i<get_access_cnt();i++){
+					Access* acc = txn->accesses[i];
+					row_t* orig_row = acc->orig_row;
+					access_t type = acc->type;
+					RC row_rc = orig_row->get_row(yield, type, this, acc, cor_id);
+					if(rc == RCOK) rc = row_rc;    
+				}
+				if (rc == RCOK) rc = validate(yield, cor_id);
+				set_rc(rc);
+				assert(lock_status == LOCK_EMPTY);
+				if(rc == Abort) lock_status = LOCK_FIRST_FAIL;
+				else lock_status = LOCK_FIRST_SUCCESS;
+			#endif
+			// printf("%d query_partitions_modified size: %d\n", get_txn_id(), query->partitions_modified.size());
+			if(query->partitions_touched.size() != 0)
+				return WAIT_REM;	
+		#endif
+		assert(query->readonly());
+		assert(query->partitions_modified.size() == 0);	
+	#endif
 	return rc;
 }
 #endif
 void TxnManager::send_prepare_messages() {
-#if CC_ALG == MDCC || CC_ALG == SI
-	// this means that it is the FIRST round of prepare in MDCC; 
-	// otherwise, it is the SECOND round of prepare to resolve conflicts.
-	if(get_rc() != Abort){ 
-#else
-	if(USE_REPLICA){
-#endif
-	#if USE_TAPIR
-		uint64_t tar_nodes[g_node_cnt];
-		uint64_t tar_nodes_cnt = 0;
-		rsp_cnt = 0;
-		fin_rsp_cnt = 0;
-		log_rsp_cnt = 0;
-		log_fin_rsp_cnt = 0;
-		for(int i = 0; i < g_node_cnt; i++) {
-			ir_log_rsp_cnt[i] = 0;
-		}
-		for(int i = 0; i < query->partitions_touched.size(); i++){
-			uint64_t part_id = query->partitions_touched[i];
-			ir_log_rsp_cnt[i] = 3;
-			uint64_t l_node = GET_NODE_ID(part_id);
-			uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
-			uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
-			bool exist = false;
-			if(l_node == g_node_id || f1 == g_node_id || f2 == g_node_id) {
-				ir_log_rsp_cnt[i]--;
-			}
-			if(l_node != g_node_id){
-				bool exist = false;
-				for(int j=0;j<tar_nodes_cnt;j++){
-					if(tar_nodes[j] == l_node) {exist = true;break;}
-				}
-				rsp_cnt += 1;
-				//every part in different node
-				// if(g_part_cnt == g_node_cnt) assert(!exist);
-				if(!exist){
-					tar_nodes[tar_nodes_cnt++] = l_node;
-				}
-			}
-			if(f1 != g_node_id){
-				bool exist = false;
-				for(int j=0;j<tar_nodes_cnt;j++){
-					if(tar_nodes[j] == f1) {exist = true;break;}
-				}
-				//every part in different node
-				// if(g_part_cnt == g_node_cnt) assert(!exist);
-				if(!exist){
-					tar_nodes[tar_nodes_cnt++] = f1;
-				}
-			}
-			if(f2 != g_node_id){
-				bool exist = false;
-				for(int j=0;j<tar_nodes_cnt;j++){
-					if(tar_nodes[j] == f2) {exist = true;break;}
-				}
-				//every part in different node
-				// if(g_part_cnt == g_node_cnt) assert(!exist);
-				if(!exist){
-					tar_nodes[tar_nodes_cnt++] = f2;
-				}
-			}
-		}
-		DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),tar_nodes_cnt);
-		for(int i=0;i<tar_nodes_cnt;i++){
-	#if TAPIR_DEBUG
-			printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
-	#endif
-#if MDCC_DEBUG
-    printf("txn %lu Send first PREP to %lu.\n", get_txn_id(),tar_nodes[i]);
-#endif
-			msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
-		}
+	#if CC_ALG == MDCC || CC_ALG == SI
+		// this means that it is the FIRST round of prepare in MDCC; 
+		// otherwise, it is the SECOND round of prepare to resolve conflicts.
+		if(get_rc() != Abort){ 
 	#else
-		uint64_t tar_nodes[g_node_cnt];
-		rsp_cnt = 0;
-		fin_rsp_cnt = 0;
-		log_rsp_cnt = 0;
-		log_fin_rsp_cnt = 0;
-		// printf("%d:%d start prepare modified: %d\n", g_node_id, get_txn_id(),query->partitions_modified.size());
-		for(int i=0;i<query->partitions_modified.size();i++){
-			uint64_t part_id = query->partitions_modified[i];
-			uint64_t l_node = GET_NODE_ID(part_id);
-			if(l_node != g_node_id){
+		if(USE_REPLICA){
+	#endif
+		#if USE_TAPIR
+			uint64_t tar_nodes[g_node_cnt];
+			uint64_t tar_nodes_cnt = 0;
+			rsp_cnt = 0;
+			fin_rsp_cnt = 0;
+			log_rsp_cnt = 0;
+			log_fin_rsp_cnt = 0;
+			for(int i = 0; i < g_node_cnt; i++) {
+				ir_log_rsp_cnt[i] = 0;
+			}
+			for(int i = 0; i < query->partitions_touched.size(); i++){
+				uint64_t part_id = query->partitions_touched[i];
+				ir_log_rsp_cnt[i] = 3;
+				uint64_t l_node = GET_NODE_ID(part_id);
+				uint64_t f1 = GET_FOLLOWER1_NODE(part_id);
+				uint64_t f2 = GET_FOLLOWER2_NODE(part_id);
 				bool exist = false;
-				for(int j=0;j<rsp_cnt;j++){
-					if(tar_nodes[j] == l_node) {exist = true;break;}
+				if(l_node == g_node_id || f1 == g_node_id || f2 == g_node_id) {
+					ir_log_rsp_cnt[i]--;
 				}
-				//every part in different node
-				if(g_part_cnt == g_node_cnt) assert(!exist);
-				if(!exist){
-					tar_nodes[rsp_cnt++] = l_node;
+				if(l_node != g_node_id){
+					bool exist = false;
+					for(int j=0;j<tar_nodes_cnt;j++){
+						if(tar_nodes[j] == l_node) {exist = true;break;}
+					}
+					rsp_cnt += 1;
+					//every part in different node
+					// if(g_part_cnt == g_node_cnt) assert(!exist);
+					if(!exist){
+						tar_nodes[tar_nodes_cnt++] = l_node;
+					}
+				}
+				if(f1 != g_node_id){
+					bool exist = false;
+					for(int j=0;j<tar_nodes_cnt;j++){
+						if(tar_nodes[j] == f1) {exist = true;break;}
+					}
+					//every part in different node
+					// if(g_part_cnt == g_node_cnt) assert(!exist);
+					if(!exist){
+						tar_nodes[tar_nodes_cnt++] = f1;
+					}
+				}
+				if(f2 != g_node_id){
+					bool exist = false;
+					for(int j=0;j<tar_nodes_cnt;j++){
+						if(tar_nodes[j] == f2) {exist = true;break;}
+					}
+					//every part in different node
+					// if(g_part_cnt == g_node_cnt) assert(!exist);
+					if(!exist){
+						tar_nodes[tar_nodes_cnt++] = f2;
+					}
 				}
 			}
-		}
-		// printf("%d:%d start prepare rsp_cnt: %d\n", g_node_id, get_txn_id(),rsp_cnt);
-		for(int i=0;i<rsp_cnt;i++){
-			// printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
-			msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
-		}
-	#endif
+			DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),tar_nodes_cnt);
+			for(int i=0;i<tar_nodes_cnt;i++){
+				#if TAPIR_DEBUG
+					printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
+				#endif
+				#if MDCC_DEBUG
+					printf("txn %lu Send first PREP to %lu.\n", get_txn_id(),tar_nodes[i]);
+				#endif
+				msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
+			}
+		#else
+			uint64_t tar_nodes[g_node_cnt];
+			rsp_cnt = 0;
+			fin_rsp_cnt = 0;
+			log_rsp_cnt = 0;
+			log_fin_rsp_cnt = 0;
+			// printf("%d:%d start prepare modified: %d\n", g_node_id, get_txn_id(),query->partitions_modified.size());
+			for(int i=0;i<query->partitions_modified.size();i++){
+				uint64_t part_id = query->partitions_modified[i];
+				uint64_t l_node = GET_NODE_ID(part_id);
+				if(l_node != g_node_id){
+					bool exist = false;
+					for(int j=0;j<rsp_cnt;j++){
+						if(tar_nodes[j] == l_node) {exist = true;break;}
+					}
+					//every part in different node
+					if(g_part_cnt == g_node_cnt) assert(!exist);
+					if(!exist){
+						tar_nodes[rsp_cnt++] = l_node;
+					}
+				}
+			}
+			// printf("%d:%d start prepare rsp_cnt: %d\n", g_node_id, get_txn_id(),rsp_cnt);
+			for(int i=0;i<rsp_cnt;i++){
+				// printf("%d:%d send prepare to %d\n", g_node_id, get_txn_id(), tar_nodes[i]);
+				msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),tar_nodes[i]);
+			}
+		#endif
 	}
 	else{
 		rsp_cnt = query->partitions_touched.size() - 1;
 		DEBUG("%ld Send PREPARE messages to %d\n",get_txn_id(),rsp_cnt);
 		for(uint64_t i = 0; i < query->partitions_touched.size(); i++) {
 		if(GET_NODE_ID(query->partitions_touched[i]) == g_node_id) continue;
-#if MDCC_DEBUG
-    printf("txn %lu Send second PREP to %lu.\n", get_txn_id(),GET_NODE_ID(query->partitions_touched[i]));
-#endif
+			#if MDCC_DEBUG
+				printf("txn %lu Send second PREP to %lu.\n", get_txn_id(),GET_NODE_ID(query->partitions_touched[i]));
+			#endif
 			msg_queue.enqueue(get_thd_id(), Message::create_message(this, RPREPARE),
 												GET_NODE_ID(query->partitions_touched[i]));
 		}
@@ -1070,16 +1011,16 @@ int TxnManager::received_tapir_response(RC rc, uint64_t return_node_id) {
 		}
 	}
 	for(int i = 0; i < query->partitions_touched.size(); i++) {
-#if MAJORITY && CC_ALG != MDCC && CC_ALG != SI
-		if(ir_log_rsp_cnt[i] > 1) {
-			return 1;
-		}
-#else
-		if(ir_log_rsp_cnt[i] > 0) {
-			// responses_left += 1;
-			return 1;
-		}
-#endif
+		#if MAJORITY && CC_ALG != MDCC && CC_ALG != SI
+			if(ir_log_rsp_cnt[i] > 1) {
+				return 1;
+			}
+		#else
+			if(ir_log_rsp_cnt[i] > 0) {
+				// responses_left += 1;
+				return 1;
+			}
+		#endif
 	}
 	rsp_cnt = 0;
 	return 0;
@@ -1395,9 +1336,9 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	get_access_end_time = get_sys_clock();
 	INC_STATS(get_thd_id(), trans_get_access_time, get_access_end_time - starttime);
 	INC_STATS(get_thd_id(), trans_get_access_count, 1);
-#if CC_ALG != MDCC
-	rc = row->get_row(yield,type, this, access,cor_id);
-#endif
+	#if CC_ALG != MDCC
+		rc = row->get_row(yield,type, this, access,cor_id);
+	#endif
 	INC_STATS(get_thd_id(), trans_get_row_time, get_sys_clock() - get_access_end_time);
 	INC_STATS(get_thd_id(), trans_get_row_count, 1);
 
@@ -1413,9 +1354,9 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 		INC_STATS(get_thd_id(), txn_conflict_cnt, 1);
 		//cflt = true;
 		// printf("CONFLICT %ld %ld %ld\n",get_txn_id(), row->get_primary_key() ,get_sys_clock());
-#if DEBUG_TIMELINE
-		printf("CONFLICT %ld %ld\n",get_txn_id(),get_sys_clock());
-#endif
+		#if DEBUG_TIMELINE
+			printf("CONFLICT %ld %ld\n",get_txn_id(),get_sys_clock());
+		#endif
 		return rc;
 	}
 	access->type = type;
@@ -1423,58 +1364,58 @@ RC TxnManager::get_row(yield_func_t &yield,row_t * row, access_t type, row_t *& 
 	//!formally! _wl->key_to_part() should be used here
 	access->is_primary = (GET_NODE_ID(row->get_primary_key() % g_part_cnt) == g_node_id ? true : false) ;
 
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT|| CC_ALG == SI)
-	if (type == WR) {
-	//printf("alloc 10 %ld\n",get_txn_id());
-	uint64_t part_id = row->get_part_id();
-	DEBUG_M("TxnManager::get_row row_t alloc\n")
-	row_pool.get(get_thd_id(),access->orig_data);
-	access->orig_data->init(row->get_table(), part_id, 0);
-	access->orig_data->copy(row);
-    //  for(int i = 0;i < this->txn->row_cnt; i++){
-    //      if(txn->accesses[i]->type == WR)
-    //             printf("txn %ld o_d[%ld] table_idx = %ld \n",this->get_txn_id(),i,txn->accesses[i]->orig_data->table_idx);
-    // }
-    //printf("\n");
-	assert(access->orig_data->get_schema() == row->get_schema());
+	#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == MDCC || CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == WOUND_WAIT|| CC_ALG == SI)
+		if (type == WR) {
+			//printf("alloc 10 %ld\n",get_txn_id());
+			uint64_t part_id = row->get_part_id();
+			DEBUG_M("TxnManager::get_row row_t alloc\n")
+			row_pool.get(get_thd_id(),access->orig_data);
+			access->orig_data->init(row->get_table(), part_id, 0);
+			access->orig_data->copy(row);
+			//  for(int i = 0;i < this->txn->row_cnt; i++){
+			//      if(txn->accesses[i]->type == WR)
+			//             printf("txn %ld o_d[%ld] table_idx = %ld \n",this->get_txn_id(),i,txn->accesses[i]->orig_data->table_idx);
+			// }
+			//printf("\n");
+			assert(access->orig_data->get_schema() == row->get_schema());
 
-	// ARIES-style physiological logging
-#if LOGGING
-		// LogRecord * record =
-		// logger.createRecord(LRT_UPDATE,L_UPDATE,get_txn_id(),part_id,row->get_table()->get_table_id(),row->get_primary_key());
-		LogRecord *record = logger.createRecord(
-				get_txn_id(), L_UPDATE, row->get_table()->get_table_id(), row->get_primary_key());
-	if(g_repl_cnt > 0) {
-		msg_queue.enqueue(get_thd_id(), Message::create_message(record, LOG_MSG),
-											g_node_id + g_node_cnt + g_client_node_cnt);
-	}
-	logger.enqueueRecord(record);
-#endif
-	}
-#endif
+			// ARIES-style physiological logging
+			#if LOGGING
+				// LogRecord * record =
+				// logger.createRecord(LRT_UPDATE,L_UPDATE,get_txn_id(),part_id,row->get_table()->get_table_id(),row->get_primary_key());
+				LogRecord *record = logger.createRecord(
+						get_txn_id(), L_UPDATE, row->get_table()->get_table_id(), row->get_primary_key());
+				if(g_repl_cnt > 0) {
+					msg_queue.enqueue(get_thd_id(), Message::create_message(record, LOG_MSG),
+														g_node_id + g_node_cnt + g_client_node_cnt);
+				}
+				logger.enqueueRecord(record);
+			#endif
+		}
+	#endif
 
-#if CC_ALG == TICTOC
-	if (!isexist) {
+	#if CC_ALG == TICTOC
+		if (!isexist) {
+			++txn->row_cnt;
+			if (type == WR)
+				++txn->write_cnt;
+				txn->accesses.add(access);
+		}
+	#else
 		++txn->row_cnt;
-		if (type == WR)
-			++txn->write_cnt;
-			txn->accesses.add(access);
-	}
-#else
-	++txn->row_cnt;
-	if (type == WR) ++txn->write_cnt;
-	txn->accesses.add(access);
-#endif
+		if (type == WR) ++txn->write_cnt;
+		txn->accesses.add(access);
+	#endif
    
 	timespan = get_sys_clock() - starttime;
     INC_STATS(get_thd_id(), trans_store_access_time, timespan + starttime - middle_time);
   	INC_STATS(get_thd_id(), trans_store_access_count, 1);
 	INC_STATS(get_thd_id(), txn_manager_time, timespan);
-#if CC_ALG == MDCC|| CC_ALG == SI
-	row_rtn  = row;
-#else
-	row_rtn  = access->data;
-#endif
+	#if CC_ALG == MDCC|| CC_ALG == SI
+		row_rtn  = row;
+	#else
+		row_rtn  = access->data;
+	#endif
 
 	if (CC_ALG == HSTORE || CC_ALG == HSTORE_SPEC || CC_ALG == CALVIN) assert(rc == RCOK);
 	assert(rc == RCOK);
@@ -1612,23 +1553,23 @@ void TxnManager::log_replica(RemReqType req_type,uint64_t ret_nid) {
 }
 
 RC TxnManager::validate(yield_func_t &yield, uint64_t cor_id) {
-#if MODE != NORMAL_MODE
-	return RCOK;
-#endif
+	#if MODE != NORMAL_MODE
+		return RCOK;
+	#endif
 	if (CC_ALG != OCC && CC_ALG != MAAT && CC_ALG != SI) {
 		return RCOK;
 	}
 	RC rc = RCOK;
 	uint64_t starttime = get_sys_clock();
 	if ((CC_ALG == OCC) && rc == RCOK) rc = occ_man.validate(this);
-	if(CC_ALG == MAAT  && rc == RCOK) {
+	if(CC_ALG == MAAT && rc == RCOK) {
 		rc = maat_man.validate(this);
 		// Note: home node must be last to validate
 		if(IS_LOCAL(get_txn_id()) && rc == RCOK) {
 			rc = maat_man.find_bound(this);
 		}
 	}
-	if (CC_ALG == SI) {
+	if (CC_ALG == SI && rc == RCOK) {
         rc = si_man.validate(this);
     } 
 
