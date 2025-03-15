@@ -88,7 +88,8 @@ public:
 	// *_delivering[warehouse_id] -> the warehouse is delivering.
 	bool ** delivering;
 //	bool volatile ** delivering;
-
+  double get_tab_dist_account_sum(uint64_t wid);
+  void check_consistency();
 private:
 	uint64_t num_wh;
 	void init_tab_item(int id);
