@@ -1,0 +1,89 @@
+diff --git a/benchmarks/tpcc.h b/benchmarks/tpcc.h
+index a23c909..97d5aad 100644
+--- a/benchmarks/tpcc.h
++++ b/benchmarks/tpcc.h
+@@ -88,7 +88,8 @@ public:
+ 	// *_delivering[warehouse_id] -> the warehouse is delivering.
+ 	bool ** delivering;
+ //	bool volatile ** delivering;
+-
++  double get_tab_dist_account_sum(uint64_t wid);
++  void check_consistency();
+ private:
+ 	uint64_t num_wh;
+ 	void init_tab_item(int id);
+diff --git a/benchmarks/tpcc_wl.cpp b/benchmarks/tpcc_wl.cpp
+index e58375f..dfa0f2d 100644
+--- a/benchmarks/tpcc_wl.cpp
++++ b/benchmarks/tpcc_wl.cpp
+@@ -28,6 +28,8 @@
+ #include "txn.h"
+ #include "mem_alloc.h"
+ #include "tpcc_const.h"
++#include "index_hash.h"
++#include "index_btree.h"
+ 
+ RC TPCCWorkload::init() {
+ 	Workload::init();
+@@ -242,6 +244,45 @@ RC TPCCWorkload::get_txn_man(TxnManager *& txn_manager) {
+ 	return RCOK;
+ }
+ 
++
++void TPCCWorkload::check_consistency() {
++	for (UInt32 wid = 1; wid <= g_num_wh; wid ++) {
++		if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
++		double wh_sum = 0;
++		INDEX * index = i_warehouse;
++		uint64_t key = wid;
++		itemid_t * item = nullptr;
++		index->index_read(key, item, wh_to_part(wid), 1);
++		// itemid_t * item = index->index_read(index, key, wh_to_part(wid));
++		row_t * row = ((row_t *)item->location);
++		row->get_value(W_YTD, wh_sum);
++
++		double dist_sum = get_tab_dist_account_sum(wid);
++		if (dist_sum != wh_sum) {
++			printf("sum of balances inconsistency!! warehouse account=%ld, district account sum=%ld\n",wh_sum,dist_sum);
++			assert(dist_sum == wh_sum);
++		}
++	}
++	printf("Sum of balances check complete, success\n");
++	return ;
++}
++
++double TPCCWorkload::get_tab_dist_account_sum(uint64_t wid) {
++	double account_sum = 0;
++	if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) return 0;
++	for (uint64_t did = 1; did <= g_dist_per_wh; did++) {
++		INDEX * index = i_district;
++		uint64_t key = distKey(did, wid);
++		itemid_t * item = nullptr;
++		index->index_read(key, item, wh_to_part(wid), 1);
++		row_t * row = ((row_t *)item->location);
++		double ytd = 0;
++		row->get_value(D_YTD, ytd);
++		account_sum+=ytd;
++	}
++	return account_sum;
++}
++
+ void TPCCWorkload::init_tab_item(int id) {
+   if (WL_VERB) printf("[init] loading item table\n");
+ 	for (UInt32 i = id+1; i <= g_max_items; i+=g_init_parallelism) {
+diff --git a/system/main.cpp b/system/main.cpp
+index b69fe73..ea9f4d9 100644
+--- a/system/main.cpp
++++ b/system/main.cpp
+@@ -400,6 +400,11 @@ int main(int argc, char *argv[]) {
+ 	//malloc_stats_print(NULL, NULL, NULL);
+ 	printf("\n");
+ 	fflush(stdout);
++	// 增加一段测试
++	#if WORKLOAD == TPCC
++		TPCCWorkload* tpcc_wl = (TPCCWorkload*)m_wl;
++		tpcc_wl->check_consistency();
++	#endif
+ 	// Free things
+ 	//tport_man.shutdown();
+ 	m_wl->index_delete_all();
