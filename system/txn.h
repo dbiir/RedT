@@ -39,6 +39,7 @@ class YCSBQuery;
 class TPCCQuery;
 class NCCQueueEntry;
 class TxnManager;
+class NCCVersion;
 //class r_query;
 
 enum TxnState {START,INIT,EXEC,PREP,FIN,DONE};
@@ -52,6 +53,7 @@ public:
 	row_t * 	orig_data;
 	// for NCC
 	NCCQueueEntry* ncc_qe;
+	NCCVersion* nversion;
 	TxnManager*	txn;
 
 	uint64_t    version;
@@ -262,6 +264,7 @@ public:
 	uint64_t greatest_write_timestamp;
 	uint64_t greatest_read_timestamp;
 	// For NCC
+	uint64_t needs_complete_accesses_cnt;
 	NCCTimeStamp MinTr;
 	NCCTimeStamp MaxTw;
 	NCCTimeStamp get_MinTr() {return MinTr;}
@@ -280,6 +283,7 @@ public:
 	NCCTimeStamp get_ncc_commit_timestamp() {return ncc_commit_timestamp;}
 	void set_ncc_commit_timestamp(NCCTimeStamp ts) {ncc_commit_timestamp = ts;}
 
+	// For MAAT
 	std::set<uint64_t> * uncommitted_reads;
 	std::set<uint64_t> * uncommitted_writes;
 	std::set<uint64_t> * uncommitted_writes_y;

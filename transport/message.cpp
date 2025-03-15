@@ -315,7 +315,7 @@ void Message::release_message(Message * msg) {
     case INIT_DONE: {
       InitDoneMessage * m_msg = (InitDoneMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                     }
     case RQRY:
@@ -330,37 +330,37 @@ void Message::release_message(Message * msg) {
       DAQueryMessage* m_msg = (DAQueryMessage*)msg;
 #endif
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                     }
     case RFIN: {
       FinishMessage * m_msg = (FinishMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                }
     case RQRY_RSP: {
       QueryResponseMessage * m_msg = (QueryResponseMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                    }
     case LOG_MSG: {
       LogMessage * m_msg = (LogMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                   }
     case LOG_MSG_RSP: {
       LogRspMessage * m_msg = (LogRspMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                       }
     case LOG_FLUSHED: {
       LogFlushedMessage * m_msg = (LogFlushedMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                       }
     case CALVIN_ACK:
@@ -371,7 +371,7 @@ void Message::release_message(Message * msg) {
     case RACK_FIN: {
       AckMessage * m_msg = (AckMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                    }
     case CL_QRY:
@@ -388,7 +388,7 @@ void Message::release_message(Message * msg) {
       DAClientQueryMessage* m_msg = (DAClientQueryMessage*)msg;
 #endif
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                     }
     case RLOG:
@@ -397,25 +397,25 @@ void Message::release_message(Message * msg) {
     case RPREPARE: {
       PrepareMessage * m_msg = (PrepareMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                    }
     case RFWD: {
       ForwardMessage * m_msg = (ForwardMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                }
     case RDONE: {
       DoneMessage * m_msg = (DoneMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                 }
     case CL_RSP: {
       ClientResponseMessage * m_msg = (ClientResponseMessage*)msg;
       m_msg->release();
-      // delete m_msg;
+      delete m_msg;
       break;
                  }
     default: {

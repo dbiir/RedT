@@ -114,7 +114,7 @@ void WorkerThread::process(yield_func_t &yield, Message * msg, uint64_t cor_id) 
         rc = process_rack_prep(yield, msg, cor_id);
 				break;
 			case RACK_FIN:
-        rc = process_rack_rfin(msg);
+        rc = process_rack_rfin(yield, msg, cor_id);
 				break;
 			case RTXN_CONT:
         rc = process_rtxn_cont(yield, msg, cor_id);
@@ -208,6 +208,7 @@ void WorkerThread::commit() {
   // ! trans total time
   uint64_t end_time = get_sys_clock();
   uint64_t timespan_short  = end_time - txn_man->txn_stats.restart_starttime;
+  uint64_t prepare_start = txn_man->txn_stats.finish_start_time - txn_man->txn_stats.restart_starttime;
   uint64_t two_pc_timespan  = end_time - txn_man->txn_stats.prepare_start_time;
   uint64_t finish_timespan  = end_time - txn_man->txn_stats.finish_start_time;
   uint64_t prepare_timespan = txn_man->txn_stats.finish_start_time - txn_man->txn_stats.prepare_start_time;
@@ -217,7 +218,11 @@ void WorkerThread::commit() {
   INC_STATS(get_thd_id(), trans_2pc_time, two_pc_timespan);
   INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_commit_time, finish_timespan);
+  #if CC_ALG == NCC
+  INC_STATS(get_thd_id(), trans_total_run_time, prepare_start);
+  #else
   INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
+  #endif
   INC_STATS(get_thd_id(), trans_commit_total_run_time, timespan_short);
 
   INC_STATS(get_thd_id(), trans_2pc_count, 1);
@@ -245,6 +250,7 @@ void WorkerThread::abort() {
 
   uint64_t end_time = get_sys_clock();
   uint64_t timespan_short  = end_time - txn_man->txn_stats.restart_starttime;
+  uint64_t prepare_start = txn_man->txn_stats.finish_start_time - txn_man->txn_stats.restart_starttime;
   uint64_t two_pc_timespan  = end_time - txn_man->txn_stats.prepare_start_time;
   uint64_t finish_timespan  = end_time - txn_man->txn_stats.finish_start_time;
   uint64_t prepare_timespan = txn_man->txn_stats.finish_start_time - txn_man->txn_stats.prepare_start_time;
@@ -254,7 +260,11 @@ void WorkerThread::abort() {
   INC_STATS(get_thd_id(), trans_2pc_time, two_pc_timespan);
   INC_STATS(get_thd_id(), trans_finish_time, finish_timespan);
   INC_STATS(get_thd_id(), trans_abort_time, finish_timespan);
+  #if CC_ALG == NCC
+  INC_STATS(get_thd_id(), trans_total_run_time, prepare_start);
+  #else
   INC_STATS(get_thd_id(), trans_total_run_time, timespan_short);
+  #endif
   INC_STATS(get_thd_id(), trans_abort_total_run_time, timespan_short);
 
   INC_STATS(get_thd_id(), trans_2pc_count, 1);
@@ -300,10 +310,10 @@ char type2char(DATxnType txn_type)
 }
 
 void WorkerThread::no_routines() {
-     _routines = new coroutine_func_t[1];
+  _routines = new coroutine_func_t[1];
 
-     _routines[0] = coroutine_func_t(bind(&WorkerThread::run, this, _1, 0));
-     printf("Init coroutine succ\n");
+  _routines[0] = coroutine_func_t(bind(&WorkerThread::run, this, _1, 0));
+  printf("Init coroutine succ\n");
 }
 RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
@@ -469,7 +479,7 @@ RC WorkerThread::run(yield_func_t &yield, uint64_t cor_id) {
 
     // delete message
     ready_starttime = get_sys_clock();
-#if CC_ALG != CALVIN && CC_ALG != NCC
+#if CC_ALG != CALVIN
     msg->release();
 #endif
     INC_STATS(get_thd_id(),worker_release_msg_time,get_sys_clock() - ready_starttime);
@@ -582,6 +592,8 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
       // INC_STATS(get_thd_id(), trans_prepare_count, 1);
       #if EARLY_PREPARE
         if(txn_man->get_rc()==Abort) return Abort;
+      #else
+        assert(txn_man->get_rc()==RCOK); //
       #endif
       // Done waiting
       if(txn_man->get_rc() == RCOK) {
@@ -598,23 +610,32 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
       #endif
       if(rc == Abort) {
         if(!txn_man->aborted) {
-          abort();
-          txn_man->send_finish_messages();
-          if(txn_man->get_local_log()){
-            txn_man->log_replica(RFIN_LOG, g_node_id); 
-            rc = WAIT_REM;
-            return rc;
-          }else
+          if (CC_ALG == NCC && txn_man->query->readonly()){
             txn_man->abort(yield, cor_id);
+            abort();
+          } else {
+            txn_man->send_finish_messages();
+            if(txn_man->get_local_log()){
+              txn_man->log_replica(RFIN_LOG, g_node_id); 
+              rc = WAIT_REM;
+              return rc;
+            }else
+              txn_man->abort(yield, cor_id);
+          } 
         }
       }
       else {
-        txn_man->send_finish_messages();
-        commit();
-        assert(txn_man->get_local_log());
-        txn_man->log_replica(RFIN_LOG, g_node_id); 
-        rc = WAIT_REM;
-        return rc;
+        if (CC_ALG == NCC && txn_man->query->readonly()){
+          txn_man->commit(yield, cor_id);
+          commit();
+        }else {
+          txn_man->send_finish_messages();
+          // commit();
+          assert(txn_man->get_local_log());
+          txn_man->log_replica(RFIN_LOG, g_node_id); 
+          rc = WAIT_REM;
+          return rc;
+        }
       }
     }else{
       // 如果是参与者
@@ -622,13 +643,13 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
       #if EARLY_PREPARE
         txn_man->finish_read_write = true;
       #endif
-      if (CC_ALG == NCC) {
-        rc = txn_man->validate(yield, cor_id);
-      }
-      if(rc == Abort || txn_man->get_rc() == Abort) {
-        txn_man->txn->rc = Abort;
-        rc = Abort;
-      }
+      // if (CC_ALG == NCC) {
+      //   rc = txn_man->validate(yield, cor_id);
+      // }
+      // if(rc == Abort || txn_man->get_rc() == Abort) {
+      //   txn_man->txn->rc = Abort;
+      //   rc = Abort;
+      // }
       msg_queue.enqueue(get_thd_id(), Message::create_message(txn_man,RACK_PREP),txn_man->get_return_node());
     }    
   }
@@ -774,18 +795,18 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
   txn_man->set_MinTr(minNCCTimeStamp(txn_man->get_MinTr(), MinTr));
   txn_man->set_MaxTw(maxNCCTimeStamp(txn_man->get_MaxTw(), MaxTw));
 #endif
-
-// #if EARLY_PREPARE
-//   if(txn_man->get_rc() == Abort && !txn_man->aborted) {
-//     txn_man->send_finish_messages();
-//     if(txn_man->get_local_log()){
-//       txn_man->log_replica(RFIN_LOG, g_node_id); 
-//       // rc = WAIT_REM;
-//       // return rc;
-//     }else
-//       txn_man->abort(yield, cor_id);
-//   }
-// #endif
+  #if EARLY_PREPARE
+  if(txn_man->get_rc() == Abort && !txn_man->aborted) {
+    txn_man->send_finish_messages();
+    if(txn_man->get_local_log()){
+      txn_man->log_replica(RFIN_LOG, g_node_id); 
+      // rc = WAIT_REM;
+      // return rc;
+    }else
+      txn_man->abort(yield, cor_id);
+    return Abort;
+  }
+  #endif
 
   // 检查RACK_PREP是否已经收到
   if (responses_left > 0) {
@@ -833,14 +854,19 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
       txn_man->abort(yield, cor_id);
     #else
       if(!txn_man->aborted) {
-        txn_man->send_finish_messages();
-        abort();
-        if(txn_man->get_local_log()){
-          txn_man->log_replica(RFIN_LOG, g_node_id); 
-          rc = WAIT_REM;
-          return rc;
-        }else
+        if (CC_ALG == NCC && txn_man->query->readonly()){
           txn_man->abort(yield, cor_id);
+          abort();
+        } else {
+          txn_man->send_finish_messages();
+          // abort();
+          if(txn_man->get_local_log()){
+            txn_man->log_replica(RFIN_LOG, g_node_id); 
+            rc = WAIT_REM;
+            return rc;
+          }else
+            txn_man->abort(yield, cor_id);
+        }
       }
     #endif
   } else {
@@ -849,19 +875,23 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
       rc = WAIT_REM;
       return rc;
     #endif
-    txn_man->send_finish_messages();
-    #if USE_REPLICA
-      commit();
-      if(txn_man->get_local_log()){
-        txn_man->log_replica(RFIN_LOG, g_node_id); 
-        rc = WAIT_REM;
-        return rc;
-      }else{
-        txn_man->commit(yield, cor_id);
-      }
-    #else
+    if (CC_ALG == NCC && txn_man->query->readonly()){
       txn_man->commit(yield, cor_id);
-    #endif
+      commit();
+    }else {
+      txn_man->send_finish_messages();
+      #if USE_REPLICA
+        if(txn_man->get_local_log()){
+          txn_man->log_replica(RFIN_LOG, g_node_id); 
+          rc = WAIT_REM;
+          return rc;
+        }else{
+          txn_man->commit(yield, cor_id);
+        }
+      #else
+        txn_man->commit(yield, cor_id);
+      #endif
+    }
   }
   return rc;
 }
@@ -893,7 +923,7 @@ RC WorkerThread::process_rack_co_log(yield_func_t &yield, Message * msg, uint64_
 #endif
   return rc;
 }
-RC WorkerThread::process_rack_rfin(Message * msg) {
+RC WorkerThread::process_rack_rfin(yield_func_t &yield, Message * msg, uint64_t cor_id) {
 
   RC rc = RCOK;
   int responses_left = 0;
@@ -924,9 +954,11 @@ RC WorkerThread::process_rack_rfin(Message * msg) {
 	// start_fin_time = get_sys_clock();
   txn_man->txn_stats.twopc_time += get_sys_clock() - txn_man->txn_stats.wait_starttime;
   if(txn_man->get_rc() == RCOK) {
-      commit();
+    txn_man->commit(yield, cor_id);
+    commit();
   } else {
-      abort();
+    txn_man->abort(yield, cor_id);
+    abort();
   }
   return rc;
 }
@@ -1326,7 +1358,14 @@ RC WorkerNumThread::run() {
 void RespQsThread::setup() {
 }
 
-RC RespQsThread::run() {
+void RespQsThread::no_routines() {
+  _routines = new coroutine_func_t[1];
+
+  _routines[0] = coroutine_func_t(bind(&RespQsThread::run, this, _1, 0));
+  printf("Init coroutine succ\n");
+}
+
+RC RespQsThread::run(yield_func_t &yield, uint64_t cor_id) {
   tsetup();
   printf("Running RespQsThread %ld\n",_thd_id);
 
@@ -1338,7 +1377,7 @@ RC RespQsThread::run() {
     uint64_t idle_starttime = get_sys_clock();
     // 帮我写一个根据线程数，拆分访问resp_qs的函数
     
-    resp_qs.RespTimeingControl(_thd_id);
+    resp_qs.RespTimeingControl(_thd_id,yield,cor_id);
     // printf("resp_qs thd %ld time %lu\n", _thd_id, get_sys_clock() - idle_starttime);
 	}
   printf("FINISH %ld:%ld\n",_node_id,_thd_id);

@@ -349,6 +349,7 @@ void TxnManager::init(uint64_t thd_id, Workload * h_wl) {
 #if CC_ALG == NCC
 	set_MaxTw(0);
 	set_MinTr(UINT64_MAX);
+	needs_complete_accesses_cnt = 0;
 #endif
 	registed_ = false;
 	txn_ready = true;
@@ -411,6 +412,7 @@ void TxnManager::reset() {
 #if CC_ALG == NCC
 	set_MaxTw(0);
 	set_MinTr(UINT64_MAX);
+	needs_complete_accesses_cnt = 0;
 #endif
 	assert(txn);
 	assert(query);

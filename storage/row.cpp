@@ -298,7 +298,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	uint64_t init_time = get_sys_clock();
 	NCCTimeStamp ts = txn->get_ncc_timestamp();
 	INC_STATS(txn->get_thd_id(), trans_cur_row_init_time, get_sys_clock() - init_time);
-	rc = this->manager->non_blocking_execute(ts, type, this, access, txn);
+	rc = this->manager->non_blocking_execute(ts, type, this, access, txn,yield,cor_id);
 	uint64_t copy_time = get_sys_clock();
 	access->data = this;
 	// access->txn = txn;

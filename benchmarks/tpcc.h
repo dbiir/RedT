@@ -146,6 +146,7 @@ private:
   bool is_local_item(uint64_t idx);
   RC send_remote_request();
   RC send_remote_subtxn();
+  void collectAccessesCnt();
   itemid_t* tpcc_read_remote_index(TPCCQuery * query);
   RC send_remote_one_side_request(yield_func_t &yield, TPCCQuery * query,row_t *& row_local, uint64_t cor_id);
 

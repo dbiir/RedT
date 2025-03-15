@@ -56,6 +56,7 @@ class NCCQueue {
 public:
     row_t* row;
     std::list<NCCQueueEntry*> q;
+    NCCTimeStamp maxTs;
     pthread_mutex_t* mutx;
     NCCQueue(row_t* row) {
         mutx = (pthread_mutex_t *) mem_allocator.alloc(sizeof(pthread_mutex_t));
@@ -65,6 +66,12 @@ public:
     void insert(NCCQueueEntry* qe) {
         pthread_mutex_lock(mutx);
         q.push_back(qe);
+        maxTs = maxNCCTimeStamp(maxTs, qe->txn_ts);
+        pthread_mutex_unlock(mutx);
+    }
+    void remove(NCCQueueEntry* qe) {
+        pthread_mutex_lock(mutx);
+        q.remove(qe);
         pthread_mutex_unlock(mutx);
     }
     void lock() {
@@ -106,6 +113,7 @@ public:
 
     std::vector<std::vector<NCCQueue*>> v_qs;
     int next_insert_vector = 0;
+    NCCTimeStamp maxTs;
 
     // 帮忙给每个key加一个锁
     pthread_mutex_t* mutx;
@@ -120,10 +128,10 @@ public:
         // }
     }
     void create(uint64_t table_id, uint64_t key, row_t* row);
-    void RespTimeingControl() ;
-    void RespTimeingControl(uint64_t thd_id);
-    void RespTimeingControl(uint64_t table_id, uint64_t key, row_t * row); 
-    void RespTimeingControlInner(NCCQueue *q, row_t * row);
+    void RespTimeingControl(yield_func_t &yield, uint64_t cor_id) ;
+    void RespTimeingControl(uint64_t thd_id,yield_func_t &yield, uint64_t cor_id);
+    void RespTimeingControl(uint64_t table_id, uint64_t key, row_t * row,yield_func_t &yield, uint64_t cor_id); 
+    void RespTimeingControlInner(NCCQueue *q, row_t * row,yield_func_t &yield, uint64_t cor_id);
     bool TxnCanSend(TxnManager* txn);
     void insert(uint64_t table_id, uint64_t key, NCCQueueEntry* qe, row_t* row);
 };

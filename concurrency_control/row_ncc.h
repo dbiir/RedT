@@ -55,13 +55,14 @@ class Row_ncc {
 public:
     void init(row_t * row);
     // RC access(TxnManager * txn, access_t type, row_t * row);
-    RC async_commit_or_abort_on_row(TxnManager * txn,bool is_commit);
-    RC non_blocking_execute(NCCTimeStamp ts, access_t type, row_t * row, Access *access, TxnManager * txn);
+    RC async_commit_or_abort_on_row(TxnManager * txn,bool is_commit,NCCVersion* version);
+    RC non_blocking_execute(NCCTimeStamp ts, access_t type, row_t * row, Access *access, TxnManager * txn,yield_func_t &yield, uint64_t cor_id);
 private:
     
     pthread_mutex_t * latch;
     //
     std::vector<NCCVersion*> versions;
+    uint64_t txn_id;
 
     row_t * _row;
 };

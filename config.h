@@ -301,6 +301,7 @@
 // [ncc]
 #define NCC_THREAD_CNT 4
 #define OPEN_TIME_CONTROL false
+#define OPEN_DEAD_LOCK_HANDLE false
 /***********************************************/
 // Logging
 /***********************************************/
@@ -329,7 +330,7 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 8388608
-#define ZIPF_THETA 0.2
+#define ZIPF_THETA 0.9
 #define TXN_WRITE_PERC 0.8
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
@@ -343,7 +344,7 @@
 #define STRICT_PPT 1
 //only consider the primary replica here,
 //try keep part_per_txn=2 when use CROSS_DC_TXN_PERC
-#define CROSS_DC_TXN_PERC 1
+#define CROSS_DC_TXN_PERC 1.0
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
 // small tpcc schemas shrink the table size.

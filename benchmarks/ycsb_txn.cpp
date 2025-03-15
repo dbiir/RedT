@@ -218,6 +218,16 @@ RC YCSBTxnManager::send_remote_subtxn() {
 	return rc;
 }
 
+void YCSBTxnManager::collectAccessesCnt() {
+	YCSBQuery* ycsb_query = (YCSBQuery*) query;
+	for(int i = 0; i < ycsb_query->requests.size(); i++) {
+		ycsb_request * req = ycsb_query->requests[i];
+		uint64_t part_id = _wl->key_to_part(req->key);
+		uint64_t node_id = GET_NODE_ID(part_id);
+		if (node_id == g_node_id) needs_complete_accesses_cnt++;
+	}
+}
+
 RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 
 	RC rc = RCOK;
@@ -230,7 +240,7 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 		start_rw_time = get_sys_clock();
 #endif
 	}
-	
+	collectAccessesCnt();
 	uint64_t starttime = get_sys_clock();
 
 	while(rc == RCOK && !is_done()) {
@@ -258,6 +268,9 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	#if OPEN_TIME_CONTROL
 		return WAIT;
 	#else 
+		if (CC_ALG == NCC && rc == RCOK) {
+			rc = validate(yield, cor_id);
+		}
 		#if EARLY_PREPARE
 			if(rc == RCOK && 
 				(CC_ALG == NCC || has_local_write())){

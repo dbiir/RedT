@@ -93,6 +93,7 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 		rc = send_remote_subtxn();
 #endif
 	}
+	// collectAccessesCnt();
 
 	while(rc == RCOK && !is_done()) {
 		rc = run_txn_state(yield, cor_id);
@@ -102,27 +103,39 @@ RC TPCCTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 	txn_stats.process_time_short += curr_time - starttime;
 
 	// ! NCC需要等待paxos日志同步
-	return WAIT;
-	#if 0
-		if (rc != Abort) {
-			if(rsp_cnt > 0) {
+	#if OPEN_TIME_CONTROL
+		return WAIT;
+	#else 
+		if (CC_ALG == NCC && rc == RCOK) {
+			rc = validate(yield, cor_id);
+		}
+		#if EARLY_PREPARE
+			if(rc == RCOK && 
+				(CC_ALG == NCC || has_local_write())){
+				//send log message
+				log_replica(RLOG, GET_NODE_ID(get_txn_id()));
 				return WAIT;
-			} else {
-				if(IS_LOCAL(get_txn_id())) {
-					INC_STATS(get_thd_id(), trans_read_write_count, 1);
-					INC_STATS(get_thd_id(), trans_read_write_time, get_sys_clock() - start_rw_time);
-					start_logging_time = get_sys_clock();
+			}
+		#endif
+		if(!IS_LOCAL(get_txn_id())){
+			if(rc == Abort) rc = abort(yield, cor_id);
+			return rc;
+		}
+		if(rc == Abort){
+			rc = start_abort(yield, cor_id);
+		}else{
+			if(rsp_cnt > 0) {
+				// printf("SI wait remote %ld cnp %ld\n",get_txn_id(),rsp_cnt);
+				return WAIT;
+			}
+			if(is_done()){
+					#if CC_ALG == WOUND_WAIT
+						txn_state = STARTCOMMIT;
+					#endif
+					rc = start_commit(yield, cor_id);
 				}
 			}
-		}
-		if(IS_LOCAL(get_txn_id())) {
-			if(is_done() && rc == RCOK)
-				rc = start_commit(yield, cor_id);
-			else if(rc == Abort)
-				rc = start_abort(yield, cor_id);
-		}
-
-		return rc;
+			return rc;
 	#endif
 }
 
@@ -391,6 +404,21 @@ RC TPCCTxnManager::send_remote_subtxn() {
 		}
 	}
 	return rc;
+}
+
+void TPCCTxnManager::collectAccessesCnt() {
+	TPCCQuery* tpcc_query = (TPCCQuery*) query;
+	if (tpcc_query->txn_type == TPCC_PAYMENT) {
+		needs_complete_accesses_cnt = 3;
+	}
+	if (tpcc_query->txn_type == TPCC_NEW_ORDER) {
+		needs_complete_accesses_cnt = 3;
+		for(uint64_t i = 0; i < tpcc_query->ol_cnt; i++) {
+			if (is_local_item(i)) {
+				needs_complete_accesses_cnt += 2;
+			}
+		}
+	}
 }
 
 RC TPCCTxnManager::send_remote_request() {

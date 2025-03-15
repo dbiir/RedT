@@ -47,6 +47,9 @@ void ResponseQueues::create(uint64_t table_id, uint64_t key, row_t* row) {
 // }
 
 bool ResponseQueues::TxnCanSend(TxnManager* txn) {
+    if (txn->get_access_cnt() < txn->needs_complete_accesses_cnt) {
+        return false;
+    }
     for (uint64_t i = 0; i < txn->get_access_cnt(); i++) {
         Access* access = txn->get_access(i);
         Response* resp = access->ncc_qe->resp;
@@ -70,30 +73,37 @@ void ResponseQueues::insert(uint64_t table_id, uint64_t key, NCCQueueEntry* qe, 
     // pthread_mutex_unlock(mutx);
 }
 
-void ResponseQueues::RespTimeingControl() {
+void ResponseQueues::RespTimeingControl(yield_func_t &yield, uint64_t cor_id) {
     uint64_t resp_time_start = get_sys_clock();
     for (auto it = qs.begin(); it != qs.end(); it++) {
         NCCQueue* q = it->second;
         if (q->q.empty()) continue;
         row_t* row = q->row;
-        RespTimeingControlInner(q, row);
+        RespTimeingControlInner(q, row,yield, cor_id);
     }
     INC_STATS(0, ncc_resp_time, get_sys_clock() - resp_time_start);
 }
 
-void ResponseQueues::RespTimeingControl(uint64_t thd_id) {
+void ResponseQueues::RespTimeingControl(uint64_t thd_id,yield_func_t &yield, uint64_t cor_id) {
     uint64_t resp_time_start = get_sys_clock();
     uint64_t index = thd_id % NCC_THREAD_CNT;
     for (auto it : v_qs[index]) {
         NCCQueue* q = it;
         if (q->q.empty()) continue;
         row_t* row = q->row;
-        RespTimeingControlInner(q, row);
+        RespTimeingControlInner(q, row,yield,cor_id);
     }
     // INC_STATS(thd_id, ncc_resp_time, get_sys_clock() - resp_time_start);
 }
 
-void ResponseQueues::RespTimeingControlInner(NCCQueue *q, row_t * row) {
+void ResponseQueues::RespTimeingControl(uint64_t table_id, uint64_t key, row_t * row,yield_func_t &yield, uint64_t cor_id) {
+    // pthread_mutex_lock(mutx);
+    std::pair<uint64_t, uint64_t> tk = std::make_pair(table_id, key);
+    NCCQueue* q = qs[tk];
+    RespTimeingControlInner(q, row,yield,cor_id);
+}
+
+void ResponseQueues::RespTimeingControlInner(NCCQueue *q, row_t * row,yield_func_t &yield, uint64_t cor_id) {
     if (!OPEN_TIME_CONTROL) return;
     assert(q != nullptr);
     if (q->q.empty()) return;
@@ -108,9 +118,9 @@ void ResponseQueues::RespTimeingControlInner(NCCQueue *q, row_t * row) {
                 (head->txn_access->type == WR && new_head->txn_access->type == RD)) {
             q->q.pop_front();
             #if CC_ALG == NCC
-            row->manager->non_blocking_execute(new_head->txn_ts, new_head->txn_access->type, new_head->txn_access->data, new_head->txn_access, new_head->txn_access->txn);
+            row->manager->non_blocking_execute(new_head->txn_ts, new_head->txn_access->type, new_head->txn_access->data, new_head->txn_access, new_head->txn_access->txn,yield,cor_id);
             #endif
-            // delete new_head;
+            delete new_head;
             new_head = q->q.front();
         }
         head = q->q.front();
@@ -130,7 +140,7 @@ void ResponseQueues::RespTimeingControlInner(NCCQueue *q, row_t * row) {
             resp->can_send = true;
         }
         TxnManager* txn_man = cur->txn_access->txn;
-        if (!txn_man->has_send_rlog && 
+        if (!txn_man->has_send_rlog && txn_man->get_rc() == RCOK &&
             TxnCanSend(txn_man)) {
             assert(!txn_man->finish_read_write);
             txn_man->log_replica(RLOG, GET_NODE_ID(txn_man->get_txn_id()));
@@ -148,14 +158,28 @@ void ResponseQueues::RespTimeingControlInner(NCCQueue *q, row_t * row) {
         }
         cur = next;
     }
+    if (OPEN_DEAD_LOCK_HANDLE) {
+        while (it != q->q.end()) {
+            NCCQueueEntry* next = *it;
+            if (next->txn_ts.time < q->maxTs.time) {
+            // if (next->resp->tr.time < q->maxTs.time) {
+                TxnManager* txn_man = next->txn_access->txn;
+                txn_man->set_rc(Abort);
+                if (IS_LOCAL(txn_man->get_txn_id())) {
+                    DEBUG_T("NCC %d enter dead lock handle and abort to node\n", txn_man->get_txn_id());
+                    txn_man->start_abort(yield, cor_id);
+                } else {
+                    DEBUG_T("NCC %d enter dead lock handle and send abort RACK_PREP to node %ld\n", txn_man->get_txn_id(), txn_man->get_return_node());
+                    msg_queue.enqueue(txn_man->get_thd_id(), Message::create_message(txn_man,RACK_PREP),txn_man->get_return_node());
+                }
+                
+                // 怎么把next从当前list中删除
+                next->q_status = NCC_ABORT;
+            }
+            it++;
+        }
+    }
     q->unlock();
-}
-
-void ResponseQueues::RespTimeingControl(uint64_t table_id, uint64_t key, row_t * row) {
-    // pthread_mutex_lock(mutx);
-    std::pair<uint64_t, uint64_t> tk = std::make_pair(table_id, key);
-    NCCQueue* q = qs[tk];
-    RespTimeingControlInner(q, row);
 }
 
 RC Ncc::async_commit_or_abort(TxnManager * txn, bool is_commit) {
@@ -165,14 +189,18 @@ RC Ncc::async_commit_or_abort(TxnManager * txn, bool is_commit) {
         row_t * row = txn->get_access(i)->orig_row;
         if (txn->get_access(i)->type == WR) {
             #if CC_ALG == NCC
-            txn->get_access(i)->data->manager->async_commit_or_abort_on_row(txn, is_commit);
+            txn->get_access(i)->data->manager->async_commit_or_abort_on_row(txn, is_commit, txn->get_access(i)->nversion);
             #endif
         }
     }
-    // 
     for (UInt32 i = 0; i < txn->get_access_cnt(); i++) {
         Access * access = txn->get_access(i);
         access->ncc_qe->q_status = is_commit ? NCCStatus::NCC_COMMIT : NCCStatus::NCC_ABORT;
+        if (!OPEN_TIME_CONTROL) {
+            // row_t* row = access->orig_row;
+            // std::pair<uint64_t, uint64_t> tk = std::make_pair(row->get_table()->get_table_id(), row->get_primary_key());
+            // resp_qs.qs[tk]->remove(access->ncc_qe);
+        }
         // resp_qs.RespTimeingControl(access->ncc_qe->resp->row->get_table()->get_table_id(),access->ncc_qe->resp->row->get_primary_key(), access->ncc_qe->resp->row);
     }
     // DEBUG_T("NCC %d enter final time control\n", txn->get_txn_id());
@@ -199,23 +227,14 @@ bool Ncc::safe_guard_check(TxnManager * txn, NCCTimeStamp &commitT) {
     NCCTimeStamp minTrs(UINT64_MAX,UINT64_MAX);
 
     for (auto &resp : resps) {
-        DEBUG_T("NCC traverse %d maxTws %lu-%lu\n", txn->get_txn_id(), maxTws.time, resp->tw.time);
+        // DEBUG_T("NCC traverse %d maxTws %lu-%lu\n", txn->get_txn_id(), maxTws.time, resp->tw.time);
         maxTws = maxNCCTimeStamp(maxTws, resp->tw);
-        DEBUG_T("NCC traverse %d minTrs %lu-%lu\n", txn->get_txn_id(), minTrs.time, resp->tr.time);
+        // DEBUG_T("NCC traverse %d minTrs %lu-%lu\n", txn->get_txn_id(), minTrs.time, resp->tr.time);
         minTrs = minNCCTimeStamp(minTrs, resp->tr);
     }
-
-    // for (auto &T : Tws) {
-    //     DEBUG_T("NCC traverse %d maxTws %lu-%lu\n", txn->get_txn_id(), maxTws.time, T.time);
-    //     maxTws = maxNCCTimeStamp(maxTws, T);
-    // }
-    DEBUG_T("NCC traverse %d maxTws %lu-%lu\n", txn->get_txn_id(), maxTws.time, txn->get_MaxTw().time);
+    // DEBUG_T("NCC traverse %d maxTws %lu-%lu\n", txn->get_txn_id(), maxTws.time, txn->get_MaxTw().time);
     maxTws = maxNCCTimeStamp(maxTws, txn->get_MaxTw());
-    // for (auto &T : Trs) {
-    //     DEBUG_T("NCC traverse %d minTrs %lu-%lu\n", txn->get_txn_id(), minTrs.time, T.time);
-    //     minTrs = minNCCTimeStamp(minTrs, T);
-    // }
-    DEBUG_T("NCC traverse %d minTrs %lu-%lu\n", txn->get_txn_id(), minTrs.time, txn->get_MinTr().time);
+    // DEBUG_T("NCC traverse %d minTrs %lu-%lu\n", txn->get_txn_id(), minTrs.time, txn->get_MinTr().time);
     minTrs = minNCCTimeStamp(minTrs, txn->get_MinTr());
     
     DEBUG_T("NCC validate %d maxTws %lu minTrs %lu\n", txn->get_txn_id(), maxTws.time, minTrs.time);
@@ -232,8 +251,8 @@ bool Ncc::safe_guard_check(TxnManager * txn, NCCTimeStamp &commitT) {
 };
 
 void Ncc::get_rw_set(TxnManager * txn, std::vector<Response *> &resps) {
-        UInt32 n = 0, m = 0;
-        for (uint64_t i = 0; i < txn->get_access_cnt(); i++) {
-            resps.push_back(txn->get_access(i)->ncc_qe->resp);
-        }
+    UInt32 n = 0, m = 0;
+    for (uint64_t i = 0; i < txn->get_access_cnt(); i++) {
+        resps.push_back(txn->get_access(i)->ncc_qe->resp);
     }
+}

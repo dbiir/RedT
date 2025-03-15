@@ -144,7 +144,7 @@ void YCSBWorkload::init_table_parallel() {
 		pthread_create(&p_thds[i], NULL, threadInitTable, this);
 	}
 	threadInitTable(this);
-
+	// resp_qs.qs.rehash(g_synth_table_size/10);
 	for (uint32_t i = 0; i < g_init_parallelism - 1; i++) {
 		int rc = pthread_join(p_thds[i], NULL);
 		//printf("thread %d complete\n", i);

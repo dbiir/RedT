@@ -52,6 +52,7 @@ void network_test_recv();
 void * run_thread(void *);
 void * run_co_thread(void *);
 void * run_nco_thread(void *);
+void * run_nco_resp_thread(void *id) ;
 WorkerThread * worker_thds;
 WorkerNumThread * worker_num_thds;
 RespQsThread* resp_qs_thds;
@@ -404,7 +405,7 @@ int main(int argc, char *argv[]) {
 #if CC_ALG == NCC
 	for (int i = 0; i < NCC_THREAD_CNT; i++) {
 		resp_qs_thds[i].init(id,g_node_id,m_wl);
-		pthread_create(&p_thds[id++], NULL, run_thread, (void *)&resp_qs_thds[i]);
+		pthread_create(&p_thds[id++], NULL, run_nco_resp_thread, (void *)&resp_qs_thds[i]);
 	}
 #endif
 	for (uint64_t i = 0; i < all_thd_cnt; i++) pthread_join(p_thds[i], NULL);
@@ -439,12 +440,18 @@ int main(int argc, char *argv[]) {
 }
 
 void * run_thread(void * id) {
-		Thread * thd = (Thread *) id;
+	Thread * thd = (Thread *) id;
 	thd->run();
 	return NULL;
 }
 void * run_nco_thread(void * id) {
-		WorkerThread * thd = (WorkerThread *) id;
+	WorkerThread * thd = (WorkerThread *) id;
+	thd->no_routines();
+	thd->start_routine();
+	return NULL;
+}
+void * run_nco_resp_thread(void *id) {
+	RespQsThread * thd = (RespQsThread *) id;
 	thd->no_routines();
 	thd->start_routine();
 	return NULL;

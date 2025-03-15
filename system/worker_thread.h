@@ -39,7 +39,7 @@ public:
     void calvin_wrapup(yield_func_t &yield, uint64_t cor_id);
     RC process_rfin(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rfwd(yield_func_t &yield, Message * msg, uint64_t cor_id);
-    RC process_rack_rfin(Message * msg);
+    RC process_rack_rfin(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rack_prep(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rack_log(yield_func_t &yield, Message * msg, uint64_t cor_id);
     RC process_rlog(yield_func_t &yield, Message * msg, uint64_t cor_id);
@@ -102,8 +102,14 @@ public:
 
 class RespQsThread : public Thread {
 public:
-    RC run();
+    void no_routines();
+    RC run(){}
+    RC run(yield_func_t &yield, uint64_t cor_id);
     void setup();
+    void start_routine() {
+        printf("start routine 0\n");
+        _routines[0]();
+    }
 
 };
 

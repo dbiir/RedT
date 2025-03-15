@@ -87,6 +87,7 @@ private:
   bool is_local_request(uint64_t idx) ;
   RC send_remote_request() ;
   RC send_remote_subtxn();
+  void collectAccessesCnt();
   void get_num_msgs_statistics();
   row_t * row;
 	YCSBWorkload * _wl;

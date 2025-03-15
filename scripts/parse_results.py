@@ -79,6 +79,7 @@ if 'avg_num_msgs_commit' in summary:
 if 'avg_num_rts_commit' in summary:
     u = sum(summary['avg_num_rts_commit'])
 
+# tput,abort,avg_trans_total_run_time,avg_trans_commit_total_run_time,trans_read_write_count,trans_fin_count,trans_read_write_time,trans_fin_time,max_num_msgs_rw,max_num_msgs_prep,max_num_msgs_commit,avg_num_msgs_rw,avg_num_msgs_prep,avg_num_msgs_commit,avg_num_rts_commit
 print a, b, e, i, j, k, m, n, o, s, t, z, p, q, u
 # f, g / h
 # print a, b, f, g, h

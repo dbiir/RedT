@@ -3,9 +3,9 @@
 # sh set_delay.sh 20 5 5 0 #40
 # python run_experiments.py -e -c vcloud ycsb_thread
 # sleep 30
-# python run_experiments.py -e -c vcloud ycsb_skew
+# python run_experiments.py -e -c vcloud ycsb_early_skew -l 20 0
 # sleep 30
-python run_experiments.py -e -c vcloud ycsb_cross_dc
+python run_experiments.py -e -c vcloud ycsb_early_cross_dc
 # sh set_delay.sh 20
 # python run_experiments.py -e -c vcloud ycsb_cross_dc
 # sleep 30
