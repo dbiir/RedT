@@ -19,8 +19,8 @@
 # sh set_delay.sh 18 #50
 # python run_experiments.py -e -c vcloud ycsb_network_delay
 # sh set_delay.sh 20 #50
-sh set_delay.sh 20 80 0 0
-python run_experiments.py -e -c vcloud ycsb_partitions
+# sh set_delay.sh 20 80 0 0
+# python run_experiments.py -e -c vcloud ycsb_partitions
 # sh set_delay.sh 1 #20
 # python run_experiments.py -e -c vcloud ycsb_network_delay
 # sh set_delay.sh 2 #30

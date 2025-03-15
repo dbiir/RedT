@@ -28,6 +28,8 @@
 #include "txn.h"
 #include "mem_alloc.h"
 #include "tpcc_const.h"
+#include "index_hash.h"
+#include "index_btree.h"
 
 RC TPCCWorkload::init() {
 	Workload::init();
@@ -240,6 +242,44 @@ RC TPCCWorkload::get_txn_man(TxnManager *& txn_manager) {
 	new(txn_manager) TPCCTxnManager();
 	//txn_manager->init( this);
 	return RCOK;
+}
+
+void TPCCWorkload::check_consistency() {
+	for (UInt32 wid = 1; wid <= g_num_wh; wid ++) {
+		if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) continue;
+		double wh_sum = 0;
+		INDEX * index = i_warehouse;
+		uint64_t key = wid;
+		itemid_t * item = nullptr;
+		index->index_read(key, item, wh_to_part(wid), 1);
+		// itemid_t * item = index->index_read(index, key, wh_to_part(wid));
+		row_t * row = ((row_t *)item->location);
+		row->get_value(W_YTD, wh_sum);
+
+		double dist_sum = get_tab_dist_account_sum(wid);
+		if (dist_sum != wh_sum) {
+			printf("sum of balances inconsistency!! warehouse account=%ld, district account sum=%ld\n",wh_sum,dist_sum);
+			assert(dist_sum == wh_sum);
+		}
+	}
+	printf("Sum of balances check complete, success\n");
+	return ;
+}
+
+double TPCCWorkload::get_tab_dist_account_sum(uint64_t wid) {
+	double account_sum = 0;
+	if(GET_NODE_ID(wh_to_part(wid)) != g_node_id) return 0;
+	for (uint64_t did = 1; did <= g_dist_per_wh; did++) {
+		INDEX * index = i_district;
+		uint64_t key = distKey(did, wid);
+		itemid_t * item = nullptr;
+		index->index_read(key, item, wh_to_part(wid), 1);
+		row_t * row = ((row_t *)item->location);
+		double ytd = 0;
+		row->get_value(D_YTD, ytd);
+		account_sum+=ytd;
+	}
+	return account_sum;
 }
 
 void TPCCWorkload::init_tab_item(int id) {

@@ -89,6 +89,9 @@ public:
 	bool ** delivering;
 //	bool volatile ** delivering;
 
+  double get_tab_dist_account_sum(uint64_t wid);
+  void check_consistency();
+
 private:
 	uint64_t num_wh;
 	void init_tab_item(int id);
@@ -99,6 +102,8 @@ private:
 	void init_tab_cust(int id, uint64_t d_id, uint64_t w_id);
 	void init_tab_hist(uint64_t c_id, uint64_t d_id, uint64_t w_id);
 	void init_tab_order(int id,uint64_t d_id, uint64_t w_id);
+
+
 
 	UInt32 perm_count;
 	uint64_t * perm_c_id;

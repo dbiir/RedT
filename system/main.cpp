@@ -400,6 +400,11 @@ int main(int argc, char *argv[]) {
 	//malloc_stats_print(NULL, NULL, NULL);
 	printf("\n");
 	fflush(stdout);
+	// 增加一段测试
+	#if WORKLOAD == TPCC
+		TPCCWorkload* tpcc_wl = (TPCCWorkload*)m_wl;
+		tpcc_wl->check_consistency();
+	#endif
 	// Free things
 	//tport_man.shutdown();
 	m_wl->index_delete_all();

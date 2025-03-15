@@ -166,7 +166,7 @@
 #define MSG_TIMEOUT 5000000000UL // in ns
 #define NETWORK_TEST false
 #define NETWORK_DELAY_TEST false
-#define NETWORK_DELAY 0UL
+#define NETWORK_DELAY 100000000UL
 
 #define MAX_QUEUE_LEN NODE_CNT * 2
 
@@ -181,7 +181,7 @@
 
 #define ISOLATION_LEVEL SERIALIZABLE
 
-#define CC_ALG SI
+#define CC_ALG NO_WAIT
 
 #define YCSB_ABORT_MODE false
 #define QUEUE_C  APACITY_NEW 1000000
@@ -325,12 +325,12 @@
 #define ACCESS_PERC 0.03
 #define INIT_PARALLELISM 1
 #define SYNTH_TABLE_SIZE 8388608
-#define ZIPF_THETA 0.2
+#define ZIPF_THETA 0.9
 #define TXN_WRITE_PERC 0.8
 #define TUP_WRITE_PERC 0.5
 #define SCAN_PERC           0
 #define SCAN_LEN          20
-#define PART_PER_TXN 2
+#define PART_PER_TXN 4
 #define DC_PER_TXN 2
 #define PERC_MULTI_PART     MPR
 #define REQ_PER_QUERY 10

@@ -71,8 +71,8 @@ def ycsb_early_cross_dc():
     load = [240]
     tcnt = [30]  #THREAD_CNT
     skew = [0.2]
-    # cross_dc_perc = [1] 
-    cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+    cross_dc_perc = [1] 
+    # cross_dc_perc = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
 
 
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT","CROSS_DC_TXN_PERC"]
@@ -108,12 +108,12 @@ def ycsb_network_delay():
     tapir=['false']
     early=['false']
     base_table_size=1048576
-    txn_write_perc = [0.8]
+    txn_write_perc = [1]
     tup_write_perc = [0.5]
     # tup_write_perc = [1]
     load = [240]
     tcnt = [30]  #THREAD_CNT
-    skew = [0.2]
+    skew = [0.8]
     cross_dc_perc = [1.0]
     # network_delay = ['50000000UL','100000000UL','150000000UL','200000000UL','250000000UL','300000000UL','350000000UL','400000000UL','450000000UL','500000000UL'] 
     network_delay = ['0UL'] 
@@ -152,7 +152,7 @@ def ycsb_skew():
     nnodes = [8]
 
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['SI',"NO_WAIT"]
     tapir=['false']
     early=['false']
     # base_table_size=1048576*10
@@ -164,9 +164,9 @@ def ycsb_skew():
     load = [240] #node_cnt*tcnt
 
     tcnt = [30]  #THREAD_CNT
-    # skew = [0.0,0.2,0.4,0.5]
-    skew = [0.0,0.2,0.4,0.5,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
     # skew = [0.6,0.65,0.7,0.75,0.8,0.85,0.9]
+    skew = [0.0,0.2,0.4,0.5,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
+    # skew = [0.7]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","SYNTH_TABLE_SIZE","TUP_WRITE_PERC","TXN_WRITE_PERC","MAX_TXN_IN_FLIGHT","USE_TAPIR","EARLY_PREPARE","ZIPF_THETA","THREAD_CNT"]
     exp = [[wl,n,algo,base_table_size*n,tup_wr_perc,txn_wr_perc,ld,ir,er,sk,thr] for thr,txn_wr_perc,tup_wr_perc,ld,n,sk,algo,ir,er in itertools.product(tcnt,txn_write_perc,tup_write_perc,load,nnodes,skew,algos,tapir,early)]
     return fmt,exp
@@ -176,7 +176,7 @@ def ycsb_early_skew():
     nnodes = [8]
 
     # algos=['NO_WAIT']
-    algos=['SI']
+    algos=['SI',"NO_WAIT"]
     tapir=['false']
     early=['true']
     # base_table_size=1048576*10
@@ -383,7 +383,8 @@ def ycsb_scaling_early():
 
 def tpcc_scaling():
     wl = 'TPCC'
-    nnodes = [4,8,12,16]
+    nnodes = [8]
+    # nnodes = [4,8,12,16]
     tapir=['false']
     early=['false']
     # algos=['NO_WAIT']
@@ -393,7 +394,7 @@ def tpcc_scaling():
     wh=16
     # wh=64
     load = [200]
-    tcnt = [12]
+    tcnt = [24]
     ctcnt = [1]
     fmt = ["WORKLOAD","NODE_CNT","CC_ALG","PERC_PAYMENT","NUM_WH","CLIENT_NODE_CNT","USE_TAPIR","EARLY_PREPARE","CENTER_CNT","MAX_TXN_IN_FLIGHT","THREAD_CNT","CLIENT_THREAD_CNT"]
     exp = [[wl,n,cc,pp,wh*n,1,ir,er,3,thr*n,thr,cthr] for thr,cthr,tif,pp,n,cc,ir,er in itertools.product(tcnt,ctcnt,load,npercpay,nnodes,algos,tapir,early)]
@@ -453,9 +454,6 @@ def tpcc_scaling_early():
     nnodes = [4,8,12,16]
     tapir=['false']
     early=['true']
-    # nnodes = [16,20]
-    # nnodes = [4,8,12,16,20]
-    # nalgos=['NO_WAIT','WAIT_DIE','MAAT','MVCC','TIMESTAMP','CALVIN']
     # algos=['NO_WAIT']
     algos=['SI']
     npercpay=[0.489]
@@ -539,7 +537,7 @@ experiment_map = {
     'tpcc_scaling':tpcc_scaling,
     'tpcc_scaling_n':tpcc_scaling_n,
     'tpcc_scaling_p':tpcc_scaling_p,
-    'tpcc_scaling_early':tpcc_scaling,
+    'tpcc_scaling_early':tpcc_scaling_early,
     'tpcc_scaling_n_early':tpcc_scaling_n_early,
     'tpcc_scaling_p_early':tpcc_scaling_p_early
 }
@@ -565,7 +563,7 @@ configs = {
     "TPORT_TYPE":"IPC",
     "TPORT_PORT":"18000",
     "PART_CNT": "NODE_CNT",
-    "PART_PER_TXN": 2,
+    "PART_PER_TXN": 4,
     "DC_PER_TXN": 2,
     "MAX_TXN_IN_FLIGHT": 10000,
     "NETWORK_DELAY": '100000000UL',

@@ -292,9 +292,9 @@ RC YCSBTxnManager::run_txn(yield_func_t &yield, uint64_t cor_id) {
 			return WAIT;
 		}
 		if(is_done()){
-#if CC_ALG == WOUND_WAIT
+		#if CC_ALG == WOUND_WAIT
 			txn_state = STARTCOMMIT;
-#endif
+		#endif
 			rc = start_commit(yield, cor_id);
 		}
 	}

@@ -575,18 +575,35 @@ RC WorkerThread::process_rack_log(yield_func_t &yield, Message * msg, uint64_t c
       if(txn_man->get_rc()==Abort) return Abort;
       // if(txn_man->aborted) return Abort;
 #else
-      assert(txn_man->get_rc()==RCOK);
+      // assert(txn_man->get_rc()==RCOK);
 #endif
-#if CO_LOG
-      txn_man->send_colog_messages();
-      rc = WAIT_REM;
-      return rc;
-#endif
-      txn_man->send_finish_messages();
-      assert(txn_man->get_local_log());
-      txn_man->log_replica(RFIN_LOG, g_node_id); 
-      rc = WAIT_REM;
-      return rc;
+      if(txn_man->get_rc() == RCOK) {
+        rc = txn_man->validate(yield, cor_id);
+      }
+      if(rc == Abort || txn_man->get_rc() == Abort) {
+        txn_man->txn->rc = Abort;
+        rc = Abort;
+      }
+      if(CC_ALG == SI) {
+        si_man.gene_finish_ts(txn_man);
+      }
+      if(rc == Abort) {
+      #if !EARLY_PREPARE
+          txn_man->send_finish_messages();
+          txn_man->abort(yield, cor_id);
+      #endif
+      } else {
+        #if CO_LOG
+          txn_man->send_colog_messages();
+          rc = WAIT_REM;
+          return rc;
+        #endif
+        txn_man->send_finish_messages();
+        assert(txn_man->get_local_log());
+        txn_man->log_replica(RFIN_LOG, g_node_id); 
+        rc = WAIT_REM;
+        return rc;
+      }
     }else{
       DEBUG_T("%d:%d send rack prep to %d\n", g_node_id, txn_man->get_txn_id(), txn_man->get_return_node());
 #if EARLY_PREPARE
@@ -1053,34 +1070,41 @@ RC WorkerThread::process_rtxn_cont(yield_func_t &yield, Message * msg, uint64_t 
 }
 
 RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t cor_id) {
-    DEBUG_T("RPREP %ld\n",msg->get_txn_id());
-    RC rc = RCOK;
-    txn_man->abort_cnt = msg->current_abort_cnt;
-#if USE_REPLICA
-#if USE_TAPIR
-#if TAPIR_DEBUG
-    printf("%d:%d send prepare ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
-#endif
-    pthread_mutex_lock(&log_lock);
-    log_count ++;
-    log_content = log_count;
-    pthread_mutex_unlock(&log_lock);
-    msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
-    return rc;
-#else
-    txn_man->log_replica(RLOG, msg->return_node_id);
-    rc = WAIT_REM;
-    return rc;
-#endif
-#else
-#if CC_ALG == TICTOC
-    // Integrate bounds
-    TxnManager * txn_man = txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),0);
-    PrepareMessage* pmsg = (PrepareMessage*)msg;
-    txn_man->_min_commit_ts = pmsg->_min_commit_ts;
-    // txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ?
-    //                         txn_man->_min_commit_ts : qmsg->_min_commit_ts;
-#endif
+  DEBUG_T("RPREP %ld\n",msg->get_txn_id());
+  RC rc = RCOK;
+  txn_man->abort_cnt = msg->current_abort_cnt;
+  #if USE_REPLICA
+    #if USE_TAPIR
+      #if TAPIR_DEBUG
+        printf("%d:%d send prepare ack to %d\n", g_node_id, msg->get_txn_id(), GET_NODE_ID(msg->get_txn_id()));
+      #endif
+        pthread_mutex_lock(&log_lock);
+        log_count ++;
+        log_content = log_count;
+        pthread_mutex_unlock(&log_lock);
+        msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+        return rc;
+    #else
+      rc = txn_man->validate(yield, cor_id);
+      txn_man->set_rc(rc);
+      if (rc == RCOK){
+        txn_man->log_replica(RLOG, msg->return_node_id);
+        rc = WAIT_REM;
+      } else {
+        msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+        txn_man->abort(yield, cor_id);
+      }
+      return rc;
+    #endif
+  #else
+    #if CC_ALG == TICTOC
+      // Integrate bounds
+      TxnManager * txn_man = txn_table.get_transaction_manager(get_thd_id(),msg->get_txn_id(),0);
+      PrepareMessage* pmsg = (PrepareMessage*)msg;
+      txn_man->_min_commit_ts = pmsg->_min_commit_ts;
+      // txn_man->_min_commit_ts = txn_man->_min_commit_ts > qmsg->_min_commit_ts ?
+      //                         txn_man->_min_commit_ts : qmsg->_min_commit_ts;
+    #endif
     // Validate transaction
     rc  = txn_man->validate(yield, cor_id);
     txn_man->set_rc(rc);
@@ -1090,7 +1114,7 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
       txn_man->abort(yield, cor_id);
     }
     return rc;
-#endif
+  #endif
 }
 
 RC WorkerThread::process_rco_log(yield_func_t &yield, Message * msg, uint64_t cor_id) {

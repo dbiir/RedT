@@ -310,7 +310,7 @@ RC row_t::get_row(yield_func_t &yield,access_t type, TxnManager *txn, Access *ac
 	if (type == WR) {
 		rc = this->manager->access(txn, P_REQ, NULL);
 		if (rc != RCOK) goto end;
-	}
+	} 
 	if ((type == WR && rc == RCOK) || type == RD || type == SCAN) {
 		rc = this->manager->access(txn, R_REQ, NULL);
 

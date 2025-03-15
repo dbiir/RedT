@@ -42,6 +42,7 @@ RC si::validate(TxnManager * txn) {
         if (wset->rows[i]->manager->validate_last_commit(txn) == Abort) {
             // printf("si Validate abort, %ld\n",txn->get_txn_id());
             rc = Abort;
+            break;
         }
     }
 
