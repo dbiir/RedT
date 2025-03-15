@@ -787,7 +787,7 @@ RC WorkerThread::process_rack_prep(yield_func_t &yield, Message * msg, uint64_t 
 #endif
   // Done waiting
 #if USE_REPLICA
-  assert(txn_man->get_rc() == RCOK);
+  // assert(txn_man->get_rc() == RCOK);
 #endif
   if(txn_man->get_rc() == RCOK) {
     rc = txn_man->validate(yield, cor_id);
@@ -1058,7 +1058,12 @@ RC WorkerThread::process_rprepare(yield_func_t &yield, Message * msg, uint64_t c
     log_count ++;
     log_content = log_count;
     pthread_mutex_unlock(&log_lock);
+    rc = txn_man->validate(yield, cor_id);
+    txn_man->set_rc(rc);
     msg_queue.enqueue(get_thd_id(),Message::create_message(txn_man,RACK_PREP),msg->return_node_id);
+    if (rc == Abort){
+      txn_man->abort(yield, cor_id);
+    }
     return rc;
 #else
     txn_man->log_replica(msg->return_node_id,false);
